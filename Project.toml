@@ -1,0 +1,13 @@
+name = "Pico"
+uuid = "0dc23a59-5ffb-49af-b6bd-932a8ae77adf"
+authors = ["Aaron Trowbridge <aaron.j.trowbridge@gmail.com> and contributors"]
+version = "0.1.0"
+
+[compat]
+julia = "1.8"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
