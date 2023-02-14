@@ -2,7 +2,7 @@
 CurrentModule = Pico
 ```
 
-# Pico
+# Pico.jl
 
 Documentation for [Pico](https://github.com/aarontrowbridge/Pico.jl).
 
@@ -10,5 +10,7 @@ Documentation for [Pico](https://github.com/aarontrowbridge/Pico.jl).
 ```
 
 ```@autodocs
-Modules = [Pico]
+Modules = [Pico] 
 ```
+
+
