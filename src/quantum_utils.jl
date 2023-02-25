@@ -23,7 +23,7 @@ using LinearAlgebra
     kronicker product utility
 """
 
-⊗(A, B) = kron(A, B)
+⊗(A::AbstractVecOrMat, B::AbstractVecOrMat) = kron(A, B)
 
 
 """
