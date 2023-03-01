@@ -128,6 +128,17 @@ function MultiModeSystem(
     κ=2π * 4e-6,
     χGF=2π * -1.01540302914e-3,
     α=-2π * 0.143,
+    α_ef = -143.277e-3 * 2π,
+    α_fh = -162.530e-3 * 2π,
+    χ₂  = -0.63429e-3 * 2π,
+    χ₂_gf = -1.12885e-3 * 2π,
+    χ₂_gh = -1.58878e-3 * 2π,
+    χ₃ = -0.54636e-3 * 2π,
+    χ₃_gf = -1.017276e-3 * 2π,
+    χ₃_gh = -1.39180e-3 * 2π,
+    κ₂ = 5.23e-6 * 2π,
+    κ₃ = 4.19e-6 * 2π,
+    κ_cross = 3.6e-6 * 2π,
     n_cavities=1 # TODO: add functionality for multiple cavities
 )
     @assert transmon_levels ∈ 2:4
@@ -146,19 +157,29 @@ function MultiModeSystem(
         :n_cavities => n_cavities,
     )
 
+    transmon_g = [1; zeros(transmon_levels - 1)]
+    transmon_e = [0; 1; zeros(transmon_levels - 2)]
+
+    A = Diagonal([0., 0., α_ef, α_ef + α_fh])
+
+    # --------------------------------------------------
+    # Drift Hamiltonian Term
+    # --------------------------------------------------
+
     if transmon_levels == 2
 
-        transmon_g = [1, 0]
-        transmon_e = [0, 1]
-
         H_drift =
-            2χ * kron(
-                transmon_e * transmon_e',
-                number(cavity_levels)
-            ) + κ / 2 * kron(
-                I(transmon_levels),
-                quad(cavity_levels)
-            )
+            2*χ₃ * kron(transmon_e * transmon_e', number(cavity_levels)) +
+            κ₃/2 * kron(I(transmon_levels), quad(cavity_levels))
+
+        # H_drift =
+        #     2χ * kron(
+        #         transmon_e * transmon_e',
+        #         number(cavity_levels)
+        #     ) + κ / 2 * kron(
+        #         I(transmon_levels),
+        #         quad(cavity_levels)
+        #     )
 
         if lab_frame
             H_drift += ωq * kron(
@@ -169,77 +190,35 @@ function MultiModeSystem(
                 number(cavity_levels)
             )
         end
-
-
-        if lab_frame
-            H_drive_transmon = kron(
-                create(transmon_levels) + annihilate(transmon_levels),
-                I(cavity_levels)
-            )
-
-            H_drive_cavity = kron(
-                I(transmon_levels),
-                create(cavity_levels) + annihilate(cavity_levels)
-            )
-
-            H_drives = [
-                H_drive_transmon,
-                H_drive_cavity,
-            ]
-        else
-            H_drive_transmon_R = kron(
-                create(transmon_levels) + annihilate(transmon_levels),
-                I(cavity_levels)
-            )
-
-            H_drive_transmon_I = kron(
-                im * (create(transmon_levels) -
-                    annihilate(transmon_levels)),
-                I(cavity_levels)
-            )
-
-            H_drive_cavity_R = kron(
-                I(transmon_levels),
-                create(cavity_levels) + annihilate(cavity_levels)
-            )
-
-            H_drive_cavity_I = kron(
-                I(transmon_levels),
-                im * (create(cavity_levels) -
-                    annihilate(cavity_levels))
-            )
-
-            H_drives = [
-                H_drive_transmon_R,
-                H_drive_transmon_I,
-                H_drive_cavity_R,
-                H_drive_cavity_I
-            ]
-        end
-
     elseif transmon_levels == 3
 
-        transmon_g = [1, 0, 0]
-        transmon_e = [0, 1, 0]
         transmon_f = [0, 0, 1]
 
         H_drift =
-            α / 2 * kron(
-                quad(transmon_levels),
-                I(cavity_levels)
-            ) +
-            2χ * kron(
-                transmon_e * transmon_e',
-                number(cavity_levels)
-            ) +
-            2χGF * kron(
-                transmon_f * transmon_f',
-                number(cavity_levels)
-            ) +
-            κ / 2 * kron(
-                I(transmon_levels),
-                quad(cavity_levels)
-            )
+            2*χ₃ * kron(transmon_e*transmon_e', number(cavity_levels)) +
+            2*χ₃_gf * kron(transmon_f*transmon_f', number(cavity_levels)) +
+            κ₃/2 * kron(I(transmon_levels), quad(cavity_levels)) +
+            kron(A[1:transmon_levels, 1:transmon_levels], I(cavity_levels))
+
+
+
+        # H_drift =
+        #     α / 2 * kron(
+        #         quad(transmon_levels),
+        #         I(cavity_levels)
+        #     ) +
+        #     2χ * kron(
+        #         transmon_e * transmon_e',
+        #         number(cavity_levels)
+        #     ) +
+        #     2χGF * kron(
+        #         transmon_f * transmon_f',
+        #         number(cavity_levels)
+        #     ) +
+        #     κ / 2 * kron(
+        #         I(transmon_levels),
+        #         quad(cavity_levels)
+        #     )
 
         if lab_frame
             H_drift += ωq * kron(
@@ -250,59 +229,75 @@ function MultiModeSystem(
                 number(cavity_levels)
             )
         end
+    elseif transmon_levels == 4
 
-        if lab_frame
-            H_drift += ωq * kron(
-                number(transmon_levels),
-                I(cavity_levels)
-            ) +
-            ωc * kron(
-                I(transmon_levels),
-                number(cavity_levels)
-            )
+        transmon_f = [0, 0, 1, 0]
+        transmon_h = [0, 0, 0, 1]
 
-            H_drive_transmon = kron(
-                create(transmon_levels) + annihilate(transmon_levels),
-                I(cavity_levels)
-            )
+        H_drift =
+            2*χ₃ * kron(transmon_e * transmon_e', number(cavity_levels)) +
+            2*χ₃_gf * kron(transmon_f * transmon_f', number(cavity_levels)) +
+            2*χ₃_gh * kron(transmon_h * transmon_h', number(cavity_levels)) +
+            κ₃/2 * kron(I(transmon_levels), quad(cavity_levels)) +
+            κ_cross* kron(I(transmon_levels), number(cavity_levels)) +
+            kron(A[1:transmon_levels, 1:transmon_levels], I(cavity_levels))
+    end
 
-            H_drive_cavity = kron(
-                I(transmon_levels),
-                create(cavity_levels) + annihilate(cavity_levels)
-            )
+    # --------------------------------------------------
+    # Drive Hamiltonian Terms
+    # --------------------------------------------------
 
-            H_drives = [
-                H_drive_transmon,
-                H_drive_cavity,
-            ]
-        else
-            H_drive_transmon_R = kron(
-                create(transmon_levels) + annihilate(transmon_levels),
-                I(cavity_levels)
-            )
+    if lab_frame
+        H_drift += ωq * kron(
+            number(transmon_levels),
+            I(cavity_levels)
+        ) +
+        ωc * kron(
+            I(transmon_levels),
+            number(cavity_levels)
+        )
 
-            H_drive_transmon_I = kron(
-                1im * (annihilate(transmon_levels) - create(transmon_levels)),
-                I(cavity_levels)
-            )
+        H_drive_transmon = kron(
+            create(transmon_levels) + annihilate(transmon_levels),
+            I(cavity_levels)
+        )
 
-            H_drive_cavity_R = kron(
-                I(transmon_levels),
-                create(cavity_levels) + annihilate(cavity_levels)
-            )
+        H_drive_cavity = kron(
+            I(transmon_levels),
+            create(cavity_levels) + annihilate(cavity_levels)
+        )
 
-            H_drive_cavity_I = kron(
-                I(transmon_levels),
-                1im * (annihilate(cavity_levels) - create(cavity_levels))
-            )
+        H_drives = [
+            H_drive_transmon,
+            H_drive_cavity,
+        ]
+    else
+        H_drive_transmon_R = kron(
+            create(transmon_levels) + annihilate(transmon_levels),
+            I(cavity_levels)
+        )
 
-            H_drives = [
-                H_drive_transmon_R,
-                H_drive_transmon_I,
-                H_drive_cavity_R,
-                H_drive_cavity_I
-            ]
-        end
+        H_drive_transmon_I = kron(
+            1im * (annihilate(transmon_levels) - create(transmon_levels)),
+            I(cavity_levels)
+        )
+
+        H_drive_cavity_R = kron(
+            I(transmon_levels),
+            create(cavity_levels) + annihilate(cavity_levels)
+        )
+
+        H_drive_cavity_I = kron(
+            I(transmon_levels),
+            1im * (annihilate(cavity_levels) - create(cavity_levels))
+        )
+
+        H_drives = [
+            H_drive_transmon_R,
+            H_drive_transmon_I,
+            H_drive_cavity_R,
+            H_drive_cavity_I
+        ]
     end
 
     return QuantumSystem(

@@ -14,10 +14,15 @@ include("quantum_systems.jl")
 include("integrators.jl")
 @reexport using .Integrators
 
+include("dynamics.jl")
+@reexport using .Dynamics
+
+include("ipopt_options.jl")
+@reexport using .IpoptOptions
+
 include("continuous_trajectories.jl")
 @reexport using .ContinuousTrajectories
 
-include("dynamics.jl")
-@reexport using .Dynamics
+
 
 end

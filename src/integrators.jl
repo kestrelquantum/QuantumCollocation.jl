@@ -1,7 +1,7 @@
 module Integrators
 
 export AbstractIntegrator
-export QuantumIntegrator
+export QuantumStateIntegrator
 
 export Exponential
 
@@ -52,12 +52,12 @@ end
 
 abstract type AbstractIntegrator end
 
-abstract type QuantumIntegrator <: AbstractIntegrator end
+abstract type QuantumStateIntegrator <: AbstractIntegrator end
 
 
 # exponential
 
-struct Exponential <: QuantumIntegrator
+struct Exponential <: QuantumStateIntegrator
     G_drift::Matrix
     G_drives::Vector{Matrix}
 
@@ -78,7 +78,7 @@ end
 
 # 2nd order Pade integrator
 
-struct SecondOrderPade <: QuantumIntegrator
+struct SecondOrderPade <: QuantumStateIntegrator
     G_drift::Matrix
     G_drives::Vector{Matrix}
     nqstates::Int
@@ -112,7 +112,7 @@ end
 
 anticom(A::AbstractMatrix, B::AbstractMatrix) = A * B + B * A
 
-struct FourthOrderPade <: QuantumIntegrator
+struct FourthOrderPade <: QuantumStateIntegrator
     G_drift::Matrix
     G_drives::Vector{Matrix}
     G_drive_anticoms::Symmetric
