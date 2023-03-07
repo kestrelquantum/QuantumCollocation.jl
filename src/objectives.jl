@@ -81,28 +81,28 @@ end
 
 """
 function QuantumObjective(;
-	cost=:infidelity_cost,
-	T=nothing,
-	Q=100.0,
+    wfn_names::Tuple{Vararg{Symbol}}
+	cost=:InfidelityCost,
+	Q::Union{Float64, Vector{Float64}}=100.0,
 	eval_hessian=true
 )
-    @assert !isnothing(system) "system must be specified"
-    @assert !isnothing(T) "T must be specified"
+    if Q isa Float64
+        Q = ones(length(wfn_names)) * Q
+    else
+        @assert length(Q) == length(wfn_names)
+    end
 
     params = Dict(
         :type => :QuantumObjective,
-        :system => system,
-        :cost_fn => cost_fn,
-        :T => T,
+        :wfn_names => wfn_names,
+        :cost => cost,
         :Q => Q,
-        :eval_hessian => eval_hessian
+        :eval_hessian => eval_hessian,
     )
 
-	cost = QuantumCost(system, cost)
+	@views function L(Z::NamedTrajectory)
 
-	@views function L(Z::AbstractVector{F}) where F
-		ψ̃T = Z[slice(T, system.n_wfn_states, system.vardim)]
-		return Q * cost(ψ̃T)
+
 	end
 
 	∇c = QuantumCostGradient(cost)
