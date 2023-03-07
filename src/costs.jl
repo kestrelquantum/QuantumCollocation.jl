@@ -42,21 +42,49 @@ function infidelity(ψ̃, ψ̃goal)
 end
 
 struct InfidelityCost <: AbstractCost
-    ls::Vector{Function}
-    ∇ls::Vector{Function}
-    ∇²ls::Vector{Function}
-    wfn_names::Tuple{Vararg{Symbol}}
+    l::Function
+    ∇l::Function
+    ∇²l::Function
+    ∇²l_structure::Vector{Tuple{Int,Int}}
+    wfn_name::Symbol
 
     function InfidelityCost(
+        Q::Float64,
         Z::NamedTrajectory,
-        wfn_names::Tuple{Vararg{Symbol}}
+        wfn_name::Symbol
     )
-        @assert all([wfn ∈ Z.names for wfn ∈ wfn_names])
-        ψ̃goals = [Z.goal[wfn] for wfn ∈ wfn_names]
-        ls = [ψ̃ -> infidelity(ψ̃, ψ̃goal) for ψ̃goal ∈ ψ̃goals]
-        ∇ls = [ψ̃ -> ForwardDiff.gradient(ψ̃ -> infidelity(ψ̃, ψ̃goal), ψ̃) for ψ̃goal ∈ ψ̃goals]
-        ∇²ls = [ψ̃ -> ForwardDiff.hessian(ψ̃ -> infidelity(ψ̃, ψ̃goal), ψ̃) for ψ̃goal ∈ ψ̃goals]
-        return new(ls, ∇ls, ∇²ls, wfn_names)
+        @assert wfn_name ∈ Z.names
+        @assert Z.goal[wfn_name] isa AbstractVector
+
+        ψ̃_goal = Z.goal[wfn_name]
+
+        l = ψ̃ -> Q * infidelity(ψ̃, ψ̃_goal)
+        ∇l = ψ̃ -> ForwardDiff.gradient(l, ψ̃)
+
+        Symbolics.@variables ψ̃[1:Z.dims[wfn_name]]
+        ψ̃ = collect(ψ̃)
+
+        ∇²l_symbolic = Symbolics.sparsehessian(l(ψ̃), ψ̃)
+        K, J, _ = findnz(∇²l_symb)
+        kjs = collect(zip(K, J))
+        filter!(((k, j),) -> k ≤ j, kjs)
+        ∇²l_structure = kjs
+
+        ∇²l_expression = Symbolics.build_function(∇²l_symbolic, ψ̃)
+        ∇²l = eval(∇²l_expression[1])
+
+        return new(l, ∇l, ∇²l, ∇²l_structure, wfn_name)
+    end
+end
+
+function (cost::InfidelityCost)(Z::NamedTrajectory; gradient=false, hessian=false)
+    @assert !(gradient && hessian)
+    if !(gradient || hessian)
+        return cost.l(Z[end][cost.wfn_name])
+    elseif gradient
+        return cost.∇l(Z[end][cost.wfn_name])
+    elseif hessian
+        return cost.∇²l(Z[end][cost.wfn_name])
     end
 end
 

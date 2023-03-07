@@ -38,7 +38,6 @@ function QuantumControlProblem(
     traj::NamedTrajectory,
     obj::Objective,
     f::Function;
-    mode::Symbol=:free_time,
     eval_hessian::Bool=true,
     options::Options=Options(),
     constraints::Vector{AbstractConstraint}=AbstractConstraint[],
