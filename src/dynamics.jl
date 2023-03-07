@@ -34,7 +34,7 @@ function QuantumDynamics(
 )
     function F(Z::NamedTrajectory)
         r = zeros(Z.dims.states * Z.T)
-        for t = 1:Z.T
+        for t = 1:Z.T-1
             r[slice(t, Z.dims.states)] = f(Z[t], Z[t + 1])
         end
     end
@@ -49,7 +49,7 @@ function QuantumDynamics(
             return hcat(∂zₜf, ∂zₜ₊₁f)
         end
 
-        for t = 1:Z.T
+        for t = 1:Z.T-1
             zₜ = Z.data[:, t]
             zₜ₊₁ = Z.data[:, t + 1]
             append!(∂, ∂f(zₜ, zₜ₊₁))
@@ -59,7 +59,7 @@ function QuantumDynamics(
 
     ∂F_structure = []
 
-    for t = 1:traj.T
+    for t = 1:traj.T-1
         for pair ∈ product(slice(t, traj.dims.states), slice(t:t+1, traj.dim))
             append!(∂F_structure, pair)
         end
@@ -77,7 +77,7 @@ function QuantumDynamics(
             )
         end
 
-        for t = 1:Z.T
+        for t = 1:Z.T-1
             zₜzₜ₊₁ = vec(Z.data[:, t:t+1])
             μₜ = μ[slice(t, Z.dims.states)]
             append!(μ∂², μ∂²f(zₜzₜ₊₁, μₜ))
@@ -87,7 +87,7 @@ function QuantumDynamics(
 
     μ∂²F_structure = []
 
-    for t = 1:traj.T
+    for t = 1:traj.T-1
         for pair ∈ product(slice(t, traj.dim), slice(t, traj.dim))
             append!(μ∂²F_structure, pair)
         end
