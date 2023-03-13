@@ -1,5 +1,7 @@
 module Costs
 
+export Cost
+
 export QuantumCost
 export QuantumCostGradient
 export QuantumCostHessian
@@ -35,11 +37,68 @@ using ForwardDiff
 abstract type AbstractCost end
 
 
-function infidelity(ψ̃, ψ̃goal)
+function infidelity(ψ̃::Vector{Real}, ψ̃goal::Vector{Real})
     ψ = iso_to_ket(ψ̃)
     ψgoal = iso_to_ket(ψ̃goal)
     return abs(1 - abs2(ψ'ψgoal))
 end
+
+function infidelity(Ũ::Matrix{Real}, Ũgoal::Matrix{Real})
+    U = iso_to_unitary(Ũ)
+    Ugoal = iso_to_unitary(Ũgoal)
+    return abs(1 - abs2(tr(U'Ugoal)))
+end
+
+
+struct Cost <: AbstractCost
+    l::Function
+    ∇l::Function
+    ∇²l::Function
+    ∇²l_structure::Vector{Tuple{Int,Int}}
+    wfn_name::Symbol
+
+    function Cost(
+        Z::NamedTrajectory,
+        J::Function,
+        x::Symbol
+    )
+        @assert x ∈ Z.names
+        @assert Z.goal[x] isa AbstractVector
+
+        x_goal = Z.goal[x]
+
+        J = x̄ -> J(x̄, x_goal)
+        ∇J = x̄ -> ForwardDiff.gradient(J, x̄)
+
+        Symbolics.@variables x̄[1:Z.dims[x]]
+        x̄ = collect(x̄)
+
+        ∇²J_symbolic = Symbolics.sparsehessian(J(x̄), x̄)
+        rows, cols, _ = findnz(∇²J_symbolic)
+        rowcols = collect(zip(rows, cols))
+        filter!((row, col) -> row ≥ col, rowcols)
+        ∇²l_structure = rowcols
+
+        ∇²J_expression = Symbolics.build_function(∇²J_symbolic, x̄)
+        ∇²J = eval(∇²J_expression[1])
+
+        return new(J, ∇J, ∇²J, ∇²J_structure, x)
+    end
+end
+
+function (cost::Cost)(Z::NamedTrajectory; gradient=false, hessian=false)
+    @assert !(gradient && hessian)
+    if !(gradient || hessian)
+        return cost.l(Z[end][cost.wfn_name])
+    elseif gradient
+        return cost.∇l(Z[end][cost.wfn_name])
+    elseif hessian
+        return cost.∇²l(Z[end][cost.wfn_name])
+    end
+end
+
+
+
 
 struct InfidelityCost <: AbstractCost
     l::Function
@@ -49,16 +108,15 @@ struct InfidelityCost <: AbstractCost
     wfn_name::Symbol
 
     function InfidelityCost(
-        Q::Float64,
         Z::NamedTrajectory,
         wfn_name::Symbol
     )
         @assert wfn_name ∈ Z.names
         @assert Z.goal[wfn_name] isa AbstractVector
 
-        ψ̃_goal = Z.goal[wfn_name]
+        x_goal = Z.goal[wfn_name]
 
-        l = ψ̃ -> Q * infidelity(ψ̃, ψ̃_goal)
+        l = ψ̃ -> infidelity(ψ̃, ψ̃_goal)
         ∇l = ψ̃ -> ForwardDiff.gradient(l, ψ̃)
 
         Symbolics.@variables ψ̃[1:Z.dims[wfn_name]]
@@ -87,6 +145,9 @@ function (cost::InfidelityCost)(Z::NamedTrajectory; gradient=false, hessian=fals
         return cost.∇²l(Z[end][cost.wfn_name])
     end
 end
+
+
+
 
 
 

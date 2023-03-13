@@ -2,7 +2,7 @@
 
 julia_version = "1.8.5"
 manifest_format = "2.0"
-project_hash = "923658d05f343bde57f767071a33a054603b0073"
+project_hash = "48cfe58f5e7a754a6f2ac9261d27adec3b82f5cb"
 
 [[deps.ANSIColoredPrinters]]
 git-tree-sha1 = "574baf8110975760d391c710b6341da1afa48d8c"
@@ -898,7 +898,7 @@ uuid = "77ba4419-2d1f-58cd-9bb1-8ffee604a2e3"
 version = "1.0.1"
 
 [[deps.NamedTrajectories]]
-deps = ["CairoMakie", "JLD2", "LaTeXStrings", "Latexify", "Reexport", "Unidecode"]
+deps = ["CairoMakie", "JLD2", "LaTeXStrings", "Latexify", "Reexport", "Revise", "Unidecode"]
 path = "../NamedTrajectories.jl"
 uuid = "538bc3a1-5ab9-4fc3-b776-35ca1e893e08"
 version = "0.1.0"

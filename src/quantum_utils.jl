@@ -61,7 +61,7 @@ const GATES = Dict(
 
 gate(U::Symbol) = GATES[U]
 
-function apply(U::Symbol, ψ::Vector{<:Number})
+function apply(gate::Symbol, ψ::Vector{<:Number})
     @assert norm(ψ) ≈ 1.0
     @assert gate in keys(GATES) "gate not found"
     Û = gate(gate)
@@ -134,6 +134,11 @@ iso_to_ket(ψ̃) = ψ̃[1:div(length(ψ̃), 2)] + im * ψ̃[(div(length(ψ̃), 2
 function normalize(state::Vector{C} where C <: Number)
     return state / norm(state)
 end
+
+function iso_to_unitary(Ũ::Vector)
+    U_dim = div(length(Ũ), 2)
+    U_real = Ũ[1:U_dim]
+    U_imag = Ũ
 
 
 """

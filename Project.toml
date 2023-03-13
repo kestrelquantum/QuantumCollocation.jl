@@ -17,6 +17,7 @@ LiveServer = "16fef848-5104-11e9-1b77-fb7a48bbb589"
 MathOptInterface = "b8f27783-ece8-5eb3-8dc8-9495eed66fee"
 NamedTrajectories = "538bc3a1-5ab9-4fc3-b776-35ca1e893e08"
 Reexport = "189a3867-3050-52da-a836-e630ba90ab69"
+Revise = "295af30f-e4ad-537b-8983-00126c2a3abe"
 SparseArrays = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
 

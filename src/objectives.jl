@@ -74,6 +74,13 @@ function Objective(term::Dict)
     return eval(term[:type])(; delete!(term, :type)...)
 end
 
+# function to convert sparse matrix to tuple of vector of nonzero indices and vector of nonzero values
+function sparse_to_moi(A::SparseMatrixCSC)
+    inds = collect(zip(findnz(A)...))
+    vals = [A[i,j] for (i,j) ∈ inds]
+    return (inds, vals)
+end
+
 
 """
     QuantumObjective
@@ -100,38 +107,45 @@ function QuantumObjective(;
         :eval_hessian => eval_hessian,
     )
 
-	@views function L(Z::NamedTrajectory)
+	function L(Z::NamedTrajectory)
+        return sum(Qᵢ * cost(Z, wfn_name) for (Qᵢ, wfn_name) ∈ zip(Q, wfn_names))
+    end
 
+    function ∇L(Z::NamedTrajectory)
+        ∇ = zeros(Z.dim * Z.T)
+        for (Qᵢ, wfn_name) ∈ zip(Q, wfn_names)
+            ∇[slice(Z.T, Z.components[wfn_name])] =
+                Qᵢ * cost(Z, wfn_name; gradient=true)
+        end
+        return ∇
+    end
 
-	end
+    structure = []
+    for wfn_name ∈ wfn_names
+        wfn_start_idx = Z.components[wfn_name][1]
+        wfn_structure = [ij .+ (wfn_start_idx - 1) for ij ∈ cost.∇²l_structure]
+        append!(structure, wfn_structure)
+    end
 
-	∇c = QuantumCostGradient(cost)
-
-	@views function ∇L(Z::AbstractVector{F}) where F
-		∇ = zeros(F, length(Z))
-		ψ̃T_slice = slice(T, system.n_wfn_states, system.vardim)
-		ψ̃T = Z[ψ̃T_slice]
-		∇[ψ̃T_slice] = Q * ∇c(ψ̃T)
-		return ∇
-	end
-
-	∂²L = nothing
-	∂²L_structure = nothing
-
-	if eval_hessian
-		∇²c = QuantumCostHessian(cost)
-
-		# ℓⁱs Hessian structure (eq. 17)
-		∂²L_structure = structure(∇²c, T, system.vardim)
-
-		∂²L = Z::AbstractVector -> begin
-			ψ̃T = view(
-				Z,
-				slice(T, system.n_wfn_states, system.vardim)
-			)
-			return Q * ∇²c(ψ̃T)
-		end
-	end
+    function ∂²L(Z::NamedTrajectory; return_moi_vals=true)
+        H = spzeros(Z.dim * Z.T, Z.dim * Z.T)
+        for (Qᵢ, wfn_name) ∈ zip(Q, wfn_names)
+            H[slice(Z.T, Z.components[wfn_name]), slice(Z.T, Z.components[wfn_name])] =
+                Qᵢ * cost(Z, wfn_name; hessian=true)
+        end
+        if return_moi_vals
+            structure = []
+            for wfn_name ∈ wfn_names
+                wfn_start_idx = Z.components[wfn_name][1]
+                wfn_structure = [ij .+ (wfn_start_idx - 1) for ij ∈ cost.∇²l_structure]
+                append!(structure, wfn_structure)
+            end
+            Hs = [H[i,j] for (i, j) ∈ structure]
+            return Hs
+        else
+            return H
+        end
+    end
 
 	return Objective(L, ∇L, ∂²L, ∂²L_structure, Dict[params])
 end
