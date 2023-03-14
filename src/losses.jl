@@ -1,19 +1,18 @@
-module Costs
+module Losses
 
-export Cost
+export Loss
 
-export QuantumCost
-export QuantumCostGradient
-export QuantumCostHessian
+export QuantumLoss
+export QuantumLossGradient
+export QuantumLossHessian
+
+export InfidelityLoss
+export UnitaryInfidelityLoss
 
 export structure
 
-export geodesic_cost
-export pure_real_cost
-export real_cost
-export infidelity_cost
-export quaternionic_cost
-export iso_infidelity
+export infidelity
+export unitary_infidelity
 
 using ..IndexingUtils
 using ..QuantumUtils
@@ -24,40 +23,41 @@ using NamedTrajectories
 using LinearAlgebra
 using SparseArrays
 using ForwardDiff
+using Symbolics
 
 #
-# cost functions
+# loss functions
 #
 
 
 # TODO: renormalize vectors in place of abs
-#       ⋅ penalize cost to remain near unit norm
+#       ⋅ penalize loss to remain near unit norm
 #       ⋅ Σ α * (1 - ψ̃'ψ̃), α = 1e-3
 
-abstract type AbstractCost end
+abstract type AbstractLoss end
 
 
-function infidelity(ψ̃::Vector{Real}, ψ̃goal::Vector{Real})
+function infidelity(ψ̃::Vector, ψ̃goal::Vector)
     ψ = iso_to_ket(ψ̃)
     ψgoal = iso_to_ket(ψ̃goal)
     return abs(1 - abs2(ψ'ψgoal))
 end
 
-function infidelity(Ũ::Matrix{Real}, Ũgoal::Matrix{Real})
-    U = iso_to_unitary(Ũ)
-    Ugoal = iso_to_unitary(Ũgoal)
+function unitary_infidelity(Ũ⃗::Vector, Ũ⃗_goal::Vector)
+    U = iso_vec_to_unitary(Ũ⃗)
+    Ugoal = iso_vec_to_unitary(Ũ⃗_goal)
     return abs(1 - abs2(tr(U'Ugoal)))
 end
 
 
-struct Cost <: AbstractCost
+struct Loss <: AbstractLoss
     l::Function
     ∇l::Function
     ∇²l::Function
     ∇²l_structure::Vector{Tuple{Int,Int}}
-    wfn_name::Symbol
+    name::Symbol
 
-    function Cost(
+    function Loss(
         Z::NamedTrajectory,
         J::Function,
         x::Symbol
@@ -77,7 +77,7 @@ struct Cost <: AbstractCost
         rows, cols, _ = findnz(∇²J_symbolic)
         rowcols = collect(zip(rows, cols))
         filter!((row, col) -> row ≥ col, rowcols)
-        ∇²l_structure = rowcols
+        ∇²J_structure = rowcols
 
         ∇²J_expression = Symbolics.build_function(∇²J_symbolic, x̄)
         ∇²J = eval(∇²J_expression[1])
@@ -86,35 +86,85 @@ struct Cost <: AbstractCost
     end
 end
 
-function (cost::Cost)(Z::NamedTrajectory; gradient=false, hessian=false)
+function (loss::Loss)(Z::NamedTrajectory; gradient=false, hessian=false)
     @assert !(gradient && hessian)
     if !(gradient || hessian)
-        return cost.l(Z[end][cost.wfn_name])
+        return loss.l(Z[end][loss.name])
     elseif gradient
-        return cost.∇l(Z[end][cost.wfn_name])
+        return loss.∇l(Z[end][loss.name])
     elseif hessian
-        return cost.∇²l(Z[end][cost.wfn_name])
+        return loss.∇²l(Z[end][loss.name])
+    end
+end
+
+struct UnitaryInfidelityLoss <: AbstractLoss
+    l::Function
+    ∇l::Function
+    ∇²l::Function
+    ∇²l_structure::Vector{Tuple{Int,Int}}
+    name::Symbol
+
+    function UnitaryInfidelityLoss(
+        name::Symbol,
+        Ũ⃗_goal::AbstractVector
+    )
+        l = Ũ⃗ -> unitary_infidelity(Ũ⃗, Ũ⃗_goal)
+        ∇l = Ũ⃗ -> ForwardDiff.gradient(l, Ũ⃗)
+
+        Symbolics.@variables Ũ⃗[1:length(Ũ⃗_goal)]
+        Ũ⃗ = collect(Ũ⃗)
+
+        ∇²l_symbolic = Symbolics.sparsehessian(l(Ũ⃗), Ũ⃗)
+        K, J, _ = findnz(∇²l_symbolic)
+        kjs = collect(zip(K, J))
+        filter!(((k, j),) -> k ≤ j, kjs)
+        ∇²l_structure = kjs
+
+        ∇²l_expression = Symbolics.build_function(∇²l_symbolic, Ũ⃗)
+        ∇²l = eval(∇²l_expression[1])
+
+        return new(l, ∇l, ∇²l, ∇²l_structure, name)
+    end
+end
+
+function (loss::UnitaryInfidelityLoss)(
+    Z::NamedTrajectory;
+    gradient=false,
+    hessian=false
+)
+    @assert !(gradient && hessian)
+
+    Ũ⃗_end = Z[end][loss.name]
+
+    if !(gradient || hessian)
+        return loss.l(Ũ⃗_end)
+    elseif gradient
+        return loss.∇l(Ũ⃗_end)
+    elseif hessian
+        return loss.∇²l(Ũ⃗_end)
     end
 end
 
 
 
 
-struct InfidelityCost <: AbstractCost
+
+
+struct InfidelityLoss <: AbstractLoss
     l::Function
     ∇l::Function
     ∇²l::Function
     ∇²l_structure::Vector{Tuple{Int,Int}}
     wfn_name::Symbol
 
-    function InfidelityCost(
+    function InfidelityLoss(
         Z::NamedTrajectory,
         wfn_name::Symbol
     )
         @assert wfn_name ∈ Z.names
         @assert Z.goal[wfn_name] isa AbstractVector
 
-        x_goal = Z.goal[wfn_name]
+        ψ̃_goal = Z.goal[wfn_name]
 
         l = ψ̃ -> infidelity(ψ̃, ψ̃_goal)
         ∇l = ψ̃ -> ForwardDiff.gradient(l, ψ̃)
@@ -135,14 +185,14 @@ struct InfidelityCost <: AbstractCost
     end
 end
 
-function (cost::InfidelityCost)(Z::NamedTrajectory; gradient=false, hessian=false)
+function (loss::InfidelityLoss)(Z::NamedTrajectory; gradient=false, hessian=false)
     @assert !(gradient && hessian)
     if !(gradient || hessian)
-        return cost.l(Z[end][cost.wfn_name])
+        return loss.l(Z[end][loss.wfn_name])
     elseif gradient
-        return cost.∇l(Z[end][cost.wfn_name])
+        return loss.∇l(Z[end][loss.wfn_name])
     elseif hessian
-        return cost.∇²l(Z[end][cost.wfn_name])
+        return loss.∇²l(Z[end][loss.wfn_name])
     end
 end
 
@@ -153,21 +203,21 @@ end
 
 
 
-struct QuantumCost
+struct QuantumLoss
     cs::Vector{Function}
     isodim::Int
 
-    function QuantumCost(
+    function QuantumLoss(
         sys::AbstractSystem,
-        cost::Symbol = :infidelity_cost
+        loss::Symbol = :infidelity_loss
     )
-        if cost == :energy_cost
-            cs = [ψ̃ⁱ -> eval(cost)(ψ̃ⁱ, sys.H_target) for i = 1:sys.nqstates]
-        elseif cost == :neg_entropy_cost
-            cs = [ψ̃ⁱ -> eval(cost)(ψ̃ⁱ) for i = 1:sys.nqstates]
+        if loss == :energy_loss
+            cs = [ψ̃ⁱ -> eval(loss)(ψ̃ⁱ, sys.H_target) for i = 1:sys.nqstates]
+        elseif loss == :neg_entropy_loss
+            cs = [ψ̃ⁱ -> eval(loss)(ψ̃ⁱ) for i = 1:sys.nqstates]
         else
             cs = [
-                ψ̃ⁱ -> eval(cost)(
+                ψ̃ⁱ -> eval(loss)(
                     ψ̃ⁱ,
                     sys.ψ̃goal[slice(i, sys.isodim)]
                 ) for i = 1:sys.nqstates
@@ -177,29 +227,29 @@ struct QuantumCost
     end
 end
 
-function (qcost::QuantumCost)(ψ̃::AbstractVector)
-    cost = 0.0
-    for (i, cⁱ) in enumerate(qcost.cs)
-        cost += cⁱ(ψ̃[slice(i, qcost.isodim)])
+function (qloss::QuantumLoss)(ψ̃::AbstractVector)
+    loss = 0.0
+    for (i, cⁱ) in enumerate(qloss.cs)
+        loss += cⁱ(ψ̃[slice(i, qloss.isodim)])
     end
-    return cost
+    return loss
 end
 
-struct QuantumCostGradient
+struct QuantumLossGradient
     ∇cs::Vector{Function}
     isodim::Int
 
-    function QuantumCostGradient(
-        cost::QuantumCost;
+    function QuantumLossGradient(
+        loss::QuantumLoss;
         simplify=true
     )
-        Symbolics.@variables ψ̃[1:cost.isodim]
+        Symbolics.@variables ψ̃[1:loss.isodim]
 
         ψ̃ = collect(ψ̃)
 
         ∇cs_symbs = [
             Symbolics.gradient(c(ψ̃), ψ̃; simplify=simplify)
-                for c in cost.cs
+                for c in loss.cs
         ]
 
         ∇cs_exprs = [
@@ -212,11 +262,11 @@ struct QuantumCostGradient
                 for ∇c_expr in ∇cs_exprs
         ]
 
-        return new(∇cs, cost.isodim)
+        return new(∇cs, loss.isodim)
     end
 end
 
-@views function (∇c::QuantumCostGradient)(
+@views function (∇c::QuantumLossGradient)(
     ψ̃::AbstractVector
 )
     ∇ = similar(ψ̃)
@@ -231,17 +281,17 @@ end
     return ∇
 end
 
-struct QuantumCostHessian
+struct QuantumLossHessian
     ∇²cs::Vector{Function}
     ∇²c_structures::Vector{Vector{Tuple{Int, Int}}}
     isodim::Int
 
-    function QuantumCostHessian(
-        cost::QuantumCost;
+    function QuantumLossHessian(
+        loss::QuantumLoss;
         simplify=true
     )
 
-        Symbolics.@variables ψ̃[1:cost.isodim]
+        Symbolics.@variables ψ̃[1:loss.isodim]
         ψ̃ = collect(ψ̃)
 
         ∇²c_symbs = [
@@ -249,7 +299,7 @@ struct QuantumCostHessian
                 c(ψ̃),
                 ψ̃;
                 simplify=simplify
-            ) for c in cost.cs
+            ) for c in loss.cs
         ]
 
         ∇²c_structures = []
@@ -274,12 +324,12 @@ struct QuantumCostHessian
                 for ∇²c_expr in ∇²c_exprs
         ]
 
-        return new(∇²cs, ∇²c_structures, cost.isodim)
+        return new(∇²cs, ∇²c_structures, loss.isodim)
     end
 end
 
 function structure(
-    H::QuantumCostHessian,
+    H::QuantumLossHessian,
     T::Int,
     vardim::Int
 )
@@ -299,7 +349,7 @@ function structure(
     return H_structure
 end
 
-@views function (H::QuantumCostHessian)(ψ̃::AbstractVector)
+@views function (H::QuantumLossHessian)(ψ̃::AbstractVector)
 
     Hs = []
 
@@ -320,11 +370,11 @@ end
 
 
 #
-# primary cost functions
+# primary loss functions
 #
 
 
-function energy_cost(
+function energy_loss(
     ψ̃::AbstractVector,
     H::AbstractMatrix
 )
@@ -334,7 +384,7 @@ end
 
 
 # TODO: figure out a way to implement this without erroring and Von Neumann entropy being always 0 for a pure state
-function neg_entropy_cost(
+function neg_entropy_loss(
     ψ̃::AbstractVector
 )
     ψ = iso_to_ket(ψ̃)
@@ -347,23 +397,23 @@ end
 
 
 #
-# experimental cost functions
+# experimental loss functions
 #
 
-function pure_real_cost(ψ̃, ψ̃goal)
+function pure_real_loss(ψ̃, ψ̃goal)
     ψ = iso_to_ket(ψ̃)
     ψgoal = iso_to_ket(ψ̃goal)
     return -(ψ'ψgoal)
 end
 
-function geodesic_cost(ψ̃, ψ̃goal)
+function geodesic_loss(ψ̃, ψ̃goal)
     ψ = iso_to_ket(ψ̃)
     ψgoal = iso_to_ket(ψ̃goal)
     amp = ψ'ψgoal
     return min(abs(1 - amp), abs(1 + amp))
 end
 
-function real_cost(ψ̃, ψ̃goal)
+function real_loss(ψ̃, ψ̃goal)
     ψ = iso_to_ket(ψ̃)
     ψgoal = iso_to_ket(ψ̃goal)
     amp = ψ'ψgoal
@@ -377,7 +427,7 @@ function iso_infidelity(ψ̃, ψ̃f)
 end
 
 
-function quaternionic_cost(ψ̃, ψ̃goal)
+function quaternionic_loss(ψ̃, ψ̃goal)
     return min(
         abs(1 - dot(ψ̃, ψ̃goal)),
         abs(1 + dot(ψ̃, ψ̃goal))

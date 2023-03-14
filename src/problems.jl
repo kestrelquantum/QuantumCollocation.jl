@@ -8,6 +8,7 @@ export initialize_trajectory!
 export update_traj_data!
 export get_traj_data
 export get_variables
+export solve!
 
 using ..IndexingUtils
 using ..QuantumSystems
@@ -37,7 +38,7 @@ function QuantumControlProblem(
     system::AbstractSystem,
     traj::NamedTrajectory,
     obj::Objective,
-    f::Function;
+    dynamics::Function;
     eval_hessian::Bool=true,
     options::Options=Options(),
     constraints::Vector{AbstractConstraint}=AbstractConstraint[],
@@ -47,14 +48,14 @@ function QuantumControlProblem(
     optimizer = Ipopt.Optimizer()
     set!(optimizer, options)
 
-    dynamics = QuantumDynamics(f, traj)
+    f = QuantumDynamics(dynamics, traj)
 
-    evaluator = PicoEvaluator(obj, dynamics, eval_hessian)
+    evaluator = PicoEvaluator(traj, obj, f, eval_hessian)
 
     n_dynamics_constraints = traj.dims.states * (traj.T - 1)
     n_variables = traj.dim * traj.T
 
-    traj_cons = constraints(traj)
+    traj_cons = trajectory_constraints(traj)
 
     constraints = vcat(traj_cons, constraints)
 
@@ -243,284 +244,260 @@ end
 # QuantumControlProblem constructors
 #
 
-function QuantumControlProblem(
-    system::AbstractSystem;
-    T=100,
-    Δt=0.01,
-    Δt_min=0.25Δt,
-    Δt_max=1.25Δt,
-    equal_Δts=true,
-    mode=:free_time,
-    integrator=:FourthOrderPade,
-    cost=:infidelity_cost,
-    Q=200.0,
-    R=0.1,
-    Rᵤ=R,
-    Rₛ=R,
-    eval_hessian=true,
-    pin_first_qstate=false,
-    options=Options(),
-    constraints::Vector{AbstractConstraint}=AbstractConstraint[],
-    u_bounds=fill(Inf, length(system.G_drives)),
-    additional_objective=nothing,
-    L1_regularized_states::Vector{Int}=Int[],
-    α=fill(10.0, length(L1_regularized_states)),
+# function QuantumControlProblem(
+#     system::AbstractSystem;
+#     T=100,
+#     Δt=0.01,
+#     Δt_min=0.25Δt,
+#     Δt_max=1.25Δt,
+#     equal_Δts=true,
+#     mode=:free_time,
+#     integrator=:FourthOrderPade,
+#     loss=:infidelity_loss,
+#     Q=200.0,
+#     R=0.1,
+#     Rᵤ=R,
+#     Rₛ=R,
+#     eval_hessian=true,
+#     pin_first_qstate=false,
+#     options=Options(),
+#     constraints::Vector{AbstractConstraint}=AbstractConstraint[],
+#     u_bounds=fill(Inf, length(system.G_drives)),
+#     additional_objective=nothing,
+#     L1_regularized_states::Vector{Int}=Int[],
+#     α=fill(10.0, length(L1_regularized_states)),
 
-    # keyword args below are for initializing the trajactory
-    linearly_interpolate=true,
-    σ = 0.1,
-    init_traj=Trajectory(
-        system,
-        T,
-        Δt;
-        linearly_interpolate=linearly_interpolate,
-        σ=σ
-    ),
-    kwargs...
-)
-    @assert mode ∈ (:fixed_time, :free_time, :min_time)
-    @assert length(u_bounds) == length(system.G_drives)
+#     # keyword args below are for initializing the trajactory
+#     linearly_interpolate=true,
+#     σ = 0.1,
+#     init_traj=Trajectory(
+#         system,
+#         T,
+#         Δt;
+#         linearly_interpolate=linearly_interpolate,
+#         σ=σ
+#     ),
+#     kwargs...
+# )
+#     @assert mode ∈ (:fixed_time, :free_time, :min_time)
+#     @assert length(u_bounds) == length(system.G_drives)
 
-    optimizer = Ipopt.Optimizer()
+#     optimizer = Ipopt.Optimizer()
 
-    set!(optimizer, options)
+#     set!(optimizer, options)
 
-    Z_indices = 1:system.vardim * T
-    Δt_indices = system.vardim * T .+ (1:T) # [Δt; Δt̄]
-    # Δt̄ is defined so that Δtᵢ = Δt̄ ∀ i when equal_Δts == true
+#     Z_indices = 1:system.vardim * T
+#     Δt_indices = system.vardim * T .+ (1:T) # [Δt; Δt̄]
+#     # Δt̄ is defined so that Δtᵢ = Δt̄ ∀ i when equal_Δts == true
 
-    n_prob_variables = length(Z_indices) + length(Δt_indices)
-    n_variables = n_prob_variables
-    n_dynamics_constraints = system.nstates * (T - 1)
+#     n_prob_variables = length(Z_indices) + length(Δt_indices)
+#     n_variables = n_prob_variables
+#     n_dynamics_constraints = system.nstates * (T - 1)
 
-    params = Dict(
-        :T => T,
-        :Δt => Δt,
-        :Δt_min => Δt_min,
-        :Δt_max => Δt_max,
-        :equal_Δts => equal_Δts,
-        :mode => mode,
-        :integrator => integrator,
-        :cost => cost,
-        :Q => Q,
-        :R => R,
-        :Rᵤ => Rᵤ,
-        :Rₛ => Rₛ,
-        :eval_hessian => eval_hessian,
-        :pin_first_qstate => pin_first_qstate,
-        :options => options,
-        :u_bounds => u_bounds,
-        :L1_regularized_states => L1_regularized_states,
-        :additional_objective_terms =>
-            isnothing(additional_objective) ?
-                [] :
-                additional_objective.terms,
-        :α => α,
-        :n_prob_variables => n_prob_variables,
-        :n_variables => n_variables,
-        :n_dynamics_constraints => n_dynamics_constraints,
-        :constraints => constraints,
-        :Z_indices => Z_indices,
-        :Δt_indices => Δt_indices,
-    )
+#     params = Dict(
+#         :T => T,
+#         :Δt => Δt,
+#         :Δt_min => Δt_min,
+#         :Δt_max => Δt_max,
+#         :equal_Δts => equal_Δts,
+#         :mode => mode,
+#         :integrator => integrator,
+#         :loss => loss,
+#         :Q => Q,
+#         :R => R,
+#         :Rᵤ => Rᵤ,
+#         :Rₛ => Rₛ,
+#         :eval_hessian => eval_hessian,
+#         :pin_first_qstate => pin_first_qstate,
+#         :options => options,
+#         :u_bounds => u_bounds,
+#         :L1_regularized_states => L1_regularized_states,
+#         :additional_objective_terms =>
+#             isnothing(additional_objective) ?
+#                 [] :
+#                 additional_objective.terms,
+#         :α => α,
+#         :n_prob_variables => n_prob_variables,
+#         :n_variables => n_variables,
+#         :n_dynamics_constraints => n_dynamics_constraints,
+#         :constraints => constraints,
+#         :Z_indices => Z_indices,
+#         :Δt_indices => Δt_indices,
+#     )
 
-    if mode ∈ (:fixed_time, :free_time)
+#     if mode ∈ (:fixed_time, :free_time)
 
-        quantum_obj = QuantumObjective(
-            system=system,
-            cost_fn=cost,
-            T=T,
-            Q=Q,
-            eval_hessian=eval_hessian
-        )
+#         quantum_obj = QuantumObjective(
+#             system=system,
+#             loss_fn=loss,
+#             T=T,
+#             Q=Q,
+#             eval_hessian=eval_hessian
+#         )
 
-        u_regularizer = QuadraticRegularizer(
-            indices=system.nstates .+ (1:system.ncontrols),
-            vardim=system.vardim,
-            times=1:T-1,
-            R=Rᵤ,
-            eval_hessian=eval_hessian
-        )
+#         u_regularizer = QuadraticRegularizer(
+#             indices=system.nstates .+ (1:system.ncontrols),
+#             vardim=system.vardim,
+#             times=1:T-1,
+#             R=Rᵤ,
+#             eval_hessian=eval_hessian
+#         )
 
-        objective =
-            quantum_obj +
-            u_regularizer +
-            additional_objective
+#         objective =
+#             quantum_obj +
+#             u_regularizer +
+#             additional_objective
 
-    elseif mode == :min_time
+#     elseif mode == :min_time
 
-        min_time_obj = MinTimeObjective(
-            Δt_indices=Δt_indices,
-            T=T,
-            eval_hessian=eval_hessian
-        )
+#         min_time_obj = MinTimeObjective(
+#             Δt_indices=Δt_indices,
+#             T=T,
+#             eval_hessian=eval_hessian
+#         )
 
-        u_regularizer = QuadraticRegularizer(
-            indices=system.nstates .+ (1:system.ncontrols),
-            vardim=system.vardim,
-            times=1:T-1,
-            R=Rᵤ,
-            eval_hessian=eval_hessian
-        )
+#         u_regularizer = QuadraticRegularizer(
+#             indices=system.nstates .+ (1:system.ncontrols),
+#             vardim=system.vardim,
+#             times=1:T-1,
+#             R=Rᵤ,
+#             eval_hessian=eval_hessian
+#         )
 
-        u_smoothness_regularizer = QuadraticSmoothnessRegularizer(
-            indices=system.nstates .+ (1:system.ncontrols),
-            vardim=system.vardim,
-            times=1:T-1,
-            R=Rₛ,
-            eval_hessian=eval_hessian
-        )
+#         u_smoothness_regularizer = QuadraticSmoothnessRegularizer(
+#             indices=system.nstates .+ (1:system.ncontrols),
+#             vardim=system.vardim,
+#             times=1:T-1,
+#             R=Rₛ,
+#             eval_hessian=eval_hessian
+#         )
 
-        objective =
-            min_time_obj +
-            u_regularizer +
-            u_smoothness_regularizer +
-            additional_objective
-    end
+#         objective =
+#             min_time_obj +
+#             u_regularizer +
+#             u_smoothness_regularizer +
+#             additional_objective
+#     end
 
 
-    if !isempty(L1_regularized_states)
+#     if !isempty(L1_regularized_states)
 
-        n_slack_variables = 2 * length(L1_regularized_states) * T
+#         n_slack_variables = 2 * length(L1_regularized_states) * T
 
-        x_indices = foldr(
-            vcat,
-            [
-                slice(t, L1_regularized_states, system.vardim)
-                    for t = 1:T
-            ]
-        )
+#         x_indices = foldr(
+#             vcat,
+#             [
+#                 slice(t, L1_regularized_states, system.vardim)
+#                     for t = 1:T
+#             ]
+#         )
 
-        params[:x_indices] = x_indices
+#         params[:x_indices] = x_indices
 
-        s1_indices = n_prob_variables .+ (1:n_slack_variables÷2)
+#         s1_indices = n_prob_variables .+ (1:n_slack_variables÷2)
 
-        s2_indices = n_prob_variables .+
-            (n_slack_variables÷2 + 1:n_slack_variables)
+#         s2_indices = n_prob_variables .+
+#             (n_slack_variables÷2 + 1:n_slack_variables)
 
-        params[:s1_indices] = s1_indices
-        params[:s2_indices] = s2_indices
+#         params[:s1_indices] = s1_indices
+#         params[:s2_indices] = s2_indices
 
-        α = foldr(vcat, [α for t = 1:T])
+#         α = foldr(vcat, [α for t = 1:T])
 
-        L1_regularizer = L1SlackRegularizer(
-            s1_indices=s1_indices,
-            s2_indices=s2_indices,
-            α=α,
-            eval_hessian=eval_hessian
-        )
+#         L1_regularizer = L1SlackRegularizer(
+#             s1_indices=s1_indices,
+#             s2_indices=s2_indices,
+#             α=α,
+#             eval_hessian=eval_hessian
+#         )
 
-        objective += L1_regularizer
+#         objective += L1_regularizer
 
-        L1_slack_con = L1SlackConstraint(
-            s1_indices,
-            s2_indices,
-            x_indices;
-            name="L1 slack variable constraint"
-        )
+#         L1_slack_con = L1SlackConstraint(
+#             s1_indices,
+#             s2_indices,
+#             x_indices;
+#             name="L1 slack variable constraint"
+#         )
 
-        params[:n_variables] += n_slack_variables
-        params[:n_slack_variables] = n_slack_variables
+#         params[:n_variables] += n_slack_variables
+#         params[:n_slack_variables] = n_slack_variables
 
-        constraints = vcat(constraints, L1_slack_con)
-    end
+#         constraints = vcat(constraints, L1_slack_con)
+#     end
 
-    dynamics = QuantumDynamics(
-        system,
-        integrator,
-        Z_indices,
-        Δt_indices,
-        T;
-        eval_hessian=eval_hessian
-    )
+#     dynamics = QuantumDynamics(
+#         system,
+#         integrator,
+#         Z_indices,
+#         Δt_indices,
+#         T;
+#         eval_hessian=eval_hessian
+#     )
 
-    evaluator = PicoEvaluator(
-        objective,
-        dynamics,
-        eval_hessian
-    )
+#     evaluator = PicoEvaluator(
+#         init_traj,
+#         objective,
+#         dynamics,
+#         eval_hessian
+#     )
 
-    prob_constraints = problem_constraints(system, params, init_traj)
+#     prob_constraints = problem_constraints(system, params, init_traj)
 
-    cons = vcat(prob_constraints, constraints)
+#     cons = vcat(prob_constraints, constraints)
 
-    variables = initialize_optimizer!(
-        optimizer,
-        evaluator,
-        cons,
-        params[:n_dynamics_constraints],
-        params[:n_variables]
-    )
+#     variables = initialize_optimizer!(
+#         optimizer,
+#         evaluator,
+#         cons,
+#         params[:n_dynamics_constraints],
+#         params[:n_variables]
+#     )
 
-    params[:objective_terms] = objective.terms
+#     params[:objective_terms] = objective.terms
 
-    return QuantumControlProblem(
-        system,
-        variables,
-        optimizer,
-        init_traj,
-        params
-    )
-end
-
-function QuantumControlProblem(
-    system::AbstractSystem,
-    init_traj::Trajectory;
-    kwargs...
-)
-    return QuantumControlProblem(
-        system;
-        T=init_traj.T,
-        Δt=init_traj.Δt,
-        init_traj=init_traj,
-        kwargs...
-    )
-end
-
+#     return QuantumControlProblem(
+#         system,
+#         variables,
+#         optimizer,
+#         init_traj,
+#         params
+#     )
+# end
 
 #
 # QuantumControlProblem methods
 #
 
-function initialize_optimizer!(
-    optimizer::Ipopt.Optimizer,
-    evaluator::PicoEvaluator,
-    constraints::Vector{AbstractConstraint},
-    n_dynamics_constraints::Int,
-    n_variables::Int
-)
-    dynamics_cons = fill(
-        MOI.NLPBoundsPair(0.0, 0.0),
-        n_dynamics_constraints
-    )
-    block_data = MOI.NLPBlockData(dynamics_cons, evaluator, true)
-    MOI.set(optimizer, MOI.NLPBlock(), block_data)
-    MOI.set(optimizer, MOI.ObjectiveSense(), MOI.MIN_SENSE)
-    variables = MOI.add_variables(optimizer, n_variables)
-    constrain!(optimizer, variables, constraints, verbose=true)
-    return variables
-end
+# function initialize_optimizer!(
+#     optimizer::Ipopt.Optimizer,
+#     evaluator::PicoEvaluator,
+#     constraints::Vector{AbstractConstraint},
+#     n_dynamics_constraints::Int,
+#     n_variables::Int
+# )
+#     dynamics_cons = fill(
+#         MOI.NLPBoundsPair(0.0, 0.0),
+#         n_dynamics_constraints
+#     )
+#     block_data = MOI.NLPBlockData(dynamics_cons, evaluator, true)
+#     MOI.set(optimizer, MOI.NLPBlock(), block_data)
+#     MOI.set(optimizer, MOI.ObjectiveSense(), MOI.MIN_SENSE)
+#     variables = MOI.add_variables(optimizer, n_variables)
+#     constrain!(optimizer, variables, constraints, verbose=true)
+#     return variables
+# end
 
 
 function initialize_trajectory!(
     prob::QuantumControlProblem,
-    traj::Trajectory
+    traj::NamedTrajectory
 )
-    for (t, x, u) in zip(1:traj.T, traj.states, traj.actions)
-        MOI.set(
-            prob.optimizer,
-            MOI.VariablePrimalStart(),
-            prob.variables[slice(t, prob.system.vardim)],
-            [x; u]
-        )
-    end
-    Δts = [traj.times[t + 1] - traj.times[t] for t = 1:traj.T-1]
-    Δt = [Δts; Δts[1]]
     MOI.set(
         prob.optimizer,
         MOI.VariablePrimalStart(),
-        prob.variables[prob.params[:Δt_indices]],
-        Δt
+        vec(prob.variables),
+        traj.datavec
     )
 end
 
@@ -528,45 +505,40 @@ initialize_trajectory!(prob::QuantumControlProblem) =
     initialize_trajectory!(prob, prob.trajectory)
 
 function get_variables(prob::QuantumControlProblem)
-    return MOI.get(
+    Z⃗ = MOI.get(
         prob.optimizer,
         MOI.VariablePrimal(),
-        prob.variables
+        vec(prob.variables)
     )
+    return Z⃗
 end
 
 @views function update_traj_data!(prob::QuantumControlProblem)
-    Z̄ = get_variables(prob)
-    Z = Z̄[prob.params[:Z_indices]]
-    Δt = Z̄[prob.params[:Δt_indices]][1:end-1]
-
-    xs = []
-
-    for t = 1:prob.trajectory.T
-        xₜ = Z[slice(t, prob.system.nstates, prob.system.vardim)]
-        push!(xs, xₜ)
-    end
-
-    us = []
-
-    for t = 1:prob.trajectory.T
-        uₜ = Z[
-            slice(
-                t,
-                prob.system.nstates + 1,
-                prob.system.vardim,
-                prob.system.vardim
-            )
-        ]
-        push!(us, uₜ)
-    end
-
-    times = [0.0; cumsum(Δt)]
-
-    prob.trajectory.states .= xs
-    prob.trajectory.actions .= us
-    prob.trajectory.times .= times
-    prob.trajectory.Δt = Z̄[prob.params[:Δt_indices]][end]
+    Z⃗ = get_variables(prob)
+    prob.trajectory = NamedTrajectory(Z⃗, prob.trajectory)
 end
+
+function solve!(
+    prob::QuantumControlProblem;
+    init_traj=prob.trajectory,
+    save_path=nothing,
+    controls_save_path=nothing,
+)
+    initialize_trajectory!(prob, init_traj)
+
+    MOI.optimize!(prob.optimizer)
+
+    update_traj_data!(prob)
+
+    if !isnothing(save_path)
+        save_problem(prob, save_path)
+    end
+
+    if !isnothing(controls_save_path)
+        save_controls(prob, controls_save_path)
+    end
+end
+
+
 
 end

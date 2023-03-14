@@ -1,7 +1,7 @@
 module Constraints
 
 export constrain!
-export constraints
+export trajectory_constraints
 
 export AbstractConstraint
 
@@ -36,12 +36,12 @@ function constrain!(
     end
 end
 
-function constraints(traj::NamedTrajectory)
+function trajectory_constraints(traj::NamedTrajectory)
     cons = AbstractConstraint[]
 
     # add bounds constraints
-    for (name, bound) ∈ traj.bounds
-        ts = [2:traj.T-1]
+    for (name, bound) ∈ pairs(traj.bounds)
+        ts = 2:traj.T-1
         js = traj.components[name]
         con_name = "bounds on $name"
         bounds_con = BoundsConstraint(ts, js, bound, traj.dim; name=con_name)
@@ -49,7 +49,7 @@ function constraints(traj::NamedTrajectory)
     end
 
     # add initial equality constraints
-    for (name, val) ∈ traj.initial
+    for (name, val) ∈ pairs(traj.initial)
         ts = [1]
         js = traj.components[name]
         con_name = "initial value of $name"
@@ -58,7 +58,7 @@ function constraints(traj::NamedTrajectory)
     end
 
     # add final equality constraints
-    for (name, val) ∈ traj.final
+    for (name, val) ∈ pairs(traj.final)
         ts = [traj.T]
         js = traj.components[name]
         con_name = "final value of $name"

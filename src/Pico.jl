@@ -11,14 +11,29 @@ include("quantum_utils.jl")
 include("quantum_systems.jl")
 @reexport using .QuantumSystems
 
+include("losses.jl")
+@reexport using .Losses
+
+include("objectives.jl")
+@reexport using .Objectives
+
 include("integrators.jl")
 @reexport using .Integrators
 
 include("dynamics.jl")
 @reexport using .Dynamics
 
+include("constraints.jl")
+@reexport using .Constraints
+
+include("evaluators.jl")
+@reexport using .Evaluators
+
 include("ipopt_options.jl")
 @reexport using .IpoptOptions
+
+include("problems.jl")
+@reexport using .Problems
 
 include("continuous_trajectories.jl")
 @reexport using .ContinuousTrajectories

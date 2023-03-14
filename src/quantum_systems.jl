@@ -335,14 +335,14 @@ function lie_subalgebra_dim(Hs::Vector{<:AbstractMatrix})
     return length(elements)
 end
 
-sys = MultiModeSystem(3, 14)
+# sys = MultiModeSystem(3, 14)
 
-Hs = [H(G) for G ∈ [sys.G_drift, sys.G_drives...]]
-Gs = [G(H) for H ∈ Hs]
-Gs[2] == sys.G_drives[1]
+# Hs = [H(G) for G ∈ [sys.G_drift, sys.G_drives...]]
+# Gs = [G(H) for H ∈ Hs]
+# Gs[2] == sys.G_drives[1]
 
-lie_subalgebra_dim(Hs[[1,2,4]])
+# lie_subalgebra_dim(Hs[[1,2,4]])
 
-size(Hs[1], 1)^2
+# size(Hs[1], 1)^2
 
 end

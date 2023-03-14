@@ -47,12 +47,12 @@ index(t::Int, pos::Int, dim::Int) = dim * (t - 1) + pos
 index(t, dim) = index(t, dim, dim)
 
 
-slice(t, pos1, pos2, dim) =
+slice(t::Int, pos1::Int, pos2::Int, dim::Int) =
     index(t, pos1, dim):index(t, pos2, dim)
 
-slice(t, pos, dim) = slice(t, 1, pos, dim)
+slice(t::Int, pos::Int, dim::Int) = slice(t, 1, pos, dim)
 
-slice(t, dim; stretch=0) = slice(t, 1, dim + stretch, dim)
+slice(t::Int, dim::Int; stretch=0) = slice(t, 1, dim + stretch, dim)
 
 slice(t::Int, indices::AbstractVector{Int}, dim::Int) =
     dim * (t - 1) .+ indices

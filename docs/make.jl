@@ -35,9 +35,9 @@ makedocs(;
         "Manual" => [
             "Quantum Systems"   => "quantum_systems.md",
             "Quantum Utilities" => "quantum_utils.md",
-            # "Quantum Costs"     => "quantum_costs.md",
+            # "Quantum Losses"     => "quantum_losss.md",
             # "Objectives"        => "objectives.md",
-            # "Costs"             => "costs.md",
+            # "Losses"             => "losss.md",
             # "Constraints"       => "constraints.md",
             # "Integrators"       => "integrators.md",
             # "Problems"          => "problems.md",

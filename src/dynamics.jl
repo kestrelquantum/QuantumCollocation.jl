@@ -9,11 +9,23 @@ using ..QuantumSystems
 using ..Integrators
 
 using NamedTrajectories
+using Base.Iterators
 using LinearAlgebra
 using SparseArrays
-using IterTools
 using ForwardDiff
 using Zygote
+
+
+
+function append_upper_half!(list::Vector, mat::AbstractMatrix)
+    for i = 1:size(mat, 1)
+        for j = i:size(mat, 2)
+            push!(list, mat[i, j])
+        end
+    end
+end
+
+
 
 abstract type AbstractDynamics end
 
@@ -33,71 +45,63 @@ function QuantumDynamics(
     traj::NamedTrajectory
 )
     function F(Z::NamedTrajectory)
-        r = zeros(Z.dims.states * Z.T)
+        r = zeros(Z.dims.states * (Z.T - 1))
         for t = 1:Z.T-1
-            r[slice(t, Z.dims.states)] = f(Z[t], Z[t + 1])
+            zₜ = Z[t].data
+            zₜ₊₁ = Z[t + 1].data
+            r[slice(t, Z.dims.states)] = f(zₜ, zₜ₊₁)
         end
+        return r
     end
 
+    function ∂f(zₜ, zₜ₊₁)
+        ∂zₜf, ∂zₜ₊₁f = Zygote.jacobian(f, zₜ, zₜ₊₁)
+        return hcat(∂zₜf, ∂zₜ₊₁f)
+    end
 
     function ∂F(Z::NamedTrajectory)
-
         ∂ = []
-
-        function ∂f(zₜ, zₜ₊₁)
-            ∂zₜf, ∂zₜ₊₁f = Zygote.jacobian(f, zₜ, zₜ₊₁)
-            return hcat(∂zₜf, ∂zₜ₊₁f)
-        end
-
         for t = 1:Z.T-1
-            zₜ = Z.data[:, t]
-            zₜ₊₁ = Z.data[:, t + 1]
+            zₜ = Z[t].data
+            zₜ₊₁ = Z[t + 1].data
             append!(∂, ∂f(zₜ, zₜ₊₁))
         end
-       return ∂
+        return ∂
     end
 
-    ∂F_structure = []
+    ∂F_structure = Tuple{Int,Int}[]
 
     for t = 1:traj.T-1
-        for pair ∈ product(slice(t, traj.dims.states), slice(t:t+1, traj.dim))
-            append!(∂F_structure, pair)
-        end
+        pairs = product(slice(t, traj.dims.states), slice(t:t+1, traj.dim))
+        append!(∂F_structure, pairs)
     end
 
+    function μ∂²f(zₜzₜ₊₁, μₜ)
+        return ForwardDiff.hessian(
+            zz -> μₜ' * f(zz[1:traj.dim], zz[traj.dim+1:end]),
+            zₜzₜ₊₁
+        )
+    end
 
-
-    function μ∂²F(Z::NamedTrajectory, μ::AbstractVector)
+    function μ∂²F(μ::AbstractVector, Z::NamedTrajectory)
         μ∂² = []
-
-        function μ∂²f(zₜzₜ₊₁, μₜ)
-            return ForwardDiff.hessian(
-                zz -> μₜ' * f(zz[1:Z.dim], zz[Z.dim+1:end]),
-                zₜzₜ₊₁
-            )
-        end
-
         for t = 1:Z.T-1
             zₜzₜ₊₁ = vec(Z.data[:, t:t+1])
             μₜ = μ[slice(t, Z.dims.states)]
-            append!(μ∂², μ∂²f(zₜzₜ₊₁, μₜ))
+            append_upper_half!(μ∂², μ∂²f(zₜzₜ₊₁, μₜ))
         end
-        return μ∂², structure
+        return μ∂²
     end
 
-    μ∂²F_structure = []
+    μ∂²F_structure = Tuple{Int,Int}[]
 
     for t = 1:traj.T-1
-        for pair ∈ product(slice(t, traj.dim), slice(t, traj.dim))
-            append!(μ∂²F_structure, pair)
-        end
+        pairs = collect(product(slice(t:t+1, traj.dim), slice(t:t+1, traj.dim)))
+        append_upper_half!(μ∂²F_structure, pairs)
     end
 
     return QuantumDynamics(F, ∂F, ∂F_structure, μ∂²F, μ∂²F_structure)
 end
-
-
-
 
 
 

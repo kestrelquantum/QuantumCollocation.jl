@@ -5,6 +5,10 @@ export ⊗
 export apply
 export ket_to_iso
 export iso_to_ket
+export unitary_to_iso_vec
+export iso_vec_to_unitary
+export iso_vec_to_iso_unitary
+export iso_unitary_to_iso_vec
 export annihilate
 export create
 export quad
@@ -135,23 +139,60 @@ function normalize(state::Vector{C} where C <: Number)
     return state / norm(state)
 end
 
-function iso_to_unitary(Ũ::Vector)
-    U_dim = div(length(Ũ), 2)
-    U_real = Ũ[1:U_dim]
-    U_imag = Ũ
+function iso_vec_to_unitary(Ũ⃗::AbstractVector)
+    Ũ⃗_dim = div(length(Ũ⃗), 2)
+    ket_dim = Int(sqrt(Ũ⃗_dim))
+    U_real_vec = Ũ⃗[1:Ũ⃗_dim]
+    U_imag_vec = Ũ⃗[(Ũ⃗_dim + 1):end]
+    U_real = reshape(U_real_vec, ket_dim, ket_dim)
+    U_imag = reshape(U_imag_vec, ket_dim, ket_dim)
+    U = U_real + im * U_imag
+    return U
+end
+
+function iso_vec_to_iso_unitary(Ũ⃗::AbstractVector)
+    Ũ⃗_dim = div(length(Ũ⃗), 2)
+    ket_dim = Int(sqrt(Ũ⃗_dim))
+    U_real_vec = Ũ⃗[1:Ũ⃗_dim]
+    U_imag_vec = Ũ⃗[(Ũ⃗_dim + 1):end]
+    U_real = reshape(U_real_vec, ket_dim, ket_dim)
+    U_imag = reshape(U_imag_vec, ket_dim, ket_dim)
+    Ũ = vcat(hcat(U_real, -U_imag), hcat(U_imag, U_real))
+    return Ũ
+end
+
+function unitary_to_iso_vec(U::AbstractMatrix)
+    U_real = real(U)
+    U_imag = imag(U)
+    U_real_vec = vec(U_real)
+    U_imag_vec = vec(U_imag)
+    Ũ⃗ = [U_real_vec; U_imag_vec]
+    return Ũ⃗
+end
+
+function iso_unitary_to_iso_vec(Ũ::AbstractMatrix)
+    ket_dim = size(Ũ, 1) ÷ 2
+    U_real = Ũ[1:ket_dim, 1:ket_dim]
+    U_imag = Ũ[(ket_dim + 1):end, 1:ket_dim]
+    U_real_vec = vec(U_real)
+    U_imag_vec = vec(U_imag)
+    Ũ⃗ = [U_real_vec; U_imag_vec]
+    return Ũ⃗
+end
+
 
 
 """
     quantum metrics
 """
 
-function fidelity(ψ̃, ψ̃_goal)
-    ψ = iso_to_ket(ψ̃)
-    ψ_goal = iso_to_ket(ψ̃_goal)
-    return abs2(ψ' * ψ_goal)
-end
+# function fidelity(ψ̃, ψ̃_goal)
+#     ψ = iso_to_ket(ψ̃)
+#     ψ_goal = iso_to_ket(ψ̃_goal)
+#     return abs2(ψ' * ψ_goal)
+# end
 
-infidelity(ψ̃, ψ̃_goal) = 1 - fidelity(ψ̃, ψ̃_goal)
+# infidelity(ψ̃, ψ̃_goal) = 1 - fidelity(ψ̃, ψ̃_goal)
 
 
 """

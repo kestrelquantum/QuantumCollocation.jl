@@ -31,6 +31,7 @@ export μₜ∂Δtₜ∂aₜ
 
 using ..IndexingUtils
 using ..QuantumSystems
+using ..QuantumUtils
 
 using LinearAlgebra
 
@@ -154,18 +155,43 @@ struct FourthOrderPade <: QuantumStateIntegrator
 end
 
 function (integrator::FourthOrderPade)(
-    ψ̃ₜ₊₁::AbstractVector,
-    ψ̃ₜ::AbstractVector,
-    aₜ::AbstractVector,
-    Δt::Real
+    xₜ₊₁::AbstractVector,
+    xₜ::AbstractVector,
+    uₜ::AbstractVector,
+    Δt::Real;
+    operator=false
 )
-    Gₜ = G(aₜ, integrator.G_drift, integrator.G_drives)
+    Gₜ = G(uₜ, integrator.G_drift, integrator.G_drives)
     Id = I(size(Gₜ, 1))
-    # return (Id - Δt / 2 * Gₜ + Δt^2 / 9 * Gₜ^2) * ψ̃ₜ₊₁ -
-    #        (Id + Δt / 2 * Gₜ + Δt^2 / 9 * Gₜ^2) * ψ̃ₜ
-    return (Id + Δt^2 / 9 * Gₜ^2) * (ψ̃ₜ₊₁ - ψ̃ₜ) -
-        Δt / 2 * Gₜ * (ψ̃ₜ₊₁ + ψ̃ₜ)
+    if operator
+        Ũₜ₊₁ = iso_vec_to_iso_unitary(xₜ₊₁)
+        Ũₜ = iso_vec_to_iso_unitary(xₜ)
+        δŨ = (Id + Δt^2 / 9 * Gₜ^2) * (Ũₜ₊₁ - Ũₜ) -
+            Δt / 2 * Gₜ * (Ũₜ₊₁ + Ũₜ)
+        δŨ⃗ = iso_unitary_to_iso_vec(δŨ)
+        return δŨ⃗
+    else
+        δx = (Id + Δt^2 / 9 * Gₜ^2) * (xₜ₊₁ - xₜ) -
+            Δt / 2 * Gₜ * (xₜ₊₁ + xₜ)
+        return δx
+    end
 end
+
+
+
+# function (integrator::FourthOrderPade)(
+#     ψ̃ₜ₊₁::AbstractVector,
+#     ψ̃ₜ::AbstractVector,
+#     aₜ::AbstractVector,
+#     Δt::Real
+# )
+#     Gₜ = G(aₜ, integrator.G_drift, integrator.G_drives)
+#     Id = I(size(Gₜ, 1))
+#     # return (Id - Δt / 2 * Gₜ + Δt^2 / 9 * Gₜ^2) * ψ̃ₜ₊₁ -
+#     #        (Id + Δt / 2 * Gₜ + Δt^2 / 9 * Gₜ^2) * ψ̃ₜ
+#     return (Id + Δt^2 / 9 * Gₜ^2) * (ψ̃ₜ₊₁ - ψ̃ₜ) -
+#         Δt / 2 * Gₜ * (ψ̃ₜ₊₁ + ψ̃ₜ)
+# end
 
 function fourth_order_pade(Gₜ::Matrix)
     Id = I(size(Gₜ, 1))
