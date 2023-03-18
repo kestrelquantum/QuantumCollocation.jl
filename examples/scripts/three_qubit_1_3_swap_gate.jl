@@ -17,8 +17,8 @@ U_goal = [
     0 0 0 0 0 0 0 1
 ] |> Matrix{ComplexF64}
 
-a = create(2)
-a_dag = annihilate(2)
+a_dag = create(2)
+a = annihilate(2)
 
 ωs = [5.18, 5.12, 5.06]
 ω_d = 5.12
@@ -51,7 +51,7 @@ H_drift +=
     J_23 * (lift(a_dag, 2, 3) * lift(a, 3, 3) + lift(a, 2, 3) * lift(a_dag, 3, 3))
 
 H_drives_Re = [lift(a, j, 3) + lift(a_dag, j, 3) for j = 1:3]
-H_drives_Im = [lift(a, j, 3) - lift(a_dag, j, 3) for j = 1:3]
+H_drives_Im = [1im * (lift(a, j, 3) - lift(a_dag, j, 3)) for j = 1:3]
 
 H_drives = vcat(H_drives_Re, H_drives_Im)
 n_drives = length(H_drives)
@@ -140,6 +140,32 @@ R = 0.1 * ones(n_drives)
 
 J += QuadraticRegularizer(:u, traj, R)
 
-prob = QuantumControlProblem(system, traj, J, f)
+max_iter = 500
+
+options = Options(
+    max_iter=max_iter,
+)
+
+prob = QuantumControlProblem(system, traj, J, f;
+    options=options,
+)
+
+plot_dir = "examples/scripts/plots/three_qubit_swap/"
+
+experiment = "T_$(T)_Q_$(Q)_iter_$(max_iter)"
+
+plot_path = generate_file_path("png", experiment, plot_dir)
+
+plot(plot_path, prob.trajectory, [:Ũ⃗, :u], ignored_labels=[:Ũ⃗])
 
 solve!(prob)
+
+fid = unitary_fidelity(prob.trajectory[end].Ũ⃗, prob.trajectory.goal.Ũ⃗)
+
+experiment *= "_fidelity_$(fid)"
+
+plot_path = generate_file_path("png", experiment, plot_dir)
+
+plot(plot_path, prob.trajectory, [:Ũ⃗, :u], ignored_labels=[:Ũ⃗])
+
+println("Final fidelity: ", fid)

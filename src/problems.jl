@@ -9,6 +9,7 @@ export update_traj_data!
 export get_traj_data
 export get_variables
 export solve!
+export generate_file_path
 
 using ..IndexingUtils
 using ..QuantumSystems
@@ -26,7 +27,7 @@ const MOI = MathOptInterface
 
 abstract type AbstractProblem end
 
-struct QuantumControlProblem <: AbstractProblem
+mutable struct QuantumControlProblem <: AbstractProblem
     system::AbstractSystem
     variables::Matrix{MOI.VariableIndex}
     optimizer::Ipopt.Optimizer
@@ -537,6 +538,40 @@ function solve!(
     if !isnothing(controls_save_path)
         save_controls(prob, controls_save_path)
     end
+end
+
+
+function generate_file_path(extension, file_name, path)
+    # Ensure the path exists.
+    mkpath(path)
+
+    # Create a save file name based on the one given; ensure it will
+    # not conflict with others in the directory.
+    max_numeric_suffix = -1
+    for (_, _, files) in walkdir(path)
+        for file_name_ in files
+            if occursin("$(file_name)", file_name_) && occursin(".$(extension)", file_name_)
+
+                numeric_suffix = parse(
+                    Int,
+                    split(split(file_name_, "_")[end], ".")[1]
+                )
+
+                max_numeric_suffix = max(
+                    numeric_suffix,
+                    max_numeric_suffix
+                )
+            end
+        end
+    end
+
+    file_path = joinpath(
+        path,
+        file_name *
+        "_$(lpad(max_numeric_suffix + 1, 5, '0')).$(extension)"
+    )
+
+    return file_path
 end
 
 

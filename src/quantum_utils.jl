@@ -16,7 +16,7 @@ export cavity_state
 export number
 export normalize
 export fidelity
-export infidelity
+export unitary_fidelity
 export population
 export populations
 
@@ -186,14 +186,17 @@ end
     quantum metrics
 """
 
-# function fidelity(ψ̃, ψ̃_goal)
-#     ψ = iso_to_ket(ψ̃)
-#     ψ_goal = iso_to_ket(ψ̃_goal)
-#     return abs2(ψ' * ψ_goal)
-# end
+function fidelity(ψ̃, ψ̃_goal)
+    ψ = iso_to_ket(ψ̃)
+    ψ_goal = iso_to_ket(ψ̃_goal)
+    return abs2(ψ' * ψ_goal)
+end
 
-# infidelity(ψ̃, ψ̃_goal) = 1 - fidelity(ψ̃, ψ̃_goal)
-
+function unitary_fidelity(Ũ⃗::Vector, Ũ⃗_goal::Vector)
+    U = iso_vec_to_unitary(Ũ⃗)
+    Ugoal = iso_vec_to_unitary(Ũ⃗_goal)
+    return abs2(tr(U'Ugoal))
+end
 
 """
     quantum measurement functions
