@@ -15,7 +15,7 @@ n_levels = 2
 ψ_init = [1.0, 0.0]
 
 # gate to be applied
-gate = σy
+gate = σx
 
 # defining goal value of wavefunction
 ψ_goal = gate * ψ_init
@@ -80,10 +80,14 @@ comps = (
     Δt = Δt
 )
 
+ddu_bound = 2e-1
+
 # defining bounds
 bounds = (
     γ = fill(γ_bound, γ_dim),
     α = fill(α_bound, α_dim),
+    ddγ = fill(ddu_bound, γ_dim),
+    ddα = fill(ddu_bound, α_dim),
     Δt = (dt_min, dt_max)
 )
 
@@ -182,7 +186,7 @@ J += QuadraticRegularizer(:ddγ, traj, R_ddγ * ones(γ_dim))
 J += QuadraticRegularizer(:ddα, traj, R_ddα * ones(α_dim))
 
 # setting maximum number of iterations
-max_iter = 100
+max_iter = 500
 
 # Ipopt options
 options = Options(
@@ -213,16 +217,23 @@ solve!(prob)
 
 # calculating unitary fidelity
 fid = fidelity(prob.trajectory[end].ψ̃, prob.trajectory.goal.ψ̃)
-println("Final fidelity: ", fid)
+println("Final fidelity:       ", fid)
 
-# rollout test
-# ψ₁ = [1, 0]
-# ψ̃₁ = ket_to_iso(ψ₁)
-# ψ̃_goal = ket_to_iso(σy * ψ₁)
-# controls = vcat(prob.trajectory.γ, prob.trajectory.α)
-# Ψ̃ = rollout(ψ̃₁, controls, vec(prob.trajectory.Δt), system)
-# println("|0⟩ Rollout fidelity:   ", fidelity(Ψ̃[:, end], ψ̃_goal))
+drives = vcat(prob.trajectory.γ, prob.trajectory.α)
+Δts = vec(prob.trajectory.Δt)
+
+# |0⟩ rollout test
+ψ₁ = [1, 0]
+ψ̃₁ = ket_to_iso(ψ₁)
+ψ̃₁_goal = ket_to_iso(gate * ψ₁)
+Ψ̃₁ = rollout(ψ̃₁, drives, Δts, system)
+println("|0⟩ Rollout fidelity: ", fidelity(Ψ̃₁[:, end], ψ̃₁_goal))
 
 # new plot name with fidelity included
 plot_path = split(plot_path, ".")[1] * "_fidelity_$(fid).png"
 plot(plot_path, prob.trajectory, [:ψ̃, :γ, :α], ignored_labels=[:ψ̃], dt_name=:Δt)
+
+# save the trajectory
+save_dir = "examples/scripts/trajectories/single_qubit/state_transfer"
+save_path = generate_file_path("jld2", experiment, save_dir)
+save(save_path, prob.trajectory)
