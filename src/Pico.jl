@@ -35,6 +35,9 @@ include("ipopt_options.jl")
 include("problems.jl")
 @reexport using .Problems
 
+include("rollouts.jl")
+@reexport using .Rollouts
+
 include("continuous_trajectories.jl")
 @reexport using .ContinuousTrajectories
 

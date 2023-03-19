@@ -39,14 +39,7 @@ end
 function trajectory_constraints(traj::NamedTrajectory)
     cons = AbstractConstraint[]
 
-    # add bounds constraints
-    for (name, bound) ∈ pairs(traj.bounds)
-        ts = 2:traj.T-1
-        js = traj.components[name]
-        con_name = "bounds on $name"
-        bounds_con = BoundsConstraint(ts, js, bound, traj.dim; name=con_name)
-        push!(cons, bounds_con)
-    end
+    init_names = []
 
     # add initial equality constraints
     for (name, val) ∈ pairs(traj.initial)
@@ -55,7 +48,10 @@ function trajectory_constraints(traj::NamedTrajectory)
         con_name = "initial value of $name"
         eq_con = EqualityConstraint(ts, js, val, traj.dim; name=con_name)
         push!(cons, eq_con)
+        push!(init_names, name)
     end
+
+    final_names = []
 
     # add final equality constraints
     for (name, val) ∈ pairs(traj.final)
@@ -64,6 +60,25 @@ function trajectory_constraints(traj::NamedTrajectory)
         con_name = "final value of $name"
         eq_con = EqualityConstraint(ts, js, val, traj.dim; name=con_name)
         push!(cons, eq_con)
+        push!(final_names, name)
+    end
+
+    # add bounds constraints
+    for (name, bound) ∈ pairs(traj.bounds)
+        if name ∈ init_names && name ∈ final_names
+            ts = 2:traj.T-1
+        elseif name ∈ init_names && !(name ∈ final_names)
+            ts = 2:traj.T
+        elseif name ∈ final_names && !(name ∈ init_names)
+            ts = 1:traj.T-1
+        else
+            ts = 1:traj.T
+        end
+        js = traj.components[name]
+        con_name = "bounds on $name"
+        bounds = collect(zip(bound[1], bound[2]))
+        bounds_con = BoundsConstraint(ts, js, bounds, traj.dim; name=con_name)
+        push!(cons, bounds_con)
     end
 
     return cons

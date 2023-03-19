@@ -194,8 +194,8 @@ end
 
 function unitary_fidelity(Ũ⃗::Vector, Ũ⃗_goal::Vector)
     U = iso_vec_to_unitary(Ũ⃗)
-    Ugoal = iso_vec_to_unitary(Ũ⃗_goal)
-    return abs2(tr(U'Ugoal))
+    U_goal = iso_vec_to_unitary(Ũ⃗_goal)
+    return abs2(tr(U'U_goal))
 end
 
 """

@@ -91,7 +91,7 @@ end
 function QuantumObjective(;
     names::Union{Nothing,Tuple{Vararg{Symbol}}}=nothing,
     name::Union{Nothing,Symbol}=nothing,
-    goals::Union{Nothing,AbstractVector{Float64},Tuple{Vararg{AbstractVector{Float64}}}}=nothing,
+    goals::Union{Nothing,AbstractVector{<:Real},Tuple{Vararg{AbstractVector{<:Real}}}}=nothing,
 	loss::Symbol=:InfidelityLoss,
 	Q::Union{Float64, Vector{Float64}}=100.0,
 	eval_hessian::Bool=true
@@ -103,7 +103,7 @@ function QuantumObjective(;
         names = (name,)
     end
 
-    if goals isa AbstractVector{Float64}
+    if goals isa AbstractVector
         goals = (goals,)
     end
 
