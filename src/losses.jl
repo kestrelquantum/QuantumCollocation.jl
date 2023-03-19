@@ -158,22 +158,17 @@ struct InfidelityLoss <: AbstractLoss
     wfn_name::Symbol
 
     function InfidelityLoss(
-        Z::NamedTrajectory,
-        wfn_name::Symbol
+        name::Symbol,
+        ψ̃_goal::AbstractVector
     )
-        @assert wfn_name ∈ Z.names
-        @assert Z.goal[wfn_name] isa AbstractVector
-
-        ψ̃_goal = Z.goal[wfn_name]
-
         l = ψ̃ -> infidelity(ψ̃, ψ̃_goal)
         ∇l = ψ̃ -> ForwardDiff.gradient(l, ψ̃)
 
-        Symbolics.@variables ψ̃[1:Z.dims[wfn_name]]
+        Symbolics.@variables ψ̃[1:length(ψ̃_goal)]
         ψ̃ = collect(ψ̃)
 
         ∇²l_symbolic = Symbolics.sparsehessian(l(ψ̃), ψ̃)
-        K, J, _ = findnz(∇²l_symb)
+        K, J, _ = findnz(∇²l_symbolic)
         kjs = collect(zip(K, J))
         filter!(((k, j),) -> k ≤ j, kjs)
         ∇²l_structure = kjs
@@ -181,18 +176,25 @@ struct InfidelityLoss <: AbstractLoss
         ∇²l_expression = Symbolics.build_function(∇²l_symbolic, ψ̃)
         ∇²l = eval(∇²l_expression[1])
 
-        return new(l, ∇l, ∇²l, ∇²l_structure, wfn_name)
+        return new(l, ∇l, ∇²l, ∇²l_structure, name)
     end
 end
 
-function (loss::InfidelityLoss)(Z::NamedTrajectory; gradient=false, hessian=false)
+function (loss::InfidelityLoss)(
+    Z::NamedTrajectory;
+    gradient=false,
+    hessian=false
+)
     @assert !(gradient && hessian)
+
+    ψ̃_end = Z[end][loss.wfn_name]
+
     if !(gradient || hessian)
-        return loss.l(Z[end][loss.wfn_name])
+        return loss.l(ψ̃_end)
     elseif gradient
-        return loss.∇l(Z[end][loss.wfn_name])
+        return loss.∇l(ψ̃_end)
     elseif hessian
-        return loss.∇²l(Z[end][loss.wfn_name])
+        return loss.∇²l(ψ̃_end)
     end
 end
 

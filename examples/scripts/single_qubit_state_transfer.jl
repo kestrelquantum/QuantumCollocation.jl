@@ -11,11 +11,14 @@ n_levels = 2
 σy = GATES[:Y]
 σz = GATES[:Z]
 
-# definining initial value of unitary
-U_init = 1.0 * I(n_levels)
+# definining initial value of wavefunction
+ψ_init = [1.0, 0.0]
 
-# definining goal value of unitary
-U_goal = σy
+# gate to be applied
+gate = σy
+
+# defining goal value of wavefunction
+ψ_goal = gate * ψ_init
 
 # defining pauli ladder operators
 σ₋ = 0.5 * (σx + 1im * σy)
@@ -30,12 +33,12 @@ H_drift = zeros(n_levels, n_levels)
 # building quantum system
 system = QuantumSystem(H_drift, H_drives)
 
-# converting unitaries to isomorphic vector representation
-Ũ⃗_init = unitary_to_iso_vec(U_init)
-Ũ⃗_goal = unitary_to_iso_vec(U_goal)
+# convert wavefunctions to isomorphic vector representation
+ψ̃_init = ket_to_iso(ψ_init)
+ψ̃_goal = ket_to_iso(ψ_goal)
 
 # getting dimension of the isomorphic vector representation
-Ũ⃗_dim = length(Ũ⃗_init)
+ψ̃_dim = length(ψ̃_init)
 
 # defining time parameters
 max_duration = 10 # μs = 10e-6 s
@@ -63,11 +66,11 @@ dt_min = 0.5 * dt
 
 u = vcat(γ, α)
 
-Ũ⃗ = unitary_rollout(Ũ⃗_init, u, Δt, system)
+ψ̃ = rollout(ψ̃_init, u, Δt, system)
 
 # defining components for trajectory
 comps = (
-    Ũ⃗ = Ũ⃗,
+    ψ̃ = ψ̃,
     γ = γ,
     dγ = randn(γ_dim, T),
     ddγ = randn(γ_dim, T),
@@ -86,7 +89,7 @@ bounds = (
 
 # defining initial values
 initial = (
-    Ũ⃗ = Ũ⃗_init,
+    ψ̃ = ψ̃_init,
     γ = zeros(γ_dim),
     α = zeros(α_dim)
 )
@@ -99,7 +102,7 @@ final = (
 
 # defining goal states
 goal = (
-    Ũ⃗ = Ũ⃗_goal,
+    ψ̃ = ψ̃_goal,
 )
 
 # creating named trajectory
@@ -119,8 +122,9 @@ P = FourthOrderPade(system)
 
 # defining dynamics function
 function f(zₜ, zₜ₊₁)
-    Ũ⃗ₜ₊₁ = zₜ₊₁[traj.components.Ũ⃗]
-    Ũ⃗ₜ = zₜ[traj.components.Ũ⃗]
+    # wavefunction states
+    ψ̃ₜ₊₁ = zₜ₊₁[traj.components.ψ̃]
+    ψ̃ₜ = zₜ[traj.components.ψ̃]
 
     # γ states + augmented states + controls
     γₜ₊₁ = zₜ₊₁[traj.components.γ]
@@ -145,7 +149,7 @@ function f(zₜ, zₜ₊₁)
 
     # controls for pade integrator
     uₜ = [γₜ; αₜ]
-    δŨ⃗ = P(Ũ⃗ₜ₊₁, Ũ⃗ₜ, uₜ, Δtₜ; operator=true)
+    δψ̃ = P(ψ̃ₜ₊₁, ψ̃ₜ, uₜ, Δtₜ)
 
     # γ dynamics
     δγ = γₜ₊₁ - γₜ - dγₜ * Δtₜ
@@ -155,17 +159,17 @@ function f(zₜ, zₜ₊₁)
     δα = αₜ₊₁ - αₜ - dαₜ * Δtₜ
     δdα = dαₜ₊₁ - dαₜ - ddαₜ * Δtₜ
 
-    return vcat(δŨ⃗, δγ, δdγ, δα, δdα)
+    return vcat(δψ̃, δγ, δdγ, δα, δdα)
 end
 
 # quantum objective weight parameter
 Q = 1.0e2
 
-# defining unitary loss
-loss = :UnitaryInfidelityLoss
+# defining infidelity loss
+loss = :InfidelityLoss
 
 # creating quantum objective
-J = QuantumObjective(:Ũ⃗, traj, loss, Q)
+J = QuantumObjective(:ψ̃, traj, loss, Q)
 
 # regularization parameters
 R_ddγ = 1e-4
@@ -178,7 +182,7 @@ J += QuadraticRegularizer(:ddγ, traj, R_ddγ * ones(γ_dim))
 J += QuadraticRegularizer(:ddα, traj, R_ddα * ones(α_dim))
 
 # setting maximum number of iterations
-max_iter = 2000
+max_iter = 100
 
 # Ipopt options
 options = Options(
@@ -191,7 +195,7 @@ prob = QuantumControlProblem(system, traj, J, f;
 )
 
 # plotting directory
-plot_dir = "examples/scripts/plots/single_qubit/Y_gate"
+plot_dir = "examples/scripts/plots/single_qubit/state_transfer"
 
 # experiment name
 experiment = "T_$(T)_Q_$(Q)_iter_$(max_iter)"
@@ -200,7 +204,7 @@ experiment = "T_$(T)_Q_$(Q)_iter_$(max_iter)"
 plot_path = generate_file_path("png", experiment, plot_dir)
 
 # plotting initial trajectory
-plot(plot_path, prob.trajectory, [:Ũ⃗, :γ, :α]; ignored_labels=[:Ũ⃗], dt_name=:Δt)
+plot(plot_path, prob.trajectory, [:ψ̃, :γ, :α]; ignored_labels=[:ψ̃], dt_name=:Δt)
 
 # solving the problem
 solve!(prob)
@@ -208,18 +212,17 @@ solve!(prob)
 @info "" prob.trajectory.Δt
 
 # calculating unitary fidelity
-fid = unitary_fidelity(prob.trajectory[end].Ũ⃗, prob.trajectory.goal.Ũ⃗)
-println("Final unitary fidelity: ", fid)
+fid = fidelity(prob.trajectory[end].ψ̃, prob.trajectory.goal.ψ̃)
+println("Final fidelity: ", fid)
 
 # rollout test
-ψ₁ = [1, 0]
-ψ̃₁ = ket_to_iso(ψ₁)
-ψ̃_goal = ket_to_iso(σy * ψ₁)
-controls = vcat(prob.trajectory.γ, prob.trajectory.α)
-Ψ̃ = rollout(ψ̃₁, controls, vec(prob.trajectory.Δt), system)
-println("|0⟩ Rollout fidelity:   ", fidelity(Ψ̃[:, end], ψ̃_goal))
+# ψ₁ = [1, 0]
+# ψ̃₁ = ket_to_iso(ψ₁)
+# ψ̃_goal = ket_to_iso(σy * ψ₁)
+# controls = vcat(prob.trajectory.γ, prob.trajectory.α)
+# Ψ̃ = rollout(ψ̃₁, controls, vec(prob.trajectory.Δt), system)
+# println("|0⟩ Rollout fidelity:   ", fidelity(Ψ̃[:, end], ψ̃_goal))
 
 # new plot name with fidelity included
-experiment *= "_fidelity_$(fid)"
-plot_path = generate_file_path("png", experiment, plot_dir)
-plot(plot_path, prob.trajectory, [:Ũ⃗, :γ, :α], ignored_labels=[:Ũ⃗], dt_name=:Δt)
+plot_path = split(plot_path, ".")[1] * "_fidelity_$(fid).png"
+plot(plot_path, prob.trajectory, [:ψ̃, :γ, :α], ignored_labels=[:ψ̃], dt_name=:Δt)
