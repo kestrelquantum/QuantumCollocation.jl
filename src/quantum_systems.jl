@@ -31,6 +31,8 @@ where ``\Im(H)`` and ``\Re(H)`` are the imaginary and real parts of ``H`` and th
 """
 G(H::AbstractMatrix{<:Number}) = I(2) ⊗ imag(H) - Im2 ⊗ real(H)
 
+iso(H::AbstractMatrix{<:Number}) = I(2) ⊗ real(H) + Im2 ⊗ imag(H)
+
 
 """
     H(G::AbstractMatrix{<:Number})::Matrix{ComplexF64}
@@ -40,9 +42,9 @@ Returns the inverse of `G(H) = iso(-iH)`, i.e. returns H
 """
 function H(G::AbstractMatrix{<:Number})
     dim = size(G, 1) ÷ 2
-    imagH = G[1:dim, 1:dim]
-    realH = -G[dim+1:end, 1:dim]
-    return realH + 1im * imagH
+    H_imag = G[1:dim, 1:dim]
+    H_real = -G[dim+1:end, 1:dim]
+    return H_real + 1im * H_imag
 end
 
 """

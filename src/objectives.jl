@@ -139,11 +139,13 @@ function QuantumObjective(;
 
     function ∂²L_structure(Z::NamedTrajectory)
         structure = []
+        final_time_offset = index(Z.T, 0, Z.dim)
         for (name, loss) ∈ zip(names, losses)
-            name_comps = Z.components[name]
-            comp_start_idx = name_comps[1]
-            comp_hessian_structure =
-                [ij .+ (comp_start_idx - 1) for ij ∈ loss.∇²l_structure]
+            comp_start_offset = Z.components[name][1] - 1
+            comp_hessian_structure = [
+                ij .+ (final_time_offset + comp_start_offset)
+                    for ij ∈ loss.∇²l_structure
+            ]
             append!(structure, comp_hessian_structure)
         end
         return structure
@@ -185,7 +187,7 @@ function QuantumObjective(
     loss::Symbol,
     Q::Float64
 )
-    goals = (traj.goal[name] for name in names)
+    goals = Tuple(traj.goal[name] for name in names)
     return QuantumObjective(names=names, goals=goals, loss=loss, Q=Q)
 end
 

@@ -4,7 +4,7 @@ using LinearAlgebra
 using Distributions
 
 # setting maximum number of iterations
-max_iter = 5000
+max_iter = 2000
 
 # defining levels for single qubit system
 n_levels = 2
@@ -65,7 +65,7 @@ dt_min = 0.5 * dt
 load_saved_traj = true
 
 if load_saved_traj
-    saved_traj_path = "examples/scripts/trajectories/single_qubit/state_transfer/T_100_Q_100.0_iter_500_00003.jld2"
+    saved_traj_path = "examples/scripts/trajectories/single_qubit/state_transfer/T_100_Q_100.0_iter_500_00004.jld2"
     loaded_traj = load_traj(saved_traj_path)
     γ = loaded_traj.γ
     dγ = loaded_traj.dγ
@@ -189,7 +189,8 @@ end
 Q = 1.0e2
 
 # defining unitary loss
-loss = :UnitaryInfidelityLoss
+# loss = :UnitaryInfidelityLoss
+loss = :UnitaryTraceLoss
 
 # creating quantum objective
 J = QuantumObjective(:Ũ⃗, traj, loss, Q)
@@ -256,7 +257,7 @@ println("|1⟩ Rollout fidelity:   ", fidelity(Ψ̃₂[:, end], ψ̃₂_goal))
 
 # new plot name with fidelity included
 experiment *= "_fidelity_$(fid)"
-plot_path = split(plot_path, ".")[1] * "_fidelity_$(fid).png"
+plot_path = join(split(plot_path, ".")[1:end-1]) * "_fidelity_$(fid).png"
 
 add_component!(prob.trajectory, :ψ̃₁, Ψ̃₁)
 
