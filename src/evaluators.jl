@@ -35,8 +35,7 @@ function MOI.eval_objective(
     evaluator::PicoEvaluator,
     Z⃗::AbstractVector
 )
-    Z = NamedTrajectory(Z⃗, evaluator.trajectory)
-    return evaluator.objective.L(Z)
+    return evaluator.objective.L(Z⃗, evaluator.trajectory)
 end
 
 function MOI.eval_objective_gradient(
@@ -44,8 +43,7 @@ function MOI.eval_objective_gradient(
     ∇::AbstractVector,
     Z⃗::AbstractVector
 )
-    Z = NamedTrajectory(Z⃗, evaluator.trajectory)
-    ∇ .= evaluator.objective.∇L(Z)
+    ∇ .= evaluator.objective.∇L(Z⃗, evaluator.trajectory)
     return nothing
 end
 
@@ -57,8 +55,7 @@ function MOI.eval_constraint(
     g::AbstractVector,
     Z⃗::AbstractVector
 )
-    Z = NamedTrajectory(Z⃗, evaluator.trajectory)
-    g .= evaluator.dynamics.F(Z)
+    g .= evaluator.dynamics.F(Z⃗)
     return nothing
 end
 
@@ -71,8 +68,7 @@ function MOI.eval_constraint_jacobian(
     J::AbstractVector,
     Z⃗::AbstractVector
 )
-    Z = NamedTrajectory(Z⃗, evaluator.trajectory)
-    ∂s = evaluator.dynamics.∂F(Z)
+    ∂s = evaluator.dynamics.∂F(Z⃗)
     for (k, ∇ₖ) in enumerate(∂s)
         J[k] = ∇ₖ
     end
@@ -97,17 +93,15 @@ function MOI.eval_hessian_lagrangian(
     σ::T,
     μ::AbstractVector{T}
 ) where T
-    Z = NamedTrajectory(Z⃗, evaluator.trajectory)
-
-    σ∂²Ls = σ * evaluator.objective.∂²L(Z)
+    σ∂²Ls = σ * evaluator.objective.∂²L(Z⃗, evaluator.trajectory)
 
     for (k, σ∂²Lₖ) in enumerate(σ∂²Ls)
         H[k] = σ∂²Lₖ
     end
 
-    μ∂²Fs = evaluator.dynamics.μ∂²F(μ, Z)
+    μ∂²Fs = evaluator.dynamics.μ∂²F(μ, Z⃗)
 
-    offset = length(evaluator.objective.∂²L_structure(Z))
+    offset = length(evaluator.objective.∂²L_structure(evaluator.trajectory))
 
     for (k, μ∂²Fₖ) in enumerate(μ∂²Fs)
         H[offset + k] = μ∂²Fₖ

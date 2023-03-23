@@ -65,7 +65,7 @@ dt_min = 0.5 * dt
 load_saved_traj = true
 
 if load_saved_traj
-    saved_traj_path = "examples/scripts/trajectories/single_qubit/state_transfer/T_100_Q_100.0_iter_500_00004.jld2"
+    saved_traj_path = "examples/scripts/trajectories/single_qubit/state_transfer/T_100_Q_100.0_iter_500_00000.jld2"
     loaded_traj = load_traj(saved_traj_path)
     γ = loaded_traj.γ
     dγ = loaded_traj.dγ
@@ -189,8 +189,8 @@ end
 Q = 1.0e2
 
 # defining unitary loss
-# loss = :UnitaryInfidelityLoss
-loss = :UnitaryTraceLoss
+loss = :UnitaryInfidelityLoss
+# loss = :UnitaryTraceLoss
 
 # creating quantum objective
 J = QuantumObjective(:Ũ⃗, traj, loss, Q)

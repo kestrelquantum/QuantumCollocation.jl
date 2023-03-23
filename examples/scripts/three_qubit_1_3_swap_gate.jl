@@ -140,7 +140,7 @@ R = 0.1 * ones(n_drives)
 
 J += QuadraticRegularizer(:u, traj, R)
 
-max_iter = 500
+max_iter = 50
 
 options = Options(
     max_iter=max_iter,

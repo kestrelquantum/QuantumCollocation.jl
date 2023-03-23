@@ -47,7 +47,7 @@ end
 function unitary_infidelity(Ũ⃗::Vector, Ũ⃗_goal::Vector)
     U = iso_vec_to_unitary(Ũ⃗)
     Ugoal = iso_vec_to_unitary(Ũ⃗_goal)
-    return abs(1 - abs2(tr(U'Ugoal)))
+    return abs(1 - abs2(tr(Ugoal'U)))
 end
 
 function unitary_trace_loss(Ũ⃗::Vector, Ũ⃗_goal::Vector)
@@ -131,13 +131,11 @@ struct UnitaryTraceLoss <: AbstractLoss
 end
 
 function (loss::UnitaryTraceLoss)(
-    Z::NamedTrajectory;
+    Ũ⃗_end::AbstractVector{<:Real};
     gradient=false,
     hessian=false
 )
     @assert !(gradient && hessian)
-
-    Ũ⃗_end = Z[end][loss.name]
 
     if !(gradient || hessian)
         return loss.l(Ũ⃗_end)
@@ -162,33 +160,44 @@ struct UnitaryInfidelityLoss <: AbstractLoss
         name::Symbol,
         Ũ⃗_goal::AbstractVector
     )
+        # l = Ũ⃗ -> unitary_infidelity(Ũ⃗, Ũ⃗_goal)
+        # ∇l = Ũ⃗ -> ForwardDiff.gradient(l, Ũ⃗)
+
+        # Symbolics.@variables Ũ⃗[1:length(Ũ⃗_goal)]
+        # Ũ⃗ = collect(Ũ⃗)
+
+        # ∇²l_symbolic = Symbolics.sparsehessian(l(Ũ⃗), Ũ⃗)
+        # K, J, _ = findnz(∇²l_symbolic)
+        # kjs = collect(zip(K, J))
+        # filter!(((k, j),) -> k ≤ j, kjs)
+        # ∇²l_structure = kjs
+
+        # ∇²l_expression = Symbolics.build_function(∇²l_symbolic, Ũ⃗)
+        # ∇²l = eval(∇²l_expression[1])
+
         l = Ũ⃗ -> unitary_infidelity(Ũ⃗, Ũ⃗_goal)
         ∇l = Ũ⃗ -> ForwardDiff.gradient(l, Ũ⃗)
+        ∇²l = Ũ⃗ -> ForwardDiff.hessian(l, Ũ⃗)
+        Ũ⃗_dim = length(Ũ⃗_goal)
 
-        Symbolics.@variables Ũ⃗[1:length(Ũ⃗_goal)]
-        Ũ⃗ = collect(Ũ⃗)
+        ∇²l_structure = []
 
-        ∇²l_symbolic = Symbolics.sparsehessian(l(Ũ⃗), Ũ⃗)
-        K, J, _ = findnz(∇²l_symbolic)
-        kjs = collect(zip(K, J))
-        filter!(((k, j),) -> k ≤ j, kjs)
-        ∇²l_structure = kjs
-
-        ∇²l_expression = Symbolics.build_function(∇²l_symbolic, Ũ⃗)
-        ∇²l = eval(∇²l_expression[1])
+        for (i, j) ∈ Iterators.product(1:Ũ⃗_dim, 1:Ũ⃗_dim)
+            if i ≤ j
+                push!(∇²l_structure, (i, j))
+            end
+        end
 
         return new(l, ∇l, ∇²l, ∇²l_structure, name)
     end
 end
 
 function (loss::UnitaryInfidelityLoss)(
-    Z::NamedTrajectory;
+    Ũ⃗_end::AbstractVector{<:Real};
     gradient=false,
     hessian=false
 )
     @assert !(gradient && hessian)
-
-    Ũ⃗_end = Z[end][loss.name]
 
     if !(gradient || hessian)
         return loss.l(Ũ⃗_end)
@@ -235,13 +244,11 @@ struct InfidelityLoss <: AbstractLoss
 end
 
 function (loss::InfidelityLoss)(
-    Z::NamedTrajectory;
+    ψ̃_end::AbstractVector{<:Real};
     gradient=false,
     hessian=false
 )
     @assert !(gradient && hessian)
-
-    ψ̃_end = Z[end][loss.wfn_name]
 
     if !(gradient || hessian)
         return loss.l(ψ̃_end)

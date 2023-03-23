@@ -44,12 +44,12 @@ function QuantumDynamics(
     f::Function,
     traj::NamedTrajectory
 )
-    function F(Z::NamedTrajectory)
-        r = zeros(Z.dims.states * (Z.T - 1))
-        for t = 1:Z.T-1
-            zₜ = Z[t].data
-            zₜ₊₁ = Z[t + 1].data
-            r[slice(t, Z.dims.states)] = f(zₜ, zₜ₊₁)
+    function F(Z⃗::AbstractVector{<:Real})
+        r = zeros(traj.dims.states * (traj.T - 1))
+        for t = 1:traj.T-1
+            zₜ = Z⃗[slice(t, traj.dim)]
+            zₜ₊₁ = Z⃗[slice(t + 1, traj.dim)]
+            r[slice(t, traj.dims.states)] = f(zₜ, zₜ₊₁)
         end
         return r
     end
@@ -59,11 +59,11 @@ function QuantumDynamics(
         return hcat(∂zₜf, ∂zₜ₊₁f)
     end
 
-    function ∂F(Z::NamedTrajectory)
+    function ∂F(Z⃗::AbstractVector{<:Real})
         ∂ = []
-        for t = 1:Z.T-1
-            zₜ = Z[t].data
-            zₜ₊₁ = Z[t + 1].data
+        for t = 1:traj.T-1
+            zₜ = Z⃗[slice(t, traj.dim)]
+            zₜ₊₁ = Z⃗[slice(t + 1, traj.dim)]
             append!(∂, ∂f(zₜ, zₜ₊₁))
         end
         return ∂
@@ -83,11 +83,11 @@ function QuantumDynamics(
         )
     end
 
-    function μ∂²F(μ::AbstractVector, Z::NamedTrajectory)
+    function μ∂²F(μ::AbstractVector, Z⃗::AbstractVector{<:Real})
         μ∂² = []
-        for t = 1:Z.T-1
-            zₜzₜ₊₁ = vec(Z.data[:, t:t+1])
-            μₜ = μ[slice(t, Z.dims.states)]
+        for t = 1:traj.T-1
+            zₜzₜ₊₁ = Z⃗[slice(t:t+1, traj.dim)]
+            μₜ = μ[slice(t, traj.dims.states)]
             append_upper_half!(μ∂², μ∂²f(zₜzₜ₊₁, μₜ))
         end
         return μ∂²

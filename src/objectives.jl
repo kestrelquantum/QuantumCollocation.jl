@@ -43,23 +43,20 @@ struct Objective
 end
 
 function Base.:+(obj1::Objective, obj2::Objective)
-	L = Z -> obj1.L(Z) + obj2.L(Z)
-	∇L = Z -> obj1.∇L(Z) + obj2.∇L(Z)
+	L = (Z⃗, Z) -> obj1.L(Z⃗, Z) + obj2.L(Z⃗, Z)
+	∇L = (Z⃗, Z) -> obj1.∇L(Z⃗, Z) + obj2.∇L(Z⃗, Z)
 	if isnothing(obj1.∂²L) && isnothing(obj2.∂²L)
 		∂²L = Nothing
 		∂²L_structure = Nothing
 	elseif isnothing(obj1.∂²L)
-		∂²L = Z -> obj2.∂²L(Z)
+		∂²L = (Z⃗, Z) -> obj2.∂²L(Z⃗, Z)
 		∂²L_structure = obj2.∂²L_structure
 	elseif isnothing(obj2.∂²L)
-		∂²L = Z -> obj1.∂²L(Z)
+		∂²L = (Z⃗, Z) -> obj1.∂²L(Z⃗, Z)
 		∂²L_structure = obj1.∂²L_structure
 	else
-		∂²L = Z -> vcat(obj1.∂²L(Z), obj2.∂²L(Z))
-		∂²L_structure = Z -> vcat(
-			obj1.∂²L_structure(Z),
-			obj2.∂²L_structure(Z)
-		)
+		∂²L = (Z⃗, Z) -> vcat(obj1.∂²L(Z⃗, Z), obj2.∂²L(Z⃗, Z))
+		∂²L_structure = Z -> vcat(obj1.∂²L_structure(Z), obj2.∂²L_structure(Z))
 	end
     terms = vcat(obj1.terms, obj2.terms)
 	return Objective(L, ∇L, ∂²L, ∂²L_structure, terms)
@@ -124,15 +121,20 @@ function QuantumObjective(;
 
     losses = [eval(loss)(name, goal) for (name, goal) ∈ zip(names, goals)]
 
-	function L(Z::NamedTrajectory)
-        return sum(Qᵢ * loss(Z) for (Qᵢ, loss) ∈ zip(Q, losses))
+	function L(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory)
+        loss = 0.0
+        for (Qᵢ, lᵢ, name) ∈ zip(Q, losses, names)
+            name_slice = slice(Z.T, Z.components[name], Z.dim)
+            loss += Qᵢ * lᵢ(Z⃗[name_slice])
+        end
+        return loss
     end
 
-    function ∇L(Z::NamedTrajectory)
+    function ∇L(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory)
         ∇ = zeros(Z.dim * Z.T)
-        for (Qᵢ, loss, name) ∈ zip(Q, losses, names)
+        for (Qᵢ, lᵢ, name) ∈ zip(Q, losses, names)
             name_slice = slice(Z.T, Z.components[name], Z.dim)
-            ∇[name_slice] = Qᵢ * loss(Z; gradient=true)
+            ∇[name_slice] = Qᵢ * lᵢ(Z⃗[name_slice]; gradient=true)
         end
         return ∇
     end
@@ -152,12 +154,12 @@ function QuantumObjective(;
     end
 
 
-    function ∂²L(Z::NamedTrajectory; return_moi_vals=true)
+    function ∂²L(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory; return_moi_vals=true)
         H = spzeros(Z.dim * Z.T, Z.dim * Z.T)
-        for (Qᵢ, name, loss) ∈ zip(Q, names, losses)
+        for (Qᵢ, name, lᵢ) ∈ zip(Q, names, losses)
             name_slice = slice(Z.T, Z.components[name], Z.dim)
             H[name_slice, name_slice] =
-                Qᵢ * loss(Z; hessian=true)
+                Qᵢ * lᵢ(Z⃗[name_slice]; hessian=true)
         end
         if return_moi_vals
             Hs = [H[i,j] for (i, j) ∈ ∂²L_structure(Z)]
@@ -270,19 +272,20 @@ function QuadraticRegularizer(;
         :eval_hessian => eval_hessian
     )
 
-	@views function L(Z::NamedTrajectory)
+	@views function L(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory)
 		J = 0.0
 		for t ∈ times
-            J += 0.5 * Z[t][name]' * diagm(R) * Z[t][name]
+            vₜ = Z⃗[slice(t, Z.components[name], Z.dim)]
+            J += 0.5 * vₜ' * diagm(R) * vₜ
 		end
 		return J
 	end
 
-	@views function ∇L(Z::NamedTrajectory)
+	@views function ∇L(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory)
 		∇ = zeros(Z.dim * Z.T)
 		for t ∈ times
 			vₜ_slice = slice(t, Z.components[name], Z.dim)
-			vₜ = Z[t][name]
+            vₜ = Z⃗[vₜ_slice]
 			∇[vₜ_slice] = R .* vₜ
 		end
 		return ∇
@@ -304,7 +307,7 @@ function QuadraticRegularizer(;
             return structure
         end
 
-		∂²L = Z -> vcat(fill(R, length(times))...)
+		∂²L = (Z⃗, Z) -> vcat(fill(R, length(times))...)
 	end
 
 	return Objective(L, ∇L, ∂²L, ∂²L_structure, Dict[params])
