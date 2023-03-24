@@ -3,6 +3,11 @@ using NamedTrajectories
 using Revise
 using LinearAlgebra
 using Distributions
+using HSL
+
+max_iter = 100
+linear_solver = "mumps"
+hsllib = nothing
 
 U_init = 1.0 * I(8)
 
@@ -67,22 +72,35 @@ Ũ⃗_dim = length(Ũ⃗_init)
 
 T = 40
 dt = 5.0
-dt_min = 0.5 * dt
-dt_max = 1.0 * dt
+Δt_min = 0.5 * dt
+Δt_max = 1.0 * dt
 u_bound = 0.04 # GHz
 u_dist = Uniform(-u_bound, u_bound)
+ddu_bound = 0.1
 
+load_saved_traj = false
+
+if !load_saved_traj
+    u = foldr(hcat, [zeros(n_drives), rand(u_dist, n_drives, T - 2), zeros(n_drives)])
+    du = randn(n_drives, T)
+    ddu = randn(n_drives, T)
+    Δt = dt * ones(1, T)
+end
+
+Ũ⃗ = unitary_rollout(Ũ⃗_init, u, Δt, system)
 
 comps = (
-    Ũ⃗ = foldr(hcat, [Ũ⃗_init, rand(Uniform(-1, 1), Ũ⃗_dim, T - 2), Ũ⃗_goal]),
-    u = foldr(hcat, [zeros(n_drives), rand(u_dist, n_drives, T - 2), zeros(n_drives)]),
-    du = randn(n_drives, T),
-    ddu = randn(n_drives, T),
-    dt = dt * ones(1, T)
+    Ũ⃗ = Ũ⃗,
+    u = u,
+    du = du,
+    ddu = ddu,
+    Δt = Δt
 )
 
 bounds = (
     u = fill(u_bound, n_drives),
+    ddu = fill(ddu_bound, n_drives),
+    Δt = (Δt_min, Δt_max),
 )
 
 initial = (
@@ -100,7 +118,7 @@ goal = (
 
 traj = NamedTrajectory(
     comps;
-    controls=(:ddu, :dt),
+    controls=(:ddu, :Δt),
     dt=dt,
     dynamical_dts=true,
     bounds=bounds,
@@ -121,7 +139,7 @@ function f(zₜ, zₜ₊₁)
     duₜ = zₜ[traj.components.du]
 
     dduₜ = zₜ[traj.components.ddu]
-    Δtₜ = zₜ[traj.components.dt][1]
+    Δtₜ = zₜ[traj.components.Δt][1]
 
     δŨ⃗ = P(Ũ⃗ₜ₊₁, Ũ⃗ₜ, uₜ, Δtₜ; operator=true)
     δu = uₜ₊₁ - uₜ - duₜ * Δtₜ
@@ -136,14 +154,15 @@ loss = :UnitaryInfidelityLoss
 
 J = QuantumObjective(:Ũ⃗, traj, loss, Q)
 
-R = 0.1 * ones(n_drives)
+R_ddu = 1e-3
 
-J += QuadraticRegularizer(:u, traj, R)
+J += QuadraticRegularizer(:ddu, traj, R_ddu * ones(n_drives))
 
-max_iter = 50
 
 options = Options(
     max_iter=max_iter,
+    linear_solver=linear_solver,
+    hsllib=hsllib,
 )
 
 prob = QuantumControlProblem(system, traj, J, f;
@@ -156,7 +175,7 @@ experiment = "T_$(T)_Q_$(Q)_iter_$(max_iter)"
 
 plot_path = generate_file_path("png", experiment, plot_dir)
 
-plot(plot_path, prob.trajectory, [:Ũ⃗, :u], ignored_labels=[:Ũ⃗])
+plot(plot_path, prob.trajectory, [:Ũ⃗, :u]; ignored_labels=[:Ũ⃗], dt_name=:Δt)
 
 solve!(prob)
 
@@ -166,6 +185,6 @@ experiment *= "_fidelity_$(fid)"
 
 plot_path = generate_file_path("png", experiment, plot_dir)
 
-plot(plot_path, prob.trajectory, [:Ũ⃗, :u], ignored_labels=[:Ũ⃗])
+plot(plot_path, prob.trajectory, [:Ũ⃗, :u]; ignored_labels=[:Ũ⃗], dt_name=:Δt)
 
 println("Final fidelity: ", fid)

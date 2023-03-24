@@ -121,7 +121,7 @@ function QuantumObjective(;
 
     losses = [eval(loss)(name, goal) for (name, goal) ∈ zip(names, goals)]
 
-	function L(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory)
+	@views function L(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory)
         loss = 0.0
         for (Qᵢ, lᵢ, name) ∈ zip(Q, losses, names)
             name_slice = slice(Z.T, Z.components[name], Z.dim)
@@ -130,7 +130,7 @@ function QuantumObjective(;
         return loss
     end
 
-    function ∇L(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory)
+    @views function ∇L(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory)
         ∇ = zeros(Z.dim * Z.T)
         for (Qᵢ, lᵢ, name) ∈ zip(Q, losses, names)
             name_slice = slice(Z.T, Z.components[name], Z.dim)
@@ -154,7 +154,7 @@ function QuantumObjective(;
     end
 
 
-    function ∂²L(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory; return_moi_vals=true)
+    @views function ∂²L(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory; return_moi_vals=true)
         H = spzeros(Z.dim * Z.T, Z.dim * Z.T)
         for (Qᵢ, name, lᵢ) ∈ zip(Q, names, losses)
             name_slice = slice(Z.T, Z.components[name], Z.dim)

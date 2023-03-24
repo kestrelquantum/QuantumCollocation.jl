@@ -35,6 +35,9 @@ using LinearAlgebra
 """
 
 const GATES = Dict(
+    :I => [1 0;
+           0 1],
+
     :X => [0 1;
            1 0],
 
@@ -195,7 +198,8 @@ end
 function unitary_fidelity(Ũ⃗::Vector, Ũ⃗_goal::Vector)
     U = iso_vec_to_unitary(Ũ⃗)
     U_goal = iso_vec_to_unitary(Ũ⃗_goal)
-    return abs2(tr(U'U_goal))
+    N = size(U, 1)
+    return 1 / N * abs(tr(U'U_goal))
 end
 
 """

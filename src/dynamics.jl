@@ -13,12 +13,13 @@ using Base.Iterators
 using LinearAlgebra
 using SparseArrays
 using ForwardDiff
+using Symbolics
 using Zygote
 
 
 
 function append_upper_half!(list::Vector, mat::AbstractMatrix)
-    for i = 1:size(mat, 1)
+    for i ∈ axes(mat, 1)
         for j = i:size(mat, 2)
             push!(list, mat[i, j])
         end
@@ -44,7 +45,7 @@ function QuantumDynamics(
     f::Function,
     traj::NamedTrajectory
 )
-    function F(Z⃗::AbstractVector{<:Real})
+    @views function F(Z⃗::AbstractVector{<:Real})
         r = zeros(traj.dims.states * (traj.T - 1))
         for t = 1:traj.T-1
             zₜ = Z⃗[slice(t, traj.dim)]
@@ -54,12 +55,31 @@ function QuantumDynamics(
         return r
     end
 
+    # function ∂f(zₜ, zₜ₊₁)
+    #     ∂zₜf, ∂zₜ₊₁f = Zygote.jacobian(f, zₜ, zₜ₊₁)
+    #     return hcat(∂zₜf, ∂zₜ₊₁f)
+    # end
+
+    f̂(zz) = f(zz[1:traj.dim], zz[traj.dim+1:end])
+
     function ∂f(zₜ, zₜ₊₁)
-        ∂zₜf, ∂zₜ₊₁f = Zygote.jacobian(f, zₜ, zₜ₊₁)
-        return hcat(∂zₜf, ∂zₜ₊₁f)
+        return ForwardDiff.jacobian(f̂, [zₜ; zₜ₊₁])
     end
 
-    function ∂F(Z⃗::AbstractVector{<:Real})
+    # Symbolics.@variables zz[1:traj.dim*2]
+    # zz = collect(zz)
+    # ∂f_symbolic = Symbolics.sparsejacobian(f̂(zz), zz; simplify=true)
+    # K, J, _ = findnz(∂f_symbolic)
+    # ∂f_structure = collect(zip(K, J))
+    # ∂f_expression = Symbolics.build_function(∂f_symbolic, zz)
+    # ∂f_sparse = eval(∂f_expression[1])
+
+    # function ∂f(zₜ, zₜ₊₁)
+    #     ∂ = ∂f_sparse([zₜ; zₜ₊₁])
+    #     return [∂[i, j] for (i, j) in ∂f_structure]
+    # end
+
+    @views function ∂F(Z⃗::AbstractVector{<:Real})
         ∂ = []
         for t = 1:traj.T-1
             zₜ = Z⃗[slice(t, traj.dim)]
@@ -72,23 +92,39 @@ function QuantumDynamics(
     ∂F_structure = Tuple{Int,Int}[]
 
     for t = 1:traj.T-1
-        pairs = product(slice(t, traj.dims.states), slice(t:t+1, traj.dim))
-        append!(∂F_structure, pairs)
+        # ∂fₜ_structure = [index(t, 0, traj.dim) .+ kj for kj in ∂f_structure]
+        ∂fₜ_structure = Iterators.product(slice(t, traj.dim), slice(t, traj.dim))
+        append!(∂F_structure, ∂fₜ_structure)
     end
 
-    function μ∂²f(zₜzₜ₊₁, μₜ)
-        return ForwardDiff.hessian(
-            zz -> μₜ' * f(zz[1:traj.dim], zz[traj.dim+1:end]),
-            zₜzₜ₊₁
-        )
+    μf̂(zₜzₜ₊₁, μₜ) = dot(μₜ, f̂(zₜzₜ₊₁))
+
+    @views function μ∂²f(zₜzₜ₊₁, μₜ)
+        return ForwardDiff.hessian(zz -> μf̂(zz, μₜ), zₜzₜ₊₁)
     end
 
-    function μ∂²F(μ::AbstractVector, Z⃗::AbstractVector{<:Real})
+
+    # Symbolics.@variables μ[1:traj.dims.states]
+    # μ = collect(μ)
+
+    # μ∂²f_symbolic = Symbolics.sparsehessian(μf̂(zz, μ), zz)
+
+    # K, J, _ = findnz(μ∂²f_symbolic)
+    # μ∂²f_structure = collect(zip(K, J))
+    # filter!(((k, j),) -> k ≤ j, μ∂²f_structure)
+    # μ∂²f_expression = Symbolics.build_function(μ∂²f_symbolic, zz, μ)
+    # μ∂²f = eval(μ∂²f_expression[1])
+
+
+    @views function μ∂²F(μ::AbstractVector, Z⃗::AbstractVector{<:Real})
         μ∂² = []
         for t = 1:traj.T-1
             zₜzₜ₊₁ = Z⃗[slice(t:t+1, traj.dim)]
             μₜ = μ[slice(t, traj.dims.states)]
-            append_upper_half!(μ∂², μ∂²f(zₜzₜ₊₁, μₜ))
+            HoL = μ∂²f(zₜzₜ₊₁, μₜ)
+            for (i, j) ∈ μ∂²f_structure
+                push!(μ∂², HoL[i, j])
+            end
         end
         return μ∂²
     end
@@ -96,8 +132,9 @@ function QuantumDynamics(
     μ∂²F_structure = Tuple{Int,Int}[]
 
     for t = 1:traj.T-1
-        pairs = collect(product(slice(t:t+1, traj.dim), slice(t:t+1, traj.dim)))
-        append_upper_half!(μ∂²F_structure, pairs)
+        # μₜ∂²fₜ_structure = [index(t, 0, traj.dim) .+ kj for kj in μ∂²f_structure]
+        μₜ∂²fₜ_structure = Iterators.product(slice(t, traj.dim), slice(t, traj.dim))
+        append!(μ∂²F_structure, μₜ∂²fₜ_structure)
     end
 
     return QuantumDynamics(F, ∂F, ∂F_structure, μ∂²F, μ∂²F_structure)

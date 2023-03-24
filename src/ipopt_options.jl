@@ -28,8 +28,7 @@ using Base: @kwdef
     diverging_iterates_tol::T = 1.0e8
     mu_target::T = 1.0e-4
     print_level::Int = 5
-    # output file must be unset if you don't want to write to a file
-    # output_file = "output.txt"
+    output_file = nothing
     print_user_options = "no"
     print_options_documentation = "no"
     print_timing_statistics = "no"
@@ -40,12 +39,16 @@ using Base: @kwdef
     print_frequency_iter = 1
     print_frequency_time = 0.0
     skip_finalize_solution_call = "no"
+    hsllib = nothing
     linear_solver = "mumps"
 end
 
 function set!(optimizer::Ipopt.Optimizer, options::Options)
     for name in fieldnames(typeof(options))
-        optimizer.options[String(name)] = getfield(options, name)
+        value = getfield(options, name)
+        if value !== nothing
+           optimizer.options[String(name)] = value
+        end
     end
 end
 

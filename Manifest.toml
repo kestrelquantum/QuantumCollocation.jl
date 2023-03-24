@@ -2,7 +2,7 @@
 
 julia_version = "1.8.5"
 manifest_format = "2.0"
-project_hash = "5c89776fb80c4390395b4a50102ba6f005dcbdce"
+project_hash = "387ecb4a507334f36af585ebf3f047b6eac9e467"
 
 [[deps.ANSIColoredPrinters]]
 git-tree-sha1 = "574baf8110975760d391c710b6341da1afa48d8c"
@@ -536,6 +536,12 @@ git-tree-sha1 = "4cc2bb72df6ff40b055295fdef6d92955f9dede8"
 uuid = "0234f1f7-429e-5d53-9886-15a909be8d59"
 version = "1.12.2+2"
 
+[[deps.HSL]]
+deps = ["Libdl", "LinearAlgebra", "METIS4_jll", "OpenBLAS32_jll", "SHA", "SparseArrays", "libblastrampoline_jll"]
+git-tree-sha1 = "3f148e03378934a63a7f327755627ea3c6df4cd9"
+uuid = "34c5aeac-e683-54a6-a0e9-6e0fdc586c50"
+version = "0.3.6"
+
 [[deps.HTTP]]
 deps = ["Base64", "CodecZlib", "Dates", "IniFile", "Logging", "LoggingExtras", "MbedTLS", "NetworkOptions", "OpenSSL", "Random", "SimpleBufferStream", "Sockets", "URIs", "UUIDs"]
 git-tree-sha1 = "37e4657cd56b11abe3d10cd4a1ec5fbdb4180263"
@@ -885,6 +891,12 @@ deps = ["JuliaInterpreter"]
 git-tree-sha1 = "60168780555f3e663c536500aa790b6368adc02a"
 uuid = "6f1432cf-f94c-5a45-995e-cdbf5db27b0b"
 version = "2.3.0"
+
+[[deps.METIS4_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
+git-tree-sha1 = "349a478e9e9d60d28c814f04d0cf544793abb435"
+uuid = "40b5814e-7855-5c9f-99f7-a735ce3fdf8b"
+version = "400.0.301+0"
 
 [[deps.METIS_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]

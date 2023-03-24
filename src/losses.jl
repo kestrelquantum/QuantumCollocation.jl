@@ -38,19 +38,20 @@ using Symbolics
 abstract type AbstractLoss end
 
 
-function infidelity(ψ̃::Vector, ψ̃goal::Vector)
+function infidelity(ψ̃::AbstractVector, ψ̃goal::AbstractVector)
     ψ = iso_to_ket(ψ̃)
     ψgoal = iso_to_ket(ψ̃goal)
     return abs(1 - abs2(ψ'ψgoal))
 end
 
-function unitary_infidelity(Ũ⃗::Vector, Ũ⃗_goal::Vector)
+function unitary_infidelity(Ũ⃗::AbstractVector, Ũ⃗_goal::AbstractVector)
     U = iso_vec_to_unitary(Ũ⃗)
     Ugoal = iso_vec_to_unitary(Ũ⃗_goal)
-    return abs(1 - abs2(tr(Ugoal'U)))
+    N = size(U, 1)
+    return abs(1 - 1 / N * abs(tr(Ugoal'U)))
 end
 
-function unitary_trace_loss(Ũ⃗::Vector, Ũ⃗_goal::Vector)
+function unitary_trace_loss(Ũ⃗::AbstractVector, Ũ⃗_goal::AbstractVector)
     U = iso_vec_to_unitary(Ũ⃗)
     Ugoal = iso_vec_to_unitary(Ũ⃗_goal)
     return 1 / 2 * tr(sqrt((U - Ugoal)' * (U - Ugoal)))
@@ -160,33 +161,33 @@ struct UnitaryInfidelityLoss <: AbstractLoss
         name::Symbol,
         Ũ⃗_goal::AbstractVector
     )
-        # l = Ũ⃗ -> unitary_infidelity(Ũ⃗, Ũ⃗_goal)
-        # ∇l = Ũ⃗ -> ForwardDiff.gradient(l, Ũ⃗)
-
-        # Symbolics.@variables Ũ⃗[1:length(Ũ⃗_goal)]
-        # Ũ⃗ = collect(Ũ⃗)
-
-        # ∇²l_symbolic = Symbolics.sparsehessian(l(Ũ⃗), Ũ⃗)
-        # K, J, _ = findnz(∇²l_symbolic)
-        # kjs = collect(zip(K, J))
-        # filter!(((k, j),) -> k ≤ j, kjs)
-        # ∇²l_structure = kjs
-
-        # ∇²l_expression = Symbolics.build_function(∇²l_symbolic, Ũ⃗)
-        # ∇²l = eval(∇²l_expression[1])
-
         l = Ũ⃗ -> unitary_infidelity(Ũ⃗, Ũ⃗_goal)
         ∇l = Ũ⃗ -> ForwardDiff.gradient(l, Ũ⃗)
-        ∇²l = Ũ⃗ -> ForwardDiff.hessian(l, Ũ⃗)
-        Ũ⃗_dim = length(Ũ⃗_goal)
 
-        ∇²l_structure = []
+        Symbolics.@variables Ũ⃗[1:length(Ũ⃗_goal)]
+        Ũ⃗ = collect(Ũ⃗)
 
-        for (i, j) ∈ Iterators.product(1:Ũ⃗_dim, 1:Ũ⃗_dim)
-            if i ≤ j
-                push!(∇²l_structure, (i, j))
-            end
-        end
+        ∇²l_symbolic = Symbolics.sparsehessian(l(Ũ⃗), Ũ⃗)
+        K, J, _ = findnz(∇²l_symbolic)
+        kjs = collect(zip(K, J))
+        filter!(((k, j),) -> k ≤ j, kjs)
+        ∇²l_structure = kjs
+
+        ∇²l_expression = Symbolics.build_function(∇²l_symbolic, Ũ⃗)
+        ∇²l = eval(∇²l_expression[1])
+
+        # l = Ũ⃗ -> unitary_infidelity(Ũ⃗, Ũ⃗_goal)
+        # ∇l = Ũ⃗ -> ForwardDiff.gradient(l, Ũ⃗)
+        # ∇²l = Ũ⃗ -> ForwardDiff.hessian(l, Ũ⃗)
+        # Ũ⃗_dim = length(Ũ⃗_goal)
+
+        # ∇²l_structure = []
+
+        # for (i, j) ∈ Iterators.product(1:Ũ⃗_dim, 1:Ũ⃗_dim)
+        #     if i ≤ j
+        #         push!(∇²l_structure, (i, j))
+        #     end
+        # end
 
         return new(l, ∇l, ∇²l, ∇²l_structure, name)
     end
