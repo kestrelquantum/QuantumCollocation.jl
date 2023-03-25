@@ -4,6 +4,8 @@ export AbstractSystem
 export QuantumSystem
 export MultiModeSystem
 
+export iso
+
 using ..QuantumUtils
 
 using LinearAlgebra

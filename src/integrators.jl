@@ -154,21 +154,25 @@ struct FourthOrderPade <: QuantumStateIntegrator
     end
 end
 
-function (integrator::FourthOrderPade)(
-    xₜ₊₁::AbstractVector,
-    xₜ::AbstractVector,
-    uₜ::AbstractVector,
+function (P::FourthOrderPade)(
+    xₜ₊₁::AbstractVector{<:Real},
+    xₜ::AbstractVector{<:Real},
+    uₜ::AbstractVector{<:Real},
     Δt::Real;
-    operator=false
+    G_additional::Union{AbstractMatrix{<:Real}, Nothing}=nothing,
+    operator::Bool=false
 )
-    Gₜ = G(uₜ, integrator.G_drift, integrator.G_drives)
+    Gₜ = G(uₜ, P.G_drift, P.G_drives)
+    if !isnothing(G_additional)
+        Gₜ += G_additional
+    end
     Id = I(size(Gₜ, 1))
     if operator
-        Ũₜ₊₁ = iso_vec_to_iso_unitary(xₜ₊₁)
-        Ũₜ = iso_vec_to_iso_unitary(xₜ)
+        Ũₜ₊₁ = iso_vec_to_iso_operator(xₜ₊₁)
+        Ũₜ = iso_vec_to_iso_operator(xₜ)
         δŨ = (Id + Δt^2 / 9 * Gₜ^2) * (Ũₜ₊₁ - Ũₜ) -
             Δt / 2 * Gₜ * (Ũₜ₊₁ + Ũₜ)
-        δŨ⃗ = iso_unitary_to_iso_vec(δŨ)
+        δŨ⃗ = iso_operator_to_iso_vec(δŨ)
         return δŨ⃗
     else
         δx = (Id + Δt^2 / 9 * Gₜ^2) * (xₜ₊₁ - xₜ) -
@@ -177,6 +181,14 @@ function (integrator::FourthOrderPade)(
     end
 end
 
+function (P::FourthOrderPade)(
+    xₜ₊₁::AbstractVector{<:Real},
+    xₜ::AbstractVector{<:Real},
+    Δt::Real;
+    kwargs...
+)
+    return P(xₜ₊₁, xₜ, zeros(eltype(xₜ), length(P.G_drives)), Δt; kwargs...)
+end
 
 
 # function (integrator::FourthOrderPade)(

@@ -4,6 +4,7 @@ export Options
 export set!
 
 using Ipopt
+using Libdl
 using Base: @kwdef
 
 """
@@ -46,7 +47,13 @@ end
 function set!(optimizer::Ipopt.Optimizer, options::Options)
     for name in fieldnames(typeof(options))
         value = getfield(options, name)
-        if value !== nothing
+        if name == :linear_solver
+            if value == "pardiso"
+                Libdl.dlopen("/usr/lib/x86_64-linux-gnu/liblapack.so.3", RTLD_GLOBAL)
+                Libdl.dlopen("/usr/lib/x86_64-linux-gnu/libomp.so.5", RTLD_GLOBAL)
+            end
+        end
+        if !isnothing(value)
            optimizer.options[String(name)] = value
         end
     end

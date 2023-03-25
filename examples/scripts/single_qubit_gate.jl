@@ -35,8 +35,8 @@ H_drift = zeros(n_levels, n_levels)
 system = QuantumSystem(H_drift, H_drives)
 
 # converting unitaries to isomorphic vector representation
-Ũ⃗_init = unitary_to_iso_vec(U_init)
-Ũ⃗_goal = unitary_to_iso_vec(U_goal)
+Ũ⃗_init = operator_to_iso_vec(U_init)
+Ũ⃗_goal = operator_to_iso_vec(U_goal)
 
 # getting dimension of the isomorphic vector representation
 Ũ⃗_dim = length(Ũ⃗_init)
@@ -86,7 +86,8 @@ end
 
 u = vcat(γ, α)
 
-Ũ⃗ = unitary_rollout(Ũ⃗_init, u, Δt, system)
+# Ũ⃗ = unitary_rollout(Ũ⃗_init, u, Δt, system)
+Ũ⃗ = unitary_geodesic(U_goal, T)
 
 # defining components for trajectory
 comps = (

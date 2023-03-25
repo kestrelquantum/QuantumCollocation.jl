@@ -3,6 +3,7 @@
 """
 
 @testset "Objectives" begin
+
     # initializing test trajectory
     T = 10
     # H_drift = GATES[:Z]
@@ -57,8 +58,8 @@
         U_init = GATES[:I]
         U_goal = GATES[:X]
 
-        Ũ⃗_init = unitary_to_iso_vec(U_init)
-        Ũ⃗_goal = unitary_to_iso_vec(U_goal)
+        Ũ⃗_init = operator_to_iso_vec(U_init)
+        Ũ⃗_goal = operator_to_iso_vec(U_goal)
 
         Z = NamedTrajectory(
             (Ũ⃗ = randn(length(Ũ⃗_init), T), u = randn(2, T)),

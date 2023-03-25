@@ -283,7 +283,7 @@ function QuadraticRegularizer(;
 
 	@views function ∇L(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory)
 		∇ = zeros(Z.dim * Z.T)
-		for t ∈ times
+		Threads.@threads for t ∈ times
 			vₜ_slice = slice(t, Z.components[name], Z.dim)
             vₜ = Z⃗[vₜ_slice]
 			∇[vₜ_slice] = R .* vₜ

@@ -99,7 +99,7 @@ function MOI.eval_hessian_lagrangian(
         H[k] = σ∂²Lₖ
     end
 
-    μ∂²Fs = evaluator.dynamics.μ∂²F(μ, Z⃗)
+    μ∂²Fs = evaluator.dynamics.μ∂²F(Z⃗, μ)
 
     offset = length(evaluator.objective.∂²L_structure(evaluator.trajectory))
 

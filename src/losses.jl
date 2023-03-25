@@ -45,15 +45,15 @@ function infidelity(ψ̃::AbstractVector, ψ̃goal::AbstractVector)
 end
 
 function unitary_infidelity(Ũ⃗::AbstractVector, Ũ⃗_goal::AbstractVector)
-    U = iso_vec_to_unitary(Ũ⃗)
-    Ugoal = iso_vec_to_unitary(Ũ⃗_goal)
+    U = iso_vec_to_operator(Ũ⃗)
+    Ugoal = iso_vec_to_operator(Ũ⃗_goal)
     N = size(U, 1)
     return abs(1 - 1 / N * abs(tr(Ugoal'U)))
 end
 
 function unitary_trace_loss(Ũ⃗::AbstractVector, Ũ⃗_goal::AbstractVector)
-    U = iso_vec_to_unitary(Ũ⃗)
-    Ugoal = iso_vec_to_unitary(Ũ⃗_goal)
+    U = iso_vec_to_operator(Ũ⃗)
+    Ugoal = iso_vec_to_operator(Ũ⃗_goal)
     return 1 / 2 * tr(sqrt((U - Ugoal)' * (U - Ugoal)))
 end
 

@@ -18,12 +18,17 @@ using Zygote
 
 
 
-function append_upper_half!(list::Vector, mat::AbstractMatrix)
-    for i ∈ axes(mat, 1)
-        for j = i:size(mat, 2)
-            push!(list, mat[i, j])
+function upper_half_vals(mat::AbstractMatrix)
+    n = size(mat, 1)
+    vals = similar(mat, n * (n + 1) ÷ 2)
+    k = 1
+    for col = axes(mat, 2)
+        for row = 1:col
+            vals[k] = mat[row, col]
+            k += 1
         end
     end
+    return vals
 end
 
 
@@ -46,8 +51,8 @@ function QuantumDynamics(
     traj::NamedTrajectory
 )
     @views function F(Z⃗::AbstractVector{<:Real})
-        r = zeros(traj.dims.states * (traj.T - 1))
-        for t = 1:traj.T-1
+        r = zeros(eltype(Z⃗), traj.dims.states * (traj.T - 1))
+        Threads.@threads for t = 1:traj.T-1
             zₜ = Z⃗[slice(t, traj.dim)]
             zₜ₊₁ = Z⃗[slice(t + 1, traj.dim)]
             r[slice(t, traj.dims.states)] = f(zₜ, zₜ₊₁)
@@ -57,10 +62,11 @@ function QuantumDynamics(
 
     # function ∂f(zₜ, zₜ₊₁)
     #     ∂zₜf, ∂zₜ₊₁f = Zygote.jacobian(f, zₜ, zₜ₊₁)
-    #     return hcat(∂zₜf, ∂zₜ₊₁f)
+    #     ∂fₜ = hcat(∂zₜf, ∂zₜ₊₁f)
+    #     return ∂fₜ
     # end
 
-    f̂(zz) = f(zz[1:traj.dim], zz[traj.dim+1:end])
+    @views f̂(zz) = f(zz[1:traj.dim], zz[traj.dim+1:end])
 
     function ∂f(zₜ, zₜ₊₁)
         return ForwardDiff.jacobian(f̂, [zₜ; zₜ₊₁])
@@ -79,12 +85,15 @@ function QuantumDynamics(
     #     return [∂[i, j] for (i, j) in ∂f_structure]
     # end
 
-    @views function ∂F(Z⃗::AbstractVector{<:Real})
-        ∂ = []
-        for t = 1:traj.T-1
+    @views function ∂F(Z⃗::AbstractVector{R}) where R <: Real
+        ∂ = zeros(R, (traj.dims.states * 2 * traj.dim) * (traj.T - 1))
+        Threads.@threads for t = 1:traj.T-1
             zₜ = Z⃗[slice(t, traj.dim)]
             zₜ₊₁ = Z⃗[slice(t + 1, traj.dim)]
-            append!(∂, ∂f(zₜ, zₜ₊₁))
+            ∂[slice(t, traj.dims.states * 2 * traj.dim)] = vec(∂f(zₜ, zₜ₊₁))
+            # for (k, j) ∈ ∂f_structure
+            #     push!(∂, ∂f(zₜ, zₜ₊₁)[k, j])
+            # end
         end
         return ∂
     end
@@ -92,9 +101,15 @@ function QuantumDynamics(
     ∂F_structure = Tuple{Int,Int}[]
 
     for t = 1:traj.T-1
-        # ∂fₜ_structure = [index(t, 0, traj.dim) .+ kj for kj in ∂f_structure]
-        ∂fₜ_structure = Iterators.product(slice(t, traj.dim), slice(t, traj.dim))
-        append!(∂F_structure, ∂fₜ_structure)
+        # ∂fₜ_structure = [
+        #     (
+        #         k + index(t, 0, traj.dims.states),
+        #         j + index(t, 0, traj.dim)
+        #     ) for (k, j) ∈ ∂f_structure
+        # ]
+        # append!(∂F_structure, ∂fₜ_structure)
+        ∂fₜ_structure = Iterators.product(slice(t, traj.dims.states), slice(t:t+1, traj.dim))
+        append!(∂F_structure, collect(∂fₜ_structure))
     end
 
     μf̂(zₜzₜ₊₁, μₜ) = dot(μₜ, f̂(zₜzₜ₊₁))
@@ -116,15 +131,15 @@ function QuantumDynamics(
     # μ∂²f = eval(μ∂²f_expression[1])
 
 
-    @views function μ∂²F(μ::AbstractVector, Z⃗::AbstractVector{<:Real})
-        μ∂² = []
-        for t = 1:traj.T-1
+    @views function μ∂²F(Z⃗::AbstractVector{R}, μ::AbstractVector{R}) where R <: Real
+        block_upper_half_dim = 2traj.dim * (2traj.dim + 1) ÷ 2
+        μ∂² = zeros(R, block_upper_half_dim * (traj.T - 1))
+        Threads.@threads for t = 1:traj.T-1
             zₜzₜ₊₁ = Z⃗[slice(t:t+1, traj.dim)]
             μₜ = μ[slice(t, traj.dims.states)]
             HoL = μ∂²f(zₜzₜ₊₁, μₜ)
-            for (i, j) ∈ μ∂²f_structure
-                push!(μ∂², HoL[i, j])
-            end
+            vals = upper_half_vals(HoL)
+            μ∂²[slice(t, block_upper_half_dim)] .= vals
         end
         return μ∂²
     end
@@ -133,8 +148,10 @@ function QuantumDynamics(
 
     for t = 1:traj.T-1
         # μₜ∂²fₜ_structure = [index(t, 0, traj.dim) .+ kj for kj in μ∂²f_structure]
-        μₜ∂²fₜ_structure = Iterators.product(slice(t, traj.dim), slice(t, traj.dim))
-        append!(μ∂²F_structure, μₜ∂²fₜ_structure)
+        # append!(μ∂²F_structure, μₜ∂²fₜ_structure)
+        μₜ∂²fₜ_structure = Iterators.product(slice(t:t+1, traj.dim), slice(t:t+1, traj.dim))
+        vals = upper_half_vals(collect(μₜ∂²fₜ_structure))
+        append!(μ∂²F_structure, vals)
     end
 
     return QuantumDynamics(F, ∂F, ∂F_structure, μ∂²F, μ∂²F_structure)

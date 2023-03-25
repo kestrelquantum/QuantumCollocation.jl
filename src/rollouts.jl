@@ -2,10 +2,16 @@ module Rollouts
 
 export rollout
 export unitary_rollout
+export unitary_geodesic
+export skew_symmetric
+export skew_symmetric_vec
 
 using ..QuantumUtils
 using ..QuantumSystems
 using ..Integrators
+
+using Manifolds
+using LinearAlgebra
 
 function rollout(
     ψ̃₁::AbstractVector,
@@ -64,13 +70,72 @@ function unitary_rollout(
             system.G_drives
         )
         Ũ⃗ₜ₋₁ = Ũ⃗[:, t - 1]
-        Ũₜ₋₁ = iso_vec_to_iso_unitary(Ũ⃗ₜ₋₁)
+        Ũₜ₋₁ = iso_vec_to_iso_operator(Ũ⃗ₜ₋₁)
         Ũₜ = integrator(Gₜ * Δt[t - 1]) * Ũₜ₋₁
-        Ũ⃗ₜ = iso_unitary_to_iso_vec(Ũₜ)
+        Ũ⃗ₜ = iso_operator_to_iso_vec(Ũₜ)
         Ũ⃗[:, t] .= Ũ⃗ₜ
     end
 
     return Ũ⃗
+end
+
+function skew_symmetric(v::AbstractVector, n::Int)
+    M = zeros(eltype(v), n, n)
+    k = 1
+    for j = 1:n
+        for i = 1:j-1
+            vᵢⱼ = v[k]
+            M[i, j] = vᵢⱼ
+            M[j, i] = -vᵢⱼ
+            k += 1
+        end
+    end
+    return M
+end
+
+function skew_symmetric_vec(M::AbstractMatrix)
+    n = size(M, 1)
+    v = zeros(eltype(M), n * (n - 1) ÷ 2)
+    k = 1
+    for j = 1:n
+        for i = 1:j-1
+            v[k] = M[i, j]
+            k += 1
+        end
+    end
+    return v
+end
+
+
+
+function unitary_geodesic(
+    U_init::AbstractMatrix{<:Number},
+    U_goal::AbstractMatrix{<:Number},
+    samples::Int;
+    return_generator=true
+)
+    U_init = Matrix{ComplexF64}(U_init)
+    U_goal = Matrix{ComplexF64}(U_goal)
+    N = size(U_init, 1)
+    M = SpecialUnitary(N)
+    ts = range(0, 1, length=samples)
+    Us = shortest_geodesic(M, U_init, U_goal, ts)
+    X = Manifolds.log(M, U_init, U_goal)
+    G = iso(X)
+    Ũ⃗s = [operator_to_iso_vec(U) for U ∈ Us]
+    Ũ⃗ = hcat(Ũ⃗s...)
+    G̃⃗ = hcat([skew_symmetric_vec(G) for t = 1:samples]...)
+    if return_generator
+        return Ũ⃗, G̃⃗
+    else
+        return Ũ⃗
+    end
+end
+
+function unitary_geodesic(U_goal, samples)
+    N = size(U_goal, 1)
+    U_init = Matrix{ComplexF64}(I(N))
+    return unitary_geodesic(U_init, U_goal, samples)
 end
 
 
