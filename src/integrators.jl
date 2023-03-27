@@ -34,6 +34,7 @@ using ..QuantumSystems
 using ..QuantumUtils
 
 using LinearAlgebra
+using SparseArrays
 
 
 # G(a) helper function
@@ -45,6 +46,57 @@ function G(
 )
     return G_drift + sum(a .* G_drives)
 end
+
+const Id2 = 1.0 * I(2)
+const Im2 = 1.0 * [0 -1; 1 0]
+
+function vecinv(
+    x::AbstractVector{T};
+    shape::Tuple{Int,Int}=(Int(sqrt(length(x))), Int(sqrt(length(x))))
+)::Matrix{T} where T
+    m, n = shape
+    return reshape(x, m, n)
+end
+
+opr_re(x::AbstractVector) = Id2 ⊗ vecinv(x)
+opr_im(x::AbstractVector) = Im2 ⊗ vecinv(x)
+
+revec(x::AbstractVector) = vec(Id2 ⊗ vecinv(x))
+imvec(x::AbstractVector) = vec(Im2 ⊗ vecinv(x))
+
+function projector(N::Int)
+    Pre = hcat(I(N), zeros(N, N))
+    Pim = hcat(zeros(N, N), I(N))
+    P̂ = Pre'Pre ⊗ Pre - Pim'Pim ⊗ Pre
+    return P̂
+end
+
+function isovec(Ũ::AbstractMatrix)
+    N = size(Ũ, 1) ÷ 2
+    P̂ = projector(N)
+    return P̂ * vec(Ũ)
+end
+
+function iso_operator(Ũ⃗::AbstractVector)
+    N² = length(Ũ⃗) ÷ 2
+    return opr_re(Ũ⃗[1:N²]) + opr_im(Ũ⃗[N²+1:end])
+end
+
+v(Ũ⃗::AbstractVector) = vec(iso_operator(Ũ⃗))
+
+function ∂Ũ⃗v(Ũ⃗::AbstractVector)
+    N² = length(Ũ⃗) ÷ 2
+    E = I(N²)
+    ∂v = Matrix{Float64}(undef, 4N², 2N²)
+    for i = 1:N²
+        eᵢ = E[:, i]
+        ∂v[:, i] = revec(eᵢ)
+        ∂v[:, N² + i] = imvec(eᵢ)
+    end
+    return ∂v
+end
+
+
 
 
 #
@@ -118,6 +170,7 @@ struct FourthOrderPade <: QuantumStateIntegrator
     G_drives::Vector{Matrix}
     G_drive_anticoms::Symmetric
     G_drift_anticoms::Vector{Matrix}
+    P̂::Matrix
 
     function FourthOrderPade(sys::QuantumSystem)
 
@@ -145,11 +198,16 @@ struct FourthOrderPade <: QuantumStateIntegrator
                 for G_drive in sys.G_drives
         ]
 
+        N = size(sys.G_drift, 1) ÷ 2
+
+        P̂ = projector(N)
+
         return new(
             sys.G_drift,
             sys.G_drives,
             Symmetric(drive_anticoms),
             drift_anticoms,
+            P̂
         )
     end
 end
@@ -168,12 +226,22 @@ function (P::FourthOrderPade)(
     end
     Id = I(size(Gₜ, 1))
     if operator
-        Ũₜ₊₁ = iso_vec_to_iso_operator(xₜ₊₁)
-        Ũₜ = iso_vec_to_iso_operator(xₜ)
-        δŨ = (Id + Δt^2 / 9 * Gₜ^2) * (Ũₜ₊₁ - Ũₜ) -
+        Gₜ² = Gₜ^2
+        # vₜ = v(xₜ)
+        # vₜ₊₁ = v(xₜ₊₁)
+        # δŨ⃗ = (Id ⊗ (Id + Δt^2 / 9 * Gₜ²)) * (vₜ₊₁ - vₜ) -
+            # (Id ⊗ (Δt / 2 * Gₜ)) * (vₜ₊₁ + vₜ)
+        Ũₜ₊₁ = iso_operator(xₜ₊₁)
+        Ũₜ = iso_operator(xₜ)
+        δŨ = (Id + Δt^2 / 9 * Gₜ²) * (Ũₜ₊₁ - Ũₜ) -
             Δt / 2 * Gₜ * (Ũₜ₊₁ + Ũₜ)
-        δŨ⃗ = iso_operator_to_iso_vec(δŨ)
-        return δŨ⃗
+        return P.P̂ * vec(δŨ)
+        # Ũₜ₊₁ = iso_vec_to_iso_operator(xₜ₊₁)
+        # Ũₜ = iso_vec_to_iso_operator(xₜ)
+        # δŨ = (Id + Δt^2 / 9 * Gₜ²) * (Ũₜ₊₁ - Ũₜ) -
+        #     Δt / 2 * Gₜ * (Ũₜ₊₁ + Ũₜ)
+        # δŨ⃗ = iso_operator_to_iso_vec(δŨ)
+        # return δŨ⃗
     else
         δx = (Id + Δt^2 / 9 * Gₜ^2) * (xₜ₊₁ - xₜ) -
             Δt / 2 * Gₜ * (xₜ₊₁ + xₜ)

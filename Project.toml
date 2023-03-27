@@ -4,6 +4,7 @@ authors = ["Aaron Trowbridge <aaron.j.trowbridge@gmail.com> and contributors"]
 version = "0.1.0"
 
 [deps]
+BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
@@ -17,6 +18,7 @@ JLD2 = "033835bb-8acc-5ee8-8aae-3f567f8a3819"
 Libdl = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 LiveServer = "16fef848-5104-11e9-1b77-fb7a48bbb589"
+ManifoldDiff = "af67fdf4-a580-4b9f-bbec-742ef357defd"
 Manifolds = "1cead3c2-87b3-11e9-0ccd-23c62b72b94e"
 MathOptInterface = "b8f27783-ece8-5eb3-8dc8-9495eed66fee"
 NamedTrajectories = "538bc3a1-5ab9-4fc3-b776-35ca1e893e08"

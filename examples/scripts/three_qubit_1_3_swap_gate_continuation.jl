@@ -43,10 +43,10 @@ U_goal = Matrix{ComplexF64}(U_goal_analytic)
 a_dag = create(2)
 a = annihilate(2)
 
-ωs = [5.18, 5.12, 5.06]
-ω_d = 5.12
+ωs = 2π * [5.18, 5.12, 5.06]
+ω_d = 2π * 5.12
 
-ξs = [0.01, 0.01, 0.01]
+ξs = 2π * fill(0.340, 3) # ξ = 0.340 GHz
 
 J_12 = 5.0e-3
 J_23 = 5.0e-3
@@ -99,6 +99,7 @@ Ũ⃗_dim = length(Ũ⃗_init)
 traj_path = "examples/scripts/trajectories/three_qubits/swap_gate/continuation/T_50_Q_100.0_iter_200_fidelity_0.9669807052313945_00000.jld2"
 init_traj = load_traj(traj_path)
 
+
 T = init_traj.T
 dt = 4.0
 Δt_min = 0.5 * dt
@@ -117,6 +118,7 @@ ddu = randn(n_drives, T)
 
 comps = (
     Ũ⃗ = init_traj.Ũ⃗,
+    G⃗ = init_traj.G⃗,
     u = init_traj.u,
     du = init_traj.du,
     ddu = init_traj.ddu,
@@ -144,7 +146,7 @@ goal = (
 
 traj = NamedTrajectory(
     comps;
-    controls=(:ddu, :Δt),
+    controls=(:ddu, :G⃗, :Δt),
     dt=dt,
     dynamical_dts=true,
     bounds=bounds,
@@ -164,10 +166,13 @@ P = FourthOrderPade(system)
     duₜ₊₁ = zₜ₊₁[traj.components.du]
     duₜ = zₜ[traj.components.du]
 
+    G⃗ₜ = zₜ[traj.components.G⃗]
+    G = skew_symmetric(G⃗ₜ, 2N)
+
     dduₜ = zₜ[traj.components.ddu]
     Δtₜ = zₜ[traj.components.Δt][1]
 
-    δŨ⃗ = P(Ũ⃗ₜ₊₁, Ũ⃗ₜ, uₜ, Δtₜ; operator=true)
+    δŨ⃗ = P(Ũ⃗ₜ₊₁, Ũ⃗ₜ, uₜ, Δtₜ; operator=true, G_additional=G)
     δu = uₜ₊₁ - uₜ - duₜ * Δtₜ
     δdu = duₜ₊₁ - duₜ - dduₜ * Δtₜ
 
@@ -180,9 +185,13 @@ loss = :UnitaryInfidelityLoss
 
 J = QuantumObjective(:Ũ⃗, traj, loss, Q)
 
-R_ddu = 1e-3
+R_ddu = 1e-4
 
 J += QuadraticRegularizer(:ddu, traj, R_ddu * ones(n_drives))
+
+R_G = 1e4
+
+J += QuadraticRegularizer(:G⃗, traj, R_G * ones(traj.dims.G⃗))
 
 options = Options(
     max_iter=max_iter,
@@ -224,6 +233,6 @@ add_component!(prob.trajectory, :ψ̃, Ψ̃)
 
 plot(plot_path, prob.trajectory, [:Ũ⃗, :ψ̃, :u]; ignored_labels=[:Ũ⃗, :ψ̃], dt_name=:Δt)
 
-save_dir = "examples/scripts/trajectories/three_qubits/swap_gate/post_continuation"
+save_dir = "examples/scripts/trajectories/three_qubits/swap_gate/continuation"
 save_path = generate_file_path("jld2", experiment, save_dir)
 save(save_path, prob.trajectory)

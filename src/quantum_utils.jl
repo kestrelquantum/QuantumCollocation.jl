@@ -3,6 +3,8 @@ module QuantumUtils
 export GATES
 export ⊗
 export apply
+export qubit_system_state
+export lift
 export ket_to_iso
 export iso_to_ket
 export operator_to_iso_vec
@@ -76,6 +78,23 @@ function apply(gate::Symbol, ψ::Vector{<:Number})
     return ComplexF64.(normalize(Û * ψ))
 end
 
+function qubit_system_state(ket::String)
+    cs = [c for c ∈ ket]
+    @assert all(c ∈ "01" for c ∈ cs)
+    states = [c == '0' ? [1, 0] : [0, 1] for c ∈ cs]
+    ψ = foldr(⊗, states)
+    ψ = Vector{ComplexF64}(ψ)
+    return ψ
+end
+
+function lift(U, q, n; l=2)
+    Is = Matrix{Number}[I(l) for i in 1:n]
+    Is[q] = U
+    return foldr(kron, Is)
+end
+
+
+
 
 """
     quantum harmonic oscillator operators
@@ -144,25 +163,28 @@ end
 
 function iso_vec_to_operator(Ũ⃗::AbstractVector)
     Ũ⃗_dim = div(length(Ũ⃗), 2)
-    ket_dim = Int(sqrt(Ũ⃗_dim))
+    N = Int(sqrt(Ũ⃗_dim))
     U_real_vec = Ũ⃗[1:Ũ⃗_dim]
     U_imag_vec = Ũ⃗[(Ũ⃗_dim + 1):end]
-    U_real = reshape(U_real_vec, ket_dim, ket_dim)
-    U_imag = reshape(U_imag_vec, ket_dim, ket_dim)
+    U_real = reshape(U_real_vec, N, N)
+    U_imag = reshape(U_imag_vec, N, N)
     U = U_real + im * U_imag
     return U
 end
 
 function iso_vec_to_iso_operator(Ũ⃗::AbstractVector)
     Ũ⃗_dim = div(length(Ũ⃗), 2)
-    ket_dim = Int(sqrt(Ũ⃗_dim))
+    N = Int(sqrt(Ũ⃗_dim))
     U_real_vec = Ũ⃗[1:Ũ⃗_dim]
     U_imag_vec = Ũ⃗[(Ũ⃗_dim + 1):end]
-    U_real = reshape(U_real_vec, ket_dim, ket_dim)
-    U_imag = reshape(U_imag_vec, ket_dim, ket_dim)
+    U_real = reshape(U_real_vec, N, N)
+    U_imag = reshape(U_imag_vec, N, N)
     Ũ = vcat(hcat(U_real, -U_imag), hcat(U_imag, U_real))
     return Ũ
 end
+
+
+
 
 function operator_to_iso_vec(U::AbstractMatrix)
     U_real = real(U)
@@ -174,14 +196,16 @@ function operator_to_iso_vec(U::AbstractMatrix)
 end
 
 function iso_operator_to_iso_vec(Ũ::AbstractMatrix)
-    ket_dim = size(Ũ, 1) ÷ 2
-    U_real = Ũ[1:ket_dim, 1:ket_dim]
-    U_imag = Ũ[(ket_dim + 1):end, 1:ket_dim]
+    N = size(Ũ, 1) ÷ 2
+    U_real = Ũ[1:N, 1:N]
+    U_imag = Ũ[(N + 1):2N, 1:N]
     U_real_vec = vec(U_real)
     U_imag_vec = vec(U_imag)
     Ũ⃗ = [U_real_vec; U_imag_vec]
     return Ũ⃗
 end
+
+
 
 
 
@@ -193,6 +217,11 @@ function fidelity(ψ̃, ψ̃_goal)
     ψ = iso_to_ket(ψ̃)
     ψ_goal = iso_to_ket(ψ̃_goal)
     return abs2(ψ' * ψ_goal)
+end
+
+function unitary_fidelity(U::Matrix, U_goal::Matrix)
+    N = size(U, 1)
+    return 1 / N * abs(tr(U'U_goal))
 end
 
 function unitary_fidelity(Ũ⃗::Vector, Ũ⃗_goal::Vector)

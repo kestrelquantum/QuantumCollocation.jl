@@ -39,7 +39,7 @@ function QuantumControlProblem(
     system::AbstractSystem,
     traj::NamedTrajectory,
     obj::Objective,
-    dynamics::Function;
+    f::Function;
     eval_hessian::Bool=true,
     options::Options=Options(),
     constraints::Vector{AbstractConstraint}=AbstractConstraint[],
@@ -49,11 +49,11 @@ function QuantumControlProblem(
     optimizer = Ipopt.Optimizer()
     set!(optimizer, options)
 
-    f = QuantumDynamics(dynamics, traj)
+    dynamics = QuantumDynamics(f, traj)
 
-    evaluator = PicoEvaluator(traj, obj, f, eval_hessian)
+    evaluator = PicoEvaluator(traj, obj, dynamics, eval_hessian)
 
-    n_dynamics_constraints = traj.dims.states * (traj.T - 1)
+    n_dynamics_constraints = dynamics.dim * (traj.T - 1)
     n_variables = traj.dim * traj.T
 
     traj_cons = trajectory_constraints(traj)

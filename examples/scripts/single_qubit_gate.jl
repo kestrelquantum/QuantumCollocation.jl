@@ -4,7 +4,8 @@ using LinearAlgebra
 using Distributions
 
 # setting maximum number of iterations
-max_iter = 2000
+max_iter = 1000
+linear_solver = "pardiso"
 
 # defining levels for single qubit system
 n_levels = 2
@@ -87,7 +88,7 @@ end
 u = vcat(γ, α)
 
 # Ũ⃗ = unitary_rollout(Ũ⃗_init, u, Δt, system)
-Ũ⃗ = unitary_geodesic(U_goal, T)
+Ũ⃗ = unitary_geodesic(U_goal, T; return_generator=false)
 
 # defining components for trajectory
 comps = (
@@ -213,6 +214,7 @@ J += QuadraticRegularizer(:ddα, traj, R_ddα * ones(α_dim))
 # Ipopt options
 options = Options(
     max_iter=max_iter,
+    linear_solver=linear_solver,
 )
 
 # defining quantum control problem

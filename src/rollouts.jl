@@ -132,10 +132,10 @@ function unitary_geodesic(
     end
 end
 
-function unitary_geodesic(U_goal, samples)
+function unitary_geodesic(U_goal, samples; kwargs...)
     N = size(U_goal, 1)
     U_init = Matrix{ComplexF64}(I(N))
-    return unitary_geodesic(U_init, U_goal, samples)
+    return unitary_geodesic(U_init, U_goal, samples; kwargs...)
 end
 
 
