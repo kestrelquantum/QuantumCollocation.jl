@@ -983,9 +983,9 @@ version = "0.3.1"
 
 [[deps.Manifolds]]
 deps = ["Colors", "Distributions", "Einsum", "Graphs", "HybridArrays", "Kronecker", "LinearAlgebra", "ManifoldDiff", "ManifoldsBase", "Markdown", "MatrixEquations", "Quaternions", "Random", "RecipesBase", "RecursiveArrayTools", "Requires", "SimpleWeightedGraphs", "SpecialFunctions", "StaticArrays", "Statistics", "StatsBase"]
-git-tree-sha1 = "a3a69757b2766d228a3315b395dace0c5d741fdc"
+git-tree-sha1 = "a74cd44728202deb8a3b1a1dc6ef1aadbd5fcd97"
 uuid = "1cead3c2-87b3-11e9-0ccd-23c62b72b94e"
-version = "0.8.51"
+version = "0.8.52"
 
 [[deps.ManifoldsBase]]
 deps = ["LinearAlgebra", "Markdown", "Random"]
@@ -1087,7 +1087,9 @@ version = "0.2.50"
 
 [[deps.NamedTrajectories]]
 deps = ["CairoMakie", "JLD2", "LaTeXStrings", "Latexify", "Reexport", "Revise", "Unidecode"]
-path = "../NamedTrajectories.jl"
+git-tree-sha1 = "8a23a32065ffb27ee2bbff4183978ba74579b170"
+repo-rev = "main"
+repo-url = "https://github.com/aarontrowbridge/NamedTrajectories.jl"
 uuid = "538bc3a1-5ab9-4fc3-b776-35ca1e893e08"
 version = "0.1.0"
 
