@@ -31,10 +31,10 @@ U_goal = Matrix{ComplexF64}(U_goal_analytic)
 a_dag = create(2)
 a = annihilate(2)
 
-ωs = [5.18, 5.12, 5.06]
-ω_d = 5.12
+ωs = 2π * [5.18, 5.12, 5.06]
+ω_d = 2π * 5.12
 
-ξs = [1.0, 1.0, 1.0]
+ξs = 2π * fill(0.340, 3) # ξ = 0.340 GHz
 
 J_12 = 5.0e-3
 J_23 = 5.0e-3
@@ -67,68 +67,75 @@ system = QuantumSystem(H_drift, H_drives)
 
 U_dim = *(size(U_init)...)
 
-Ũ⃗_init = operator_to_iso_vec(U_init)
-Ũ⃗_goal = operator_to_iso_vec(U_goal)
-
-Ũ⃗_dim = length(Ũ⃗_init)
-
-T = 50
-dt = 4.0
-Δt_min = 0.5 * dt
-Δt_max = 1.0 * dt
-
-# -------------------------------------------
-# Setting up geodesic control problem
-# -------------------------------------------
-
-
-
 N = size(U_init, 1)
 
 n = 2 * N
 
 n_controls = n * (n - 1) ÷ 2
 
-Ũ⃗, G⃗_geodesic = unitary_geodesic(U_goal, T)
 
-Ũ⃗[:, 1]
-Ũ⃗[:, 1] |> iso_vec_to_operator |> U -> unitary_fidelity(U, U_goal)
+Ũ⃗_init = operator_to_iso_vec(U_init)
+Ũ⃗_goal = operator_to_iso_vec(U_goal)
 
-G⃗ = G⃗_geodesic + rand(Normal(0, 0.01), size(G⃗_geodesic))
+Ũ⃗_dim = length(Ũ⃗_init)
 
-Δt = fill(dt, 1, T)
+# -------------------------------------------
+# Setting up geodesic control problem
+# -------------------------------------------
 
-comps = (
-    Ũ⃗ = Ũ⃗,
-    G⃗ = G⃗,
-    Δt = Δt
-)
+load_traj = true
 
-bounds = (
-    Δt = (Δt_min, Δt_max),
-)
+if load_traj
+    traj_path = "examples/scripts/trajectories/three_qubits/swap_gate/geodesic_T_50_dt_4.0_Δt_min_2.0_Δt_max_4.0_R_G_0.01_Q_100.0_F_1.0000471425548512_00000.jld2"
+    traj = load_traj(traj_path)
+else
+    T = 50
+    dt = 4.0
+    Δt_min = 0.5 * dt
+    Δt_max = 1.0 * dt
 
-initial = (
-    Ũ⃗ = Ũ⃗_init,
-)
 
-final = (;
-)
+    Ũ⃗, G⃗_geodesic = unitary_geodesic(U_goal, T)
 
-goal = (
-    Ũ⃗ = Ũ⃗_goal,
-)
+    Ũ⃗[:, 1]
+    Ũ⃗[:, 1] |> iso_vec_to_operator |> U -> unitary_fidelity(U, U_goal)
 
-traj = NamedTrajectory(
-    comps;
-    controls=(:G⃗, :Δt),
-    dt=dt,
-    dynamical_dts=true,
-    bounds=bounds,
-    initial=initial,
-    final=final,
-    goal=goal
-)
+    G⃗ = G⃗_geodesic + rand(Normal(0, 0.01), size(G⃗_geodesic))
+
+    Δt = fill(dt, 1, T)
+
+    comps = (
+        Ũ⃗ = Ũ⃗,
+        G⃗ = G⃗,
+        Δt = Δt
+    )
+
+    bounds = (
+        Δt = (Δt_min, Δt_max),
+    )
+
+    initial = (
+        Ũ⃗ = Ũ⃗_init,
+    )
+
+    final = (;
+    )
+
+    goal = (
+        Ũ⃗ = Ũ⃗_goal,
+    )
+
+    traj = NamedTrajectory(
+        comps;
+        controls=(:G⃗, :Δt),
+        dt=dt,
+        dynamical_dts=true,
+        bounds=bounds,
+        initial=initial,
+        final=final,
+        goal=goal
+    )
+end
 
 P = FourthOrderPade(system)
 
