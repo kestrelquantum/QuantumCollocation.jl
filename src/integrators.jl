@@ -226,22 +226,12 @@ function (P::FourthOrderPade)(
     end
     Id = I(size(Gₜ, 1))
     if operator
-        Gₜ² = Gₜ^2
-        # vₜ = v(xₜ)
-        # vₜ₊₁ = v(xₜ₊₁)
-        # δŨ⃗ = (Id ⊗ (Id + Δt^2 / 9 * Gₜ²)) * (vₜ₊₁ - vₜ) -
-            # (Id ⊗ (Δt / 2 * Gₜ)) * (vₜ₊₁ + vₜ)
-        Ũₜ₊₁ = iso_operator(xₜ₊₁)
-        Ũₜ = iso_operator(xₜ)
-        δŨ = (Id + Δt^2 / 9 * Gₜ²) * (Ũₜ₊₁ - Ũₜ) -
+        Ũₜ₊₁ = iso_vec_to_iso_operator(xₜ₊₁)
+        Ũₜ = iso_vec_to_iso_operator(xₜ)
+        δŨ = (Id + Δt^2 / 9 * Gₜ^2) * (Ũₜ₊₁ - Ũₜ) -
             Δt / 2 * Gₜ * (Ũₜ₊₁ + Ũₜ)
-        return P.P̂ * vec(δŨ)
-        # Ũₜ₊₁ = iso_vec_to_iso_operator(xₜ₊₁)
-        # Ũₜ = iso_vec_to_iso_operator(xₜ)
-        # δŨ = (Id + Δt^2 / 9 * Gₜ²) * (Ũₜ₊₁ - Ũₜ) -
-        #     Δt / 2 * Gₜ * (Ũₜ₊₁ + Ũₜ)
-        # δŨ⃗ = iso_operator_to_iso_vec(δŨ)
-        # return δŨ⃗
+        δŨ⃗ = iso_operator_to_iso_vec(δŨ)
+        return δŨ⃗
     else
         δx = (Id + Δt^2 / 9 * Gₜ^2) * (xₜ₊₁ - xₜ) -
             Δt / 2 * Gₜ * (xₜ₊₁ + xₜ)

@@ -83,11 +83,11 @@ Ũ⃗_dim = length(Ũ⃗_init)
 # Setting up geodesic control problem
 # -------------------------------------------
 
-load_traj = true
+load_trajectory = false
 
-if load_traj
+if load_trajectory
     traj_path = "examples/scripts/trajectories/three_qubits/swap_gate/geodesic_T_50_dt_4.0_Δt_min_2.0_Δt_max_4.0_R_G_0.01_Q_100.0_F_1.0000471425548512_00000.jld2"
-    traj = load_traj(traj_path)
+    traj = NamedTrajectories.load_traj(traj_path)
 else
     T = 50
     dt = 4.0

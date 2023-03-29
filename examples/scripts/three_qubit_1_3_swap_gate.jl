@@ -96,62 +96,115 @@ Ũ⃗_goal = operator_to_iso_vec(U_goal)
 
 Ũ⃗_dim = length(Ũ⃗_init)
 
-traj_path = "examples/scripts/trajectories/three_qubits/swap_gate/continuation/T_50_Q_100.0_iter_200_fidelity_0.9669807052313945_00000.jld2"
-init_traj = load_traj(traj_path)
+load = :post_continuation
 
-T = init_traj.T
-dt = 4.0
-Δt_min = 0.5 * dt
-Δt_max = 2.0 * dt
-u_bound = 0.04 # GHz
-u_dist = Uniform(-u_bound, u_bound)
-ddu_bound = 0.1
+if load == :continuation
+    traj_path = "examples/scripts/trajectories/three_qubits/swap_gate/continuation/T_50_Q_200.0_iter_200_fidelity_0.9999813247231153_00000.jld2"
+    init_traj = load_traj(traj_path)
 
-
-
-u = foldr(hcat, [zeros(n_drives), rand(u_dist, n_drives, T - 2), zeros(n_drives)])
-du = randn(n_drives, T)
-ddu = randn(n_drives, T)
+    T = init_traj.T
+    dt = 4.0
+    Δt_min = 0.5 * dt
+    Δt_max = 2.0 * dt
+    u_bound = 2π * 0.04 # GHz
+    u_dist = Uniform(-u_bound, u_bound)
+    ddu_bound = 0.001
 
 
 
-comps = (
-    Ũ⃗ = init_traj.Ũ⃗,
-    u = init_traj.u,
-    du = init_traj.du,
-    ddu = init_traj.ddu,
-    Δt = init_traj.Δt
-)
+    u = foldr(hcat, [zeros(n_drives), rand(u_dist, n_drives, T - 2), zeros(n_drives)])
+    du = randn(n_drives, T)
+    ddu = randn(n_drives, T)
 
-bounds = (
-    u = fill(u_bound, n_drives),
-    ddu = fill(ddu_bound, n_drives),
-    Δt = (Δt_min, Δt_max),
-)
 
-initial = (
-    Ũ⃗ = Ũ⃗_init,
-    u = zeros(n_drives),
-)
 
-final = (
-    u = zeros(n_drives),
-)
+    comps = (
+        Ũ⃗ = init_traj.Ũ⃗,
+        u = init_traj.u,
+        du = init_traj.du,
+        ddu = init_traj.ddu,
+        Δt = init_traj.Δt
+    )
 
-goal = (
-    Ũ⃗ = Ũ⃗_goal,
-)
+    bounds = (
+        u = fill(u_bound, n_drives),
+        ddu = fill(ddu_bound, n_drives),
+        Δt = (Δt_min, Δt_max),
+    )
 
-traj = NamedTrajectory(
-    comps;
-    controls=(:ddu, :Δt),
-    dt=dt,
-    dynamical_dts=true,
-    bounds=bounds,
-    initial=initial,
-    final=final,
-    goal=goal
-)
+    initial = (
+        Ũ⃗ = Ũ⃗_init,
+        u = zeros(n_drives),
+    )
+
+    final = (
+        u = zeros(n_drives),
+    )
+
+    goal = (
+        Ũ⃗ = Ũ⃗_goal,
+    )
+
+    traj = NamedTrajectory(
+        comps;
+        controls=(:ddu, :Δt),
+        dt=dt,
+        dynamical_dts=true,
+        bounds=bounds,
+        initial=initial,
+        final=final,
+        goal=goal
+    )
+elseif load == :post_continuation
+    traj_path = "examples/scripts/trajectories/three_qubits/swap_gate/post_continuation/T_50_Q_100.0_iter_200_fidelity_0.7857872051064816_00000.jld2"
+    init_traj = load_traj(traj_path)
+
+    T = init_traj.T
+    dt = 4.0
+    Δt_min = 0.5 * dt
+    Δt_max = 2.0 * dt
+    u_bound = 2π * 0.04 # GHz
+    u_dist = Uniform(-u_bound, u_bound)
+    ddu_bound = 0.0005
+
+    comps = (
+        Ũ⃗ = init_traj.Ũ⃗,
+        u = init_traj.u,
+        du = init_traj.du,
+        ddu = init_traj.ddu,
+        Δt = init_traj.Δt
+    )
+
+    bounds = (
+        u = fill(u_bound, n_drives),
+        ddu = fill(ddu_bound, n_drives),
+        Δt = (Δt_min, Δt_max),
+    )
+
+    initial = (
+        Ũ⃗ = Ũ⃗_init,
+        u = zeros(n_drives),
+    )
+
+    final = (
+        u = zeros(n_drives),
+    )
+
+    goal = (
+        Ũ⃗ = Ũ⃗_goal,
+    )
+
+    traj = NamedTrajectory(
+        comps;
+        controls=(:ddu, :Δt),
+        dt=dt,
+        dynamical_dts=true,
+        bounds=bounds,
+        initial=initial,
+        final=final,
+        goal=goal
+    )
+end
 
 
 P = FourthOrderPade(system)
@@ -180,9 +233,18 @@ loss = :UnitaryInfidelityLoss
 
 J = QuantumObjective(:Ũ⃗, traj, loss, Q)
 
-R_ddu = 1e-3
+R_u = 1e-2
+
+J += QuadraticRegularizer(:u, traj, R_u * ones(n_drives))
+
+R_du = 1e-2
+
+J += QuadraticRegularizer(:du, traj, R_du * ones(n_drives))
+
+R_ddu = 1e-2
 
 J += QuadraticRegularizer(:ddu, traj, R_ddu * ones(n_drives))
+
 
 options = Options(
     max_iter=max_iter,
@@ -195,7 +257,7 @@ prob = QuantumControlProblem(system, traj, J, f;
 
 plot_dir = "examples/scripts/plots/three_qubit_swap/"
 
-experiment = "T_$(T)_Q_$(Q)_iter_$(max_iter)"
+experiment = "T_$(traj.T)_Q_$(Q)_iter_$(max_iter)"
 
 plot_path = generate_file_path("png", experiment, plot_dir)
 
@@ -211,7 +273,7 @@ experiment *= "_fidelity_$(fid)"
 println("Final fidelity: ", fid)
 
 # |0⟩ rollout test
-ψ = qubit_system_state("000")
+ψ = qubit_system_state("100")
 ψ̃ = ket_to_iso(ψ)
 ψ̃_goal = ket_to_iso(U_goal * ψ)
 Ψ̃ = rollout(ψ̃, prob.trajectory.u, prob.trajectory.Δt, system)

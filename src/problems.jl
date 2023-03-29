@@ -117,127 +117,127 @@ end
 
 
 
-function problem_constraints(
-    system::AbstractSystem,
-    params::Dict,
-    init_traj::NamedTrajectory
-)::Vector{AbstractConstraint}
+# function problem_constraints(
+#     system::AbstractSystem,
+#     params::Dict,
+#     init_traj::NamedTrajectory
+# )::Vector{AbstractConstraint}
 
-    cons = AbstractConstraint[]
+#     cons = AbstractConstraint[]
 
-    # initial quantum state constraints: ψ̃(t=1) = ψ̃1
-    ψ1_con = EqualityConstraint(
-        1,
-        1:system.n_wfn_states,
-        system.ψ̃init,
-        system.vardim;
-        name="initial quantum state constraints"
-    )
-    push!(cons, ψ1_con)
+#     # initial quantum state constraints: ψ̃(t=1) = ψ̃1
+#     ψ1_con = EqualityConstraint(
+#         1,
+#         1:system.n_wfn_states,
+#         system.ψ̃init,
+#         system.vardim;
+#         name="initial quantum state constraints"
+#     )
+#     push!(cons, ψ1_con)
 
-    #TODO: maybe add ∫a constraint
+#     #TODO: maybe add ∫a constraint
 
-    # initial and final a(t ∈ {1, T}) = 0 constraints
-    a_cons = EqualityConstraint(
-        [1, params[:T]],
-        system.n_wfn_states .+ slice(system.∫a + 1, system.ncontrols),
-        0.0,
-        system.vardim;
-        name="initial and final augmented state constraints"
-    )
-    push!(cons, a_cons)
+#     # initial and final a(t ∈ {1, T}) = 0 constraints
+#     a_cons = EqualityConstraint(
+#         [1, params[:T]],
+#         system.n_wfn_states .+ slice(system.∫a + 1, system.ncontrols),
+#         0.0,
+#         system.vardim;
+#         name="initial and final augmented state constraints"
+#     )
+#     push!(cons, a_cons)
 
-    # initial and final da(t ∈ {1, T}) = 0 constraints
-    # aug_cons = EqualityConstraint(
-    #     [1, params[:T]],
-    #     system.n_wfn_states .+ slice(system.∫a + 2, system.ncontrols),
-    #     0.0,
-    #     system.vardim;
-    #     name="initial and final augmented state constraints"
-    # )
-    # push!(cons, da_cons)
+#     # initial and final da(t ∈ {1, T}) = 0 constraints
+#     # aug_cons = EqualityConstraint(
+#     #     [1, params[:T]],
+#     #     system.n_wfn_states .+ slice(system.∫a + 2, system.ncontrols),
+#     #     0.0,
+#     #     system.vardim;
+#     #     name="initial and final augmented state constraints"
+#     # )
+#     # push!(cons, da_cons)
 
-    # bound |a(t)| < a_bound
-    a_bound_con = BoundsConstraint(
-        2:params[:T]-1,
-        system.n_wfn_states .+ slice(system.∫a + 1, system.ncontrols),
-        system.a_bounds,
-        system.vardim;
-        name="bound |a(t)| < a_bound"
-    )
-    push!(cons, a_bound_con)
+#     # bound |a(t)| < a_bound
+#     a_bound_con = BoundsConstraint(
+#         2:params[:T]-1,
+#         system.n_wfn_states .+ slice(system.∫a + 1, system.ncontrols),
+#         system.a_bounds,
+#         system.vardim;
+#         name="bound |a(t)| < a_bound"
+#     )
+#     push!(cons, a_bound_con)
 
-    # bound |u(t)| < u_bound
-    u_bound_con = BoundsConstraint(
-        1:params[:T],
-        system.nstates .+ (1:system.ncontrols),
-        params[:u_bounds],
-        system.vardim;
-        name="bound |u(t)| < u_bound"
-    )
-    push!(cons, u_bound_con)
+#     # bound |u(t)| < u_bound
+#     u_bound_con = BoundsConstraint(
+#         1:params[:T],
+#         system.nstates .+ (1:system.ncontrols),
+#         params[:u_bounds],
+#         system.vardim;
+#         name="bound |u(t)| < u_bound"
+#     )
+#     push!(cons, u_bound_con)
 
-    # pin first qstate to be equal to analytic solution
-    if params[:pin_first_qstate]
-        ψ̃¹goal = system.ψ̃goal[1:system.isodim]
-        pin_con = EqualityConstraint(
-            params[:T],
-            1:system.isodim,
-            ψ̃¹goal,
-            system.vardim;
-            name="pinned first qstate at T"
-        )
-        push!(cons, pin_con)
-    end
+#     # pin first qstate to be equal to analytic solution
+#     if params[:pin_first_qstate]
+#         ψ̃¹goal = system.ψ̃goal[1:system.isodim]
+#         pin_con = EqualityConstraint(
+#             params[:T],
+#             1:system.isodim,
+#             ψ̃¹goal,
+#             system.vardim;
+#             name="pinned first qstate at T"
+#         )
+#         push!(cons, pin_con)
+#     end
 
-    if params[:mode] ∈ (:free_time, :min_time)
-        Δt_con = TimeStepBoundsConstraint(
-            (params[:Δt_min], params[:Δt_max]),
-            params[:Δt_indices],
-            params[:T];
-            name="time step bounds constraint"
-        )
-        push!(cons, Δt_con)
+#     if params[:mode] ∈ (:free_time, :min_time)
+#         Δt_con = TimeStepBoundsConstraint(
+#             (params[:Δt_min], params[:Δt_max]),
+#             params[:Δt_indices],
+#             params[:T];
+#             name="time step bounds constraint"
+#         )
+#         push!(cons, Δt_con)
 
-        if params[:equal_Δts]
-            Δts_all_equal_con = TimeStepsAllEqualConstraint(
-                params[:Δt_indices];
-                name="time steps all equal constraint"
-            )
-            push!(cons, Δts_all_equal_con)
-        end
+#         if params[:equal_Δts]
+#             Δts_all_equal_con = TimeStepsAllEqualConstraint(
+#                 params[:Δt_indices];
+#                 name="time steps all equal constraint"
+#             )
+#             push!(cons, Δts_all_equal_con)
+#         end
 
-        if params[:mode] == :min_time
-            if params[:pin_first_qstate]
-                ψ̃T_con = EqualityConstraint(
-                    params[:T],
-                    (system.isodim + 1):system.n_wfn_states,
-                    init_traj.states[end][(system.isodim + 1):system.n_wfn_states],
-                    system.vardim;
-                    name="final qstate constraint"
-                )
-            else
-                ψ̃T_con = EqualityConstraint(
-                    params[:T],
-                    1:system.n_wfn_states,
-                    init_traj.states[end][1:system.n_wfn_states],
-                    system.vardim;
-                    name="final qstate constraint"
-                )
-            end
-            push!(cons, ψ̃T_con)
-        end
-    elseif params[:mode] == :fixed_time
-        Δt_con = TimeStepEqualityConstraint(
-            params[:Δt],
-            params[:Δt_indices];
-            name="time step constraint"
-        )
-        push!(cons, Δt_con)
-    end
+#         if params[:mode] == :min_time
+#             if params[:pin_first_qstate]
+#                 ψ̃T_con = EqualityConstraint(
+#                     params[:T],
+#                     (system.isodim + 1):system.n_wfn_states,
+#                     init_traj.states[end][(system.isodim + 1):system.n_wfn_states],
+#                     system.vardim;
+#                     name="final qstate constraint"
+#                 )
+#             else
+#                 ψ̃T_con = EqualityConstraint(
+#                     params[:T],
+#                     1:system.n_wfn_states,
+#                     init_traj.states[end][1:system.n_wfn_states],
+#                     system.vardim;
+#                     name="final qstate constraint"
+#                 )
+#             end
+#             push!(cons, ψ̃T_con)
+#         end
+#     elseif params[:mode] == :fixed_time
+#         Δt_con = TimeStepEqualityConstraint(
+#             params[:Δt],
+#             params[:Δt_indices];
+#             name="time step constraint"
+#         )
+#         push!(cons, Δt_con)
+#     end
 
-    return cons
-end
+#     return cons
+# end
 
 
 
@@ -498,7 +498,7 @@ function initialize_trajectory!(
         prob.optimizer,
         MOI.VariablePrimalStart(),
         vec(prob.variables),
-        traj.datavec
+        collect(traj.datavec)
     )
 end
 

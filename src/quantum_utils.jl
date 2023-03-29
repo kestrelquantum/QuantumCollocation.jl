@@ -173,13 +173,14 @@ function iso_vec_to_operator(Ũ⃗::AbstractVector)
 end
 
 function iso_vec_to_iso_operator(Ũ⃗::AbstractVector)
-    Ũ⃗_dim = div(length(Ũ⃗), 2)
-    N = Int(sqrt(Ũ⃗_dim))
-    U_real_vec = Ũ⃗[1:Ũ⃗_dim]
-    U_imag_vec = Ũ⃗[(Ũ⃗_dim + 1):end]
-    U_real = reshape(U_real_vec, N, N)
-    U_imag = reshape(U_imag_vec, N, N)
-    Ũ = vcat(hcat(U_real, -U_imag), hcat(U_imag, U_real))
+    N = Int(sqrt(length(Ũ⃗) ÷ 2))
+    Ũ = Matrix{eltype(Ũ⃗)}(undef, 2N, 2N)
+    U_real = reshape(Ũ⃗[1:N^2], N, N)
+    U_imag = reshape(Ũ⃗[N^2+1:end], N, N)
+    Ũ[1:N, 1:N] = U_real
+    Ũ[1:N, (N + 1):end] = -U_imag
+    Ũ[(N + 1):end, 1:N] = U_imag
+    Ũ[(N + 1):end, (N + 1):end] = U_real
     return Ũ
 end
 

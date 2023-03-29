@@ -96,7 +96,7 @@ Ũ⃗_goal = operator_to_iso_vec(U_goal)
 
 Ũ⃗_dim = length(Ũ⃗_init)
 
-traj_path = "examples/scripts/trajectories/three_qubits/swap_gate/continuation/T_50_Q_100.0_iter_200_fidelity_0.9669807052313945_00000.jld2"
+traj_path = "examples/scripts/trajectories/three_qubits/swap_gate/continuation/T_50_Q_200.0_iter_200_fidelity_0.999994882002093_00000.jld2"
 init_traj = load_traj(traj_path)
 
 
@@ -104,9 +104,9 @@ T = init_traj.T
 dt = 4.0
 Δt_min = 0.5 * dt
 Δt_max = 2.0 * dt
-u_bound = 0.04 # GHz
+u_bound = 2π * 0.04 # GHz
 u_dist = Uniform(-u_bound, u_bound)
-ddu_bound = 0.1
+ddu_bound = 0.001
 
 
 
@@ -179,17 +179,25 @@ P = FourthOrderPade(system)
     return vcat(δŨ⃗, δu, δdu)
 end
 
-Q = 100.0
+Q = 200.0
 
 loss = :UnitaryInfidelityLoss
 
 J = QuantumObjective(:Ũ⃗, traj, loss, Q)
 
-R_ddu = 1e-4
+R_u = 1e-2
+
+J += QuadraticRegularizer(:u, traj, R_u * ones(n_drives))
+
+R_du = 1e-2
+
+J += QuadraticRegularizer(:du, traj, R_du * ones(n_drives))
+
+R_ddu = 1e-2
 
 J += QuadraticRegularizer(:ddu, traj, R_ddu * ones(n_drives))
 
-R_G = 1e4
+R_G = 2e2
 
 J += QuadraticRegularizer(:G⃗, traj, R_G * ones(traj.dims.G⃗))
 
