@@ -277,7 +277,7 @@ println("Final fidelity: ", fid)
 ψ̃ = ket_to_iso(ψ)
 ψ̃_goal = ket_to_iso(U_goal * ψ)
 Ψ̃ = rollout(ψ̃, prob.trajectory.u, prob.trajectory.Δt, system)
-println("|0⟩ Rollout fidelity:   ", fidelity(Ψ̃[:, end], ψ̃_goal))
+println("|100⟩ → U|100⟩ = |001⟩ Rollout fidelity:   ", fidelity(Ψ̃[:, end], ψ̃_goal))
 
 plot_path = generate_file_path("png", experiment, plot_dir)
 

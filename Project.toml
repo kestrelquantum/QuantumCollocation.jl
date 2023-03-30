@@ -1,7 +1,7 @@
 name = "Pico"
 uuid = "0dc23a59-5ffb-49af-b6bd-932a8ae77adf"
 authors = ["Aaron Trowbridge <aaron.j.trowbridge@gmail.com> and contributors"]
-version = "0.1.0"
+version = "0.1.1"
 
 [deps]
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
@@ -31,9 +31,18 @@ Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
 Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
 
 [compat]
+julia = "1.8"
 BenchmarkTools = "1.3"
 NamedTrajectories = "0.1"
-julia = "1.8"
+CairoMakie = "0.10"
+Distributions = "0.25"
+Documenter = "0.27"
+ForwardDiff = "0.10"
+Ipopt = "1.2"
+MathOptInterface = "1.13"
+IterTools = "1.4"
+Manifolds = "0.8"
+
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
