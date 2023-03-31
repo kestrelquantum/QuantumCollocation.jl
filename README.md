@@ -5,7 +5,7 @@
 [![Build Status](https://github.com/aarontrowbridge/Pico.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/aarontrowbridge/Pico.jl/actions/workflows/CI.yml?query=branch%3Amain)
 [![Coverage](https://codecov.io/gh/aarontrowbridge/Pico.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/aarontrowbridge/Pico.jl)
 
-**Pico.jl** gets it's name from "Pade integrator collocation" and is designed for setting up and solving direct collocation problems specific to quantum optimal control, i.e. problems of the form:
+**Pico.jl** gets it's name from "Pade integrator collocation" and uses [NamedTrajectories.jl](https://github.com/aarontrowbridge/NamedTrajectories.jl) to set up and solve direct collocation problems specific to quantum optimal control, i.e. problems of the form:
 
 ```math
 \begin{aligned}
