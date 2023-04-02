@@ -67,8 +67,8 @@ imvec(x::AbstractVector) = vec(Im2 ⊗ vecinv(x))
 function projector(N::Int)
     Pre = hcat(I(N), zeros(N, N))
     Pim = hcat(zeros(N, N), I(N))
-    P̂ = Pre'Pre ⊗ Pre - Pim'Pim ⊗ Pre
-    return P̂
+    P̂ = vcat(Pre, -Pim) ⊗ Pre
+    return P̂, Pre, Pim
 end
 
 function isovec(Ũ::AbstractMatrix)
