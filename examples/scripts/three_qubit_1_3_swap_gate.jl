@@ -1,5 +1,5 @@
 using Revise
-using Pico
+using QuantumCollocation
 using NamedTrajectories
 using LinearAlgebra
 using Distributions

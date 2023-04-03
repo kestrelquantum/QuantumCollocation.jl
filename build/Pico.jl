@@ -1,4 +1,4 @@
-module Pico
+module QuantumCollocation
 
 # Write your package code here.
 

@@ -1,7 +1,7 @@
 # Fdb version 3
-["pdflatex"] 1680446231 "/home/aaron/projects/Pico.jl/notes/pico-implementation-details/pico.tex" "pico.pdf" "pico" 1680446232
+["pdflatex"] 1680446231 "/home/aaron/projects/QuantumCollocation.jl/notes/pico-implementation-details/pico.tex" "pico.pdf" "pico" 1680446232
   "/etc/texmf/web2c/texmf.cnf" 1661381987 475 c0e671620eb5563b2130f56340a5fde8 ""
-  "/home/aaron/projects/Pico.jl/notes/pico-implementation-details/pico.tex" 1680446213 40485 18c74ebde7c98f648f69e09fcb4a8ab1 ""
+  "/home/aaron/projects/QuantumCollocation.jl/notes/pico-implementation-details/pico.tex" 1680446213 40485 18c74ebde7c98f648f69e09fcb4a8ab1 ""
   "/usr/share/texlive/texmf-dist/fonts/map/fontname/texfonts.map" 1577235249 3524 cb3e574dea2d1052e39280babc910dc8 ""
   "/usr/share/texlive/texmf-dist/fonts/tfm/public/amsfonts/cmextra/cmbsy5.tfm" 1246382020 1120 1e8878807317373affa7f7bba4cf2f6a ""
   "/usr/share/texlive/texmf-dist/fonts/tfm/public/amsfonts/cmextra/cmbsy7.tfm" 1246382020 1120 7f9f170e8aa57527ad6c49feafd45d54 ""
