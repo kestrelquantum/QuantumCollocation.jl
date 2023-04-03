@@ -1,0 +1,1174 @@
+\documentclass{article}
+
+\usepackage[bookmarks]{hyperref}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{mathrsfs}
+\usepackage{physics}
+\usepackage[a4paper, margin=1in]{geometry}
+
+
+\newcommand{\isopsi}{\tilde \psi}
+\newcommand{\isoU}{\widetilde{U}}
+\newcommand{\isovecU}{\vec{\widetilde{U}}}
+\newcommand{\isovec}{\text{isovec}}
+\newcommand{\HI}{H^{\text{I}}}
+\newcommand{\HR}{H^{\text{R}}}
+\newcommand{\BR}{B^{\text{R}}}
+\newcommand{\BI}{B^{\text{I}}}
+\newcommand{\FR}{F^{\text{R}}}
+\newcommand{\FI}{F^{\text{I}}}
+\newcommand{\UR}{U^{\text{R}}}
+\newcommand{\UI}{U^{\text{I}}}
+\newcommand{\AR}{A^{\text{R}}}
+\newcommand{\AI}{A^{\text{I}}}
+\newcommand{\Pre}{P_{\text{Re}}}
+\newcommand{\Pim}{P_{\text{Im}}}
+
+
+\title{Pico.jl Implementation Notes}
+\author{Aaron Trowbridge}
+\date{}
+
+\setcounter{section}{-1}
+
+% \setlength\parindent{0pt}
+
+\begin{document}
+\maketitle
+
+\pagenumbering{roman}
+
+% \begin{abstract}
+%   Here we present a novel approach to the problem of quantum optimal control which takes advantage of a relationship between the implicit midpoint method and the Pad\'e approximation of the matrix exponential function. We demonstrate this approach, using an accompanying Julia package, on an assortment of quantum systems including a single qubit system, two-qubit system, and a system composed of a qubit coupled to an array of harmonic oscillators.
+% \end{abstract}
+
+\tableofcontents
+
+\newpage
+
+\pagenumbering{arabic}
+
+\section{Introduction}
+
+The goal of QOC is to generate a \textit{pulse} $\vb{a}(t)$ that minimizes some cost between 
+
+\begin{equation} 
+  \ket{\psi(T)} = U(T, 0) \ket{\psi}_{\text{init}}
+\end{equation}
+
+where
+
+\begin{equation}
+  U(T, 0) = \mathcal{T} \exp \qty( \frac{-i}{\hbar} \int_0^T dt \ H(\vb{a}(t), t)) 
+\end{equation}
+
+and $\ket{\psi}_{\text{goal}}$. This cost is typically defined to be the infidelity:
+
+\begin{equation}
+  \ell \qty(\ket{\psi(T)}) = 1 - \abs{\bra{\psi(T)} \ket{\psi}_{\text{goal}}}^2
+\end{equation}
+
+The QOC optimization problem can then be defined as finding the pulse that minimizes the infidelity; this is accomplished by discretizing the trajectory of $\ket{\psi(t)}$ and $\vb{a}(t)$, with a time step $\Delta t$ and solving the following optimization problem:
+
+\begin{align*}
+  \hat{\vb{a}}_{1:T-1} = \arg \min_{\vb{a}_{1:T-1}} \quad &\ell \qty(\ket{\psi(T)})\\
+  \text{s.t. } \quad 
+    & \ket{\psi(T)} = \prod_{t=1}^{T-1} \exp \qty( \frac{-i}{\hbar} \ H(\vb{a}_t, t) \ \Delta t) \ket{\psi}_{\text{init}} \\
+\end{align*}
+
+
+
+% \newpage
+\section{Problem Formulation}
+
+Given a quantum system with a Hamiltonian of the form
+
+$$
+H(\vb{{a}}(t), t ) = H_{\text{drift}} + \sum_{j=1}^c a^j(t) H_{\text{drive}}^j
+$$
+
+we solve the constrained optimization problem
+
+\begin{align*}
+  \underset{\vb{x}_{1:T}, \ \vb{u}_{1:T-1}}{\text{minimize}} \quad
+    & \frac{1}{2} \sum_{t=1}^{T-1} \qty(\vb{a}_t^\top R_{\vb{a}} \vb{a}_t + \dot{\vb{a}}_t^\top R_{\dot{\vb{a}}} \dot{\vb{a}}_t + \vb{u}_t^\top R_{\vb{u}} \vb{u}_t) + Q \cdot \ell(\isopsi_T^i)\\ 
+  \text{subject to} \quad 
+    & \vb{f}(\vb{x}_{t+1}, \vb{x}_t, \vb{u}_t) = \vb{0}  \\
+    &  \isopsi^i_1 = \isopsi^i_\text{init} \\
+    & \isopsi^1_T = \isopsi^1_\text{goal} \quad \text{if }\ \textsf{pin\_first\_qstate = true}\\
+    & \smallint \vb{a}_1 = \vb{a}_1 = \dd_t \vb{a}_1 = \vb{0} \\  
+    & \smallint \vb{a}_T = \vb{a}_T = \dd_t \vb{a}_T = \vb{0} \\
+    & \abs{a^j_t} \leq a^j_\text{bound} \\
+\end{align*}
+
+
+The \textit{state} vector $\vb{x}_t$ contains both the $n$ (\textsf{nqstates}) quantum isomorphism states $\isopsi^i_t$ (each of dimension \textsf{isodim = 2*ketdim}) and the augmented control states $\smallint \vb{a}_t$, $\vb{a}_t$, and $\dd_t \vb{a}_t$ (the number of augmented state vector is \textsf{augdim}). The \textit{action} vector $\vb{u}_t$ contains the second derivative of the \textit{control} vector $\vb{a}_t$, which has dimension \textsf{ncontrols}. Thus, we have:
+
+\begin{equation}
+  \vb{x}_t = \mqty(
+    \isopsi^1_t \\ 
+    \vdots \\ 
+    \isopsi^n_t \\ 
+    \smallint \vb{a}_t \\ 
+    \vb{a}_t \\ 
+    \dd_t \vb{a}_t 
+  )
+  \quad \text{and} \quad 
+  \vb{u}_t = \mqty(
+    \dd^2_t \vb{a}_t
+  )
+\end{equation}
+
+In summary, 
+\begin{align*}
+  \dim(\vb{x}_t) &= \textsf{nstates = nqstates * isodim + ncontrols * augdim} \\
+  \dim(\vb{u}_t) &= \textsf{ncontrols}
+\end{align*}
+
+Additionally the cost function $\ell$ can be chosen somewhat liberally, the default is currently
+
+$$
+\ell(\isopsi, \isopsi_{\text{goal}}) = 1 - \abs{\braket{\psi}{\psi_\text{goal}}}^2
+$$
+
+
+\newpage
+\section{Dynamics}
+
+Finally, $\vb{f}(\vb{x}_{t+1}, \vb{x}_t, \vb{u}_t)$ describes the dynamics of all the variables in the system, where the controls' dynamics are trivial and formally $\isopsi^i_t$ satisfies a discretized version of the isomorphic Schr\"oedinger equation:
+
+$$
+\dv{\isopsi^i}{t} = \widetilde{(- i H)}(\vb{a}(t), t) \isopsi^i
+$$
+
+I will the use the notation $G(H)(\vb{a}(t), t) = \widetilde{(- i H)}(\vb{a}(t), t)$, to describe this operator (the Generator of time translation), which acts on the isomorphic quantum state vectors 
+
+$$
+\isopsi = \begin{pmatrix} \psi^{\mathrm{Re}} \\ \psi^{\mathrm{Im}} \end{pmatrix}
+$$ 
+
+It can be shown that
+
+$$
+G(H) =  - \begin{pmatrix} 0 & -1 \\ 1 & 0 \end{pmatrix} \otimes H^{\mathrm{Re}} + \begin{pmatrix} 1 & 0 \\ 0 &1 \end{pmatrix} \otimes H^{\mathrm{Im}}
+$$
+
+where $\otimes$ is the Kronecker product.  We then have the linear isomorphism dynamics equation:
+
+$$
+\dv{\isopsi}{t} = G(\vb{a}(t),t) \isopsi
+$$
+
+where
+
+$$
+G(\vb{a}(t),t) = G(H_{\text{drift}}) + \sum_j a^j(t) G(H_{\text{drive}}^j) 
+$$
+
+The implicit dynamics constraint function $\vb{f}$ can be decomposed as follows:
+
+$$
+\vb{f}(\vb{x}_{t+1}, \vb{x}_t, \vb{u}_t) 
+= \begin{pmatrix} 
+  \vb{P}^{(m)} (\isopsi^1_{t+1}, \isopsi^1_t, \vb{a}_t) \\ 
+  \vdots \\
+  \vb{P}^{(m)} (\isopsi^n_{t+1}, \isopsi^n_t, \vb{a}_t) \\
+  \smallint \vb{a}_{t+1} - \left(\smallint \vb{a}_t + \vb{a}_t \cdot \Delta t_t  \right) \\
+  \vb{a}_{t+1} - \left(\vb{a}_t + \dd_t \vb{a}_t \cdot \Delta t_t  \right) \\
+  \dd_t \vb{a}_{t+1} - \left(\dd_t \vb{a}_t + \vb{u}_t \cdot \Delta t_t \right)
+  \end{pmatrix}
+$$
+
+\newpage
+\subsection{Pad\'e integrators}
+
+We define (and implement) just the $m \in \{2, 4\}$ order Pad\'e integrators $\vb{P}^{(m)}$:
+
+\begin{align*}
+  \vb{P}^{(2)}(\isopsi^i_{t+1}, \isopsi^i_t, \vb{a}_t) &= \left(I - \frac{\Delta t}{2} G(\vb{a}_t) \right) \isopsi^i_{t+1} -  \left(I + \frac{\Delta t}{2} G(\vb{a}_t) \right) \isopsi^i_{t}\\   
+  \vb{P}^{(4)}(\isopsi^i_{t+1}, \isopsi^i_t, \vb{a}_t) &= \left(I - \frac{\Delta t}{2} G(\vb{a}_t) + \frac{(\Delta t)^2}{9} G(\vb{a}_t)^2\right) \isopsi^i_{t+1} \\ 
+  &- \left(I + \frac{\Delta t}{2} G(\vb{a}_t) + \frac{(\Delta t)^2}{9} G(\vb{a}_t)^2\right) \isopsi^i_t 
+\end{align*}
+
+Where again 
+
+$$
+G(\vb{a}_t) = G_{\text{drift}} + \vb{a}_t \vdot \vb{G}_{\text{drive}}
+$$
+
+with $\vb{G}_{\text{drive}} = (G^1_{\text{drive}}, \dots, G^c_{\text{drive}})^\top$, where $c = \textsf{ncontrols}$
+
+\newpage
+\section{Differentiation}
+
+Our problem consists of $Z_{\dim}=$ \textsf{(nstates + ncontrols) $\times$ T} total variables, arranged into a vector
+
+\begin{equation}
+  \vb{Z} = \mqty(
+    \vb{x}_1 \\
+    \vb{u}_1 \\
+    \vdots \\
+    \vb{x}_T \\
+    \vb{u}_T \\
+  ) =
+  \mqty(
+    \vb{z}_1 \\
+    \vdots \\ 
+    \vb{z}_T
+  )
+\end{equation}
+
+where $\vb{z}_t = \mqty( \vb{x}_t \\ \vb{u}_t)$ is referred to as a \textit{knot point} and has dimension 
+$$
+z_{\dim} = \textsf{vardim} = \textsf{nstates + ncontrols}.
+$$ 
+
+Also, as of right now, $\vb{u}_T$ is included in $\vb{Z}$ but is ignored in calculations. 
+
+\subsection{Objective Gradient}
+
+Given the objective
+
+\begin{equation}
+  J(\vb{Z}) = Q \sum_{i=1}^n \ell(\isopsi_T^i, \isopsi_\text{goal}^i) + \frac{R}{2} \sum_{t=1}^{T-1} \vb{u}_t^2 
+\end{equation}
+
+we arrive at the gradient
+
+\begin{equation}
+  \grad_{\vb{Z}} J(\vb{Z}) = \mqty(
+    \vb{0}_{x_{\dim}} \\
+    R \cdot \vb{u}_1 \\
+    \vdots \\
+    \vb{0}_{x_{\dim}} \\
+    R \cdot \vb{u}_t \\
+    \vdots \\
+    \vb{0}_{x_{\dim}} \\
+    R \cdot \vb{u}_{T-1} \\
+    Q \cdot \grad_{\isopsi^1} \ell^1 \\
+    \vdots \\
+    Q \cdot \grad_{\isopsi^n} \ell^n \\
+    \vb{0}
+  ) 
+\end{equation}
+
+where $\ell^i = \ell(\isopsi^i_T, \isopsi^i_{\text{goal}})$. $\grad_{\isopsi^i}\ell^i$ is currently not calculated by hand, but at compile time via \textsf{Symbolics.jl}.
+
+\subsection{Dynamics Jacobian}
+
+Writing, $\vb{f}(\vb{z}_{t}, \vb{z}_{t+1}) = \vb{f}(\isopsi^i_{t+1}, \isopsi^i_t, \vb{a}_t)$, we can arrange the dynamics constraints into a vector
+
+\begin{equation}
+  \vb{F} = \mqty(
+    \vb{f}(\vb{z}_{1}, \vb{z}_{2}) \\
+    \vdots \\
+    \vb{f}(\vb{z}_{T-1}, \vb{z}_{T}) \\
+  ) = \mqty(
+    \vb{f}_1 \\
+    \vdots \\
+    \vb{f}_{T-1}
+  )
+\end{equation}
+
+where we have defined $\vb{f}_t = \vb{f}(\vb{z}_t, \vb{z}_{t+1})$.
+
+\hfill
+
+The dynamics Jacobian matrix $\pdv{\vb{F}}{\vb{Z}}$ then has dimensions 
+$$
+F_{\dim} \times Z_{\dim} = (f_{\dim} \cdot (T-1)) \times (z_{\dim} \cdot T)
+$$
+
+This matrix has a block diagonal structure:
+
+\begin{equation}
+  \pdv{\vb{F}}{\vb{Z}} = \mqty(
+    \pdv{\vb{f}_1}{\vb{z}_1} & \pdv{\vb{f}_1}{\vb{z}_2} & \\
+    & \ddots & \ddots & \\
+    & & \pdv{\vb{f}_t}{\vb{z}_t} & \pdv{\vb{f}_t}{\vb{z}_{t+1}} \\
+    & & & \ddots & \ddots \\
+    & & & & \pdv{\vb{f}_T}{\vb{z}_{T-1}} & \pdv{\vb{f}_T}{\vb{z}_{T}}
+  )
+\end{equation}
+
+We just need the $f_{\dim} \times z_{\dim}$ Jacobian matrices $\pdv{\vb{f}_t}{\vb{z}_{t}}$ and $\pdv{\vb{f}_t}{\vb{z}_{t+1}}$.
+
+\subsubsection*{$\vb{f}_t$ Jacobian expressions}
+
+With $\vb{P}^{(m),i}_t = \vb{P}^{(m)}(\isopsi^i_{t+1}, \isopsi^i_{t}, \vb{a}_t)$, we first have
+
+\begin{equation}
+  \pdv{\vb{f}_t}{\vb{z}_t} = \mqty(
+    \ddots & & & & \vdots \\
+    & \pdv{\vb{P}_t^{(m),i}}{\isopsi^i_t} & & & \pdv{\vb{P}_t^{(m),i}}{\vb{a}_t} \\
+    & & \ddots & & \vdots \\ 
+    & & & -I_{c}^{\smallint \vb{a}_t} & -\Delta t I_{c}^{\vb{a}_t} & \\
+    & & & & -I_{c}^{\vb{a}_t} & -\Delta t I_{c}^{\dd_t\vb{a}_t} \\
+    & & & & & \ddots & \ddots \\ 
+    & & & & & & -I_{c}^{\dd_t^{c-1}\vb{a}_t} & -\Delta tI_{c}^{\vb{u}_t} \\ 
+  )
+\end{equation}
+
+where, $c = \textsf{ncontrols}$, and the diagonal dots in the bottom right indicate that the number of $-I_c$ blocks on the diagonal should equal \textsf{augdim}, which is set to 3 by default.
+
+\newpage
+
+Lastly,
+
+\begin{equation}
+   \pdv{\vb{f}_t}{\vb{z}_{t+1}} = \mqty(
+    \pdv{\vb{P}_t^{(m),1}}{\isopsi^1_{t+1}} & & & \\
+    & \ddots & & \\
+    & & \pdv{\vb{P}_t^{(m),n}}{\isopsi^n_{t+1}} & \\ 
+    & & & I_{c \cdot \textsf{augdim}} \\
+  )
+\end{equation}
+
+\subsubsection*{$\vb{P}^{(m),i}_t$ Jacobian expressions}
+
+For the $\isopsi^i$ components, we have, for $m = 2$,
+
+\begin{align}
+  \pdv{\vb{P}_t^{(2),i}}{\isopsi^i_t} &= -\qty(I + \frac{\Delta t}{2}G(\vb{a}_t)) \\
+  \pdv{\vb{P}_t^{(2),i}}{\isopsi^i_{t+1}} &= I - \frac{\Delta t}{2}G(\vb{a}_t)
+\end{align}
+
+and, for $m = 4$,
+
+\begin{align}
+  \pdv{\vb{P}_t^{(4),i}}{\isopsi^i_t} &= -\qty(I + \frac{\Delta t}{2}G(\vb{a}_t) + \frac{(\Delta t)^2}{9} G(\vb{a}_t)^2) \\
+  \pdv{\vb{P}_t^{(4),i}}{\isopsi^i_{t+1}} &= I - \frac{\Delta t}{2}G(\vb{a}_t) + \frac{(\Delta t)^2}{9} G(\vb{a}_t)^2.
+\end{align}
+
+
+Now, for the $\vb{a}_t$ components, we have, for $m = 2$,
+
+\begin{equation}
+  \pdv{\vb{P}_t^{(2),i}}{a^j_t} 
+    = \frac{-\Delta t}{2} G^j_{\text{drive}} \qty(\isopsi^i_{t+1} + \isopsi^i_{t})
+\end{equation}
+
+and, for $m = 4$,
+
+\begin{equation}
+  \pdv{\vb{P}_t^{(4),i}}{a^j_t} 
+    = \frac{-\Delta t}{2} G^j_{\text{drive}} \qty(\isopsi^i_{t+1} + \isopsi^i_{t}) + \frac{\qty(\Delta t)^2}{9} \qty{G^j_{\text{drive}}, G(\vb{a}_t)}\qty(\isopsi^i_{t+1} - \isopsi^i_{t})
+\end{equation}
+
+where $\qty{A, B} = AB + BA$ is the anticommutator. 
+
+
+\newpage
+
+\subsection{Hessian of the Lagrangian}
+
+The Lagrangian function is defined to be
+
+\begin{equation}
+  \mathscr{L}(\vb{Z}; \sigma, \vb*{\mu}) = \sigma \cdot J(\vb{Z}) + \vb*{\mu} \vdot \vb{F}(\vb{Z})
+\end{equation}
+
+where $\vb*{\mu}$ is a $Z_{\dim}$-dimensional vector provided by the solver.
+
+\hfill
+
+For the Hessian we have 
+
+\begin{equation}
+  \laplacian \mathscr{L} = \sigma \cdot \laplacian J + \vb*{\mu} \vdot \laplacian \vb{F}.
+\end{equation}
+
+We will look at $\laplacian J$ and $\vb*{\mu} \vdot \laplacian \vb{F}$ separately.
+
+\subsubsection*{Objective Hessian}
+
+With $\ell^i = \ell(\isopsi^i_T, \isopsi^i_{\text{goal}})$, we have
+
+\begin{equation}
+  \laplacian J(\vb{Z}) = \mqty(
+    \ddots \\
+    & \vb{0} \\
+    & & R_t I_c \\
+    & & & \ddots \\
+    & & & & \ddots \\
+    & & & & & Q \cdot \laplacian \ell^i \\
+    & & & & & & \ddots \\
+    & & & & & & & \vb{0}
+  ) 
+\end{equation}
+
+where $\laplacian \ell^i$ is again calculated using \textsf{Symbolics.jl}.
+
+\newpage
+\subsubsection*{Dynamics Hessian}
+
+With $\vb*{\mu} = \qty(\vec \mu_1, \dots, \vec \mu_T)$, $\vec\mu_t = \qty(\mu_t^1, \dots, \mu_t^{z_{\text{dim}}})$, and using
+
+\begin{equation*}
+\vec\mu_t^{\isopsi^i} = \qty(\mu_t^{(i - 1)\cdot \isopsi_{\dim} + 1}, \dots, \mu_t^{i\cdot\isopsi_{\dim}})
+\end{equation*}
+
+we have
+
+\begin{equation}
+  \vb*{\mu} \vdot \laplacian \vb{F} = \mqty(
+    & \vdots & \\ 
+    & \qty(\pdv{\vb{P}_t^{(m), i}}{\isopsi_t^i}{a^j_t})^\top \vec \mu^{\isopsi^i}_t \\
+    & \vdots \\
+    \ddots & \vb{0}\\
+    & \displaystyle{\sum_{i=1}^n} \textstyle{\vec\mu_t^{\isopsi^i} \vdot \pdv{\vb{P}_t^{(4), i}}{a_t^k}{a_t^j}} & \vb{0} & \hdots & \qty(\vec \mu^{\isopsi^i}_t)^\top \pdv{\vb{P}_t^{(m), i}}{a^k_t}{\isopsi_{t+1}^i} & \hdots \\
+    & & \ddots \\
+  )
+\end{equation}
+
+with
+
+\begin{equation}
+  \pdv{\vb{P}_t^{(4), i}}{a_t^k}{a_t^j} = \frac{\qty(\Delta t)^2}{9}\qty{G^j_{\text{drive}}, G^k_{\text{drive}}} \qty(\isopsi^i_{t+1} - \isopsi^i_t)
+\end{equation}
+
+\hfill
+
+with, again, $\qty{A, B} = AB + BA$, being the anticommutator.
+
+\hfill
+
+since
+
+$$
+x \vdot (Ay) = x^\top A y = (A^\top x)^\top y
+$$
+
+For the mixed partials we have:
+
+\begin{equation}
+  \pdv{\vb{P}_t^{(2), i}}{\isopsi_t^i}{a^j_t} = \pdv{\vb{P}_t^{(2), i}}{\isopsi_{t+1}^i}{a^j_t} = -\frac{\Delta t}{2} G^j_{\text{drive}}
+\end{equation}
+
+and 
+
+\begin{align}
+  \pdv{\vb{P}_t^{(4), i}}{\isopsi_t^i}{a^j_t} &= -\frac{\Delta t}{2} G^j_{\text{drive}} - \frac{\qty(\Delta t)^2}{9}\bigg( \qty{G^j_{\text{drive}}, G_{\text{drift}}} + \vb{a}_t \vdot \qty{G^j_{\text{drive}}, \vb{G}_{\text{drive}}} \bigg)\\
+  \pdv{\vb{P}_t^{(4), i}}{\isopsi_{t+1}^i}{a^j_t} &= -\frac{\Delta t}{2} G^j_{\text{drive}} + \frac{\qty(\Delta t)^2}{9}\bigg( \qty{G^j_{\text{drive}}, G_{\text{drift}}} + \vb{a}_t \vdot \qty{G^j_{\text{drive}}, \vb{G}_{\text{drive}}} \bigg)
+\end{align}
+
+\section{Minimum Time Problem}
+
+Once a solution has been found for a given \textit{time horizon}, we can solve the time minimization problem below, initialized with the given solution.
+
+\begin{align*}
+  \underset{\Delta t_{1:T-1}}{\underset{\vb{x}_{1:T}, \ \vb{u}_{1:T-1}}{\text{minimize}}} & 
+  \quad \sum_t \Delta t_t + \frac{1}{2} \sum_t \vb{u}_t^\top R_u \vb{u}_t + \frac{R_s}{2} \sum_t \qty(\vb{u}_{t+1} - \vb{u}_t)^2\\
+  \text{subject to} & \quad \vb{f}(\vb{x}_{t+1}, \vb{x}_t, \vb{u}_t, \Delta t_t) = \vb{0}\\
+  & \quad \vb{x}_T = \vb{x}^\text{nominal}_T
+\end{align*}
+
+For this problem we will define, with $\vb{Z}$ as defined before 
+
+$$
+  \Delta \vb{t} = \mqty(
+    \Delta t_1 \\ 
+    \vdots \\ 
+    \Delta t_{T-1}
+  )
+  \quad \text{and} \quad
+  \vb{\bar Z} = \mqty(\vb{Z} \\ \Delta \vb{t})
+$$
+
+
+\subsection{Objective Gradient}
+
+Let's write the objective function as 
+
+\begin{equation}
+  J = J_{\Delta t} + J_u + J_s
+\end{equation}
+
+then
+
+\begin{equation}
+  \nabla_{\vb{\bar Z}} J = \mqty(
+    \nabla_{\vb{Z}} J \\
+    \nabla_{\vb{\Delta \vb{t}}} J
+  ) = \mqty(
+    \nabla_{\vb{Z}} J_u + \nabla_{\vb{Z}} J_s \\
+    \nabla_{\vb{\Delta \vb{t}}} J_{\Delta t}
+  )
+\end{equation}
+
+where 
+
+\begin{equation}
+  \nabla_{\vb{Z}} J_u = \mqty(
+    \vdots \\ 
+    \vb{0} \\
+    R_u \vb{u}_t \\  
+    \vdots \\ 
+  ), 
+  \quad \quad
+  \nabla_{\vb{Z}} J_s = 
+  % \mqty(
+  %   \vb{0} \\
+  %   -R_s \qty(\vb{u}_2 - \vb{u}_1) \\  
+  %   \vb{0} \\
+  %   R_s \qty(\vb{u}_2 - \vb{u}_1) - R_s \qty(\vb{u}_3 - \vb{u}_2) \\
+  %   \vdots \\ 
+  %   \vb{0} \\
+  %   R_s \qty(\vb{u}_t - \vb{u}_{t-1}) - R_s \qty(\vb{u}_{t+1} - \vb{u}_t) \\
+  %   \vdots \\
+  %   \vb{0} \\
+  %   R_s \qty(\vb{u}_{T-1} - \vb{u}_{T-2})
+  % ) = 
+  \mqty(
+    \vb{0} \\
+    R_s \qty(\vb{u}_1 - \vb{u}_2) \\  
+    \vdots \\ 
+    \vb{0} \\
+    R_s \qty(-\vb{u}_{t-1} + 2\vb{u}_t - \vb{u}_{t+1}) \\
+    \vdots \\
+    \vb{0} \\
+    R_s \qty(-\vb{u}_{T-2} + \vb{u}_{T-1})
+  ),
+\end{equation}
+
+and
+
+\begin{equation}
+  \nabla_{\vb{\Delta \vb{t}}} J_{\Delta t} = \vb{1}_{T-1}
+\end{equation}
+
+
+
+
+
+\subsection{Dynamics Jacobian}
+
+
+We then have, with $\vb{F}$ defined as before (but taking the corresponding $\Delta t_t$):
+
+\begin{equation}
+  \pdv{\vb{F}}{\vb{\bar Z}} = \mqty(
+    \displaystyle \pdv{\vb{F}}{\vb{Z}} &  
+    \displaystyle \pdv{\vb{F}}{\Delta \vb{t}}
+  )
+\end{equation}
+
+where 
+
+\begin{equation}
+  \pdv{\vb{F}}{\Delta \vb{t}} = \mqty(
+    \displaystyle \pdv{\vb{f}_1}{\Delta t_1} \\
+    & \ddots \\
+    & & \displaystyle \pdv{\vb{f}_{T-1}}{\Delta t_{T-1}}
+  )
+\end{equation}
+
+with
+
+\begin{equation}
+  \pdv{\vb{f}_t}{\Delta t_t} = 
+  \mqty(
+    \vdots \\
+    \displaystyle \pdv{\vb{P}^{(n),i}_t}{\Delta t_t} \\
+    \vdots \\
+    -\vb{a}_t \\
+    - \dot{\vb{a}}_t \\
+    - \vb{u}_t \\
+  )
+\end{equation}
+
+and
+
+\begin{align}
+  \pdv{\vb{P}^{(4),i}_t}{\Delta t_t} 
+  &= \qty( -\frac{1}{2} G(\vb{a}_t) + \frac{2 \Delta t_t}{9} G(\vb{a}_t)^2) \isopsi^i_{t+1}
+  - \qty(\frac{1}{2} G(\vb{a}_t) + \frac{2\Delta t_t}{9} G(\vb{a}_t)^2) \isopsi^i_t \nonumber\\
+  &= -\frac{1}{2} G(\vb{a}_t) \qty(\isopsi^i_{t+1} + \isopsi^i_t) + \frac{2\Delta t_t}{9} G(\vb{a}_t)^2 \qty(\isopsi^i_{t+1} - \isopsi^i_t) \\
+  \pdv{\vb{P}^{(2),i}_t}{\Delta t_t} 
+  &=  -\frac{1}{2} G(\vb{a}_t) \qty(\isopsi^i_{t+1} + \isopsi^i_t)
+\end{align}
+
+\newpage
+
+\subsection{Hessian of the Lagrangian}
+
+As before we will first define the objective Hessian and then the dynamics Lagrangian Hessian
+
+\subsubsection*{Objective Hessian}
+
+Decomposing as before, we have
+
+$$
+\nabla_{\vb{\bar Z}}^2 J = \mqty(
+  \nabla_{\vb{Z}}^2 J_u + \nabla_{\vb{Z}}^2 J_s \\
+  & \nabla_{\vb{\Delta \vb{t}}}^2 J_{\Delta t}
+) = 
+\mqty(
+  \nabla_{\vb{Z}}^2 J_u + \nabla_{\vb{Z}}^2 J_s \\
+  & \vb{0}_{T-1 \times T-1}
+)
+$$
+
+where 
+
+\begin{equation}
+  \nabla_{\vb{Z}}^2 J_u = 
+  \mqty(
+    \ddots \\ 
+    & \vb{0} \\
+    & & R_u I \\  
+    & & & \ddots \\ 
+  )
+\end{equation}
+
+and, showing the upper triangular structure of the Hessian,
+
+\begin{equation}
+  \nabla_{\vb{Z}}^2 J_s =
+  \mqty(
+    \vb{0} & & \vb{0}\\
+    & R_s I & &  -R_s I \\
+    & & \vb{0} & & \vb{0}\\
+    & & & 2 R_s I & & -R_s I \\ 
+    & & & & \vb{0} & & \ddots \\
+    & & & & & 2 R_s I & & -R_s I\\
+    & & & & & & \ddots \\
+    & & & & & & & R_s I \\
+  )
+\end{equation}
+
+
+\subsubsection*{Hessian of the Dynamics Lagrangian}
+
+Defining 
+
+$$
+\mathcal{L}_f = \vb*{\mu} \vdot \vb{F} 
+$$
+
+we want to compute
+
+$$
+\nabla_{\vb{\bar Z}}^2 \mathcal{L}_f = \mqty(
+  \nabla_{\vb{Z}}^2 \mathcal{L}_f & 
+  \nabla^\top_{\Delta \vb{t}} \nabla_{\vb{Z}} \mathcal{L}_f \\
+  \nabla^\top_{\vb{Z}} \nabla_{\Delta \vb{t}} \mathcal{L}_f & 
+  \nabla_{\vb{\Delta \vb{t}}}^2 \mathcal{L}_f
+)
+$$
+
+we have already computed $\nabla_{\vb{Z}}^2 \mathcal{L}_f$ above, so we then have
+
+\begin{equation}
+  \nabla_{\vb{\Delta \vb{t}}}^2 \mathcal{L}_f = 
+  \mqty(
+    \ddots \\
+    & \displaystyle \vec \mu_t \vdot \pdv[2]{\vb{f}_t}{\Delta t_t} \\
+    & & \ddots \\
+  )
+\end{equation}
+
+where
+
+\begin{equation}
+  \vec \mu_t \vdot \pdv[2]{\vb{f}_t}{\Delta t_t} = 
+  \vec \mu_t \vdot \mqty(
+    \vdots \\
+    \displaystyle \pdv[2]{\vb{P}^{(n),i}_t}{\Delta t_t} \\
+    \vdots \\
+    \vb{0} \\
+    \vb{0} \\
+    \vb{0} \\
+  ) = 
+  \sum_i \vec \mu_t^{\isopsi_i} \vdot \pdv[2]{\vb{P}^{(n),i}_t}{\Delta t_t}
+\end{equation}
+
+with 
+
+\begin{align}
+  \pdv[2]{\vb{P}^{(4),i}_t}{\Delta t_t} 
+  &= \frac{2}{9} G(\vb{a}_t)^2 \qty(\isopsi^i_{t+1} - \isopsi^i_t) \\
+  \pdv[2]{\vb{P}^{(2),i}_t}{\Delta t_t} 
+  &= \vb{0} 
+\end{align}
+
+
+We also have
+
+\begin{equation}
+  \nabla^\top_{\Delta \vb{t}} \nabla_{\vb{Z}} \mathcal{L}_f 
+  = \mqty(
+    \ddots \\
+    & \qty( \displaystyle \pdv{\vb{f}_t}{\Delta t_t}{\vb{z}_t} )^\top \vec \mu_t \\ 
+    & \qty( \displaystyle \pdv{\vb{f}_t}{\Delta t_t}{\vb{z}_{t+1}} )^\top \vec \mu_t  
+    & \qty( \displaystyle \pdv{\vb{f}_{t+1}}{\Delta t_{t+1}}{\vb{z}_{t+1}} )^\top \vec \mu_{t+1} \\ 
+    & & \qty( \displaystyle \pdv{\vb{f}_{t+1}}{\Delta t_{t+1}}{\vb{z}_{t+2}} )^\top \vec \mu_{t+1} \\ 
+    & & & \ddots \\
+  ) \\ 
+\end{equation}
+
+where
+
+\begin{equation}
+  \qty(\pdv{\vb{f}_t}{\Delta t_t}{\vb{z}_t})^\top \vec \mu_t
+  = \mqty(
+    \vdots \\
+    \qty(
+      \displaystyle \pdv{\vb{P}^{(n),i}_t}{\Delta t_t}{\isopsi^i_t}
+    )^\top \vec \mu^{\isopsi^i}_t \\ 
+    \vdots \\
+    \vb{0} \\
+    -\vec \mu^{\int \vb{a}}_t 
+    + \displaystyle \sum_i \qty(\pdv{\vb{P}^{(n),i}_t}{\Delta t_t}{\vb{a}_t})^\top \vec \mu^{\isopsi^i}_t \\
+    -\vec \mu^{\vb{a}}_t\\ 
+    -\vec \mu^{\dot{\vb{a}}}_t\\ 
+  )
+\end{equation}
+
+and
+
+\begin{equation}
+  \qty(\pdv{\vb{f}_t}{\Delta t_t}{\vb{z}_{t+1}})^\top \vec \mu_t
+  = \mqty(
+    \vdots \\
+    \qty(\displaystyle \pdv{\vb{P}^{(n),i}_t}{\Delta t_t}{\isopsi^i_{t+1}})^\top \vec \mu^{\isopsi^i}_t \\ 
+    \vdots \\
+    \vb{0} \\
+    \vb{0} \\
+    \vb{0} \\
+    \vb{0} \\
+  )
+\end{equation}
+
+with 
+
+\begin{align}
+  \pdv{\vb{P}^{(4),i}_t}{\Delta t_t}{\isopsi^i_t}
+  &= -\qty(\frac{1}{2} G(\vb{a}_t) + \frac{2 \Delta t_t}{9} G(\vb{a}_t)^2) \\ 
+  \pdv{\vb{P}^{(4),i}_t}{\Delta t_t}{\isopsi^i_{t+1}}
+  &= -\frac{1}{2} G(\vb{a}_t) + \frac{2 \Delta t_t}{9} G(\vb{a}_t)^2 
+\end{align}
+
+and 
+
+\begin{equation}
+  \pdv{\vb{P}^{(2),i}_t}{\Delta t_t}{\isopsi^i_t}
+  = \pdv{\vb{P}^{(2),i}_t}{\Delta t_t}{\isopsi^i_{t+1}}
+  = -\frac{1}{2} G(\vb{a}_t) 
+\end{equation}
+
+and for the $j$th column of $\pdv{\vb{P}^{(n),i}_t}{\Delta t_t}{\vb{a}_t}$ we have
+
+
+\begin{equation}
+  \pdv{\vb{P}_t^{(4),i}}{\Delta t_t}{a^j_t} 
+    = -\frac{1}{2} G^j_{\text{drive}} \qty(\isopsi^i_{t+1} + \isopsi^i_{t}) 
+    + \frac{2 \Delta t_t}{9} \qty{G^j_{\text{drive}}, G(\vb{a}_t)}\qty(\isopsi^i_{t+1} - \isopsi^i_{t})
+\end{equation}
+
+and
+
+
+\begin{equation}
+  \pdv{\vb{P}_t^{(2),i}}{\Delta t_t}{a^j_t} 
+    = -\frac{1}{2} G^j_{\text{drive}} \qty(\isopsi^i_{t+1} + \isopsi^i_{t}) 
+\end{equation}
+
+\newpage
+
+\section{Unitary Implementation}
+
+\subsection{Vectorized Isomorphic Unitary Pad\'e Dynamics}
+
+We show later on that we can efficiently vectorize the Pad\'e dynamics for the isomorphic representation of the unitary, i.e. retain information about only the real and imaginary parts of the unitary.  The resulting dynamics expression is given by
+
+\begin{align*}
+  \hat{\vb{P}}(\isovecU_{t+1}, \isovecU_t, \vb{a}_t, h_t) 
+  &= \hat B(\vb{a}_t, h_t) \isovecU_{t+1} - \hat F(\vb{a}_t, h_t) \isovecU_{t}.
+\end{align*}
+
+\noindent
+Here 
+
+\begin{align*}
+  \hat B(\vb{a}_t, h_t) &= \qty(I_2 \otimes I_N) \otimes \BR(\vb{a}_t, h_t) + (\Im \otimes \ I_N) \otimes \BI(\vb{a}_t, h_t) \\
+  \hat F(\vb{a}_t, h_t) &= \qty(I_2 \otimes I_N) \otimes \FR(\vb{a}_t, h_t) - (\Im \otimes \ I_N) \otimes \FI(\vb{a}_t, h_t), 
+\end{align*}
+
+\noindent
+along with
+
+\begin{align*}
+  \BR(\vb{a}_t, h_t) &= I - \frac{h_t}{2} \HI(\vb{a}_t) + \frac{h_t^2}{9}\qty(\qty(\HI(\vb{a}_t))^2 - \qty(\HR(\vb{a}_t))^2) \\
+  \BI(\vb{a}_t, h_t) &= \frac{h_t}{2} \HR(\vb{a}_t) - \frac{h_t^2}{9}\qty{\HR(\vb{a}_t),\HI(\vb{a}_t)},
+\end{align*}
+
+\noindent
+and
+
+\begin{align*}
+  \FR(\vb{a}_t, h_t) &= I + \frac{h_t}{2} \HI(\vb{a}_t) + \frac{h_t^2}{9}\qty(\qty(\HI(\vb{a}_t))^2 - \qty(\HR(\vb{a}_t))^2) \\
+  \FI(\vb{a}_t, h_t) &= \frac{h_t}{2} \HR(\vb{a}_t) + \frac{h_t^2}{9}\qty{\HR(\vb{a}_t),\HI(\vb{a}_t)}.
+\end{align*}
+
+
+\newpage
+
+\subsection{Derivation of the Dynamics}
+
+\subsubsection*{Isomorphic Vectorization}
+
+To store just the real and imaginary parts of complex-valued matrices $A = \AR + i \AI \in \mathbb{C}^{N \times N}$ in a vector, for numerical purposes,  we define a projection matrix $\hat P \in \mathbb{R}^{2N^2 \times 4N^2}$ that will act on the vectorization of the real-valued isomorphic representation $\tilde A = \text{iso}(A) = I_2 \otimes \AR + \Im \otimes \AI \in \mathbb{R}^{2N \times 2N}$ as follows: 
+
+\begin{align*}
+  \isovec\qty(\tilde A)
+  &= \hat P \ \text{vec}(\tilde A) \\
+  &= \hat P \ \text{vec}\qty(I_2 \otimes \AR + \Im \otimes \AI) \\
+  &= \mqty(\text{vec}(\AR) \\ \text{vec}(\AI)).
+\end{align*}
+
+Given projection matrices $\Pre = \mqty(I_N & \vb{0}) \in \mathbb{R}^{N \times 2N}$ and $\Pim = \mqty(\vb{0} & I_N) \in \mathbb{R}^{N \times 2N}$ we can write the projection matrix $\hat P$ as
+
+\begin{align*}
+  \hat P_1 &= (\Pre^\top\Pre - \Pim^\top\Pim) \otimes \Pre, 
+\end{align*}
+
+\noindent
+or equivalently as
+
+\begin{align*}
+  \hat P_2 &= \qty(\Pim^\top\Pre + \Pre^\top\Pim) \otimes \Pim.
+\end{align*}
+
+\noindent
+Both of these projectors produce identically correct results, i.e. $\hat P_1 \text{vec}(\tilde A) = \hat P_2 \text{vec}(\tilde A)$, so we will write $\hat P_1 \simeq \hat P_2$. This is demonstrated as follows: 
+
+\begin{align*}
+  \hat P_1 \text{vec}(\tilde A) 
+  &= \qty(\qty(\Pre^\top\Pre - \Pim^\top\Pim) \otimes \Pre) \ \text{vec}(\tilde A) \\
+  &= \qty(\Pre^\top\Pre \otimes \Pre) \ \text{vec}(\tilde A) - \qty(\Pim^\top\Pim \otimes \Pre) \ \text{vec}(\tilde A) \\
+  &= \text{vec}\qty(\Pre \tilde A \Pre^\top\Pre - \Pre \tilde A \Pim^\top\Pim) \\
+  &= \text{vec}\qty(\mqty(I_N & \vb{0}) \mqty(\AR & -\AI \\ \AI & \AR) \mqty(I_N \\ \vb{0}) \mqty(I_N & \vb{0}) - \mqty(I_N & \vb{0}) \mqty(\AR & -\AI \\ \AI & \AR) \mqty(\vb{0} \\ I_N) \mqty(\vb{0} & I_N)) \\
+  &= \text{vec}\qty(\mqty(I_N & \vb{0}) \mqty(\AR \\ \AI) \mqty(I_N & \vb{0}) - \mqty(I_N & \vb{0}) \mqty(-\AI \\ \AR) \mqty(\vb{0} & I_N)) \\
+  &= \text{vec}\qty(\AR\mqty(I_N & \vb{0}) + \AI \mqty(\vb{0} & I_N)) \\
+  &= \text{vec}\qty(\mqty(\AR & \AI)) \\
+  &= \mqty(\text{vec}(\AR) \\ \text{vec}(\AI)).
+\end{align*}
+
+\noindent
+And also
+
+\begin{align*}
+  \hat P_2 \text{vec}(\tilde A) 
+  &= \qty(\qty(\Pim^\top\Pre + \Pre^\top\Pim) \otimes \Pim) \ \text{vec}(\tilde A) \\
+  &= \qty(\Pim^\top\Pre \otimes \Pim) \ \text{vec}(\tilde A) + \qty(\Pre^\top\Pim \otimes \Pim) \ \text{vec}(\tilde A) \\
+  &= \text{vec}\qty(\Pim \tilde A \Pre^\top\Pim + \Pim \tilde A \Pim^\top\Pre) \\
+  &= \text{vec}\qty(\mqty(\vb{0} & I_N) \mqty(\AR & -\AI \\ \AI & \AR) \mqty(I_N \\ \vb{0}) \mqty(\vb{0} & I_N) + \mqty(\vb{0} & I_N) \mqty(\AR & -\AI \\ \AI & \AR) \mqty(\vb{0} \\ I_N) \mqty(I_N & \vb{0})) \\
+  &= \text{vec}\qty(\mqty(\vb{0} & I_N) \mqty(\AR \\ \AI) \mqty(\vb{0} & I_N) + \mqty(\vb{0} & I_N) \mqty(-\AI \\ \AR) \mqty(I_N & \vb{0})) \\
+  &= \text{vec}\qty(\AI \mqty(\vb{0} & I_N) + \AR \mqty(I_N & \vb{0})) \\
+  &= \text{vec}\qty(\mqty(\AR & \AI)) \\
+  &= \mqty(\text{vec}(\AR) \\ \text{vec}(\AI)).
+\end{align*}
+
+For later convenience let's now look at the expression $\hat P_1 \qty(I_{2N} \otimes \tilde A)$
+
+\begin{align*}
+  \hat P_1 \qty(I_{2N} \otimes \tilde A)
+  &= \qty(\qty(\Pre^\top\Pre - \Pim^\top\Pim) \otimes \Pre) \qty(I_{2N} \otimes \tilde A) \\
+  &= \qty(\Pre^\top\Pre - \Pim^\top\Pim) \otimes \qty(\Pre \tilde A) \\
+  &= \qty(\Pre^\top\Pre - \Pim^\top\Pim) \otimes \qty(\AR \Pre - \AI \Pim) \\
+  &= \qty(\Pre^\top\Pre - \Pim^\top\Pim) \otimes \qty(\AR \Pre) - \qty(\Pre^\top\Pre - \Pim^\top\Pim) \otimes \qty(\AI \Pim) \\
+  &= \qty(I_{2N} \otimes \AR) \qty(\qty(\Pre^\top\Pre - \Pim^\top\Pim) \otimes \Pre) - \qty(I_{2N} \otimes \AI) \qty(\qty(\Pre^\top\Pre - \Pim^\top\Pim) \otimes \Pim) \\ 
+  &= \qty(I_2 \otimes I_N \otimes \AR) \hat P_1 - \qty(I_2 \otimes I_N \otimes \AI) \qty(\qty(\Pre^\top\Pre - \Pim^\top\Pim) \otimes \Pim) \\ 
+  &= \qty(I_2 \otimes I_N \otimes \AR) \hat P_1 + \qty(\Im^2 \otimes I_N \otimes \AI) \qty(\qty(\Pre^\top\Pre - \Pim^\top\Pim) \otimes \Pim) \\ 
+  &= \qty(I_2 \otimes I_N \otimes \AR) \hat P_1 + \qty(\Im \otimes I_N \otimes \AI) \qty(\Im \otimes I_N \otimes I_N) \qty(\qty(\Pre^\top\Pre - \Pim^\top\Pim) \otimes \Pim) \\ 
+  &= \qty(I_2 \otimes I_N \otimes \AR) \hat P_1 + \qty(\Im \otimes I_N \otimes \AI) \qty( \qty(\qty(\Im \otimes I_N)\Pre^\top\Pre - \qty(\Im \otimes I_N)\Pim^\top\Pim) \otimes \Pim) \\ 
+  &= \qty(I_2 \otimes I_N \otimes \AR) \hat P_1 + \qty(\Im \otimes I_N \otimes \AI) \qty( \qty(\Pim^\top\Pre + \Pre^\top\Pim) \otimes \Pim) \\ 
+  &= \qty(I_2 \otimes I_N \otimes \AR) \hat P_1 + \qty(\Im \otimes I_N \otimes \AI) \hat P_2\\ 
+  &\simeq \qty(I_2 \otimes I_N \otimes \AR + \Im \otimes I_N \otimes \AI) \hat P_1 \\
+  &= \hat A \hat P_1,
+\end{align*}
+
+\noindent
+Where we used 
+
+\begin{align*}
+  \Pre \tilde A &= \mqty(I_N & \vb{0}) \mqty(\AR & -\AI \\ \AI & \AR) \\
+  &= \mqty(\AR & -\AI) \\
+  &= \AR \Pre - \AI \Pim,
+\end{align*}
+
+\noindent
+and
+
+\begin{align*}
+  (\Im \otimes I_N)\Pre^\top &= \mqty(& -I_N \\ I_N &) \mqty(I_N \\ \vb{0}) = \mqty(\vb{0} \\ I_N) = \Pim^\top \\ 
+  (\Im \otimes I_N)\Pim^\top &= \mqty(& -I_N \\ I_N &) \mqty(\vb{0} \\ I_N) = -\mqty(I_N \\ \vb{0}) = -\Pre^\top.
+\end{align*}
+
+\noindent
+We can then conclude that
+
+\begin{align*}
+  \boxed{\hat P \qty(I_{2N} \otimes \tilde A) \simeq \hat A \hat P.}
+\end{align*}
+
+\newpage
+\subsubsection*{Isomorphic Pad\'e Dynamics}
+Our motivation here is to compute the unitary Pad\'e dynamics on the isomorphic vector representation of the unitary, $\isovecU = \isovec(\isoU) = \hat P \ \text{vec}(\isoU) = \hat P \ \text{vec}(\text{iso}(U))$. We can write these dynamics As
+
+\begin{align*}
+  f(z_t, z_{t+1}) &= f(\isovecU_t, \vb{a}_t, h_t, \isovecU_{t+1}, \vb{a}_{t+1}, h_{t+1}) \\
+  &= \hat{\vb{P}}(\isovecU_{t+1}, \isovecU_t, \vb{a}_t, h_t) \\
+  &= \isovec\qty(\vb{P}(\isoU_{t+1}, \isoU_t, \vb{a}_t, h_t)) \\
+  &= \hat P \ \text{vec}\qty(\tilde B(\vb{a}_t, h_t) \isoU_{t+1} - \tilde F(\vb{a}_t, h_t) \isoU_t) \\
+  &= \hat P \qty(I_{2N} \otimes \tilde B(\vb{a}_t, h_t)) \text{vec}\qty(\isoU_{t+1}) - \hat P \qty(I_{2N} \otimes \tilde F(\vb{a}_t, h_t)) \text{vec}\qty(\isoU_t) \\
+  &= \hat B(\vb{a}_t, h_t) \hat P \ \text{vec}\qty(\isoU_{t+1})  - \hat F(\vb{a}_t, h_t) \hat P \ \text{vec}\qty(\isoU_t) \\
+  &= \hat B(\vb{a}_t, h_t) \isovecU_{t+1} - \hat F(\vb{a}_t, h_t) \isovecU_t
+\end{align*}
+
+\noindent
+where
+
+\begin{align*}
+  \tilde B(\vb{a}_t, h_t) &= I_2 \otimes \BR(\vb{a}_t, h_t) + \Im \otimes \BI(\vb{a}_t, h_t), \\
+  \tilde F(\vb{a}_t, h_t) &= I_2 \otimes \FR(\vb{a}_t, h_t) - \Im \otimes \FI(\vb{a}_t, h_t)
+\end{align*}
+
+\noindent
+and 
+
+\begin{align*}
+  \hat B(\vb{a}_t, h_t) &= \qty(I_2 \otimes I_N) \otimes \BR(\vb{a}_t, h_t) + \qty(\Im \otimes I_N) \otimes \BI(\vb{a}_t, h_t), \\
+  \hat F(\vb{a}_t, h_t) &= \qty(I_2 \otimes I_N) \otimes \FR(\vb{a}_t, h_t) - \qty(\Im \otimes I_N) \otimes \FI(\vb{a}_t, h_t). 
+\end{align*}
+
+
+
+\newpage
+\subsection{Derivatives}
+
+\subsubsection*{Jacobian}
+
+For the states we have
+
+\begin{align*}
+  \pdv{f}{\isovecU_t} &= - \hat F \quad \text{and} \quad
+  \pdv{f}{\isovecU_{t+1}} = \hat B
+\end{align*}
+
+
+For the drives we have
+
+\begin{align*}
+  \pdv{f}{a^j_t} % &= \isovec\qty(\pdv{B}{a^j_t} \isoU_{t+1} - \pdv{F}{a^j_t} \isoU_t) \\
+  % &= \isovec\Bigg(\qty(I_2 \otimes \pdv{\BR}{a^j_t} + \Im \otimes \pdv{\BI}{a^j_t}) \isoU_{t+1} \\
+  % & \quad \quad \quad \quad - \qty(I_2 \otimes \pdv{\FR}{a^j_t} - \Im \otimes \pdv{\FI}{a^j_t}) \isoU_t\Bigg) \\
+  % &= \isovec\Bigg( I_2 \otimes \qty(\pdv{\BR}{a^j_t} \UR_{t+1} - \pdv{\BI}{a^j_t} \UI_{t+1}) \\
+  % & \quad \quad \quad \quad + \Im \otimes \qty(\pdv{\BR}{a^j_t} \UI_{t+1} + \pdv{\BI}{a^j_t} \UR_{t+1}) \\
+  % & \quad \quad \quad \quad - I_2 \otimes \qty(\pdv{\FR}{a^j_t} \UR_t + \pdv{\FI}{a^j_t} \UI_t) \\
+  % & \quad \quad \quad \quad - \Im \otimes \qty(\pdv{\FR}{a^j_t} \UI_t - \pdv{\FI}{a^j_t} \UR_t)\Bigg) \\
+  % &= \isovec\Bigg( I_2 \otimes \qty(\pdv{\BR}{a^j_t} \UR_{t+1} - \pdv{\BI}{a^j_t} \UI_{t+1} - \pdv{\FR}{a^j_t} \UR_t - \pdv{\FI}{a^j_t} \UI_t) \\
+  % & \quad \quad \quad \quad + \Im \otimes \qty(\pdv{\BR}{a^j_t} \UI_{t+1} + \pdv{\BI}{a^j_t} \UR_{t+1} - \pdv{\FR}{a^j_t} \UI_t + \pdv{\FI}{a^j_t} \UR_t)\Bigg) \\
+  &= \pdv{\hat B}{a^j_t} \isovecU_{t+1} - \pdv{\hat F}{a^j_t} \isovecU_{t} \\
+  &= \qty((I_2 \otimes I_N) \otimes \pdv{\BR}{a^j_t} + (\Im \otimes I_N) \otimes \pdv{\BI}{a^j_t}) \isovecU_{t+1} \\
+  & \quad - \qty((I_2 \otimes I_N) \otimes \pdv{\FR}{a^j_t} - (\Im \otimes I_N) \otimes \pdv{\FI}{a^j_t}) \isovecU_{t} 
+  % \\
+  % &= \mqty(
+  %   \text{vec} \qty(\pdv{\BR}{a^j_t} \UR_{t+1} - \pdv{\BI}{a^j_t} \UI_{t+1} - \pdv{\FR}{a^j_t} \UR_t - \pdv{\FI}{a^j_t} \UI_t)\\
+  %   \text{vec}\qty(\pdv{\BR}{a^j_t} \UI_{t+1} + \pdv{\BI}{a^j_t} \UR_{t+1} - \pdv{\FR}{a^j_t} \UI_t + \pdv{\FI}{a^j_t} \UR_t)
+  % )
+\end{align*}
+
+where, writing $\partial_{a^j_t} H = H_j$, we have 
+
+\begin{align*}
+  \pdv{\BR}{a^j_t} &= -\frac{h_t}{2} \HI_j + \frac{h_t^2}{9} \qty(\qty{\HI,\HI_j} - \qty{\HR, \HR_j}) \\
+  &= -\frac{h_t}{2} \HI_j + \frac{h_t^2}{9} \qty(\qty{\HI_0, \HI_j} - \qty{\HR_0, \HR_j} + \sum_{i=0}^d a^i_t \qty(\qty{\HI_i, \HI_j} - \qty{\HR_i, \HR_j})) \\
+  \pdv{\BI}{a^j_t} &= \frac{h_t}{2} \HR_j - \frac{h_t^2}{9} \qty(\qty{\HR,\HI_j} + \qty{\HI,\HR_j}) \\
+  &= \frac{h_t}{2} \HR_j - \frac{h_t^2}{9} \qty(\qty{\HR_0,\HI_j} + \qty{\HI_0,\HR_j} + \sum_i a^i_t \qty(\qty{\HR_i,\HI_j} + \qty{\HI_i,\HR_j})) \\
+\end{align*}
+
+and 
+
+\begin{align*}
+  \pdv{\FR}{a^j_t} &= \frac{h_t}{2} \HI_j + \frac{h_t^2}{9} \qty(\qty{\HI,\HI_j} - \qty{\HR, \HR_j}) \\
+  &= \frac{h_t}{2} \HI_j + \frac{h_t^2}{9} \qty(\qty{\HI_0, \HI_j} - \qty{\HR_0, \HR_j} + \sum_i a^i_t \qty(\qty{\HI_i, \HI_j} - \qty{\HR_i, \HR_j})) \\
+  \pdv{\FI}{a^j_t} &= \frac{h_t}{2} \HR_j + \frac{h_t^2}{9} \qty(\qty{\HR,\HI_j} + \qty{\HI,\HR_j})\\
+  &= \frac{h_t}{2} \HR_j + \frac{h_t^2}{9} \qty(\qty{\HR_0,\HI_j} + \qty{\HI_0,\HR_j} + \sum_i a^i_t \qty(\qty{\HR_i,\HI_j} + \qty{\HI_i,\HR_j})) \\
+\end{align*}
+
+For the timestep $h_t$ we have
+
+\begin{align*}
+  \pdv{f}{h_t} % &= \isovec\qty(\pdv{B}{h_t} \isoU_{t+1} - \pdv{F}{h_t} \isoU_t) \\
+  % &= \isovec\Bigg( I_2 \otimes \qty(\pdv{\BR}{h_t} \UR_{t+1} - \pdv{\BI}{h_t} \UI_{t+1} - \pdv{\FR}{h_t} \UR_t - \pdv{\FI}{h_t} \UI_t) \\
+  % & \quad \quad \quad \quad + \Im \otimes \qty(\pdv{\BR}{h_t} \UI_{t+1} + \pdv{\BI}{h_t} \UR_{t+1} - \pdv{\FR}{h_t} \UI_t + \pdv{\FI}{h_t} \UR_t)\Bigg) \\
+  &= \pdv{\hat B}{h_t} \isovecU_{t+1} - \pdv{\hat F}{h_t} \isovecU_{t} \\
+  &= \qty((I_2 \otimes I_N) \otimes \pdv{\BR}{h_t} + (\Im \otimes I_N) \otimes \pdv{\BI}{h_t}) \isovecU_{t+1} \\
+  & \quad - \qty((I_2 \otimes I_N) \otimes \pdv{\FR}{h_t} - (\Im \otimes I_N) \otimes \pdv{\FI}{h_t}) \isovecU_{t}
+  % &= \mqty(
+    % \text{vec} \qty(\pdv{\BR}{h_t} \UR_{t+1} - \pdv{\BI}{h_t} \UI_{t+1} - \pdv{\FR}{h_t} \UR_t - \pdv{\FI}{h_t} \UI_t)\\
+    % \text{vec}\qty(\pdv{\BR}{h_t} \UI_{t+1} + \pdv{\BI}{h_t} \UR_{t+1} - \pdv{\FR}{h_t} \UI_t + \pdv{\FI}{h_t} \UR_t)
+    % )
+\end{align*}
+
+where 
+
+\begin{align*} 
+  \pdv{\BR}{h_t} &= -\frac{1}{2} \HI + \frac{2h_t}{9} \qty(\qty(\HI)^2 - \qty(\HR)^2) \\
+  \pdv{\BI}{h_t} &= \frac{1}{2} \HR - \frac{2h_t}{9} \qty{\HR,\HI}
+\end{align*}
+
+and
+
+\begin{align*}
+  \pdv{\FR}{h_t} &= \frac{1}{2} \HI + \frac{2h_t}{9} \qty(\qty(\HI)^2 - \qty(\HR)^2) \\
+  \pdv{\FI}{h_t} &= \frac{1}{2} \HR + \frac{2h_t}{9} \qty{\HR,\HI}.
+\end{align*}
+
+So we then have, with $z_t = \mqty(\isovecU_t & \vb{a}_t & h_t)^\top$
+
+\begin{equation*}
+  \partial_{z_t:z_{t+1}} f = \mqty(\partial_{z_t}f & \partial_{z_{t+1}}f) = \mqty(-\hat F & \partial_{\vb{a}_t}f & \partial_{h_t} f & \hat B & \vb{0} & \vb{0} )
+\end{equation*}
+
+\subsubsection*{Hessian of the Lagrangian}
+
+\begin{align*}
+  \mathcal{L} = \vb*{\mu}^\top \vb{F}(\vb{Z}) = \sum_t \mu_t^\top f(z_t, z_{t+1}) = \sum_t \mathcal{L}_t
+\end{align*}
+
+\begin{align*}
+  \mathcal{L}_t = \mu_t^\top f(z_t, z_{t+1})
+\end{align*}
+
+\begin{align*}
+  \partial^2_{z_t:z_{t+1}} \mathcal{L}_t 
+  % &= \mqty(
+  %   \partial^2_{z_t} \mathcal{L}_t & \partial_{z_t}\partial_{z_{t+1}} \mathcal{L}_t \\
+  %   \partial_{z_t}\partial_{z_{t+1}} \mathcal{L}_t & \partial^2_{z_{t+1}} \mathcal{L}_t
+  % ) \\ 
+  &= \mqty(
+    \partial^2_{z_t} \mathcal{L}_t & \partial_{z_{t+1}} \partial_{z_t} \mathcal{L}_t \\
+    \ddots & \vb{0}
+  )
+\end{align*}
+
+
+\begin{align*}
+  \partial^2_{z_t} \mathcal{L}_t = \mqty(
+    \vb{0} & \partial_{\vb{a}_t} \partial_{\isovecU_t} \mathcal{L}_t & \partial_{h_t} \partial_{\isovecU_t} \mathcal{L}_t \\
+    & \partial^2_{\vb{a}_t} \mathcal{L}_t & \partial_{h_t} \partial_{\vb{a}_t} \mathcal{L}_t \\
+    & & \partial^2_{h_t} \mathcal{L}_t
+  )
+\end{align*}
+
+\begin{align*}
+  \partial_{z_{t+1}} \partial_{z_t}\mathcal{L}_t = \mqty(
+    \vb{0} & \partial_{\isovecU_{t+1}} \partial_{\vb{a}_t} \mathcal{L}_t & \partial_{\isovecU_{t+1}} \partial_{h_t} \mathcal{L}_t \\
+    & \vb{0} & \vb{0} \\
+    & & \vb{0} 
+  )
+\end{align*}
+
+
+
+
+\begin{align*}
+  \pdv{\mathcal{L}_t}{a^j_t}{\isovecU_t} &= \pdv{a^j_t} \pdv{\mathcal{L}_t}{\isovecU_t} \\
+  &= \pdv{a^j_t} \qty(-\hat F^\top \mu_t) \\
+  &= -\qty(\pdv{\hat F}{a^j_t})^\top \mu_t \\
+  &= -\qty((I_2 \otimes I_N) \otimes \pdv{\FR}{a^j_t} - (\Im \otimes I_N) \otimes \pdv{\FI}{a^j_t})^\top \mu_t \\
+\end{align*}
+
+\begin{align*}
+  \pdv{\mathcal{L}_t}{a^j_t}{\isovecU_{t+1}} &= \pdv{a^j_t} \pdv{\mathcal{L}_t}{\isovecU_{t+1}} \\
+  &= \pdv{a^j_t} \qty(\hat B^\top \mu_t) \\
+  &= \qty(\pdv{\hat B}{a^j_t})^\top \mu_t \\
+  &= \qty((I_2 \otimes I_N) \otimes \pdv{\BR}{a^j_t} + (\Im \otimes I_N) \otimes \pdv{\BI}{a^j_t})^\top \mu_t \\
+\end{align*}
+
+\begin{align*}
+  \pdv{\mathcal{L}_t}{a^i_t}{a^j_t} &= \mu_t^\top \pdv{f_t}{a^i_t}{a^j_t} \\
+  &= \mu_t^\top \qty(\pdv{\hat B}{a^i_t}{a^j_t} \isovecU_{t+1} - \pdv{\hat F}{a^i_t}{a^j_t} \isovecU_t) \\
+\end{align*}
+
+\begin{align*}
+  \pdv{\hat B}{a^i_t}{a^j_t} &= \qty(I_2 \otimes I_N) \otimes \pdv{\BR}{a^i_t}{a^j_t} + (\Im \otimes I_N) \otimes \pdv{\BI}{a^i_t}{a^j_t} \\
+  \pdv{\hat F}{a^i_t}{a^j_t} &= \qty(I_2 \otimes I_N) \otimes \pdv{\FR}{a^i_t}{a^j_t} - (\Im \otimes I_N) \otimes \pdv{\FI}{a^i_t}{a^j_t} \\
+\end{align*}
+
+\begin{align*}
+  \pdv{\BR}{a^i_t}{a^j_t} &= \frac{h_t^2}{9}\qty(\qty{\HI_i, \HI_j} - \qty{\HR_i, \HR_j})\\
+  \pdv{\BI}{a^i_t}{a^j_t} &= -\frac{h_t^2}{9}\qty(\qty{\HR_i, \HI_j} + \qty{\HI_i, \HR_j})\\
+\end{align*}
+
+and
+
+\begin{align*}
+  \pdv{\FR}{a^i_t}{a^j_t} &= \frac{h_t^2}{9}\qty(\qty{\HI_i, \HI_j} - \qty{\HR_i, \HR_j})\\
+  \pdv{\FI}{a^i_t}{a^j_t} &= \frac{h_t^2}{9}\qty(\qty{\HR_i, \HI_j} + \qty{\HI_i, \HR_j})\\
+\end{align*}
+
+\begin{align*}
+  \pdv{\mathcal{L}_t}{h_t}{\isovecU_t} &= \pdv{h_t} \pdv{\mathcal{L}_t}{\isovecU_t} \\
+  &= \pdv{h_t} \qty(-\hat F^\top \mu_t) \\
+  &= -\qty(\pdv{\hat F}{h_t})^\top \mu_t \\
+  &= -\qty((I_2 \otimes I_N) \otimes \pdv{\FR}{h_t} - (\Im \otimes I_N) \otimes \pdv{\FI}{h_t})^\top \mu_t \\
+\end{align*}
+
+\begin{align*}
+  \pdv{\mathcal{L}_t}{h_t}{\isovecU_{t+1}} &= \pdv{h_t} \pdv{\mathcal{L}_t}{\isovecU_{t+1}} \\
+  &= \pdv{h_t} \qty(\hat B^\top \mu_t) \\
+  &= \qty(\pdv{\hat B}{h_t})^\top \mu_t \\
+  &= \qty((I_2 \otimes I_N) \otimes \pdv{\BR}{h_t} + (\Im \otimes I_N) \otimes \pdv{\BI}{h_t})^\top \mu_t \\
+\end{align*}
+
+\begin{align*}
+  \pdv{\mathcal{L}_t}{h_t}{a^j_t} &= \mu_t^\top \pdv{f_t}{h_t}{a^j_t} \\
+  &= \mu_t^\top \qty(\pdv{\hat B}{h_t}{a^j_t} \isovecU_{t+1} - \pdv{\hat F}{h_t}{a^j_t} \isovecU_t) \\
+  &= \mu_t^\top \Bigg( \qty(\qty(I_2 \otimes I_N) \otimes \pdv{\BR}{h_t}{a^j_t} + (\Im \otimes I_N) \otimes \pdv{\BI}{h_t}{a^j_t}) \isovecU_{t+1} \\
+  & \quad - \qty(\qty(I_2 \otimes I_N) \otimes \pdv{\FR}{h_t}{a^j_t} - \qty(\Im \otimes I_N) \otimes \pdv{\FI}{h_t}{a^j_t}) \isovecU_t \Bigg)
+\end{align*}
+
+\begin{align*}
+  \pdv{\BR}{h_t}{a^j_t} &= -\frac{1}{2}\HI_j + \frac{2h_t}{9}\qty(\qty{\HI, \HI_j} - \qty{\HR, \HR_j})\\
+  \pdv{\BI}{h_t}{a^j_t} &= \frac{1}{2}\HR_j - \frac{2h_t}{9}\qty(\qty{\HR, \HI_j} + \qty{\HI, \HR_j})\\
+\end{align*}
+
+and
+
+\begin{align*}
+  \pdv{\FR}{h_t}{a^j_t} &= \frac{1}{2}\HI_j + \frac{2h_t}{9}\qty(\qty{\HI, \HI_j} - \qty{\HR, \HR_j})\\
+  \pdv{\FI}{h_t}{a^j_t} &= \frac{1}{2}\HR_j + \frac{2h_t}{9}\qty(\qty{\HR, \HI_j} + \qty{\HI, \HR_j})\\
+\end{align*}
+
+\begin{align*}
+  \pdv[2]{\mathcal{L}_t}{h_t} &= \mu_t^\top \pdv[2]{f_t}{h_t} \\
+  &= \mu_t^\top \qty(\pdv[2]{\hat B}{h_t} \isovecU_{t+1} - \pdv[2]{\hat F}{h_t} \isovecU_t) \\
+  &= \mu_t^\top \Bigg( \qty(\qty(I_2 \otimes I_N) \otimes \pdv[2]{\BR}{h_t} + (\Im \otimes I_N) \otimes \pdv[2]{\BI}{h_t}) \isovecU_{t+1} \\
+  & \quad - \qty(\qty(I_2 \otimes I_N) \otimes \pdv[2]{\FR}{h_t} - \qty(\Im \otimes I_N) \otimes \pdv[2]{\FI}{h_t}) \isovecU_t \Bigg) \\
+\end{align*}
+
+where
+
+\begin{align*}
+  \pdv[2]{\BR}{h_t} &= \frac{2}{9}\qty(\qty(\HI)^2 - \qty(\HR)^2)\\
+  \pdv[2]{\BI}{h_t} &= -\frac{2}{9}\qty{\HR, \HI}\\
+\end{align*}
+
+and 
+
+\begin{align*}
+  \pdv[2]{\FR}{h_t} &= \frac{2}{9}\qty(\qty(\HI)^2 - \qty(\HR)^2)\\
+  \pdv[2]{\FI}{h_t} &= \frac{2}{9}\qty{\HR, \HI}\\
+\end{align*}
+
+
+
+
+
+
+\end{document}

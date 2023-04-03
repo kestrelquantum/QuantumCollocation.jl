@@ -1,10 +1,11 @@
+using Revise
 using Pico
 using NamedTrajectories
 using LinearAlgebra
 using Distributions
 using Manifolds
 
-max_iter = 200
+max_iter = 50
 linear_solver = "pardiso"
 
 U_init = 1.0 * I(8)
@@ -26,19 +27,6 @@ U_goal_analytic =
     e11 ⊗ Id ⊗ e11
 
 U_goal = Matrix{ComplexF64}(U_goal_analytic)
-
-
-
-# U_goal = [
-#     1 0 0 0 0 0 0 0;
-#     0 0 0 0 1 0 0 0;
-#     0 0 1 0 0 0 0 0;
-#     0 0 0 0 0 0 1 0;
-#     0 1 0 0 0 0 0 0;
-#     0 0 0 0 0 1 0 0;
-#     0 0 0 1 0 0 0 0;
-#     0 0 0 0 0 0 0 1
-# ] |> Matrix{ComplexF64}
 
 a_dag = create(2)
 a = annihilate(2)
@@ -206,21 +194,21 @@ elseif load == :post_continuation
     )
 end
 
-
-P = FourthOrderPade(system)
+P = UnitaryFourthOrderPade(system)
 
 @views function f(zₜ, zₜ₊₁)
     Ũ⃗ₜ₊₁ = zₜ₊₁[traj.components.Ũ⃗]
-    Ũ⃗ₜ = zₜ[traj.components.Ũ⃗]
     uₜ₊₁ = zₜ₊₁[traj.components.u]
-    uₜ = zₜ[traj.components.u]
     duₜ₊₁ = zₜ₊₁[traj.components.du]
+
+    Ũ⃗ₜ = zₜ[traj.components.Ũ⃗]
+    uₜ = zₜ[traj.components.u]
     duₜ = zₜ[traj.components.du]
 
     dduₜ = zₜ[traj.components.ddu]
     Δtₜ = zₜ[traj.components.Δt][1]
 
-    δŨ⃗ = P(Ũ⃗ₜ₊₁, Ũ⃗ₜ, uₜ, Δtₜ; operator=true)
+    δŨ⃗ = P(Ũ⃗ₜ₊₁, Ũ⃗ₜ, uₜ, Δtₜ)
     δu = uₜ₊₁ - uₜ - duₜ * Δtₜ
     δdu = duₜ₊₁ - duₜ - dduₜ * Δtₜ
 
