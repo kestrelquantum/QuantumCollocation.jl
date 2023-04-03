@@ -70,7 +70,7 @@ function projector(N::Int)
     Pre = hcat(I(N), zeros(N, N))
     Pim = hcat(zeros(N, N), I(N))
     P̂ = vcat(Pre, -Pim) ⊗ Pre
-    return P̂, Pre, Pim
+    return P̂
 end
 
 function isovec(Ũ::AbstractMatrix)
@@ -167,12 +167,20 @@ struct UnitaryFourthOrderPade{R} <: QuantumUnitaryIntegrator
         H_drive_real_anticomms = anticomm(sys.H_drives_real, sys.H_drives_real)
         H_drive_imag_anticomms = anticomm(sys.H_drives_imag, sys.H_drives_imag)
 
-        H_drift_real_anticomm_H_drives_real = anticomm(sys.H_drift_real, sys.H_drives_real)
-        H_drift_real_anticomm_H_drives_imag = anticomm(sys.H_drift_real, sys.H_drives_imag)
-        H_drift_imag_anticomm_H_drives_real = anticomm(sys.H_drift_imag, sys.H_drives_real)
-        H_drift_imag_anticomm_H_drives_imag = anticomm(sys.H_drift_imag, sys.H_drives_imag)
+        H_drift_real_anticomm_H_drives_real =
+            anticomm(sys.H_drift_real, sys.H_drives_real)
 
-        H_drives_real_anticomm_H_drives_imag = anticomm(sys.H_drives_real, sys.H_drives_imag)
+        H_drift_real_anticomm_H_drives_imag =
+            anticomm(sys.H_drift_real, sys.H_drives_imag)
+
+        H_drift_imag_anticomm_H_drives_real =
+            anticomm(sys.H_drift_imag, sys.H_drives_real)
+
+        H_drift_imag_anticomm_H_drives_imag =
+            anticomm(sys.H_drift_imag, sys.H_drives_imag)
+
+        H_drives_real_anticomm_H_drives_imag =
+            anticomm(sys.H_drives_real, sys.H_drives_imag)
 
         n_drives = length(sys.H_drives_real)
 
@@ -269,7 +277,10 @@ end
 end
 
 
-@inline function B_real(P::UnitaryFourthOrderPade{R}, a::AbstractVector{<:Real}, Δt::Real) where R
+@inline function B_real(
+    P::UnitaryFourthOrderPade{R},
+    a::AbstractVector{<:Real}, Δt::Real
+) where R
     HI = operator(a, P.H_drift_imag, P.H_drives_imag, P.n_drives)
 
     HI² = squared_operator(
@@ -291,7 +302,10 @@ end
     return I(P.N) - Δt / 2 * HI + Δt^2 / 9 * (HI² - HR²)
 end
 
-@inline function B_imag(P::UnitaryFourthOrderPade{R}, a::AbstractVector{<:Real}, Δt::Real) where R
+@inline function B_imag(
+    P::UnitaryFourthOrderPade{R},
+    a::AbstractVector{<:Real}, Δt::Real
+) where R
     HR = operator(a, P.H_drift_real, P.H_drives_real, P.n_drives)
 
     HR_anticomm_HI = operator_anticomm_operator(
