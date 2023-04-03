@@ -29,6 +29,7 @@ Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"
 Zygote = "e88e6eb3-aa80-5325-afca-941959d7151f"
 
 [compat]
+julia = "1.8"
 BenchmarkTools = "1.3"
 CairoMakie = "0.10"
 Distributions = "0.25"
