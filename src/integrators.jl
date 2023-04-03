@@ -3,6 +3,8 @@ module Integrators
 export AbstractIntegrator
 export QuantumStateIntegrator
 
+export UnitaryFourthOrderPade
+
 export Exponential
 
 export SecondOrderPade
@@ -68,7 +70,7 @@ function projector(N::Int)
     Pre = hcat(I(N), zeros(N, N))
     Pim = hcat(zeros(N, N), I(N))
     P̂ = vcat(Pre, -Pim) ⊗ Pre
-    return P̂, Pre, Pim
+    return P̂
 end
 
 function isovec(Ũ::AbstractMatrix)
@@ -96,6 +98,26 @@ function ∂Ũ⃗v(Ũ⃗::AbstractVector)
     return ∂v
 end
 
+anticomm(A::AbstractMatrix, B::AbstractMatrix) = A * B + B * A
+
+function anticomm(A::AbstractMatrix, Bs::AbstractVector{<:AbstractMatrix})
+    return [anticomm(A, B) for B in Bs]
+end
+
+function anticomm(As::AbstractVector{<:AbstractMatrix{R}}, Bs::AbstractVector{<:AbstractMatrix{R}}) where R
+    @assert length(As) == length(Bs)
+    n = length(As)
+    anticomms = Matrix{Matrix{R}}(undef, n, n)
+    for i = 1:n
+        for j = 1:n
+            anticomms[i, j] = anticomm(As[i], Bs[j])
+        end
+    end
+    return anticomms
+end
+
+
+
 
 
 
@@ -106,6 +128,272 @@ end
 abstract type AbstractIntegrator end
 
 abstract type QuantumStateIntegrator <: AbstractIntegrator end
+
+abstract type QuantumUnitaryIntegrator <: AbstractIntegrator end
+
+
+"""
+"""
+struct UnitaryFourthOrderPade{R} <: QuantumUnitaryIntegrator
+    I_2N::SparseMatrixCSC{R, Int}
+    Ω_2N::SparseMatrixCSC{R, Int}
+    H_drift_real::Matrix{R}
+    H_drift_imag::Matrix{R}
+    H_drives_real::Vector{Matrix{R}}
+    H_drives_imag::Vector{Matrix{R}}
+    H_drift_real_anticomm_H_drift_imag::Matrix{R}
+    H_drift_real_squared::Matrix{R}
+    H_drift_imag_squared::Matrix{R}
+    H_drive_real_anticomms::Matrix{Matrix{R}}
+    H_drive_imag_anticomms::Matrix{Matrix{R}}
+    H_drift_real_anticomm_H_drives_real::Vector{Matrix{R}}
+    H_drift_real_anticomm_H_drives_imag::Vector{Matrix{R}}
+    H_drift_imag_anticomm_H_drives_real::Vector{Matrix{R}}
+    H_drift_imag_anticomm_H_drives_imag::Vector{Matrix{R}}
+    H_drives_real_anticomm_H_drives_imag::Matrix{Matrix{R}}
+    n_drives::Int
+    N::Int
+
+    function UnitaryFourthOrderPade(sys::QuantumSystem{R}) where R <: Real
+        N = size(sys.H_drift_real, 1)
+        I_2N = sparse(I(2N))
+        Ω_2N = sparse(kron(Im2, I(N)))
+
+        H_drift_real_anticomm_H_drift_imag = anticomm(sys.H_drift_real, sys.H_drift_imag)
+
+        H_drift_real_squared = sys.H_drift_real^2
+        H_drift_imag_squared = sys.H_drift_imag^2
+
+        H_drive_real_anticomms = anticomm(sys.H_drives_real, sys.H_drives_real)
+        H_drive_imag_anticomms = anticomm(sys.H_drives_imag, sys.H_drives_imag)
+
+        H_drift_real_anticomm_H_drives_real =
+            anticomm(sys.H_drift_real, sys.H_drives_real)
+
+        H_drift_real_anticomm_H_drives_imag =
+            anticomm(sys.H_drift_real, sys.H_drives_imag)
+
+        H_drift_imag_anticomm_H_drives_real =
+            anticomm(sys.H_drift_imag, sys.H_drives_real)
+
+        H_drift_imag_anticomm_H_drives_imag =
+            anticomm(sys.H_drift_imag, sys.H_drives_imag)
+
+        H_drives_real_anticomm_H_drives_imag =
+            anticomm(sys.H_drives_real, sys.H_drives_imag)
+
+        n_drives = length(sys.H_drives_real)
+
+        return new{R}(
+            I_2N,
+            Ω_2N,
+            sys.H_drift_real,
+            sys.H_drift_imag,
+            sys.H_drives_real,
+            sys.H_drives_imag,
+            H_drift_real_anticomm_H_drift_imag,
+            H_drift_real_squared,
+            H_drift_imag_squared,
+            H_drive_real_anticomms,
+            H_drive_imag_anticomms,
+            H_drift_real_anticomm_H_drives_real,
+            H_drift_real_anticomm_H_drives_imag,
+            H_drift_imag_anticomm_H_drives_real,
+            H_drift_imag_anticomm_H_drives_imag,
+            H_drives_real_anticomm_H_drives_imag,
+            n_drives,
+            N
+        )
+    end
+end
+
+@inline function squared_operator(
+    a::AbstractVector{<:Real},
+    A_drift_squared::Matrix{<:Real},
+    A_drift_anticomm_A_drives::Vector{<:Matrix{<:Real}},
+    A_drive_anticomms::Matrix{<:Matrix{<:Real}},
+    n_drives::Int
+)
+    A² = A_drift_squared
+    for i = 1:n_drives
+        aⁱ = a[i]
+        A² += aⁱ * A_drift_anticomm_A_drives[i]
+        for j = i:n_drives
+            aʲ = a[j]
+            A² += aⁱ * aʲ * A_drive_anticomms[i, j]
+        end
+    end
+    return A²
+end
+
+@inline function operator(
+    a::AbstractVector{<:Real},
+    A_drift::Matrix{<:Real},
+    A_drives::Vector{<:Matrix{<:Real}},
+    n_drives::Int
+)
+    A = A_drift
+    for i = 1:n_drives
+        A += a[i] * A_drives[i]
+    end
+    return A
+end
+
+@inline function operator_anticomm_operator(
+    a::AbstractVector{<:Real},
+    A_drift_anticomm_B_drift::Matrix{<:Real},
+    A_drift_anticomm_B_drives::Vector{<:Matrix{<:Real}},
+    B_drift_anticomm_A_drives::Vector{<:Matrix{<:Real}},
+    A_drives_anticomm_B_drives::Matrix{<:Matrix{<:Real}},
+    n_drives::Int
+)
+    A_anticomm_B = A_drift_anticomm_B_drift
+    for i = 1:n_drives
+        aⁱ = a[i]
+        A_anticomm_B += aⁱ * A_drift_anticomm_B_drives[i]
+        A_anticomm_B += aⁱ * B_drift_anticomm_A_drives[i]
+        A_anticomm_B += aⁱ^2 * A_drives_anticomm_B_drives[i, i]
+        for j = i+1:n_drives
+            aʲ = a[j]
+            A_anticomm_B += 2 * aⁱ * aʲ * A_drives_anticomm_B_drives[i, j]
+        end
+    end
+    return A_anticomm_B
+end
+
+@inline function operator_anticomm_term(
+    a::AbstractVector{<:Real},
+    A_drift_anticomm_B_drives::Vector{<:Matrix{<:Real}},
+    A_drives_anticomm_B_drives::Matrix{<:Matrix{<:Real}},
+    n_drives::Int,
+    j::Int
+)
+    A_anticomm_Bⱼ = A_drift_anticomm_B_drives[j]
+    for i = 1:n_drives
+        aⁱ = a[i]
+        A_anticomm_Bⱼ += aⁱ * A_drives_anticomm_B_drives[i, j]
+    end
+    return A_anticomm_Bⱼ
+end
+
+
+@inline function B_real(
+    P::UnitaryFourthOrderPade{R},
+    a::AbstractVector{<:Real}, Δt::Real
+) where R
+    HI = operator(a, P.H_drift_imag, P.H_drives_imag, P.n_drives)
+
+    HI² = squared_operator(
+        a,
+        P.H_drift_imag_squared,
+        P.H_drift_imag_anticomm_H_drives_imag,
+        P.H_drive_imag_anticomms,
+        P.n_drives
+    )
+
+    HR² = squared_operator(
+        a,
+        P.H_drift_real_squared,
+        P.H_drift_real_anticomm_H_drives_real,
+        P.H_drive_real_anticomms,
+        P.n_drives
+    )
+
+    return I(P.N) - Δt / 2 * HI + Δt^2 / 9 * (HI² - HR²)
+end
+
+@inline function B_imag(
+    P::UnitaryFourthOrderPade{R},
+    a::AbstractVector{<:Real}, Δt::Real
+) where R
+    HR = operator(a, P.H_drift_real, P.H_drives_real, P.n_drives)
+
+    HR_anticomm_HI = operator_anticomm_operator(
+        a,
+        P.H_drift_real_anticomm_H_drift_imag,
+        P.H_drift_real_anticomm_H_drives_imag,
+        P.H_drift_imag_anticomm_H_drives_real,
+        P.H_drives_real_anticomm_H_drives_imag,
+        P.n_drives
+    )
+
+    return Δt / 2 * HR - Δt^2 / 9 * HR_anticomm_HI
+end
+
+@inline function F_real(P::UnitaryFourthOrderPade{R}, a::AbstractVector{<:Real}, Δt::Real) where R
+    HI = operator(a, P.H_drift_imag, P.H_drives_imag, P.n_drives)
+
+    HI² = squared_operator(
+        a,
+        P.H_drift_imag_squared,
+        P.H_drift_imag_anticomm_H_drives_imag,
+        P.H_drive_imag_anticomms,
+        P.n_drives
+    )
+
+    HR² = squared_operator(
+        a,
+        P.H_drift_real_squared,
+        P.H_drift_real_anticomm_H_drives_real,
+        P.H_drive_real_anticomms,
+        P.n_drives
+    )
+
+    return I(P.N) + Δt / 2 * HI + Δt^2 / 9 * (HI² - HR²)
+end
+
+@inline function F_imag(P::UnitaryFourthOrderPade{R}, a::AbstractVector{<:Real}, Δt::Real) where R
+    HR = operator(a, P.H_drift_real, P.H_drives_real, P.n_drives)
+
+    HR_anticomm_HI = operator_anticomm_operator(
+        a,
+        P.H_drift_real_anticomm_H_drift_imag,
+        P.H_drift_real_anticomm_H_drives_imag,
+        P.H_drift_imag_anticomm_H_drives_real,
+        P.H_drives_real_anticomm_H_drives_imag,
+        P.n_drives
+    )
+
+    return Δt / 2 * HR + Δt^2 / 9 * HR_anticomm_HI
+end
+
+# function (P::UnitaryFourthOrderPade)(
+#     Ũ⃗ₜ₊₁::AbstractVector,
+#     Ũ⃗ₜ::AbstractVector,
+#     aₜ::AbstractVector,
+#     Δt::Real,
+# )
+#     BR = B_real(P, aₜ, Δt)
+#     BI = B_imag(P, aₜ, Δt)
+#     FR = F_real(P, aₜ, Δt)
+#     FI = F_imag(P, aₜ, Δt)
+#     B̂ = P.I_2N ⊗ BR + P.Ω_2N ⊗ BI
+#     F̂ = P.I_2N ⊗ FR - P.Ω_2N ⊗ FI
+#     return B̂ * Ũ⃗ₜ₊₁ - F̂ * Ũ⃗ₜ
+# end
+
+
+@views function (P::UnitaryFourthOrderPade{R})(
+    Ũ⃗ₜ₊₁::AbstractVector,
+    Ũ⃗ₜ::AbstractVector,
+    aₜ::AbstractVector,
+    Δt::Real,
+) where R <: Real
+    N² = P.N^2
+    UₜR = reshape(Ũ⃗ₜ[1:N²], P.N, P.N)
+    UₜI = reshape(Ũ⃗ₜ[N²+1:2N²], P.N, P.N)
+    Uₜ₊₁R = reshape(Ũ⃗ₜ₊₁[1:N²], P.N, P.N)
+    Uₜ₊₁I = reshape(Ũ⃗ₜ₊₁[N²+1:2N²], P.N, P.N)
+    BR = B_real(P, aₜ, Δt)
+    BI = B_imag(P, aₜ, Δt)
+    FR = F_real(P, aₜ, Δt)
+    FI = F_imag(P, aₜ, Δt)
+    δUR = BR * Uₜ₊₁R - BI * Uₜ₊₁I - FR * UₜR - FI * UₜI
+    δUI = BR * Uₜ₊₁I + BI * Uₜ₊₁R - FR * UₜI + FI * UₜR
+    δŨ⃗ = vec(hcat(δUR, δUI))
+    return δŨ⃗
+end
+
 
 
 # exponential
@@ -163,8 +451,6 @@ end
 
 # 4th order Pade integrator
 
-anticom(A::AbstractMatrix, B::AbstractMatrix) = A * B + B * A
-
 struct FourthOrderPade <: QuantumStateIntegrator
     G_drift::Matrix
     G_drives::Vector{Matrix}
@@ -188,13 +474,13 @@ struct FourthOrderPade <: QuantumStateIntegrator
                     drive_anticoms[k, k] = 2 * sys.G_drives[k]^2
                 else
                     drive_anticoms[k, j] =
-                        anticom(sys.G_drives[k], sys.G_drives[j])
+                        anticomm(sys.G_drives[k], sys.G_drives[j])
                 end
             end
         end
 
         drift_anticoms = [
-            anticom(G_drive, sys.G_drift)
+            anticomm(G_drive, sys.G_drift)
                 for G_drive in sys.G_drives
         ]
 

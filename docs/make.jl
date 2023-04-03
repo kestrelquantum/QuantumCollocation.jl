@@ -1,18 +1,18 @@
-using Pico
+using QuantumCollocation
 using Documenter
 
 push!(LOAD_PATH, joinpath(@__DIR__, "..", "src"))
 
-DocMeta.setdocmeta!(Pico, :DocTestSetup, :(using Pico); recursive=true)
+DocMeta.setdocmeta!(QuantumCollocation, :DocTestSetup, :(using QuantumCollocation); recursive=true)
 
 makedocs(;
-    modules=[Pico],
+    modules=[QuantumCollocation],
     authors="Aaron Trowbridge <aaron.j.trowbridge@gmail.com> and contributors",
-    repo="https://github.com/aarontrowbridge/Pico.jl/blob/{commit}{path}#{line}",
-    sitename="Pico.jl",
+    repo="https://github.com/aarontrowbridge/QuantumCollocation.jl/blob/{commit}{path}#{line}",
+    sitename="QuantumCollocation.jl",
     format=Documenter.HTML(;
         prettyurls=get(ENV, "CI", "false") == "true",
-        canonical="https://aarontrowbridge.github.io/Pico.jl",
+        canonical="https://aarontrowbridge.github.io/QuantumCollocation.jl",
         edit_link="main",
         assets=String[],
         mathengine = MathJax3(Dict(
@@ -47,6 +47,6 @@ makedocs(;
 )
 
 deploydocs(;
-    repo="github.com/aarontrowbridge/Pico.jl",
+    repo="github.com/aarontrowbridge/QuantumCollocation.jl",
     devbranch="main",
 )

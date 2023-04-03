@@ -276,7 +276,7 @@ function QuadraticRegularizer(;
 		J = 0.0
 		for t ∈ times
             vₜ = Z⃗[slice(t, Z.components[name], Z.dim)]
-            J += 0.5 * vₜ' * diagm(R) * vₜ
+            J += 0.5 * vₜ' *  (R .* vₜ)
 		end
 		return J
 	end

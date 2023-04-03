@@ -1,4 +1,4 @@
-using Pico
+using QuantumCollocation
 using NamedTrajectories
 using LinearAlgebra
 using Distributions
@@ -144,7 +144,7 @@ traj = NamedTrajectory(
 )
 
 # creating fourth order pade integrator
-P = FourthOrderPade(system)
+P = UnitaryFourthOrderPade(system)
 
 # defining dynamics function
 function f(zₜ, zₜ₊₁)
@@ -174,7 +174,7 @@ function f(zₜ, zₜ₊₁)
 
     # controls for pade integrator
     uₜ = [γₜ; αₜ]
-    δŨ⃗ = P(Ũ⃗ₜ₊₁, Ũ⃗ₜ, uₜ, Δtₜ; operator=true)
+    δŨ⃗ = P(Ũ⃗ₜ₊₁, Ũ⃗ₜ, uₜ, Δtₜ)
 
     # γ dynamics
     δγ = γₜ₊₁ - γₜ - dγₜ * Δtₜ

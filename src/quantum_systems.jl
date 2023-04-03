@@ -66,9 +66,13 @@ abstract type AbstractSystem end
 A struct for storing the isomorphisms of the system's drift and drive Hamiltonians,
 as well as the system's parameters.
 """
-struct QuantumSystem <: AbstractSystem
-    G_drift::Matrix{Float64}
-    G_drives::Vector{Matrix{Float64}}
+struct QuantumSystem{R} <: AbstractSystem
+    H_drift_real::Matrix{R}
+    H_drift_imag::Matrix{R}
+    H_drives_real::Vector{Matrix{R}}
+    H_drives_imag::Vector{Matrix{R}}
+    G_drift::Matrix{R}
+    G_drives::Vector{Matrix{R}}
     params::Dict{Symbol, Any}
 end
 
@@ -86,12 +90,25 @@ function QuantumSystem(
     H_drift::Matrix{<:Number},
     H_drives::Vector{<:Matrix{<:Number}};
     params=Dict{Symbol, Any}(),
+    R::DataType=Float64,
     kwargs...
 )
+    H_drift_real = real(H_drift)
+    H_drift_imag = imag(H_drift)
+    H_drives_real = real.(H_drives)
+    H_drives_imag = imag.(H_drives)
     G_drift = G(H_drift)
     G_drives = G.(H_drives)
     params = merge(params, Dict(kwargs...))
-    return QuantumSystem(G_drift, G_drives, params)
+    return QuantumSystem{R}(
+        H_drift_real,
+        H_drift_imag,
+        H_drives_real,
+        H_drives_imag,
+        G_drift,
+        G_drives,
+        params
+    )
 end
 
 

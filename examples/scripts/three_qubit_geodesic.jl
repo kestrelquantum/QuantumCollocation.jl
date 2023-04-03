@@ -1,4 +1,4 @@
-using Pico
+using QuantumCollocation
 using NamedTrajectories
 using LinearAlgebra
 using SparseArrays

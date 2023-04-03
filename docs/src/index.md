@@ -1,16 +1,16 @@
 ```@meta
-CurrentModule = Pico
+CurrentModule = QuantumCollocation
 ```
 
-# Pico.jl
+# QuantumCollocation.jl
 
-Documentation for [Pico](https://github.com/aarontrowbridge/Pico.jl).
+Documentation for [QuantumCollocation](https://github.com/aarontrowbridge/QuantumCollocation.jl).
 
 ```@index
 ```
 
 ```@autodocs
-Modules = [Pico] 
+Modules = [QuantumCollocation] 
 ```
 
 

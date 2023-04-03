@@ -68,7 +68,7 @@ git-tree-sha1 = "18f84637e00b72ba6769034a4b50d79ee40c84a9"
 uuid = "69de0a69-1ddd-5017-9359-2bf0b02dc9f0"
 version = "2.5.5"
 
-[[deps.Pico]]
+[[deps.QuantumCollocation]]
 path = ".."
 uuid = "0dc23a59-5ffb-49af-b6bd-932a8ae77adf"
 version = "0.1.0"

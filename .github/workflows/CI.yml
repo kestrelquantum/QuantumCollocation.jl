@@ -56,6 +56,6 @@ jobs:
       - run: |
           julia --project=docs -e '
             using Documenter: DocMeta, doctest
-            using Pico
-            DocMeta.setdocmeta!(Pico, :DocTestSetup, :(using Pico); recursive=true)
-            doctest(Pico)'
+            using QuantumCollocation
+            DocMeta.setdocmeta!(QuantumCollocation, :DocTestSetup, :(using QuantumCollocation); recursive=true)
+            doctest(QuantumCollocation)'
