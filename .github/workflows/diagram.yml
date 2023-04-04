@@ -16,15 +16,15 @@ jobs:
           output_file: "images/diagram.svg"
           excluded_paths: "ignore,.github,notes,images"
           excluded_globs: "**/*.{png,ico,md};/*.*"
-          branch: diagram
-      - name: Create PR
-        uses: peter-evans/create-pull-request@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: Update diagram
-          title: Update diagram
-          body: |
-            This PR updates the repo-visualization diagram.
-          base: main
-          delete-branch: true
+          # branch: diagram
+      # - name: Create PR
+      #   uses: peter-evans/create-pull-request@v4
+      #   with:
+      #     token: ${{ secrets.GITHUB_TOKEN }}
+      #     commit-message: Update diagram
+      #     title: Update diagram
+      #     body: |
+      #       This PR updates the repo-visualization diagram.
+      #     base: main
+      #     delete-branch: true
            
