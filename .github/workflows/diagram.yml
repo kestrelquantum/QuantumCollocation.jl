@@ -26,4 +26,5 @@ jobs:
           body: |
             This PR updates the repo-visualization diagram.
           base: main
+          delete-branch: true
            
