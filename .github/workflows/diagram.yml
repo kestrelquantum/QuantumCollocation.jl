@@ -13,7 +13,8 @@ jobs:
       - name: Update diagram
         uses: githubocto/repo-visualizer@main
         with:
-          excluded_paths: "ignore,.github"
+          excluded_paths: "ignore,.github,notes"
+          excluded_globs: "**/*.{png,ico,md};/*"
           branch: diagram
       - name: Create PR
         uses: peter-evans/create-pull-request@v3
@@ -24,4 +25,6 @@ jobs:
           body: |
             This PR updates the diagram.
           labels: diagram
-          branch: main 
+          branch: diagram
+          base: main
+           
