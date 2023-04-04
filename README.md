@@ -28,3 +28,7 @@ QuantumCollocation.jl is not yet registered, so you will need to install it manu
 using Pkg
 Pkg.add(url="https://github.com/aarontrowbridge/QuantumCollocation.jl", rev="main")
 ```
+
+## Repo Structure
+
+![Repo Structure](./diagram.svg)
