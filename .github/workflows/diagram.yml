@@ -13,8 +13,9 @@ jobs:
       - name: Update diagram
         uses: githubocto/repo-visualizer@main
         with:
-          excluded_paths: "ignore,.github,notes"
+          excluded_paths: "ignore,.github,notes,images"
           excluded_globs: "**/*.{png,ico,md};/*.*"
+          output_file: "images/diagram.svg"
           branch: diagram
       - name: Create PR
         uses: peter-evans/create-pull-request@v3
