@@ -18,12 +18,15 @@ jobs:
           excluded_globs: "**/*.{png,ico,md};/*.*"
           branch: diagram
       - name: Create PR
-        uses: peter-evans/create-pull-request@v3
+        uses: peter-evans/create-pull-request@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: Update diagram
           title: Update diagram
           body: |
-            This PR was created automatically by a GitHub Action.
-            The workflow is defined in `.github/workflows/diagram.yml`.
-          delete-branch: true
+            Update repo-visualization diagram
+      # delete branch after PR is merged
+      - name: Delete branch
+        uses: peter-evans/delete-branch@v1
+        with:
+          branch: diagram
+          
