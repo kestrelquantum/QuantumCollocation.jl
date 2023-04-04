@@ -44,4 +44,4 @@ See the example script [examples/scripts/single_qubit_gate.jl](examples/scripts/
 
 Uses GitHub Next's [repo-visualization](https://githubnext.com/projects/repo-visualization/) tool to see repo structure.
 
-![Repo Structure](images/diagram.svg)
+![Repo Structure](diagram.svg)
