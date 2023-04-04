@@ -14,7 +14,14 @@ jobs:
         uses: githubocto/repo-visualizer@main
         with:
           output_file: "images/diagram.svg"
+          artifact_name: "diagram"
           excluded_paths: "ignore,.github,notes,images"
           excluded_globs: "**/*.{png,ico,md};/*.*"
-          branch: dev-aaron
+      - name: Get artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: "diagram" 
+          path: "downloads"
+
+      
          
