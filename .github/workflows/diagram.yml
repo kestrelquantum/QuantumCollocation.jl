@@ -17,16 +17,4 @@ jobs:
           excluded_paths: "ignore,.github,notes,images"
           excluded_globs: "**/*.{png,ico,md};/*.*"
           branch: diagram
-      - name: Create PR
-        uses: peter-evans/create-pull-request@v4
-        with:
-          commit-message: Update diagram
-          title: Update diagram
-          body: |
-            Update repo-visualization diagram
-          branch: diagram
-          base: main
-      - name: delete branch
-        run: git push origin --delete diagram
          
-          
