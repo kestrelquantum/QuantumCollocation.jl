@@ -17,15 +17,16 @@ jobs:
           excluded_paths: "ignore,.github,notes,images"
           excluded_globs: "**/*.{png,ico,md};/*.*"
           branch: diagram
-      # create PR from diagram branch to main
-      - name: Create PR
-        uses: peter-evans/create-pull-request@v3
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: Update diagram
-          title: Update diagram
-          body: |
-            This PR was created automatically by a GitHub Action.
-            The workflow is defined in `.github/workflows/diagram.yml`.
-          branch: diagram
-          base: main
+      # # create PR from diagram branch to main
+      # - name: Create PR
+      #   uses: peter-evans/create-pull-request@v3
+      #   with:
+      #     token: ${{ secrets.GITHUB_TOKEN }}
+      #     commit-message: Update diagram
+      #     title: Update diagram
+      #     body: |
+      #       This PR was created automatically by a GitHub Action.
+      #       The workflow is defined in `.github/workflows/diagram.yml`.
+      #     branch: diagram
+      #     delete-branch: true
+      #     base: main
