@@ -47,6 +47,6 @@ makedocs(;
 )
 
 deploydocs(;
-    repo="github.com/aarontrowbridge/QuantumCollocation.jl",
-    devbranch="main",
+    repo="github.com/aarontrowbridge/QuantumCollocation.jl.git",
+    devbranch="dev-aaron",
 )
