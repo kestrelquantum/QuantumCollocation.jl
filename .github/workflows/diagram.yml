@@ -18,14 +18,12 @@ jobs:
           excluded_globs: "**/*.{png,ico,md};/*.*"
           branch: diagram
       - name: Create PR
-        uses: peter-evans/create-pull-request@v3
+        uses: peter-evans/create-pull-request@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: Update diagram
           title: Update diagram
           body: |
-            This PR updates the diagram.
-          labels: diagram
-          branch: main 
-          base: diagram
+            This PR updates the repo-visualization diagram.
+          branch: diagram 
            
