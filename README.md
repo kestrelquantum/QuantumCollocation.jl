@@ -29,6 +29,10 @@ using Pkg
 Pkg.add(url="https://github.com/aarontrowbridge/QuantumCollocation.jl", rev="main")
 ```
 
+## Implementation Details
+
+For a details of the implementation, in the current absence of a documenation page, please see the (rough) notes document [pico.pdf](notes/pico-implementation-details/pico.pdf).
+
 ## Repo Structure
 
 Uses GitHub Next's [repo-visualization](https://githubnext.com/projects/repo-visualization/) tool to see repo structure.
