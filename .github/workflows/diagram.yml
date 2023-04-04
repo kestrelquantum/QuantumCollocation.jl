@@ -24,5 +24,4 @@ jobs:
           body: |
             This PR updates the diagram.
           labels: diagram
-          branch: diagram
-          base: main 
+          branch: main 
