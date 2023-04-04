@@ -24,9 +24,9 @@ jobs:
           title: Update diagram
           body: |
             Update repo-visualization diagram
-      # delete branch after PR is merged
-      - name: Delete branch
-        uses: peter-evans/delete-branch@v1
-        with:
           branch: diagram
+          base: main
+      - name: delete branch
+        run: git push origin --delete diagram
+         
           
