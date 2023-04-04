@@ -36,7 +36,7 @@ For a details of the implementation, in the current absence of a documenation pa
 ## Examples
 
 ### Single Qubit X-Gate
-See the example script [examples/scripts/single_qubit_gate.jl], which  produces the following plot:
+See the example script [examples/scripts/single_qubit_gate.jl](examples/scripts/single_qubit_gate.jl), which  produces the following plot:
 
 ![Single Qubit X-Gate](images/T_100_Q_1000_iter_1000_00004_fidelity_0.9999999999994745.png)
 
@@ -44,4 +44,4 @@ See the example script [examples/scripts/single_qubit_gate.jl], which  produces 
 
 Uses GitHub Next's [repo-visualization](https://githubnext.com/projects/repo-visualization/) tool to see repo structure.
 
-![Repo Structure](./diagram.svg)
+![Repo Structure](images/diagram.svg)
