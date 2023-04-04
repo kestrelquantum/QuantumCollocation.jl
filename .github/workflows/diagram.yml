@@ -27,5 +27,4 @@ jobs:
             This PR updates the diagram.
           labels: diagram
           branch: main 
-          delete-branch: true
            
