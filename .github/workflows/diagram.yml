@@ -26,7 +26,5 @@ jobs:
           body: |
             This PR updates the diagram.
           labels: diagram
-          branch: diagram
-          delete-branch: true
-          base: main
+          branch: main
            
