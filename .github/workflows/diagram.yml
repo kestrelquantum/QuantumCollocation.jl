@@ -3,7 +3,7 @@ on:
   workflow_dispatch: {}
   push:
     branches:
-      - main
+      - main 
 jobs:
   get_data:
     runs-on: ubuntu-latest
@@ -14,3 +14,4 @@ jobs:
         uses: githubocto/repo-visualizer@main
         with:
           excluded_paths: "ignore,.github"
+          branch: diagram
