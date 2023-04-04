@@ -31,4 +31,6 @@ Pkg.add(url="https://github.com/aarontrowbridge/QuantumCollocation.jl", rev="mai
 
 ## Repo Structure
 
+Uses GitHub Next's [repo-visualization](https://githubnext.com/projects/repo-visualization/) tool to see repo structure.
+
 ![Repo Structure](./diagram.svg)
