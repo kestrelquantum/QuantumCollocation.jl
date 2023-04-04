@@ -15,3 +15,13 @@ jobs:
         with:
           excluded_paths: "ignore,.github"
           branch: diagram
+      - name: Create PR
+        uses: peter-evans/create-pull-request@v3
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: Update diagram
+          title: Update diagram
+          body: |
+            This PR updates the diagram.
+          labels: diagram
+          branch: diagram
