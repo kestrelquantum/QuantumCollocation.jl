@@ -25,5 +25,5 @@ jobs:
           title: Update diagram
           body: |
             This PR updates the repo-visualization diagram.
-          branch: main 
+          base: main
            
