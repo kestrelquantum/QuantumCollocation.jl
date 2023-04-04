@@ -16,5 +16,5 @@ jobs:
           output_file: "images/diagram.svg"
           excluded_paths: "ignore,.github,notes,images"
           excluded_globs: "**/*.{png,ico,md};/*.*"
-        branch: dev-aaron
+          branch: dev-aaron
          
