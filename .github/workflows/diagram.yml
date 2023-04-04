@@ -14,7 +14,7 @@ jobs:
         uses: githubocto/repo-visualizer@main
         with:
           excluded_paths: "ignore,.github,notes"
-          excluded_globs: "**/*.{png,ico,md};/*"
+          excluded_globs: "**/*.{png,ico,md};/*.*"
           branch: diagram
       - name: Create PR
         uses: peter-evans/create-pull-request@v3
