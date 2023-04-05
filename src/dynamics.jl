@@ -56,7 +56,6 @@ end
 function jacobian_structure(∂f̂::Function, zdim::Int)
     zz = collect(Symbolics.@variables(zz[1:2zdim])...)
     ∂f = ∂f̂(zz)
-    # A = collect(simplify(Aᵢ for Aᵢ ∈ ∂f))
     return structure(sparse(∂f))
 end
 
@@ -66,7 +65,6 @@ function hessian_of_lagrangian_structure(∂f̂::Function, zdim::Int, μdim::Int
     ∂²f̂(zz) = reshape(ForwardDiff.jacobian(x -> vec(∂f̂(x)), zz), μdim, 2zdim, 2zdim)
     ∂²f = ∂²f̂(zz)
     @einsum μ∂²f[j, k] := μ[i] * ∂²f[i, j, k]
-    # μ∂²f = collect(simplify(μ∂²fᵢ for μ∂²fᵢ ∈ μ∂²f))
     return structure(sparse(μ∂²f), upper_half=true)
 end
 
