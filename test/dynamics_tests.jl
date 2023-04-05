@@ -40,14 +40,15 @@
 
         # test dynamics jacobian
         shape = (Z.dims.states * (Z.T - 1), Z.dim * Z.T)
-        @test ForwardDiff.jacobian(dynamics.F, Z.datavec) ≈
-            dense(dynamics.∂F(Z.datavec), dynamics.∂F_structure, shape)
+        @test all(ForwardDiff.jacobian(dynamics.F, Z.datavec) .≈
+            dense(dynamics.∂F(Z.datavec), dynamics.∂F_structure, shape))
+
 
         # test dynamics hessian of the lagrangian
         shape = (Z.dim * Z.T, Z.dim * Z.T)
         μ = rand(Z.dims.states * (Z.T - 1))
-        @test ForwardDiff.hessian(Z⃗ -> μ' * dynamics.F(Z⃗), Z.datavec) ≈
-            dense(dynamics.μ∂²F(Z.datavec, μ), dynamics.μ∂²F_structure, shape)
+        @test all(ForwardDiff.hessian(Z⃗ -> μ' * dynamics.F(Z⃗), Z.datavec) .≈
+            dense(dynamics.μ∂²F(Z.datavec, μ), dynamics.μ∂²F_structure, shape))
 
 
     end
