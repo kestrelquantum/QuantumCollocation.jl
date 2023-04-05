@@ -248,21 +248,28 @@ drives = vcat(prob.trajectory.γ, prob.trajectory.α)
 ψ₁ = [1, 0]
 ψ̃₁ = ket_to_iso(ψ₁)
 ψ̃₁_goal = ket_to_iso(gate * ψ₁)
-Ψ̃₁ = rollout(ψ̃₁, drives, Δts, system)
-println("|0⟩ Rollout fidelity:   ", fidelity(Ψ̃₁[:, end], ψ̃₁_goal))
+Ψ̃₁_fourth_order_pade = rollout(ψ̃₁, drives, Δts, system)
+Ψ̃₁_exp = rollout(ψ̃₁, drives, Δts, system; integrator=exp)
+println("|0⟩ Fourth order Pade rollout fidelity:   ", fidelity(Ψ̃₁_fourth_order_pade[:, end], ψ̃₁_goal))
+println("|0⟩ Exponential rollout fidelity:         ", fidelity(Ψ̃₁_exp[:, end], ψ̃₁_goal))
+println()
+
 
 # |1⟩ rollout test
 ψ₂ = [0, 1]
 ψ̃₂ = ket_to_iso(ψ₂)
 ψ̃₂_goal = ket_to_iso(gate * ψ₂)
-Ψ̃₂ = rollout(ψ̃₂, drives, Δts, system)
-println("|1⟩ Rollout fidelity:   ", fidelity(Ψ̃₂[:, end], ψ̃₂_goal))
+Ψ̃₂_fourth_order_pade = rollout(ψ̃₂, drives, Δts, system)
+Ψ̃₂_exp = rollout(ψ̃₂, drives, Δts, system; integrator=exp)
+println("|1⟩ Fourth order Pade rollout fidelity:   ", fidelity(Ψ̃₂_fourth_order_pade[:, end], ψ̃₂_goal))
+println("|1⟩ Exponential rollout fidelity:         ", fidelity(Ψ̃₂_exp[:, end], ψ̃₂_goal))
+
 
 # new plot name with fidelity included
 experiment *= "_fidelity_$(fid)"
 plot_path = join(split(plot_path, ".")[1:end-1]) * "_fidelity_$(fid).png"
 
-add_component!(prob.trajectory, :ψ̃₁, Ψ̃₁)
+add_component!(prob.trajectory, :ψ̃₁, Ψ̃₁_exp)
 
 plot(plot_path, prob.trajectory, [:Ũ⃗, :γ, :α, :ψ̃₁];
     ignored_labels=[:Ũ⃗],

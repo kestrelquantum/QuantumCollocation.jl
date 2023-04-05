@@ -5,6 +5,11 @@ export QuantumStateIntegrator
 
 export UnitaryFourthOrderPade
 
+export state
+export controls
+export timestep
+export comps
+
 export Exponential
 
 export SecondOrderPade
@@ -35,6 +40,7 @@ using ..IndexingUtils
 using ..QuantumSystems
 using ..QuantumUtils
 
+using NamedTrajectories
 using LinearAlgebra
 using SparseArrays
 
@@ -132,6 +138,20 @@ abstract type QuantumStateIntegrator <: AbstractIntegrator end
 abstract type QuantumUnitaryIntegrator <: AbstractIntegrator end
 
 
+function comps(P::AbstractIntegrator, traj::NamedTrajectory)
+    state_comps = traj.components[state(P)]
+    u = controls(P)
+    if u isa Tuple
+        control_comps = (traj.components[uᵢ] for uᵢ in u)
+    else
+        control_comps = traj.components[u]
+    end
+    timestep_comp = traj.components[timestep(P)]
+    return state_comps, control_comps, timestep_comp
+end
+
+
+
 """
 """
 struct UnitaryFourthOrderPade{R} <: QuantumUnitaryIntegrator
@@ -151,10 +171,18 @@ struct UnitaryFourthOrderPade{R} <: QuantumUnitaryIntegrator
     H_drift_imag_anticomm_H_drives_real::Vector{Matrix{R}}
     H_drift_imag_anticomm_H_drives_imag::Vector{Matrix{R}}
     H_drives_real_anticomm_H_drives_imag::Matrix{Matrix{R}}
+    unitary_symb::Union{Symbol,Nothing}
+    drive_symb::Union{Symbol,Tuple{Vararg{Symbol}},Nothing}
+    timestep_symb::Union{Symbol,Nothing}
     n_drives::Int
     N::Int
 
-    function UnitaryFourthOrderPade(sys::QuantumSystem{R}) where R <: Real
+    function UnitaryFourthOrderPade(
+        sys::QuantumSystem{R},
+        unitary_symb::Union{Symbol,Nothing}=nothing,
+        drive_symb::Union{Symbol,Tuple{Vararg{Symbol}},Nothing}=nothing,
+        timestep_symb::Union{Symbol,Nothing}=nothing
+    ) where R <: Real
         N = size(sys.H_drift_real, 1)
         I_2N = sparse(I(2N))
         Ω_2N = sparse(kron(Im2, I(N)))
@@ -201,11 +229,18 @@ struct UnitaryFourthOrderPade{R} <: QuantumUnitaryIntegrator
             H_drift_imag_anticomm_H_drives_real,
             H_drift_imag_anticomm_H_drives_imag,
             H_drives_real_anticomm_H_drives_imag,
+            unitary_symb,
+            drive_symb,
+            timestep_symb,
             n_drives,
             N
         )
     end
 end
+
+state(P::UnitaryFourthOrderPade) = P.unitary_symb
+controls(P::UnitaryFourthOrderPade) = P.drive_symb
+timestep(P::UnitaryFourthOrderPade) = P.timestep_symb
 
 @inline function squared_operator(
     a::AbstractVector{<:Real},
@@ -392,6 +427,18 @@ end
     δUI = BR * Uₜ₊₁I + BI * Uₜ₊₁R - FR * UₜI + FI * UₜR
     δŨ⃗ = vec(hcat(δUR, δUI))
     return δŨ⃗
+end
+
+@views function(P::UnitaryFourthOrderPade)(
+    zₜ₊₁::AbstractVector,
+    zₜ::AbstractVector,
+    traj::NamedTrajectory
+)
+    Ũ⃗ₜ₊₁ = zₜ₊₁[traj.components[P.unitary_symb]]
+    Ũ⃗ₜ = zₜ[traj.components[P.unitary_symb]]
+    aₜ = zₜ[traj.components[P.control_symb]]
+    Δtₜ = zₜ[traj.components[P.timestep_symb]]
+    return P(Ũ⃗ₜ₊₁, Ũ⃗ₜ, aₜ, Δtₜ)
 end
 
 
