@@ -59,10 +59,9 @@ function jacobian_structure(∂f̂::Function, zdim::Int)
     return structure(sparse(∂f))
 end
 
-function hessian_of_lagrangian_structure(∂f̂::Function, zdim::Int, μdim::Int)
+function hessian_of_lagrangian_structure(∂²f̂::Function, zdim::Int, μdim::Int)
     zz = collect(Symbolics.@variables(zz[1:2zdim])...)
     μ = collect(Symbolics.@variables(μ[1:μdim])...)
-    ∂²f̂(zz) = reshape(ForwardDiff.jacobian(x -> vec(∂f̂(x)), zz), μdim, 2zdim, 2zdim)
     ∂²f = ∂²f̂(zz)
     @einsum μ∂²f[j, k] := μ[i] * ∂²f[i, j, k]
     return structure(sparse(μ∂²f), upper_half=true)
@@ -226,11 +225,18 @@ function QuantumDynamics(
 
     μf̂(zₜzₜ₊₁, μₜ) = dot(μₜ, f̂(zₜzₜ₊₁))
 
-    @views function μ∂²f(zₜzₜ₊₁, μₜ)
+    @views function μ∂²f̂(zₜzₜ₊₁, μₜ)
         return ForwardDiff.hessian(zz -> μf̂(zz, μₜ), zₜzₜ₊₁)
     end
 
-    μ∂²f_structure = hessian_of_lagrangian_structure(∂f̂, traj.dim, dynamics_dim)
+    ∂²f̂(zz) = reshape(
+        ForwardDiff.jacobian(x -> vec(∂f̂(x)), zz),
+        traj.dims.states,
+        2traj.dim,
+        2traj.dim
+    )
+
+    μ∂²f_structure = hessian_of_lagrangian_structure(∂²f̂, traj.dim, dynamics_dim)
     μ∂²f_n_nzvals = length(μ∂²f_structure)
 
     @views function μ∂²F(Z⃗::AbstractVector{R}, μ::AbstractVector{R}) where R <: Real
@@ -238,9 +244,9 @@ function QuantumDynamics(
         Threads.@threads for t = 1:traj.T-1
             zₜzₜ₊₁ = Z⃗[slice(t:t+1, traj.dim)]
             μₜ = μ[slice(t, dynamics_dim)]
-            HoL = μ∂²f(zₜzₜ₊₁, μₜ)
-            for (k, (i, j)) ∈ enumerate(μ∂²f_structure)
-                μ∂²[index(t, k, μ∂²f_n_nzvals)] = HoL[i, j]
+            μ∂²fₜ = μ∂²f̂(zₜzₜ₊₁, μₜ)
+            for (i, (j, k)) ∈ enumerate(μ∂²f_structure)
+                μ∂²[index(t, i, μ∂²f_n_nzvals)] = μ∂²fₜ[j, k]
             end
         end
         return μ∂²

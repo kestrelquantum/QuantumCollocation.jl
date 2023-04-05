@@ -63,7 +63,7 @@ dt_min = 0.5 * dt
 α_dist = Uniform(-α_bound, α_bound)
 
 # load saved trajectory
-load_saved_traj = true
+load_saved_traj = false
 
 if load_saved_traj
     saved_traj_path = "examples/scripts/trajectories/single_qubit/state_transfer/T_100_Q_100.0_iter_500_00000.jld2"
