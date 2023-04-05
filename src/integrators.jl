@@ -133,9 +133,11 @@ end
 
 abstract type AbstractIntegrator end
 
-abstract type QuantumStateIntegrator <: AbstractIntegrator end
+abstract type QuantumIntegrator <: AbstractIntegrator end
 
-abstract type QuantumUnitaryIntegrator <: AbstractIntegrator end
+abstract type QuantumStateIntegrator <: QuantumIntegrator end
+
+abstract type QuantumUnitaryIntegrator <: QuantumIntegrator end
 
 
 function comps(P::AbstractIntegrator, traj::NamedTrajectory)
@@ -184,6 +186,8 @@ struct UnitaryFourthOrderPade{R} <: QuantumUnitaryIntegrator
         timestep_symb::Union{Symbol,Nothing}=nothing
     ) where R <: Real
         N = size(sys.H_drift_real, 1)
+        n_drives = length(sys.H_drives_real)
+
         I_2N = sparse(I(2N))
         Ω_2N = sparse(kron(Im2, I(N)))
 
@@ -210,7 +214,6 @@ struct UnitaryFourthOrderPade{R} <: QuantumUnitaryIntegrator
         H_drives_real_anticomm_H_drives_imag =
             anticomm(sys.H_drives_real, sys.H_drives_imag)
 
-        n_drives = length(sys.H_drives_real)
 
         return new{R}(
             I_2N,
@@ -264,14 +267,9 @@ end
 @inline function operator(
     a::AbstractVector{<:Real},
     A_drift::Matrix{<:Real},
-    A_drives::Vector{<:Matrix{<:Real}},
-    n_drives::Int
+    A_drives::Vector{<:Matrix{<:Real}}
 )
-    A = A_drift
-    for i = 1:n_drives
-        A += a[i] * A_drives[i]
-    end
-    return A
+    return A_drift + sum(a .* A_drives)
 end
 
 @inline function operator_anticomm_operator(
@@ -314,9 +312,10 @@ end
 
 @inline function B_real(
     P::UnitaryFourthOrderPade{R},
-    a::AbstractVector{<:Real}, Δt::Real
+    a::AbstractVector{<:Real},
+    Δt::Real
 ) where R
-    HI = operator(a, P.H_drift_imag, P.H_drives_imag, P.n_drives)
+    HI = operator(a, P.H_drift_imag, P.H_drives_imag)
 
     HI² = squared_operator(
         a,
@@ -334,14 +333,15 @@ end
         P.n_drives
     )
 
-    return I(P.N) - Δt / 2 * HI + Δt^2 / 9 * (HI² - HR²)
+    return sparse(I(P.N) - Δt / 2 * HI + Δt^2 / 9 * (HI² - HR²))
 end
 
 @inline function B_imag(
     P::UnitaryFourthOrderPade{R},
-    a::AbstractVector{<:Real}, Δt::Real
+    a::AbstractVector{<:Real},
+    Δt::Real
 ) where R
-    HR = operator(a, P.H_drift_real, P.H_drives_real, P.n_drives)
+    HR = operator(a, P.H_drift_real, P.H_drives_real)
 
     HR_anticomm_HI = operator_anticomm_operator(
         a,
@@ -352,11 +352,15 @@ end
         P.n_drives
     )
 
-    return Δt / 2 * HR - Δt^2 / 9 * HR_anticomm_HI
+    return sparse(Δt / 2 * HR - Δt^2 / 9 * HR_anticomm_HI)
 end
 
-@inline function F_real(P::UnitaryFourthOrderPade{R}, a::AbstractVector{<:Real}, Δt::Real) where R
-    HI = operator(a, P.H_drift_imag, P.H_drives_imag, P.n_drives)
+@inline function F_real(
+    P::UnitaryFourthOrderPade{R},
+    a::AbstractVector{<:Real},
+    Δt::Real
+) where R
+    HI = operator(a, P.H_drift_imag, P.H_drives_imag)
 
     HI² = squared_operator(
         a,
@@ -374,11 +378,15 @@ end
         P.n_drives
     )
 
-    return I(P.N) + Δt / 2 * HI + Δt^2 / 9 * (HI² - HR²)
+    return sparse(I(P.N) + Δt / 2 * HI + Δt^2 / 9 * (HI² - HR²))
 end
 
-@inline function F_imag(P::UnitaryFourthOrderPade{R}, a::AbstractVector{<:Real}, Δt::Real) where R
-    HR = operator(a, P.H_drift_real, P.H_drives_real, P.n_drives)
+@inline function F_imag(
+    P::UnitaryFourthOrderPade{R},
+    a::AbstractVector{<:Real},
+    Δt::Real
+) where R
+    HR = operator(a, P.H_drift_real, P.H_drives_real)
 
     HR_anticomm_HI = operator_anticomm_operator(
         a,
@@ -389,7 +397,7 @@ end
         P.n_drives
     )
 
-    return Δt / 2 * HR + Δt^2 / 9 * HR_anticomm_HI
+    return sparse(Δt / 2 * HR + Δt^2 / 9 * HR_anticomm_HI)
 end
 
 # function (P::UnitaryFourthOrderPade)(
@@ -440,6 +448,244 @@ end
     Δtₜ = zₜ[traj.components[P.timestep_symb]]
     return P(Ũ⃗ₜ₊₁, Ũ⃗ₜ, aₜ, Δtₜ)
 end
+
+function ∂aₜʲB_real(
+    P::UnitaryFourthOrderPade{R},
+    a::AbstractVector,
+    Δt::Real,
+    j::Int
+) where R
+    ∂aʲBR = -Δt / 2 * P.H_drives_imag[j]
+    ∂aʲBR += Δt^2 / 9 * P.H_drift_imag_anticomm_H_drives_imag[j]
+    ∂aʲBR += -Δt^2 / 9 * P.H_drift_real_anticomm_H_drives_real[j]
+    for (i, aⁱ) ∈ enumerate(a)
+        ∂aʲBR += Δt^2 / 9 * aⁱ * P.H_drives_imag_anticomms[i, j]
+        ∂aʲBR += -Δt^2 / 9 * aⁱ * P.H_drives_real_anticomms[i, j]
+    end
+    return ∂aʲBR
+end
+
+function ∂aₜʲB_imag(
+    P::UnitaryFourthOrderPade{R},
+    a::AbstractVector,
+    Δt::Real,
+    j::Int
+) where R
+    ∂aʲBI = Δt / 2 * P.H_drives_real[j]
+    ∂aʲBI += -Δt^2 / 9 * P.H_drift_real_anticomm_H_drives_imag[j]
+    ∂aʲBI += -Δt^2 / 9 * P.H_drift_imag_anticomm_H_drives_real[j]
+    for (i, aⁱ) ∈ enumerate(a)
+        ∂aʲBI += -Δt^2 / 9 * aⁱ * P.H_drives_imag_anticomm_H_drives_imag[i, j]
+        ∂aʲBI += -Δt^2 / 9 * aⁱ * P.H_drives_imag_anticomm_H_drives_imag[j, i]
+    end
+    return ∂aʲBI
+end
+
+function ∂aₜʲF_real(
+    P::UnitaryFourthOrderPade{R},
+    a::AbstractVector,
+    Δt::Real,
+    j::Int
+) where R
+    ∂aʲFR = Δt / 2 * P.H_drives_imag[j]
+    ∂aʲFR += Δt^2 / 9 * P.H_drift_imag_anticomm_H_drives_imag[j]
+    ∂aʲFR += -Δt^2 / 9 * P.H_drift_real_anticomm_H_drives_real[j]
+    for (i, aⁱ) ∈ enumerate(a)
+        ∂aʲFR += Δt^2 / 9 * aⁱ * P.H_drives_imag_anticomms[i, j]
+        ∂aʲFR += -Δt^2 / 9 * aⁱ * P.H_drives_real_anticomms[i, j]
+    end
+    return ∂aʲFR
+end
+
+function ∂aₜʲF_imag(
+    P::UnitaryFourthOrderPade{R},
+    a::AbstractVector,
+    Δt::Real,
+    j::Int
+) where R
+    ∂aʲFI = Δt / 2 * P.H_drives_real[j]
+    ∂aʲFI += Δt^2 / 9 * P.H_drift_real_anticomm_H_drives_imag[j]
+    ∂aʲFI += Δt^2 / 9 * P.H_drift_imag_anticomm_H_drives_real[j]
+    for (i, aⁱ) ∈ enumerate(a)
+        ∂aʲFI += Δt^2 / 9 * aⁱ * P.H_drives_real_anticomm_H_drives_imag[i, j]
+        ∂aʲFI += Δt^2 / 9 * aⁱ * P.H_drives_real_anticomm_H_drives_imag[j, i]
+    end
+    return ∂aʲFI
+end
+
+function ∂aₜ(
+    P::UnitaryFourthOrderPade{R},
+    Ũ⃗ₜ₊₁::AbstractVector,
+    Ũ⃗ₜ::AbstractVector,
+    aₜ::AbstractVector,
+    Δtₜ::Real;
+    drive_indices=1:P.n_drives
+) where R <: Real
+    ∂a = spzeros(R, 2P.N^2, length(drive_indices))
+    for j ∈ drive_indices
+        ∂aʲBR = ∂aₜʲB_real(P, aₜ, Δtₜ, j)
+        ∂aʲBI = ∂aₜʲB_imag(P, aₜ, Δtₜ, j)
+        ∂aʲFR = ∂aₜʲF_real(P, aₜ, Δtₜ, j)
+        ∂aʲFI = ∂aₜʲF_imag(P, aₜ, Δtₜ, j)
+        # TODO: make this more efficient
+        ∂a[:, j] =
+            (P.I_2N ⊗ ∂aʲBR + P.Ω_2N ⊗ ∂aʲBI) * Ũ⃗ₜ₊₁ -
+            (P.I_2N ⊗ ∂aʲFR - P.Ω_2N ⊗ ∂aʲFI) * Ũ⃗ₜ
+    end
+    dropzeros!(∂a)
+    return ∂a
+end
+
+function ∂ΔtₜB_real(
+    P::UnitaryFourthOrderPade{R},
+    aₜ::AbstractVector,
+    Δtₜ::Real
+) where R
+    HI = operator(aₜ, P.H_drift_imag, P.H_drives_imag)
+    HI² = squared_operator(
+        aₜ,
+        P.H_drift_imag_squared,
+        P.H_drift_imag_anticomm_H_drives_imag,
+        P.H_drive_imag_anticomms,
+        P.n_drives
+    )
+    HR² = squared_operator(
+        aₜ,
+        P.H_drift_real_squared,
+        P.H_drift_real_anticomm_H_drives_real,
+        P.H_drive_real_anticomms,
+        P.n_drives
+    )
+    return - 1 / 2 * HI + 2Δtₜ / 9 * (HI² - HR²)
+end
+
+function ∂ΔtₜB_imag(
+    P::UnitaryFourthOrderPade{R},
+    aₜ::AbstractVector,
+    Δtₜ::Real
+) where R
+    HR = operator(aₜ, P.H_drift_real, P.H_drives_real)
+    HR_anticomm_HI = operator_anticomm_operator(
+        aₜ,
+        P.H_drift_real_anticomm_H_drift_imag,
+        P.H_drift_real_anticomm_H_drives_imag,
+        P.H_drift_imag_anticomm_H_drives_real,
+        P.H_drives_real_anticomm_H_drives_imag,
+        P.n_drives
+    )
+    return 1 / 2 * HR + 2Δtₜ / 9 * HR_anticomm_HI
+end
+
+function ∂ΔtₜF_real(
+    P::UnitaryFourthOrderPade{R},
+    aₜ::AbstractVector,
+    Δtₜ::Real
+) where R
+    HI = operator(aₜ, P.H_drift_imag, P.H_drives_imag)
+    HI² = squared_operator(
+        aₜ,
+        P.H_drift_imag_squared,
+        P.H_drift_imag_anticomm_H_drives_imag,
+        P.H_drive_imag_anticomms,
+        P.n_drives
+    )
+    HR² = squared_operator(
+        aₜ,
+        P.H_drift_real_squared,
+        P.H_drift_real_anticomm_H_drives_real,
+        P.H_drive_real_anticomms,
+        P.n_drives
+    )
+    return 1 / 2 * HI + 2Δtₜ / 9 * (HI² - HR²)
+end
+
+function ∂ΔtₜF_imag(
+    P::UnitaryFourthOrderPade{R},
+    aₜ::AbstractVector,
+    Δtₜ::Real
+) where R
+    HR = operator(aₜ, P.H_drift_real, P.H_drives_real)
+    HR_anticomm_HI = operator_anticomm_operator(
+        aₜ,
+        P.H_drift_real_anticomm_H_drift_imag,
+        P.H_drift_real_anticomm_H_drives_imag,
+        P.H_drift_imag_anticomm_H_drives_real,
+        P.H_drives_real_anticomm_H_drives_imag,
+        P.n_drives
+    )
+    return 1 / 2 * HR + 2Δtₜ / 9 * HR_anticomm_HI
+end
+
+function ∂Δtₜ(
+    P::UnitaryFourthOrderPade{R},
+    Ũ⃗ₜ₊₁::AbstractVector,
+    Ũ⃗ₜ::AbstractVector,
+    aₜ::AbstractVector,
+    Δtₜ::Real
+) where R <: Real
+    ∂ΔtₜBR = ∂ΔtₜB_real(P, aₜ, Δtₜ)
+    ∂ΔtₜBI = ∂ΔtₜB_imag(P, aₜ, Δtₜ)
+    ∂ΔtₜFR = ∂ΔtₜF_real(P, aₜ, Δtₜ)
+    ∂ΔtₜFI = ∂ΔtₜF_imag(P, aₜ, Δtₜ)
+    ∂ΔtₜP = (P.I_2N ⊗ ∂ΔtₜBR + P.Ω_2N ⊗ ∂ΔtₜBI) * Ũ⃗ₜ₊₁ -
+            (P.I_2N ⊗ ∂ΔtₜFR - P.Ω_2N ⊗ ∂ΔtₜFI) * Ũ⃗ₜ
+    return sparse(∂ΔtₜP)
+end
+
+
+function jacobian(
+    integrator::UnitaryFourthOrderPade,
+    zₜ::AbstractVector,
+    zₜ₊₁::AbstractVector,
+    traj::NamedTrajectory
+)
+    Ũ⃗ₜ₊₁ = zₜ₊₁[traj.components[integrator.unitary_symb]]
+    Ũ⃗ₜ = zₜ[traj.components[integrator.unitary_symb]]
+
+    if integrator.control_symb isa Tuple
+        aₜs = (zₜ[traj.components[s]] for s ∈ integrator.control_symb)
+    else
+        aₜ = zₜ[traj.components[integrator.control_symb]]
+    end
+
+    Δtₜ = zₜ[traj.components[integrator.timestep_symb]]
+
+    BR = B_real(integrator, aₜ, Δtₜ)
+    BI = B_imag(integrator, aₜ, Δtₜ)
+    FR = F_real(integrator, aₜ, Δtₜ)
+    FI = F_imag(integrator, aₜ, Δtₜ)
+
+    F̂ = P.I_2N ⊗ FR - P.Ω_2N ⊗ FI
+    B̂ = P.I_2N ⊗ BR + P.Ω_2N ⊗ BI
+
+    ∂Ũ⃗ₜP = -F̂
+    ∂Ũ⃗ₜ₊₁P = B̂
+
+    if integrator.drive_symb isa Tuple
+        ∂aₜPs = []
+        H_drive_mark = 1
+        for aₜᵢ ∈ aₜs
+            n_aᵢ_drives = length(aₜᵢ)
+            drive_indices = H_drive_mark:(H_drive_mark + n_aᵢ_drives - 1)
+            ∂aₜᵢP = ∂aₜ(integrator, Ũ⃗ₜ₊₁, Ũ⃗ₜ, aₜ, Δtₜ; drive_indices=drive_indices)
+            push!(∂aₜPs, ∂aₜᵢP)
+            H_drive_mark += n_aᵢ_drives
+        end
+    else
+        ∂aₜP = ∂aₜ(integrator, Ũ⃗ₜ₊₁, Ũ⃗ₜ, aₜ, Δtₜ)
+    end
+
+    ∂ΔtₜP = ∂Δtₜ(integrator, Ũ⃗ₜ₊₁, Ũ⃗ₜ, aₜ, Δtₜ)
+
+    return ∂Ũ⃗ₜP, ∂Ũ⃗ₜ₊₁P, ∂aₜP, ∂ΔtₜP
+end
+
+
+
+
+
+
+
 
 
 

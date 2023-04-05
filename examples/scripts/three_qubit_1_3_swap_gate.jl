@@ -5,7 +5,7 @@ using LinearAlgebra
 using Distributions
 using Manifolds
 
-max_iter = 50
+max_iter = 500
 linear_solver = "pardiso"
 
 U_init = 1.0 * I(8)

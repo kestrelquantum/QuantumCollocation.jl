@@ -9,7 +9,6 @@ using ..QuantumSystems
 using ..Integrators
 
 using NamedTrajectories
-using Base.Iterators
 using LinearAlgebra
 using SparseArrays
 using Einsum
@@ -97,6 +96,16 @@ function QuantumDynamics(
             for integrator ∈ integrators
     ])
 
+    for integrator ∈ integrators
+        if integrator isa QuantumIntegrator && controls(integrator) isa Tuple
+            drive_comps = [traj.components[s] for s ∈ integrator.drive_symb]
+            number_of_drives = sum(length.(drive_comps))
+            @assert number_of_drives == integrator.n_drives "number of drives ($(number_of_drives)) does not match number of drive terms in Hamiltonian ($(integrator.n_drives))"
+        end
+    end
+
+
+
     function f(zₜ, zₜ₊₁)
         δs = []
         for integrator ∈ integrators
@@ -127,16 +136,17 @@ function QuantumDynamics(
         ∂ = spzeros(dynamics_dim, 2traj.dim)
         for integrator ∈ integrators
             x_comps, u_comps, Δt_comps = comps(integrator, traj)
-            ∂x, ∂u, ∂Δt = jacobian(integrator, zₜ, zₜ₊₁, traj)
-            ∂[:, x_comps] = ∂x
+            ∂xₜf, ∂xₜ₊₁f, ∂uₜf, ∂Δtₜf = jacobian(integrator, zₜ, zₜ₊₁, traj)
+            ∂[:, x_comps] = ∂xₜf
+            ∂[:, x_comps .+ traj.dim] = ∂xₜ₊₁f
             if u_comps isa Tuple
-                for (uᵢ_comps, ∂uᵢ) ∈ zip(u_comps, ∂u)
-                    ∂[:, uᵢ_comps] = ∂uᵢ
+                for (uᵢ_comps, ∂uᵢf) ∈ zip(u_comps, ∂u)
+                    ∂[:, uᵢ_comps] = ∂uᵢf
                 end
             else
-                ∂[:, u_comps] = ∂u
+                ∂[:, u_comps] = ∂uₜf
             end
-            ∂[:, Δt_comps] = ∂Δt
+            ∂[:, Δt_comps] = ∂Δtₜf
         end
     end
 
@@ -150,21 +160,36 @@ function QuantumDynamics(
         return ∂
     end
 
-    function μ∂²f(zₜ, zₜ₊₁)
+    function μ∂²f(zₜ, zₜ₊₁, μₜ)
         μ∂² = spzeros(dynamics_dim, 2traj.dim, 2traj.dim)
         for integrator ∈ integrators
             x_comps, u_comps, Δt_comps = comps(integrator, traj)
-            μ∂²x, μ∂²u, μ∂²Δt = hessian_of_the_lagrangian(integrator, zₜ, zₜ₊₁, traj)
-            μ∂²[x_comps, x_comps] = μ∂²x
+            μ∂uₜ∂xₜf, μ∂²uₜf, μ∂Δtₜ∂xₜf, μ∂Δtₜ∂uₜf, μ∂²Δtₜf, μ∂uₜ∂xₜ₊₁f, μ∂Δtₜ∂xₜ₊₁f =
+                hessian_of_the_lagrangian(integrator, zₜ, zₜ₊₁, μₜ, traj)
             if u_comps isa Tuple
-                for (uᵢ_comps, μ∂²uᵢ) ∈ zip(u_comps, μ∂²u)
-                    μ∂²[uᵢ_comps, uᵢ_comps] = μ∂²uᵢ
+                for (uᵢ_comps, μ∂uₜᵢ∂xₜf) ∈ zip(u_comps, μ∂uₜ∂xₜf)
+                    μ∂²[x_comps, uᵢ_comps] = μ∂uₜᵢ∂xₜf
+                end
+                for (uᵢ_comps, μ∂²uₜᵢf) ∈ zip(u_comps, μ∂²uₜf)
+                    μ∂²[uᵢ_comps, uᵢ_comps] = μ∂²uₜᵢf
+                end
+                for (uᵢ_comps, μ∂Δtₜ∂uₜᵢf) ∈ zip(u_comps, μ∂Δtₜ∂uₜf)
+                    μ∂²[uᵢ_comps, Δt_comps] = μ∂Δtₜ∂uₜᵢf
+                end
+                for (uᵢ_comps, μ∂uₜᵢ∂xₜ₊₁f) ∈ zip(u_comps, μ∂uₜ∂xₜ₊₁f)
+                    μ∂²[x_comps, uᵢ_comps .+ traj.dim] = μ∂uₜᵢ∂xₜ₊₁f
                 end
             else
-                μ∂²[u_comps, u_comps] = μ∂²u
+                μ∂²[x_comps, u_comps] = μ∂uₜ∂xₜf
+                μ∂²[u_comps, u_comps] = μ∂²uₜf
+                μ∂²[u_comps, Δt_comps] = μ∂Δtₜ∂uₜf
+                μ∂²[x_comps, u_comps .+ traj.dim] = μ∂uₜ∂xₜ₊₁f
             end
-            μ∂²[Δt_comps, Δt_comps] = μ∂²Δt
+            μ∂²[x_comps, Δt_comps] = μ∂Δtₜ∂xₜf
+            μ∂²[x_comps, Δt_comps .+ traj.dim] = μ∂Δtₜ∂xₜ₊₁f
+            μ∂²[Δt_comps, Δt_comps] = μ∂²Δtₜf
         end
+        return μ∂²
     end
 end
 
