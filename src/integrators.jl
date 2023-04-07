@@ -19,6 +19,30 @@ export dim
 
 export fourth_order_pade
 
+export sixth_order_pade
+export eighth_order_pade
+
+export TenthOrderPade
+export tenth_order_pade
+
+# jacobians
+export ∂ψ̃ⁱₜ
+export ∂ψ̃ⁱₜ₊₁
+export ∂aₜ
+
+# hessians of the lagrangian
+export μₜ∂²aₜ
+export μⁱₜ∂aₜ∂ψ̃ⁱₜ
+export μⁱₜ∂aₜ∂ψ̃ⁱₜ₊₁
+
+# min time jacobian and hessians of the lagrangian
+export ∂Δtₜ
+export μₜ∂²Δtₜ
+export μⁱₜ∂Δtₜ∂ψ̃ⁱₜ
+export μⁱₜ∂Δtₜ∂ψ̃ⁱₜ₊₁
+export μₜ∂Δtₜ∂aₜ
+
+
 using ..IndexingUtils
 using ..QuantumSystems
 using ..QuantumUtils
