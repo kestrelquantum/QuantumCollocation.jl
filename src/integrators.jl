@@ -13,6 +13,12 @@ export second_order_pade
 export FourthOrderPade
 export fourth_order_pade
 
+export sixth_order_pade
+export eighth_order_pade
+
+export TenthOrderPade
+export tenth_order_pade
+
 # jacobians
 export ∂ψ̃ⁱₜ
 export ∂ψ̃ⁱₜ₊₁
@@ -534,6 +540,55 @@ function (P::FourthOrderPade)(
     return P(xₜ₊₁, xₜ, zeros(eltype(xₜ), length(P.G_drives)), Δt; kwargs...)
 end
 
+struct TenthOrderPade <: QuantumStateIntegrator
+    G_drift::Matrix
+    G_drives::Vector{Matrix}
+    nqstates::Int
+    isodim::Int
+
+    TenthOrderPade(sys::QuantumSystem) =
+        new(sys.G_drift, sys.G_drives, sys.nqstates, sys.isodim)
+end
+
+
+function (P::TenthOrderPade)(
+    xₜ₊₁::AbstractVector{<:Real},
+    xₜ::AbstractVector{<:Real},
+    uₜ::AbstractVector{<:Real},
+    Δt::Real;
+    G_additional::Union{AbstractMatrix{<:Real}, Nothing}=nothing,
+    operator::Bool=false
+)
+    Gₜ = G(uₜ, P.G_drift, P.G_drives)
+    if !isnothing(G_additional)
+        Gₜ += G_additional
+    end
+    Id = I(size(Gₜ, 1))
+    
+    if operator
+        Ũₜ₊₁ = iso_vec_to_iso_operator(xₜ₊₁)
+        Ũₜ = iso_vec_to_iso_operator(xₜ)
+        δŨ = (Id + Δt^2 / 9 * Gₜ^2 + Δt^4 * Gₜ^4 / 1008) * (Ũₜ₊₁ - Ũₜ) -
+            (Δt / 2 * Gₜ + Δt^3 * Gₜ^3 / 72 + Δt^5 * Gₜ^3 / 30240) * (Ũₜ₊₁ + Ũₜ)
+        δŨ⃗ = iso_operator_to_iso_vec(δŨ)
+        return δŨ⃗
+    else
+        δx = (Id + Δt^2 / 9 * Gₜ^2 + Δt^4 * Gₜ^4 / 1008) * (xₜ₊₁ - xₜ) -
+        (Δt / 2 * Gₜ + Δt^3 * Gₜ^3 / 72 + Δt^5 * Gₜ^3 / 30240) * (xₜ₊₁ + xₜ)
+        return δx
+    end
+end
+
+function (P::TenthOrderPade)(
+    xₜ₊₁::AbstractVector{<:Real},
+    xₜ::AbstractVector{<:Real},
+    Δt::Real;
+    kwargs...
+)
+    return P(xₜ₊₁, xₜ, zeros(eltype(xₜ), length(P.G_drives)), Δt; kwargs...)
+end
+
+
 
 # function (integrator::FourthOrderPade)(
 #     ψ̃ₜ₊₁::AbstractVector,
@@ -556,6 +611,35 @@ function fourth_order_pade(Gₜ::Matrix)
         (Id + 1 / 2 * Gₜ + 1 / 9 * Gₜ²)
 end
 
+
+function sixth_order_pade(Gₜ::Matrix)
+    Id = I(size(Gₜ, 1))
+    Gₜ² = Gₜ^2
+    Gₜ3 = Gₜ^3
+    return inv(Id - 1 / 2 * Gₜ + 1 / 9 * Gₜ² - 1/72 * Gₜ3) *
+        (Id + 1 / 2 * Gₜ + 1 / 9 * Gₜ² + 1/72 * Gₜ3)
+end
+
+function eighth_order_pade(Gₜ::Matrix)
+    Id = I(size(Gₜ, 1))
+    Gₜ² = Gₜ^2
+    Gₜ² = Gₜ^2
+    Gₜ³ = Gₜ^3
+    Gₜ⁴ = Gₜ^4
+    return inv(Id - 1 / 2 * Gₜ + 1 / 9 * Gₜ² - 1/72 * Gₜ³ + 1/1008*Gₜ4) *
+        (Id + 1 / 2 * Gₜ + 1 / 9 * Gₜ² + 1/72 * Gₜ³ + 1/1008 * Gₜ⁴)
+end
+
+function tenth_order_pade(Gₜ::Matrix)
+    Id = I(size(Gₜ, 1))
+    Gₜ² = Gₜ^2
+    Gₜ² = Gₜ^2
+    Gₜ³ = Gₜ^3
+    Gₜ⁴ = Gₜ^4
+    Gₜ⁵ = Gₜ^5
+    return inv(Id - 1 / 2 * Gₜ + 1 / 9 * Gₜ² - 1/72 * Gₜ³ + 1/1008*Gₜ⁴ - 1/30240 * Gₜ⁵) *
+        (Id + 1 / 2 * Gₜ + 1 / 9 * Gₜ² + 1/72 * Gₜ³ + 1/1008 * Gₜ⁴ + 1/30240 * Gₜ⁵)
+end
 
 #
 # Jacobians
