@@ -45,11 +45,11 @@ LiveServer = "1.1"
 Makie = "0.19.4"
 Manifolds = "0.8"
 MathOptInterface = "1.13"
-NamedTrajectories = "0.1"
 Reexport = "1.2"
 Revise = "3.5"
 Symbolics = "5.2"
 Zygote = "0.6"
+NamedTrajectories = "0.1.1"
 julia = "1.8"
 
 [extras]

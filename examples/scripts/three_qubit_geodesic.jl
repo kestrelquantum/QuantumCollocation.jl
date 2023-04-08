@@ -128,7 +128,7 @@ else
     traj = NamedTrajectory(
         comps;
         controls=(:G⃗, :Δt),
-        dt=dt,
+        timestep=dt,
         dynamical_dts=true,
         bounds=bounds,
         initial=initial,

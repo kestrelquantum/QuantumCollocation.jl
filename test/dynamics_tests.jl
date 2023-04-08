@@ -21,7 +21,7 @@
                 du = randn(2, T)
             ),
             controls=:du,
-            dt=0.1,
+            timestep=0.1,
             goal=(ψ̃ = [1, 0, 0, 0],)
         )
 
@@ -31,8 +31,8 @@
             uₜ = zₜ[Z.components.u]
             uₜ₊₁ = zₜ₊₁[Z.components.u]
             duₜ = zₜ[Z.components.du]
-            δψ̃ = P(ψ̃ₜ₊₁, ψ̃ₜ, uₜ, Z.dt)
-            δu = uₜ₊₁ - uₜ - duₜ * Z.dt
+            δψ̃ = P(ψ̃ₜ₊₁, ψ̃ₜ, uₜ, Z.timestep)
+            δu = uₜ₊₁ - uₜ - duₜ * Z.timestep
             return vcat(δψ̃, δu)
         end
 

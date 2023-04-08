@@ -17,7 +17,7 @@
     #     ψ̃ₜ₊₁ = zₜ₊₁[Z.components.ψ̃]
     #     ψ̃ₜ = zₜ[Z.components.ψ̃]
     #     uₜ = zₜ[Z.components.u]
-    #     δψ̃ = P(ψ̃ₜ₊₁, ψ̃ₜ, uₜ, Z.dt)
+    #     δψ̃ = P(ψ̃ₜ₊₁, ψ̃ₜ, uₜ, Z.timestep)
     #     return δψ̃
     # end
 
@@ -29,7 +29,7 @@
         Z = NamedTrajectory(
             (ψ̃ = randn(4, T), u = randn(2, T)),
             controls=:u,
-            dt=0.1,
+            timestep=0.1,
             goal=(ψ̃ = [1, 0, 0, 0],)
         )
 
@@ -64,7 +64,7 @@
         Z = NamedTrajectory(
             (Ũ⃗ = randn(length(Ũ⃗_init), T), u = randn(2, T)),
             controls=:u,
-            dt=0.1,
+            timestep=0.1,
             initial=(Ũ⃗ = Ũ⃗_init,),
             goal=(Ũ⃗ = Ũ⃗_goal,)
         )

@@ -136,7 +136,7 @@ if load == :continuation
     traj = NamedTrajectory(
         comps;
         controls=(:ddu, :Δt),
-        dt=dt,
+        timestep=dt,
         dynamical_dts=true,
         bounds=bounds,
         initial=initial,
@@ -185,7 +185,7 @@ elseif load == :post_continuation
     traj = NamedTrajectory(
         comps;
         controls=(:ddu, :Δt),
-        dt=dt,
+        timestep=dt,
         dynamical_dts=true,
         bounds=bounds,
         initial=initial,
