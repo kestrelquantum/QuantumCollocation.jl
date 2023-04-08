@@ -275,3 +275,8 @@ plot(plot_path, prob.trajectory, [:Ũ⃗, :γ, :α, :ψ̃₁];
     ignored_labels=[:Ũ⃗],
     dt_name=:Δt
 )
+
+save_dir = "examples/scripts/single_qubit/trajectories"
+save_path = generate_file_path("jld2", experiment, save_dir)
+
+save(save_path, prob.trajectory)

@@ -333,7 +333,7 @@ end
         P.n_drives
     )
 
-    return sparse(I(P.N) - Δt / 2 * HI + Δt^2 / 9 * (HI² - HR²))
+    return I(P.N) - Δt / 2 * HI + Δt^2 / 9 * (HI² - HR²)
 end
 
 @inline function B_imag(
@@ -352,7 +352,7 @@ end
         P.n_drives
     )
 
-    return sparse(Δt / 2 * HR - Δt^2 / 9 * HR_anticomm_HI)
+    return Δt / 2 * HR - Δt^2 / 9 * HR_anticomm_HI
 end
 
 @inline function F_real(
@@ -378,7 +378,7 @@ end
         P.n_drives
     )
 
-    return sparse(I(P.N) + Δt / 2 * HI + Δt^2 / 9 * (HI² - HR²))
+    return I(P.N) + Δt / 2 * HI + Δt^2 / 9 * (HI² - HR²)
 end
 
 @inline function F_imag(
@@ -397,7 +397,7 @@ end
         P.n_drives
     )
 
-    return sparse(Δt / 2 * HR + Δt^2 / 9 * HR_anticomm_HI)
+    return Δt / 2 * HR + Δt^2 / 9 * HR_anticomm_HI
 end
 
 # function (P::UnitaryFourthOrderPade)(
