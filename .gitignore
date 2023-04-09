@@ -2,6 +2,6 @@
 *.jl.cov
 *.jl.mem
 /docs/build/
-/examples/*/plots/
-/examples/*/trajectories/
+/examples/**/plots/
+/examples/**/trajectories/
 pardiso.lic

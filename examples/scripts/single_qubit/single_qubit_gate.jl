@@ -5,7 +5,7 @@ using Distributions
 
 # setting maximum number of iterations
 max_iter = 1000
-linear_solver = "pardiso"
+linear_solver = "mumps"
 
 # defining levels for single qubit system
 n_levels = 2
@@ -202,17 +202,26 @@ J = QuantumObjective(:Ũ⃗, traj, loss, Q)
 
 
 # regularization parameters
-R = 1e-3
+R = 1e-1
 drive_bound_ratio = γ_bound / α_bound
 
-R_ddγ = R
-R_ddα = R * drive_bound_ratio
+R_γ = R
+R_α = R * drive_bound_ratio
 
 # addign quadratic regularization term on γ to the objective
-J += QuadraticRegularizer(:ddγ, traj, R_ddγ * ones(γ_dim))
+J += QuadraticRegularizer(:γ, traj, R_γ * ones(γ_dim))
 
 # adding quadratic regularization term on
-J += QuadraticRegularizer(:ddα, traj, R_ddα * ones(α_dim))
+J += QuadraticRegularizer(:α, traj, R_α * ones(α_dim))
+
+# R_ddγ = R
+# R_ddα = R * drive_bound_ratio
+
+# # addign quadratic regularization term on γ to the objective
+# J += QuadraticRegularizer(:ddγ, traj, R_ddγ * ones(γ_dim))
+
+# # adding quadratic regularization term on
+# J += QuadraticRegularizer(:ddα, traj, R_ddα * ones(α_dim))
 
 # Ipopt options
 options = Options(

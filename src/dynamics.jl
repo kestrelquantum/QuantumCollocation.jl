@@ -174,7 +174,7 @@ function QuantumDynamics(
 
     function ∂f(zₜ, zₜ₊₁)
         ∂ = spzeros(dynamics_dim, 2traj.dim)
-        for (integrator, integrator_comps) ∈ zip(integrators, integrator_comps)
+        for (integrator, integrator_comps) ∈ zip(integrators, dynamics_comps)
             if integrator isa QuantumIntegrator
                 x_comps, u_comps, Δt_comps = comps(integrator, traj)
                 ∂xₜf, ∂xₜ₊₁f, ∂uₜf, ∂Δtₜf = jacobian(integrator, zₜ, zₜ₊₁, traj)
@@ -264,7 +264,7 @@ function QuantumDynamics(
         return μ∂²s
     end
 
-    return QuantumDynamics(F, ∂F, ∂F_structure, μ∂²F, μ∂²F_structure, dyanmics_dim)
+    return QuantumDynamics(F, ∂F, ∂F_structure, μ∂²F, μ∂²F_structure, dynamics_dim)
 end
 
 function QuantumDynamics(

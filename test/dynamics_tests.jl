@@ -65,34 +65,6 @@
             goal=(Ũ⃗ = [1 0 0 0; 0 0 0 0; 0 0 0 0; 0 0 0 0],)
         )
 
-        function f(zₜ, zₜ₊₁)
-            Ũ⃗ₜ₊₁ = zₜ₊₁[Z.components.Ũ⃗]
-            Ũ⃗ₜ = zₜ[Z.components.Ũ⃗]
-
-            # γ states + augmented states + controls
-            γₜ₊₁ = zₜ₊₁[Z.components.γ]
-            γₜ = zₜ[Z.components.γ]
-
-            dγₜ₊₁ = zₜ₊₁[Z.components.dγ]
-            dγₜ = zₜ[Z.components.dγ]
-
-            ddγₜ = zₜ[Z.components.ddγ]
-
-            # α states + augmented states + controls
-            αₜ₊₁ = zₜ₊₁[Z.components.α]
-            αₜ = zₜ[Z.components.α]
-
-            dαₜ₊₁ = zₜ₊₁[Z.components.dα]
-            dαₜ = zₜ[Z.components.dα]
-
-            ddαₜ = zₜ[Z.components.ddα]
-
-            # time step
-            Δtₜ = zₜ[Z.components.Δt][1]
-
-            # controls for pade integrator
-            uₜ = [γₜ; αₜ]
-            δU
     end
 
 end

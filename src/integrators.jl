@@ -431,7 +431,7 @@ end
     Ũ⃗ₜ₊₁::AbstractVector,
     Ũ⃗ₜ::AbstractVector,
     aₜ::AbstractVector,
-    Δt<:Real,
+    Δt::Real
 ) where R <: Real
     N² = P.N^2
     UₜR = reshape(Ũ⃗ₜ[1:N²], P.N, P.N)
@@ -456,11 +456,11 @@ end
     Ũ⃗ₜ₊₁ = zₜ₊₁[traj.components[P.unitary_symb]]
     Ũ⃗ₜ = zₜ[traj.components[P.unitary_symb]]
     if P.drive_symb isa Tuple
-        aₜ = vcat(zₜ[traj.components[s]] for s in P.drive_symb...)
+        aₜ = vcat([zₜ[traj.components[s]] for s in P.drive_symb]...)
     else
         aₜ = zₜ[traj.components[P.drive_symb]]
     end
-    Δtₜ = zₜ[traj.components[P.timestep_symb]]
+    Δtₜ = zₜ[traj.components[P.timestep_symb]][1]
     return P(Ũ⃗ₜ₊₁, Ũ⃗ₜ, aₜ, Δtₜ)
 end
 
@@ -664,7 +664,7 @@ function jacobian(
         aₜ = zₜ[traj.components[integrator.drive_symb]]
     end
 
-    Δtₜ = zₜ[traj.components[integrator.timestep_symb]]
+    Δtₜ = zₜ[traj.components[integrator.timestep_symb]][1]
 
     BR = B_real(integrator, aₜ, Δtₜ)
     BI = B_imag(integrator, aₜ, Δtₜ)
@@ -679,19 +679,23 @@ function jacobian(
 
     if integrator.drive_symb isa Tuple
         ∂aₜPs = []
-        H_drive_mark = 1
+        H_drive_mark = 0
         for aₜᵢ ∈ aₜs
             n_aᵢ_drives = length(aₜᵢ)
-            drive_indices = H_drive_mark:(H_drive_mark + n_aᵢ_drives - 1)
+            drive_indices = (H_drive_mark + 1):(H_drive_mark + n_aᵢ_drives)
             ∂aₜᵢP = ∂aₜ(integrator, Ũ⃗ₜ₊₁, Ũ⃗ₜ, aₜ, Δtₜ, drive_indices)
             push!(∂aₜPs, ∂aₜᵢP)
             H_drive_mark += n_aᵢ_drives
         end
+        ∂aₜP = Tuple(∂aₜPs...)
     else
         ∂aₜP = ∂aₜ(integrator, Ũ⃗ₜ₊₁, Ũ⃗ₜ, aₜ, Δtₜ)
     end
 
     ∂ΔtₜP = ∂Δtₜ(integrator, Ũ⃗ₜ₊₁, Ũ⃗ₜ, aₜ, Δtₜ)
+
+    @info "" ∂aₜP
+    @info "" ∂ΔtₜP
 
     return ∂Ũ⃗ₜP, ∂Ũ⃗ₜ₊₁P, ∂aₜP, ∂ΔtₜP
 end
@@ -923,7 +927,7 @@ function hessian_of_the_lagrangian(
     Ũ⃗ₜ₊₁ = zₜ₊₁[traj.components[P.unitary_symb]]
     Ũ⃗ₜ = zₜ[traj.components[P.unitary_symb]]
 
-    Δtₜ = zₜ[traj.components[P.timestep_symb]]
+    Δtₜ = zₜ[traj.components[P.timestep_symb]][1]
 
     if P.drive_symb isa Tuple
         aₜ = Tuple(zₜ[traj.components[s]] for s ∈ P.drive_symb)
