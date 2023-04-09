@@ -5,7 +5,7 @@ using SparseArrays
 using Distributions
 using Manifolds
 
-max_iter = 200
+max_iter = 500
 linear_solver = "pardiso"
 
 U_init = 1.0 * I(8)
@@ -95,12 +95,9 @@ else
     Δt_max = 1.0 * dt
 
 
-    Ũ⃗, G⃗_geodesic = unitary_geodesic(U_goal, T)
+    Ũ⃗, G⃗ = unitary_geodesic(U_goal, T; return_generator=true)
 
-    Ũ⃗[:, 1]
-    Ũ⃗[:, 1] |> iso_vec_to_operator |> U -> unitary_fidelity(U, U_goal)
-
-    G⃗ = G⃗_geodesic + rand(Normal(0, 0.01), size(G⃗_geodesic))
+    # G⃗ = G⃗_geodesic + rand(Normal(0, 0.01), size(G⃗_geodesic))
 
     Δt = fill(dt, 1, T)
 
@@ -129,7 +126,7 @@ else
         comps;
         controls=(:G⃗, :Δt),
         timestep=dt,
-        dynamical_dts=true,
+        dynamical_timesteps=true,
         bounds=bounds,
         initial=initial,
         final=final,

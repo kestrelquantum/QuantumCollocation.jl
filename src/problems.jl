@@ -82,6 +82,23 @@ function QuantumControlProblem(
     )
 end
 
+# constructor that accepts just an AbstractIntegrator
+function QuantumControlProblem(
+    system::AbstractSystem,
+    traj::NamedTrajectory,
+    obj::Objective,
+    integrator::AbstractIntegrator;
+    kwargs...
+)
+    return QuantumControlProblem(
+        system,
+        traj,
+        obj,
+        [integrator];
+        kwargs...
+    )
+end
+
 
 
 function QuantumControlProblem(

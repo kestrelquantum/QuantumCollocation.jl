@@ -4,7 +4,7 @@ using LinearAlgebra
 using Distributions
 
 # setting maximum number of iterations
-max_iter = 1000
+max_iter = 10000
 linear_solver = "mumps"
 
 # defining levels for single qubit system

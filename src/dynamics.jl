@@ -152,18 +152,19 @@ function QuantumDynamics(
     function f(zₜ, zₜ₊₁)
         δ = Vector{eltype(zₜ)}(undef, dynamics_dim)
         for (integrator, integrator_comps) ∈ zip(integrators, dynamics_comps)
-            δ[integrator_comps] = integrator(zₜ₊₁, zₜ, traj)
+            δ[integrator_comps] = integrator(zₜ, zₜ₊₁, traj)
         end
         return δ
     end
 
-    @views function F(Z⃗::AbstractVector{<:Real})
-        δ = zeros(dynamics_dim * (traj.T - 1))
-        for t = 1:traj.T-1
+    @views function F(Z⃗::AbstractVector{R}) where R <: Real
+        δ = Vector{R}(undef, dynamics_dim * (traj.T - 1))
+        Threads.@threads for t = 1:traj.T-1
             zₜ = Z⃗[slice(t, traj.dim)]
-            zₜ₊₁ = Z⃗[slice(t+1, traj.dim)]
+            zₜ₊₁ = Z⃗[slice(t + 1, traj.dim)]
             δ[slice(t, dynamics_dim)] = f(zₜ, zₜ₊₁)
         end
+        return δ
     end
 
 
@@ -177,12 +178,12 @@ function QuantumDynamics(
         for (integrator, integrator_comps) ∈ zip(integrators, dynamics_comps)
             if integrator isa QuantumIntegrator
                 x_comps, u_comps, Δt_comps = comps(integrator, traj)
-                ∂xₜf, ∂xₜ₊₁f, ∂uₜf, ∂Δtₜf = jacobian(integrator, zₜ, zₜ₊₁, traj)
+                ∂xₜf, ∂xₜ₊₁f, ∂uₜf, ∂Δtₜf = Integrators.jacobian(integrator, zₜ, zₜ₊₁, traj)
                 ∂[integrator_comps, x_comps] = ∂xₜf
                 ∂[integrator_comps, x_comps .+ traj.dim] = ∂xₜ₊₁f
                 if u_comps isa Tuple
-                    for (uᵢ_comps, ∂uᵢf) ∈ zip(u_comps, ∂u)
-                        ∂[integrator_comps, uᵢ_comps] = ∂uᵢf
+                    for (uᵢ_comps, ∂uₜᵢf) ∈ zip(u_comps, ∂uₜf)
+                        ∂[integrator_comps, uᵢ_comps] = ∂uₜᵢf
                     end
                 else
                     ∂[integrator_comps, u_comps] = ∂uₜf
@@ -190,7 +191,7 @@ function QuantumDynamics(
                 ∂[integrator_comps, Δt_comps] = ∂Δtₜf
             elseif integrator isa DerivativeIntegrator
                 x_comps, dx_comps, Δt_comps = comps(integrator, traj)
-                ∂xₜf, ∂xₜ₊₁f, ∂dxₜf, ∂Δtₜf = jacobian(integrator, zₜ, zₜ₊₁, traj)
+                ∂xₜf, ∂xₜ₊₁f, ∂dxₜf, ∂Δtₜf = Integrators.jacobian(integrator, zₜ, zₜ₊₁, traj)
                 ∂[integrator_comps, x_comps] = ∂xₜf
                 ∂[integrator_comps, x_comps .+ traj.dim] = ∂xₜ₊₁f
                 ∂[integrator_comps, dx_comps] = ∂dxₜf
@@ -199,12 +200,13 @@ function QuantumDynamics(
                 error("integrator type not supported: $(typeof(integrator))")
             end
         end
+        return ∂
     end
 
     ∂f_nnz = length(∂f_structure)
 
-    @views function ∂F(Z⃗::AbstractVector{<:Real})
-        ∂s = zeros(eltype(Z⃗), length(∂F_structure))
+    @views function ∂F(Z⃗::AbstractVector{R}) where R <: Real
+        ∂s = zeros(R, length(∂F_structure))
         Threads.@threads for t = 1:traj.T-1
             zₜ = Z⃗[slice(t, traj.dim)]
             zₜ₊₁ = Z⃗[slice(t + 1, traj.dim)]
@@ -217,10 +219,10 @@ function QuantumDynamics(
     end
 
     function μ∂²f(zₜ, zₜ₊₁, μₜ)
-        μ∂² = spzeros(dynamics_dim, 2traj.dim, 2traj.dim)
+        μ∂² = spzeros(2traj.dim, 2traj.dim)
         for (integrator, integrator_comps) ∈ zip(integrators, dynamics_comps)
             x_comps, u_comps, Δt_comps = comps(integrator, traj)
-            μ∂uₜ∂xₜf, μ∂²uₜf, μ∂Δtₜ∂xₜf, μ∂Δtₜ∂uₜf, μ∂²Δtₜf, μ∂uₜ∂xₜ₊₁f, μ∂Δtₜ∂xₜ₊₁f =
+            μ∂uₜ∂xₜf, μ∂²uₜf, μ∂Δtₜ∂xₜf, μ∂Δtₜ∂uₜf, μ∂²Δtₜf, μ∂xₜ₊₁∂uₜf, μ∂xₜ₊₁∂Δtₜf =
                 hessian_of_the_lagrangian(integrator, zₜ, zₜ₊₁, μₜ[integrator_comps], traj)
             if u_comps isa Tuple
                 for (uᵢ_comps, μ∂uₜᵢ∂xₜf) ∈ zip(u_comps, μ∂uₜ∂xₜf)
@@ -232,18 +234,18 @@ function QuantumDynamics(
                 for (uᵢ_comps, μ∂Δtₜ∂uₜᵢf) ∈ zip(u_comps, μ∂Δtₜ∂uₜf)
                     μ∂²[uᵢ_comps, Δt_comps] += μ∂Δtₜ∂uₜᵢf
                 end
-                for (uᵢ_comps, μ∂uₜᵢ∂xₜ₊₁f) ∈ zip(u_comps, μ∂uₜ∂xₜ₊₁f)
-                    μ∂²[x_comps, uᵢ_comps .+ traj.dim] += μ∂uₜᵢ∂xₜ₊₁f
+                for (uᵢ_comps, μ∂xₜ₊₁∂uₜᵢf) ∈ zip(u_comps, μ∂xₜ₊₁∂uₜf)
+                    μ∂²[uᵢ_comps, x_comps .+ traj.dim] += μ∂xₜ₊₁∂uₜᵢf
                 end
             else
                 μ∂²[x_comps, u_comps] += μ∂uₜ∂xₜf
                 μ∂²[u_comps, u_comps] += μ∂²uₜf
                 μ∂²[u_comps, Δt_comps] += μ∂Δtₜ∂uₜf
-                μ∂²[x_comps, u_comps .+ traj.dim] += μ∂uₜ∂xₜ₊₁f
+                μ∂²[u_comps, x_comps .+ traj.dim] += μ∂xₜ₊₁∂uₜf
             end
             μ∂²[x_comps, Δt_comps] += μ∂Δtₜ∂xₜf
-            μ∂²[x_comps, Δt_comps .+ traj.dim] += μ∂Δtₜ∂xₜ₊₁f
-            μ∂²[Δt_comps, Δt_comps] += μ∂²Δtₜf
+            μ∂²[Δt_comps, x_comps .+ traj.dim] += μ∂xₜ₊₁∂Δtₜf
+            μ∂²[Δt_comps, Δt_comps] .+= μ∂²Δtₜf
         end
         return μ∂²
     end
@@ -251,7 +253,7 @@ function QuantumDynamics(
     μ∂²f_nnz = length(μ∂²f_structure)
 
     @views function μ∂²F(Z⃗::AbstractVector{<:Real}, μ⃗::AbstractVector{<:Real})
-        μ∂²s = zeros(eltype(Z⃗), length(μ∂²F_structure))
+        μ∂²s = Vector{eltype(Z⃗)}(undef, length(μ∂²F_structure))
         Threads.@threads for t = 1:traj.T-1
             zₜ = Z⃗[slice(t, traj.dim)]
             zₜ₊₁ = Z⃗[slice(t + 1, traj.dim)]
@@ -266,6 +268,8 @@ function QuantumDynamics(
 
     return QuantumDynamics(F, ∂F, ∂F_structure, μ∂²F, μ∂²F_structure, dynamics_dim)
 end
+
+QuantumDynamics(P::AbstractIntegrator, traj::NamedTrajectory) = QuantumDynamics([P], traj)
 
 function QuantumDynamics(
     f::Function,
