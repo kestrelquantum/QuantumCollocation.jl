@@ -953,6 +953,99 @@ function hessian_of_the_lagrangian(
     )
 end
 
+end
+
+function (integrator::Exponential)(
+    ψ̃ₜ₊₁::AbstractVector,
+    ψ̃ₜ::AbstractVector,
+    aₜ::AbstractVector,
+    Δt::Real,
+)
+    Gₜ = G(aₜ, integrator.G_drift, integrator.G_drives)
+    return ψ̃ₜ₊₁ - exp(Gₜ * Δt) * ψ̃ₜ
+end
+
+
+# 2nd order Pade integrator
+
+struct SecondOrderPade <: QuantumStateIntegrator
+    G_drift::Matrix
+    G_drives::Vector{Matrix}
+    nqstates::Int
+    isodim::Int
+
+    SecondOrderPade(sys::QuantumSystem) =
+        new(sys.G_drift, sys.G_drives, sys.nqstates, sys.isodim)
+end
+
+function (integrator::SecondOrderPade)(
+    ψ̃ₜ₊₁::AbstractVector,
+    ψ̃ₜ::AbstractVector,
+    aₜ::AbstractVector,
+    Δt::Real
+)
+    Gₜ = G(aₜ, integrator.G_drift, integrator.G_drives)
+    # Id = I(size(Gₜ, 1))
+    # return (Id - Δt / 2 * Gₜ) * ψ̃ₜ₊₁ -
+    #        (Id + Δt / 2 * Gₜ) * ψ̃ₜ
+    return ψ̃ₜ₊₁ - ψ̃ₜ - Δt / 2 * Gₜ * (ψ̃ₜ₊₁ + ψ̃ₜ)
+end
+
+function second_order_pade(Gₜ::Matrix)
+    Id = I(size(Gₜ, 1))
+    return inv(Id - 1 / 2 * Gₜ) *
+        (Id + 1 / 2 * Gₜ)
+end
+
+
+# 4th order Pade integrator
+
+struct FourthOrderPade <: QuantumStateIntegrator
+    G_drift::Matrix
+    G_drives::Vector{Matrix}
+    G_drive_anticoms::Symmetric
+    G_drift_anticoms::Vector{Matrix}
+    P̂::Matrix
+
+    function FourthOrderPade(sys::QuantumSystem)
+
+        ncontrols = length(sys.G_drives)
+
+        drive_anticoms = fill(
+            zeros(size(sys.G_drift)),
+            ncontrols,
+            ncontrols
+        )
+
+        for j = 1:ncontrols
+            for k = 1:j
+                if k == j
+                    drive_anticoms[k, k] = 2 * sys.G_drives[k]^2
+                else
+                    drive_anticoms[k, j] =
+                        anticomm(sys.G_drives[k], sys.G_drives[j])
+                end
+            end
+        end
+
+        drift_anticoms = [
+            anticomm(G_drive, sys.G_drift)
+                for G_drive in sys.G_drives
+        ]
+
+        N = size(sys.G_drift, 1) ÷ 2
+
+        P̂ = projector(N)
+
+        return new(
+            sys.G_drift,
+            sys.G_drives,
+            Symmetric(drive_anticoms),
+            drift_anticoms,
+            P̂
+        )
+    end
+end
 
 function (P::FourthOrderPade)(
     xₜ₊₁::AbstractVector{<:Real},
@@ -962,6 +1055,54 @@ function (P::FourthOrderPade)(
 )
     return P(xₜ₊₁, xₜ, zeros(eltype(xₜ), length(P.G_drives)), Δt; kwargs...)
 end
+
+
+struct SixthOrderPade <: QuantumStateIntegrator
+    G_drift::Matrix
+    G_drives::Vector{Matrix}
+
+    SixthOrderPade(sys::QuantumSystem) =
+        new(sys.G_drift, sys.G_drives)
+end
+
+
+function (P::SixthOrderPade)(
+    xₜ₊₁::AbstractVector{<:Real},
+    xₜ::AbstractVector{<:Real},
+    uₜ::AbstractVector{<:Real},
+    Δt::Real;
+    G_additional::Union{AbstractMatrix{<:Real}, Nothing}=nothing,
+    operator::Bool=false
+)
+    Gₜ = G(uₜ, P.G_drift, P.G_drives)
+    if !isnothing(G_additional)
+        Gₜ += G_additional
+    end
+    Id = I(size(Gₜ, 1))
+
+    if operator
+        Ũₜ₊₁ = iso_vec_to_iso_operator(xₜ₊₁)
+        Ũₜ = iso_vec_to_iso_operator(xₜ)
+        δŨ = (Id + Δt^2 / 9 * Gₜ^2) * (Ũₜ₊₁ - Ũₜ) -
+            (Δt / 2 * Gₜ + Δt^3 * Gₜ^3 / 72) * (Ũₜ₊₁ + Ũₜ)
+        δŨ⃗ = iso_operator_to_iso_vec(δŨ)
+        return δŨ⃗
+    else
+        δx = (Id + Δt^2 / 9 * Gₜ^2) * (xₜ₊₁ - xₜ) -
+        (Δt / 2 * Gₜ + Δt^3 * Gₜ^3 / 72) * (xₜ₊₁ + xₜ)
+        return δx
+    end
+end
+
+function (P::SixthOrderPade)(
+    xₜ₊₁::AbstractVector{<:Real},
+    xₜ::AbstractVector{<:Real},
+    Δt::Real;
+    kwargs...
+)
+    return P(xₜ₊₁, xₜ, zeros(eltype(xₜ), length(P.G_drives)), Δt; kwargs...)
+end
+
 
 struct TenthOrderPade <: QuantumStateIntegrator
     G_drift::Matrix

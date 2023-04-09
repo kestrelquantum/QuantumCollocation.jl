@@ -201,6 +201,59 @@ elseif load == :no_load
     u_dist = Uniform(-u_bound, u_bound)
     ddu_bound = 0.001
 
+    Ũ⃗ = unitary_geodesic(Ũ_goal, T)
+
+    u = foldr(hcat, [zeros(n_drives), rand(u_dist, n_drives, T - 2), zeros(n_drives)])
+    du = randn(n_drives, T)
+    ddu = randn(n_drives, T)
+
+
+    comps = (
+        Ũ⃗ = Ũ⃗,
+        u = u,
+        du = du,
+        ddu = ddu,
+        Δt = fill(dt, T)
+    )
+
+    bounds = (
+        u = fill(u_bound, n_drives),
+        ddu = fill(ddu_bound, n_drives),
+        Δt = (Δt_min, Δt_max),
+    )
+
+    initial = (
+        Ũ⃗ = Ũ⃗_init,
+        u = zeros(n_drives),
+    )
+
+    final = (
+        u = zeros(n_drives),
+    )
+
+    goal = (
+        Ũ⃗ = Ũ⃗_goal,
+    )
+
+    traj = NamedTrajectory(
+        comps;
+        controls=(:ddu, :Δt),
+        timestep=dt,
+        dynamical_dts=true,
+        bounds=bounds,
+        initial=initial,
+        final=final,
+        goal=goal
+    )
+elseif load == :no_load
+    T = 100
+    dt = 2.0
+    Δt_min = 0.5 * dt
+    Δt_max = 2.0 * dt
+    u_bound = 2π * 0.04 # GHz
+    u_dist = Uniform(-u_bound, u_bound)
+    ddu_bound = 0.001
+
     Ũ⃗ = unitary_geodesic(U_goal, T)
 
     u = foldr(hcat, [zeros(n_drives), rand(u_dist, n_drives, T - 2), zeros(n_drives)])
