@@ -10,6 +10,8 @@ export get_traj_data
 export get_variables
 export solve!
 export generate_file_path
+export save_problem
+export load_problem
 
 using ..IndexingUtils
 using ..QuantumSystems
@@ -19,6 +21,8 @@ using ..Constraints
 using ..Dynamics
 using ..Objectives
 
+
+using JLD2
 using NamedTrajectories
 using Libdl
 using Ipopt
@@ -517,6 +521,19 @@ end
 @views function update_traj_data!(prob::QuantumControlProblem)
     Z⃗ = get_variables(prob)
     prob.trajectory = NamedTrajectory(Z⃗, prob.trajectory)
+end
+
+
+
+
+function save_problem(prob::AbstractProblem, path::String)
+    mkpath(dirname(path))
+    @save path prob
+end
+
+function load_problem(path::String)
+    @load path prob
+    return prob
 end
 
 function solve!(

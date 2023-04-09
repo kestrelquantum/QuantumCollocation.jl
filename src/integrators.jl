@@ -13,7 +13,9 @@ export second_order_pade
 export FourthOrderPade
 export fourth_order_pade
 
+export SixthOrderPade
 export sixth_order_pade
+
 export eighth_order_pade
 
 export TenthOrderPade
@@ -540,14 +542,60 @@ function (P::FourthOrderPade)(
     return P(xₜ₊₁, xₜ, zeros(eltype(xₜ), length(P.G_drives)), Δt; kwargs...)
 end
 
+
+struct SixthOrderPade <: QuantumStateIntegrator
+    G_drift::Matrix
+    G_drives::Vector{Matrix}
+
+    SixthOrderPade(sys::QuantumSystem) =
+        new(sys.G_drift, sys.G_drives)
+end
+
+
+function (P::SixthOrderPade)(
+    xₜ₊₁::AbstractVector{<:Real},
+    xₜ::AbstractVector{<:Real},
+    uₜ::AbstractVector{<:Real},
+    Δt::Real;
+    G_additional::Union{AbstractMatrix{<:Real}, Nothing}=nothing,
+    operator::Bool=false
+)
+    Gₜ = G(uₜ, P.G_drift, P.G_drives)
+    if !isnothing(G_additional)
+        Gₜ += G_additional
+    end
+    Id = I(size(Gₜ, 1))
+    
+    if operator
+        Ũₜ₊₁ = iso_vec_to_iso_operator(xₜ₊₁)
+        Ũₜ = iso_vec_to_iso_operator(xₜ)
+        δŨ = (Id + Δt^2 / 9 * Gₜ^2) * (Ũₜ₊₁ - Ũₜ) -
+            (Δt / 2 * Gₜ + Δt^3 * Gₜ^3 / 72) * (Ũₜ₊₁ + Ũₜ)
+        δŨ⃗ = iso_operator_to_iso_vec(δŨ)
+        return δŨ⃗
+    else
+        δx = (Id + Δt^2 / 9 * Gₜ^2) * (xₜ₊₁ - xₜ) -
+        (Δt / 2 * Gₜ + Δt^3 * Gₜ^3 / 72) * (xₜ₊₁ + xₜ)
+        return δx
+    end
+end
+
+function (P::SixthOrderPade)(
+    xₜ₊₁::AbstractVector{<:Real},
+    xₜ::AbstractVector{<:Real},
+    Δt::Real;
+    kwargs...
+)
+    return P(xₜ₊₁, xₜ, zeros(eltype(xₜ), length(P.G_drives)), Δt; kwargs...)
+end
+
+
 struct TenthOrderPade <: QuantumStateIntegrator
     G_drift::Matrix
     G_drives::Vector{Matrix}
-    nqstates::Int
-    isodim::Int
 
     TenthOrderPade(sys::QuantumSystem) =
-        new(sys.G_drift, sys.G_drives, sys.nqstates, sys.isodim)
+        new(sys.G_drift, sys.G_drives)
 end
 
 
@@ -569,12 +617,12 @@ function (P::TenthOrderPade)(
         Ũₜ₊₁ = iso_vec_to_iso_operator(xₜ₊₁)
         Ũₜ = iso_vec_to_iso_operator(xₜ)
         δŨ = (Id + Δt^2 / 9 * Gₜ^2 + Δt^4 * Gₜ^4 / 1008) * (Ũₜ₊₁ - Ũₜ) -
-            (Δt / 2 * Gₜ + Δt^3 * Gₜ^3 / 72 + Δt^5 * Gₜ^3 / 30240) * (Ũₜ₊₁ + Ũₜ)
+            (Δt / 2 * Gₜ + Δt^3 * Gₜ^3 / 72 + Δt^5 * Gₜ^5 / 30240) * (Ũₜ₊₁ + Ũₜ)
         δŨ⃗ = iso_operator_to_iso_vec(δŨ)
         return δŨ⃗
     else
         δx = (Id + Δt^2 / 9 * Gₜ^2 + Δt^4 * Gₜ^4 / 1008) * (xₜ₊₁ - xₜ) -
-        (Δt / 2 * Gₜ + Δt^3 * Gₜ^3 / 72 + Δt^5 * Gₜ^3 / 30240) * (xₜ₊₁ + xₜ)
+        (Δt / 2 * Gₜ + Δt^3 * Gₜ^3 / 72 + Δt^5 * Gₜ^5 / 30240) * (xₜ₊₁ + xₜ)
         return δx
     end
 end
