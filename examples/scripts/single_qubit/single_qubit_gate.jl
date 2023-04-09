@@ -94,11 +94,11 @@ Ũ⃗ = unitary_geodesic(U_goal, T; return_generator=false)
 comps = (
     Ũ⃗ = Ũ⃗,
     γ = γ,
-    dγ = dγ,
-    ddγ = ddγ,
+    # dγ = dγ,
+    # ddγ = ddγ,
     α = α,
-    dα = dα,
-    ddα = ddα,
+    # dα = dα,
+    # ddα = ddα,
     Δt = Δt
 )
 
@@ -108,8 +108,8 @@ ddu_bound = 2e-1
 bounds = (
     γ = fill(γ_bound, γ_dim),
     α = fill(α_bound, α_dim),
-    ddγ = fill(ddu_bound, γ_dim),
-    ddα = fill(ddu_bound, α_dim),
+    # ddγ = fill(ddu_bound, γ_dim),
+    # ddα = fill(ddu_bound, α_dim),
     Δt = (dt_min, dt_max)
 )
 
@@ -134,9 +134,10 @@ goal = (
 # creating named trajectory
 traj = NamedTrajectory(
     comps;
-    controls=(:ddγ, :ddα, :Δt),
+    # controls=(:ddγ, :ddα, :Δt),
+    controls=(:γ, :α, :Δt),
     timestep=dt,
-    dynamical_dts=true,
+    dynamical_timesteps=true,
     bounds=bounds,
     initial=initial,
     final=final,
@@ -144,48 +145,50 @@ traj = NamedTrajectory(
 )
 
 # creating fourth order pade integrator
-P = UnitaryFourthOrderPade(system)
+P = UnitaryFourthOrderPade(system, :Ũ⃗, (:γ, :α), :Δt)
+
+f = [P]
 
 # defining dynamics function
-function f(zₜ, zₜ₊₁)
-    Ũ⃗ₜ₊₁ = zₜ₊₁[traj.components.Ũ⃗]
-    Ũ⃗ₜ = zₜ[traj.components.Ũ⃗]
+# function f(zₜ, zₜ₊₁)
+#     Ũ⃗ₜ₊₁ = zₜ₊₁[traj.components.Ũ⃗]
+#     Ũ⃗ₜ = zₜ[traj.components.Ũ⃗]
 
-    # γ states + augmented states + controls
-    γₜ₊₁ = zₜ₊₁[traj.components.γ]
-    γₜ = zₜ[traj.components.γ]
+#     # γ states + augmented states + controls
+#     γₜ₊₁ = zₜ₊₁[traj.components.γ]
+#     γₜ = zₜ[traj.components.γ]
 
-    dγₜ₊₁ = zₜ₊₁[traj.components.dγ]
-    dγₜ = zₜ[traj.components.dγ]
+#     dγₜ₊₁ = zₜ₊₁[traj.components.dγ]
+#     dγₜ = zₜ[traj.components.dγ]
 
-    ddγₜ = zₜ[traj.components.ddγ]
+#     ddγₜ = zₜ[traj.components.ddγ]
 
-    # α states + augmented states + controls
-    αₜ₊₁ = zₜ₊₁[traj.components.α]
-    αₜ = zₜ[traj.components.α]
+#     # α states + augmented states + controls
+#     αₜ₊₁ = zₜ₊₁[traj.components.α]
+#     αₜ = zₜ[traj.components.α]
 
-    dαₜ₊₁ = zₜ₊₁[traj.components.dα]
-    dαₜ = zₜ[traj.components.dα]
+#     dαₜ₊₁ = zₜ₊₁[traj.components.dα]
+#     dαₜ = zₜ[traj.components.dα]
 
-    ddαₜ = zₜ[traj.components.ddα]
+#     ddαₜ = zₜ[traj.components.ddα]
 
-    # time step
-    Δtₜ = zₜ[traj.components.Δt][1]
+#     # time step
+#     Δtₜ = zₜ[traj.components.Δt][1]
 
-    # controls for pade integrator
-    uₜ = [γₜ; αₜ]
-    δŨ⃗ = P(Ũ⃗ₜ₊₁, Ũ⃗ₜ, uₜ, Δtₜ)
+#     # controls for pade integrator
+#     uₜ = [γₜ; αₜ]
+#     δŨ⃗ = P(Ũ⃗ₜ₊₁, Ũ⃗ₜ, uₜ, Δtₜ)
 
-    # γ dynamics
-    δγ = γₜ₊₁ - γₜ - dγₜ * Δtₜ
-    δdγ = dγₜ₊₁ - dγₜ - ddγₜ * Δtₜ
+#     # γ dynamics
+#     δγ = γₜ₊₁ - γₜ - dγₜ * Δtₜ
+#     δdγ = dγₜ₊₁ - dγₜ - ddγₜ * Δtₜ
 
-    # α dynamics
-    δα = αₜ₊₁ - αₜ - dαₜ * Δtₜ
-    δdα = dαₜ₊₁ - dαₜ - ddαₜ * Δtₜ
+#     # α dynamics
+#     δα = αₜ₊₁ - αₜ - dαₜ * Δtₜ
+#     δdα = dαₜ₊₁ - dαₜ - ddαₜ * Δtₜ
 
-    return vcat(δŨ⃗, δγ, δdγ, δα, δdα)
-end
+#     return vcat(δŨ⃗, δγ, δdγ, δα, δdα)
+# end
 
 # quantum objective weight parameter
 Q = 1.0e2
