@@ -5,8 +5,8 @@ using LinearAlgebra
 using Distributions
 using Manifolds
 
-max_iter = 50
-linear_solver = "pardiso"
+max_iter = 5000
+linear_solver = "mumps"
 
 U_init = 1.0 * I(8)
 
@@ -84,7 +84,7 @@ Ũ⃗_goal = operator_to_iso_vec(U_goal)
 
 Ũ⃗_dim = length(Ũ⃗_init)
 
-load = :post_continuation
+load = :no_load
 
 if load == :continuation
     traj_path = "examples/scripts/trajectories/three_qubits/swap_gate/continuation/T_50_Q_200.0_iter_200_fidelity_0.9999813247231153_00000.jld2"
@@ -136,7 +136,7 @@ if load == :continuation
     traj = NamedTrajectory(
         comps;
         controls=(:ddu, :Δt),
-        dt=dt,
+        timestep=dt,
         dynamical_dts=true,
         bounds=bounds,
         initial=initial,
@@ -185,8 +185,114 @@ elseif load == :post_continuation
     traj = NamedTrajectory(
         comps;
         controls=(:ddu, :Δt),
-        dt=dt,
+        timestep=dt,
         dynamical_dts=true,
+        bounds=bounds,
+        initial=initial,
+        final=final,
+        goal=goal
+    )
+elseif load == :no_load
+    T = 100
+    dt = 2.0
+    Δt_min = 0.5 * dt
+    Δt_max = 2.0 * dt
+    u_bound = 2π * 0.04 # GHz
+    u_dist = Uniform(-u_bound, u_bound)
+    ddu_bound = 0.001
+
+    Ũ⃗ = unitary_geodesic(Ũ_goal, T)
+
+    u = foldr(hcat, [zeros(n_drives), rand(u_dist, n_drives, T - 2), zeros(n_drives)])
+    du = randn(n_drives, T)
+    ddu = randn(n_drives, T)
+
+
+    comps = (
+        Ũ⃗ = Ũ⃗,
+        u = u,
+        du = du,
+        ddu = ddu,
+        Δt = fill(dt, T)
+    )
+
+    bounds = (
+        u = fill(u_bound, n_drives),
+        ddu = fill(ddu_bound, n_drives),
+        Δt = (Δt_min, Δt_max),
+    )
+
+    initial = (
+        Ũ⃗ = Ũ⃗_init,
+        u = zeros(n_drives),
+    )
+
+    final = (
+        u = zeros(n_drives),
+    )
+
+    goal = (
+        Ũ⃗ = Ũ⃗_goal,
+    )
+
+    traj = NamedTrajectory(
+        comps;
+        controls=(:ddu, :Δt),
+        timestep=dt,
+        dynamical_dts=true,
+        bounds=bounds,
+        initial=initial,
+        final=final,
+        goal=goal
+    )
+elseif load == :no_load
+    T = 100
+    dt = 2.0
+    Δt_min = 0.5 * dt
+    Δt_max = 2.0 * dt
+    u_bound = 2π * 0.04 # GHz
+    u_dist = Uniform(-u_bound, u_bound)
+    ddu_bound = 0.001
+
+    Ũ⃗ = unitary_geodesic(U_goal, T)
+
+    u = foldr(hcat, [zeros(n_drives), rand(u_dist, n_drives, T - 2), zeros(n_drives)])
+    # du = randn(n_drives, T)
+    # ddu = randn(n_drives, T)
+
+
+    comps = (
+        Ũ⃗ = Ũ⃗,
+        u = u,
+        # du = du,
+        # ddu = ddu,
+        Δt = fill(dt, 1, T)
+    )
+
+    bounds = (
+        u = fill(u_bound, n_drives),
+        # ddu = fill(ddu_bound, n_drives),
+        Δt = (Δt_min, Δt_max),
+    )
+
+    initial = (
+        Ũ⃗ = Ũ⃗_init,
+        u = zeros(n_drives),
+    )
+
+    final = (
+        u = zeros(n_drives),
+    )
+
+    goal = (
+        Ũ⃗ = Ũ⃗_goal,
+    )
+
+    traj = NamedTrajectory(
+        comps;
+        controls=(:u, :Δt),
+        timestep=dt,
+        dynamical_timesteps=true,
         bounds=bounds,
         initial=initial,
         final=final,
@@ -194,26 +300,26 @@ elseif load == :post_continuation
     )
 end
 
-P = UnitaryFourthOrderPade(system)
+P = UnitaryPadeIntegrator(system, :Ũ⃗, :u, :Δt)
 
-@views function f(zₜ, zₜ₊₁)
-    Ũ⃗ₜ₊₁ = zₜ₊₁[traj.components.Ũ⃗]
-    uₜ₊₁ = zₜ₊₁[traj.components.u]
-    duₜ₊₁ = zₜ₊₁[traj.components.du]
+# @views function f(zₜ, zₜ₊₁)
+#     Ũ⃗ₜ₊₁ = zₜ₊₁[traj.components.Ũ⃗]
+#     uₜ₊₁ = zₜ₊₁[traj.components.u]
+#     duₜ₊₁ = zₜ₊₁[traj.components.du]
 
-    Ũ⃗ₜ = zₜ[traj.components.Ũ⃗]
-    uₜ = zₜ[traj.components.u]
-    duₜ = zₜ[traj.components.du]
+#     Ũ⃗ₜ = zₜ[traj.components.Ũ⃗]
+#     uₜ = zₜ[traj.components.u]
+#     duₜ = zₜ[traj.components.du]
 
-    dduₜ = zₜ[traj.components.ddu]
-    Δtₜ = zₜ[traj.components.Δt][1]
+#     dduₜ = zₜ[traj.components.ddu]
+#     Δtₜ = zₜ[traj.components.Δt][1]
 
-    δŨ⃗ = P(Ũ⃗ₜ₊₁, Ũ⃗ₜ, uₜ, Δtₜ)
-    δu = uₜ₊₁ - uₜ - duₜ * Δtₜ
-    δdu = duₜ₊₁ - duₜ - dduₜ * Δtₜ
+#     δŨ⃗ = P(Ũ⃗ₜ₊₁, Ũ⃗ₜ, uₜ, Δtₜ)
+#     δu = uₜ₊₁ - uₜ - duₜ * Δtₜ
+#     δdu = duₜ₊₁ - duₜ - dduₜ * Δtₜ
 
-    return vcat(δŨ⃗, δu, δdu)
-end
+#     return vcat(δŨ⃗, δu, δdu)
+# end
 
 Q = 100.0
 
@@ -225,13 +331,13 @@ R_u = 1e-2
 
 J += QuadraticRegularizer(:u, traj, R_u * ones(n_drives))
 
-R_du = 1e-2
+# R_du = 1e-2
 
-J += QuadraticRegularizer(:du, traj, R_du * ones(n_drives))
+# J += QuadraticRegularizer(:du, traj, R_du * ones(n_drives))
 
-R_ddu = 1e-2
+# R_ddu = 1e-2
 
-J += QuadraticRegularizer(:ddu, traj, R_ddu * ones(n_drives))
+# J += QuadraticRegularizer(:ddu, traj, R_ddu * ones(n_drives))
 
 
 options = Options(
@@ -239,11 +345,11 @@ options = Options(
     linear_solver=linear_solver,
 )
 
-prob = QuantumControlProblem(system, traj, J, f;
+prob = QuantumControlProblem(system, traj, J, P;
     options=options,
 )
 
-plot_dir = "examples/scripts/plots/three_qubit_swap/"
+plot_dir = "examples/scripts/plots/three_qubit_swap/" * string(load)
 
 experiment = "T_$(traj.T)_Q_$(Q)_iter_$(max_iter)"
 
@@ -274,6 +380,6 @@ add_component!(prob.trajectory, :ψ̃, Ψ̃)
 
 plot(plot_path, prob.trajectory, [:Ũ⃗, :ψ̃, :u]; ignored_labels=[:Ũ⃗, :ψ̃], dt_name=:Δt)
 
-save_dir = "examples/scripts/trajectories/three_qubits/swap_gate/post_continuation"
+save_dir = "examples/scripts/trajectories/three_qubits/swap_gate/" * string(load)
 save_path = generate_file_path("jld2", experiment, save_dir)
 save(save_path, prob.trajectory)

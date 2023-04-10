@@ -15,6 +15,7 @@ export load_problem
 
 using ..IndexingUtils
 using ..QuantumSystems
+using ..Integrators
 using ..Evaluators
 using ..IpoptOptions
 using ..Constraints
@@ -38,6 +39,71 @@ mutable struct QuantumControlProblem <: AbstractProblem
     trajectory::NamedTrajectory
     params::Dict{Symbol, Any}
 end
+
+function QuantumControlProblem(
+    system::AbstractSystem,
+    traj::NamedTrajectory,
+    obj::Objective,
+    integrators::Vector{<:AbstractIntegrator};
+    eval_hessian::Bool=true,
+    options::Options=Options(),
+    constraints::Vector{AbstractConstraint}=AbstractConstraint[],
+    params::Dict{Symbol, Any}=Dict{Symbol, Any}(),
+    kwargs...
+)
+    optimizer = Ipopt.Optimizer()
+    set!(optimizer, options)
+
+    dynamics = QuantumDynamics(integrators, traj)
+
+    evaluator = PicoEvaluator(traj, obj, dynamics, eval_hessian)
+
+    n_dynamics_constraints = dynamics.dim * (traj.T - 1)
+    n_variables = traj.dim * traj.T
+
+    traj_cons = trajectory_constraints(traj)
+
+    constraints = vcat(traj_cons, constraints)
+
+    variables = initialize_optimizer!(
+        optimizer,
+        evaluator,
+        constraints,
+        n_dynamics_constraints,
+        n_variables
+    )
+
+    variables = reshape(variables, traj.dim, traj.T)
+
+    params = merge(kwargs, params)
+
+    return QuantumControlProblem(
+        system,
+        variables,
+        optimizer,
+        traj,
+        params
+    )
+end
+
+# constructor that accepts just an AbstractIntegrator
+function QuantumControlProblem(
+    system::AbstractSystem,
+    traj::NamedTrajectory,
+    obj::Objective,
+    integrator::AbstractIntegrator;
+    kwargs...
+)
+    return QuantumControlProblem(
+        system,
+        traj,
+        obj,
+        [integrator];
+        kwargs...
+    )
+end
+
+
 
 function QuantumControlProblem(
     system::AbstractSystem,

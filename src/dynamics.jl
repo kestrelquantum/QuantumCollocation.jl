@@ -9,9 +9,9 @@ using ..QuantumSystems
 using ..Integrators
 
 using NamedTrajectories
-using Base.Iterators
 using LinearAlgebra
 using SparseArrays
+using Einsum
 using ForwardDiff
 using Symbolics
 using Zygote
@@ -31,6 +31,78 @@ function upper_half_vals(A::AbstractMatrix)
     return vals
 end
 
+# create an m x n sparse matrix filled with l symbolics num variables
+function random_sparse_symbolics_matrix(m, n, l)
+    A = zeros(Symbolics.Num, m * n)
+    xs = collect(Symbolics.@variables(x[1:l])...)
+    rands = randperm(m * n)[1:l]
+    for i ∈ 1:l
+        A[rands[i]] = xs[i]
+    end
+    return sparse(reshape(A, m, n))
+end
+
+function structure(A::SparseMatrixCSC; upper_half=false)
+    I, J, _ = findnz(A)
+    index_pairs = collect(zip(I, J))
+    if upper_half
+        @assert size(A, 1) == size(A, 2)
+        index_pairs = filter(p -> p[1] <= p[2], index_pairs)
+    end
+    return index_pairs
+end
+
+function jacobian_structure(∂f̂::Function, zdim::Int)
+    zz = collect(Symbolics.@variables(zz[1:2zdim])...)
+    ∂f = ∂f̂(zz)
+    return structure(sparse(∂f))
+end
+
+function hessian_of_lagrangian_structure(∂²f̂::Function, zdim::Int, μdim::Int)
+    zz = collect(Symbolics.@variables(zz[1:2zdim])...)
+    μ = collect(Symbolics.@variables(μ[1:μdim])...)
+    ∂²f = ∂²f̂(zz)
+    @einsum μ∂²f[j, k] := μ[i] * ∂²f[i, j, k]
+    return structure(sparse(μ∂²f), upper_half=true)
+end
+
+function dynamics_structure(∂f̂::Function, traj::NamedTrajectory, dynamics_dim::Int)
+    ∂²f̂(zz) = reshape(
+        ForwardDiff.jacobian(x -> vec(∂f̂(x)), zz),
+        traj.dims.states,
+        2traj.dim,
+        2traj.dim
+    )
+
+    ∂f_structure = jacobian_structure(∂f̂, traj.dim)
+
+    ∂F_structure = Tuple{Int,Int}[]
+
+    for t = 1:traj.T-1
+        ∂fₜ_structure = [
+            (
+                i + index(t, 0, dynamics_dim),
+                j + index(t, 0, traj.dim)
+            ) for (i, j) ∈ ∂f_structure
+        ]
+        append!(∂F_structure, ∂fₜ_structure)
+    end
+
+    μ∂²f_structure = hessian_of_lagrangian_structure(∂²f̂, traj.dim, dynamics_dim)
+
+    μ∂²F_structure = Tuple{Int,Int}[]
+
+    for t = 1:traj.T-1
+        μ∂²fₜ_structure = [ij .+ index(t, 0, traj.dim) for ij ∈ μ∂²f_structure]
+        append!(μ∂²F_structure, μ∂²fₜ_structure)
+    end
+
+    return ∂f_structure, ∂F_structure, μ∂²f_structure, μ∂²F_structure
+end
+
+
+
+
 
 
 abstract type AbstractDynamics end
@@ -48,6 +120,211 @@ struct QuantumDynamics <: AbstractDynamics
 end
 
 function QuantumDynamics(
+    integrators::Vector{<:AbstractIntegrator},
+    traj::NamedTrajectory
+)
+    @assert all([
+        !isnothing(state(integrator)) &&
+        !isnothing(controls(integrator)) &&
+        !isnothing(timestep(integrator))
+            for integrator ∈ integrators
+    ])
+
+    for integrator ∈ integrators
+        if integrator isa QuantumIntegrator && controls(integrator) isa Tuple
+            drive_comps = [traj.components[s] for s ∈ integrator.drive_symb]
+            number_of_drives = sum(length.(drive_comps))
+            @assert number_of_drives == integrator.n_drives "number of drives ($(number_of_drives)) does not match number of drive terms in Hamiltonian ($(integrator.n_drives))"
+        end
+    end
+
+    dynamics_comps = []
+    let comp_mark = 0
+        for integrator ∈ integrators
+            integrator_comps = (comp_mark + 1):(comp_mark + dim(integrator))
+            push!(dynamics_comps, integrator_comps)
+            comp_mark += dim(integrator)
+        end
+    end
+
+    dynamics_dim = dim(integrators)
+
+    function f(zₜ, zₜ₊₁)
+        δ = Vector{eltype(zₜ)}(undef, dynamics_dim)
+        for (integrator, integrator_comps) ∈ zip(integrators, dynamics_comps)
+            δ[integrator_comps] = integrator(zₜ, zₜ₊₁, traj)
+        end
+        return δ
+    end
+
+    @views function F(Z⃗::AbstractVector{R}) where R <: Real
+        δ = Vector{R}(undef, dynamics_dim * (traj.T - 1))
+        Threads.@threads for t = 1:traj.T-1
+            zₜ = Z⃗[slice(t, traj.dim)]
+            zₜ₊₁ = Z⃗[slice(t + 1, traj.dim)]
+            δ[slice(t, dynamics_dim)] = f(zₜ, zₜ₊₁)
+        end
+        return δ
+    end
+
+
+    ∂f̂(zₜzₜ₊₁) = ForwardDiff.jacobian(zz -> f(zz[1:traj.dim], zz[traj.dim+1:end]), zₜzₜ₊₁)
+
+    ∂f_structure, ∂F_structure, μ∂²f_structure, μ∂²F_structure =
+        dynamics_structure(∂f̂, traj, dynamics_dim)
+
+    function ∂f(zₜ, zₜ₊₁)
+
+        ∂ = spzeros(dynamics_dim, 2traj.dim)
+
+        for (integrator, integrator_comps) ∈ zip(integrators, dynamics_comps)
+
+            if integrator isa QuantumIntegrator
+
+                if integrator.autodiff
+
+                    ∂P(z1, z2) = ForwardDiff.jacobian(
+                        zz -> integrator(zz[1:traj.dim], zz[traj.dim+1:end], traj),
+                        [z1; z2]
+                    )
+
+                    ∂[integrator_comps, 1:2traj.dim] = sparse(∂P(zₜ, zₜ₊₁))
+                else
+                    x_comps, u_comps, Δt_comps = comps(integrator, traj)
+
+                    ∂xₜf, ∂xₜ₊₁f, ∂uₜf, ∂Δtₜf =
+                        Integrators.jacobian(integrator, zₜ, zₜ₊₁, traj)
+
+                    ∂[integrator_comps, x_comps] = ∂xₜf
+                    ∂[integrator_comps, x_comps .+ traj.dim] = ∂xₜ₊₁f
+
+                    if u_comps isa Tuple
+                        for (uᵢ_comps, ∂uₜᵢf) ∈ zip(u_comps, ∂uₜf)
+                            ∂[integrator_comps, uᵢ_comps] = ∂uₜᵢf
+                        end
+                    else
+                        ∂[integrator_comps, u_comps] = ∂uₜf
+                    end
+
+                    ∂[integrator_comps, Δt_comps] = ∂Δtₜf
+                end
+
+            elseif integrator isa DerivativeIntegrator
+
+                x_comps, dx_comps, Δt_comps = comps(integrator, traj)
+
+                ∂xₜf, ∂xₜ₊₁f, ∂dxₜf, ∂Δtₜf =
+                    Integrators.jacobian(integrator, zₜ, zₜ₊₁, traj)
+
+                ∂[integrator_comps, x_comps] = ∂xₜf
+                ∂[integrator_comps, x_comps .+ traj.dim] = ∂xₜ₊₁f
+                ∂[integrator_comps, dx_comps] = ∂dxₜf
+                ∂[integrator_comps, Δt_comps] = ∂Δtₜf
+            else
+                error("integrator type not supported: $(typeof(integrator))")
+            end
+        end
+        return ∂
+    end
+
+    ∂f_nnz = length(∂f_structure)
+
+    @views function ∂F(Z⃗::AbstractVector{R}) where R <: Real
+        ∂s = zeros(R, length(∂F_structure))
+        Threads.@threads for t = 1:traj.T-1
+            zₜ = Z⃗[slice(t, traj.dim)]
+            zₜ₊₁ = Z⃗[slice(t + 1, traj.dim)]
+            ∂fₜ = ∂f(zₜ, zₜ₊₁)
+            for (k, (i, j)) ∈ enumerate(∂f_structure)
+                ∂s[index(t, k, ∂f_nnz)] = ∂fₜ[i, j]
+            end
+        end
+        return ∂s
+    end
+
+    function μ∂²f(zₜ, zₜ₊₁, μₜ)
+
+        μ∂² = spzeros(2traj.dim, 2traj.dim)
+
+        for (integrator, integrator_comps) ∈ zip(integrators, dynamics_comps)
+
+            if integrator isa QuantumIntegrator
+
+                if integrator.autodiff
+
+                    μ∂²P(z1, z2, μ) = ForwardDiff.hessian(
+                        zz -> μ' * integrator(zz[1:traj.dim], zz[traj.dim+1:end], traj),
+                        [z1; z2]
+                    )
+
+                    μ∂²[1:2traj.dim, 1:2traj.dim] = sparse(μ∂²P(zₜ, zₜ₊₁, μₜ[integrator_comps]))
+
+                else
+                    x_comps, u_comps, Δt_comps = comps(integrator, traj)
+
+                    μ∂uₜ∂xₜf, μ∂²uₜf, μ∂Δtₜ∂xₜf, μ∂Δtₜ∂uₜf, μ∂²Δtₜf, μ∂xₜ₊₁∂uₜf, μ∂xₜ₊₁∂Δtₜf =
+                        hessian_of_the_lagrangian(integrator, zₜ, zₜ₊₁, μₜ[integrator_comps], traj)
+
+                    if u_comps isa Tuple
+                        for (uᵢ_comps, μ∂uₜᵢ∂xₜf) ∈ zip(u_comps, μ∂uₜ∂xₜf)
+                            μ∂²[x_comps, uᵢ_comps] += μ∂uₜᵢ∂xₜf
+                        end
+                        for (uᵢ_comps, μ∂²uₜᵢf) ∈ zip(u_comps, μ∂²uₜf)
+                            μ∂²[uᵢ_comps, uᵢ_comps] += μ∂²uₜᵢf
+                        end
+                        for (uᵢ_comps, μ∂Δtₜ∂uₜᵢf) ∈ zip(u_comps, μ∂Δtₜ∂uₜf)
+                            μ∂²[uᵢ_comps, Δt_comps] += μ∂Δtₜ∂uₜᵢf
+                        end
+                        for (uᵢ_comps, μ∂xₜ₊₁∂uₜᵢf) ∈ zip(u_comps, μ∂xₜ₊₁∂uₜf)
+                            μ∂²[uᵢ_comps, x_comps .+ traj.dim] += μ∂xₜ₊₁∂uₜᵢf
+                        end
+                    else
+                        μ∂²[x_comps, u_comps] += μ∂uₜ∂xₜf
+                        μ∂²[u_comps, u_comps] += μ∂²uₜf
+                        μ∂²[u_comps, Δt_comps] += μ∂Δtₜ∂uₜf
+                        μ∂²[u_comps, x_comps .+ traj.dim] += μ∂xₜ₊₁∂uₜf
+                    end
+
+                    μ∂²[x_comps, Δt_comps] += μ∂Δtₜ∂xₜf
+                    μ∂²[Δt_comps, x_comps .+ traj.dim] += μ∂xₜ₊₁∂Δtₜf
+                    μ∂²[Δt_comps, Δt_comps] .+= μ∂²Δtₜf
+                end
+
+            elseif integrator isa DerivativeIntegrator
+
+                x_comps, dx_comps, Δt_comps = comps(integrator, traj)
+
+                μ∂dxₜ∂Δtₜf = -μₜ[integrator_comps]
+
+                μ∂²[dx_comps, Δt_comps] += μ∂dxₜ∂Δtₜf
+
+            end
+        end
+        return μ∂²
+    end
+
+    μ∂²f_nnz = length(μ∂²f_structure)
+
+    @views function μ∂²F(Z⃗::AbstractVector{<:Real}, μ⃗::AbstractVector{<:Real})
+        μ∂²s = Vector{eltype(Z⃗)}(undef, length(μ∂²F_structure))
+        Threads.@threads for t = 1:traj.T-1
+            zₜ = Z⃗[slice(t, traj.dim)]
+            zₜ₊₁ = Z⃗[slice(t + 1, traj.dim)]
+            μₜ = μ⃗[slice(t, dynamics_dim)]
+            μₜ∂²fₜ = μ∂²f(zₜ, zₜ₊₁, μₜ)
+            for (k, (i, j)) ∈ enumerate(μ∂²f_structure)
+                μ∂²s[index(t, k, μ∂²f_nnz)] = μₜ∂²fₜ[i, j]
+            end
+        end
+        return μ∂²s
+    end
+
+    return QuantumDynamics(F, ∂F, ∂F_structure, μ∂²F, μ∂²F_structure, dynamics_dim)
+end
+
+QuantumDynamics(P::AbstractIntegrator, traj::NamedTrajectory) = QuantumDynamics([P], traj)
+
+function QuantumDynamics(
     f::Function,
     traj::NamedTrajectory
 )
@@ -63,6 +340,7 @@ function QuantumDynamics(
         return r
     end
 
+    # TODO: benchmark Zygote vs ForwardDiff for jacobian
     # function ∂f(zₜ, zₜ₊₁)
     #     ∂zₜf, ∂zₜ₊₁f = Zygote.jacobian(f, zₜ, zₜ₊₁)
     #     ∂fₜ = hcat(∂zₜf, ∂zₜ₊₁f)
@@ -71,52 +349,47 @@ function QuantumDynamics(
 
     @views f̂(zz) = f(zz[1:traj.dim], zz[traj.dim+1:end])
 
-    function ∂f(zₜ, zₜ₊₁)
-        return ForwardDiff.jacobian(f̂, [zₜ; zₜ₊₁])
-    end
+    ∂f̂(zz) = ForwardDiff.jacobian(f̂, zz)
+
+    ∂f_structure, ∂F_structure, μ∂²f_structure, μ∂²F_structure =
+        dynamics_structure(∂f̂, traj, dynamics_dim)
+
+    ∂f(zₜ, zₜ₊₁) = ∂f̂([zₜ; zₜ₊₁])
+
+    ∂f_nnz = length(∂f_structure)
 
     @views function ∂F(Z⃗::AbstractVector{R}) where R <: Real
-        ∂ = zeros(R, (dynamics_dim * 2 * traj.dim) * (traj.T - 1))
+        ∂ = zeros(R, length(∂F_structure))
         Threads.@threads for t = 1:traj.T-1
             zₜ = Z⃗[slice(t, traj.dim)]
             zₜ₊₁ = Z⃗[slice(t + 1, traj.dim)]
-            ∂[slice(t, dynamics_dim * 2 * traj.dim)] = vec(∂f(zₜ, zₜ₊₁))
+            ∂fₜ = ∂f(zₜ, zₜ₊₁)
+            for (k, (i, j)) ∈ enumerate(∂f_structure)
+                ∂[index(t, k, ∂f_nnz)] = ∂fₜ[i, j]
+            end
         end
         return ∂
     end
 
-    ∂F_structure = Tuple{Int,Int}[]
+    μf̂(zz, μ) = dot(μ, f̂(zz))
 
-    for t = 1:traj.T-1
-        ∂fₜ_structure = Iterators.product(slice(t, dynamics_dim), slice(t:t+1, traj.dim))
-        append!(∂F_structure, collect(∂fₜ_structure))
-    end
-
-    μf̂(zₜzₜ₊₁, μₜ) = dot(μₜ, f̂(zₜzₜ₊₁))
-
-    @views function μ∂²f(zₜzₜ₊₁, μₜ)
+    @views function μ∂²f̂(zₜzₜ₊₁, μₜ)
         return ForwardDiff.hessian(zz -> μf̂(zz, μₜ), zₜzₜ₊₁)
     end
 
+    μ∂²f_nnz = length(μ∂²f_structure)
+
     @views function μ∂²F(Z⃗::AbstractVector{R}, μ::AbstractVector{R}) where R <: Real
-        block_upper_half_dim = 2traj.dim * (2traj.dim + 1) ÷ 2
-        μ∂² = zeros(R, block_upper_half_dim * (traj.T - 1))
+        μ∂² = zeros(R, length(μ∂²F_structure))
         Threads.@threads for t = 1:traj.T-1
             zₜzₜ₊₁ = Z⃗[slice(t:t+1, traj.dim)]
             μₜ = μ[slice(t, dynamics_dim)]
-            HoL = μ∂²f(zₜzₜ₊₁, μₜ)
-            vals = upper_half_vals(HoL)
-            μ∂²[slice(t, block_upper_half_dim)] .= vals
+            μ∂²fₜ = μ∂²f̂(zₜzₜ₊₁, μₜ)
+            for (k, (i, j)) ∈ enumerate(μ∂²f_structure)
+                μ∂²[index(t, k, μ∂²f_nnz)] = μ∂²fₜ[i, j]
+            end
         end
         return μ∂²
-    end
-
-    μ∂²F_structure = Tuple{Int,Int}[]
-
-    for t = 1:traj.T-1
-        μₜ∂²fₜ_structure = Iterators.product(slice(t:t+1, traj.dim), slice(t:t+1, traj.dim))
-        vals = upper_half_vals(collect(μₜ∂²fₜ_structure))
-        append!(μ∂²F_structure, vals)
     end
 
     return QuantumDynamics(F, ∂F, ∂F_structure, μ∂²F, μ∂²F_structure, dynamics_dim)

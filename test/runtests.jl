@@ -5,6 +5,10 @@ using NamedTrajectories
 using Test
 using LinearAlgebra
 using ForwardDiff
+using FiniteDiff
+using Random
+
+Random.seed!(1234)
 
 include("test_utils.jl")
 

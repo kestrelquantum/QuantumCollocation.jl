@@ -147,7 +147,7 @@ goal = (
 traj = NamedTrajectory(
     comps;
     controls=(:ddu, :G⃗, :Δt),
-    dt=dt,
+    timestep=dt,
     dynamical_dts=true,
     bounds=bounds,
     initial=initial,

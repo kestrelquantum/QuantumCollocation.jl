@@ -17,7 +17,7 @@
     #     ψ̃ₜ₊₁ = zₜ₊₁[Z.components.ψ̃]
     #     ψ̃ₜ = zₜ[Z.components.ψ̃]
     #     uₜ = zₜ[Z.components.u]
-    #     δψ̃ = P(ψ̃ₜ₊₁, ψ̃ₜ, uₜ, Z.dt)
+    #     δψ̃ = P(ψ̃ₜ₊₁, ψ̃ₜ, uₜ, Z.timestep)
     #     return δψ̃
     # end
 
@@ -58,7 +58,7 @@
         Z = NamedTrajectory(
             (ψ̃ = randn(4, T), u = randn(2, T)),
             controls=:u,
-            dt=0.1,
+            timestep=0.1,
             goal=(ψ̃ = [1, 0, 0, 0],)
         )
 
@@ -72,11 +72,15 @@
 
         # test objective function gradient
 
-        @test ForwardDiff.gradient(L, Z.datavec) ≈ ∇L(Z.datavec)
+        @test all(ForwardDiff.gradient(L, Z.datavec) .≈ ∇L(Z.datavec))
 
         # test objective function hessian
         shape = (Z.dim * Z.T, Z.dim * Z.T)
-        @test ForwardDiff.hessian(L, Z.datavec) ≈ dense(∂²L(Z.datavec), ∂²L_structure, shape) atol=1e-7
+        @test all(isapprox(
+            ForwardDiff.hessian(L, Z.datavec),
+            dense(∂²L(Z.datavec), ∂²L_structure, shape);
+            atol=1e-7
+        ))
     end
 
     @testset "Quadratic Smoothness Regularizer Objective" begin
@@ -84,7 +88,7 @@
         Z = NamedTrajectory(
             (ψ̃ = randn(4, T), u = randn(2, T)),
             controls=:u,
-            dt=0.1,
+            timestep=0.1,
             goal=(ψ̃ = [1, 0, 0, 0],)
         )
 
@@ -98,11 +102,15 @@
 
         # test objective function gradient
 
-        @test ForwardDiff.gradient(L, Z.datavec) ≈ ∇L(Z.datavec)
+        @test all(ForwardDiff.gradient(L, Z.datavec) .≈ ∇L(Z.datavec))
 
         # test objective function hessian
         shape = (Z.dim * Z.T, Z.dim * Z.T)
-        @test ForwardDiff.hessian(L, Z.datavec) ≈ dense(∂²L(Z.datavec), ∂²L_structure, shape) atol=1e-7
+        @test all(isapprox(
+            ForwardDiff.hessian(L, Z.datavec),
+            dense(∂²L(Z.datavec), ∂²L_structure, shape);
+            atol=1e-7
+        ))
     end
 
     @testset "Unitary Objective" begin
@@ -116,7 +124,7 @@
         Z = NamedTrajectory(
             (Ũ⃗ = randn(length(Ũ⃗_init), T), u = randn(2, T)),
             controls=:u,
-            dt=0.1,
+            timestep=0.1,
             initial=(Ũ⃗ = Ũ⃗_init,),
             goal=(Ũ⃗ = Ũ⃗_goal,)
         )
@@ -132,10 +140,10 @@
         ∂²L_structure = J.∂²L_structure(Z)
 
         # test objective function gradient
-        @test ForwardDiff.gradient(L, Z.datavec) ≈ ∇L(Z.datavec)
+        @test all(ForwardDiff.gradient(L, Z.datavec) ≈ ∇L(Z.datavec))
 
         # test objective function hessian
         shape = (Z.dim * Z.T, Z.dim * Z.T)
-        @test ForwardDiff.hessian(L, Z.datavec) ≈ dense(∂²L(Z.datavec), ∂²L_structure, shape)
+        @test all(ForwardDiff.hessian(L, Z.datavec) .≈ dense(∂²L(Z.datavec), ∂²L_structure, shape))
     end
 end

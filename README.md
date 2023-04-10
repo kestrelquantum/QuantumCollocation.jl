@@ -22,7 +22,7 @@ This package is under active development and issues may arise -- please be patie
 
 ## Installation
 
-QuantumCollocation.jl is registered, so to install just use:
+QuantumCollocation.jl is registered! To install:
 
 ```julia
 using Pkg

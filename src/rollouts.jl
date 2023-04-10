@@ -112,7 +112,7 @@ function unitary_geodesic(
     U_init::AbstractMatrix{<:Number},
     U_goal::AbstractMatrix{<:Number},
     samples::Int;
-    return_generator=true
+    return_generator=false
 )
     U_init = Matrix{ComplexF64}(U_init)
     U_goal = Matrix{ComplexF64}(U_goal)

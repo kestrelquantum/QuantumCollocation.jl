@@ -4,8 +4,8 @@ using LinearAlgebra
 using Distributions
 
 # setting maximum number of iterations
-max_iter = 1000
-linear_solver = "pardiso"
+max_iter = 10000
+linear_solver = "mumps"
 
 # defining levels for single qubit system
 n_levels = 2
@@ -63,7 +63,7 @@ dt_min = 0.5 * dt
 α_dist = Uniform(-α_bound, α_bound)
 
 # load saved trajectory
-load_saved_traj = true
+load_saved_traj = false
 
 if load_saved_traj
     saved_traj_path = "examples/scripts/trajectories/single_qubit/state_transfer/T_100_Q_100.0_iter_500_00000.jld2"
@@ -94,11 +94,11 @@ Ũ⃗ = unitary_geodesic(U_goal, T; return_generator=false)
 comps = (
     Ũ⃗ = Ũ⃗,
     γ = γ,
-    dγ = dγ,
-    ddγ = ddγ,
+    # dγ = dγ,
+    # ddγ = ddγ,
     α = α,
-    dα = dα,
-    ddα = ddα,
+    # dα = dα,
+    # ddα = ddα,
     Δt = Δt
 )
 
@@ -108,8 +108,8 @@ ddu_bound = 2e-1
 bounds = (
     γ = fill(γ_bound, γ_dim),
     α = fill(α_bound, α_dim),
-    ddγ = fill(ddu_bound, γ_dim),
-    ddα = fill(ddu_bound, α_dim),
+    # ddγ = fill(ddu_bound, γ_dim),
+    # ddα = fill(ddu_bound, α_dim),
     Δt = (dt_min, dt_max)
 )
 
@@ -134,9 +134,10 @@ goal = (
 # creating named trajectory
 traj = NamedTrajectory(
     comps;
-    controls=(:ddγ, :ddα, :Δt),
-    dt=dt,
-    dynamical_dts=true,
+    # controls=(:ddγ, :ddα, :Δt),
+    controls=(:γ, :α, :Δt),
+    timestep=dt,
+    dynamical_timesteps=true,
     bounds=bounds,
     initial=initial,
     final=final,
@@ -144,48 +145,50 @@ traj = NamedTrajectory(
 )
 
 # creating fourth order pade integrator
-P = UnitaryFourthOrderPade(system)
+P = UnitaryPadeIntegrator(system, :Ũ⃗, (:γ, :α), :Δt)
+
+f = [P]
 
 # defining dynamics function
-function f(zₜ, zₜ₊₁)
-    Ũ⃗ₜ₊₁ = zₜ₊₁[traj.components.Ũ⃗]
-    Ũ⃗ₜ = zₜ[traj.components.Ũ⃗]
+# function f(zₜ, zₜ₊₁)
+#     Ũ⃗ₜ₊₁ = zₜ₊₁[traj.components.Ũ⃗]
+#     Ũ⃗ₜ = zₜ[traj.components.Ũ⃗]
 
-    # γ states + augmented states + controls
-    γₜ₊₁ = zₜ₊₁[traj.components.γ]
-    γₜ = zₜ[traj.components.γ]
+#     # γ states + augmented states + controls
+#     γₜ₊₁ = zₜ₊₁[traj.components.γ]
+#     γₜ = zₜ[traj.components.γ]
 
-    dγₜ₊₁ = zₜ₊₁[traj.components.dγ]
-    dγₜ = zₜ[traj.components.dγ]
+#     dγₜ₊₁ = zₜ₊₁[traj.components.dγ]
+#     dγₜ = zₜ[traj.components.dγ]
 
-    ddγₜ = zₜ[traj.components.ddγ]
+#     ddγₜ = zₜ[traj.components.ddγ]
 
-    # α states + augmented states + controls
-    αₜ₊₁ = zₜ₊₁[traj.components.α]
-    αₜ = zₜ[traj.components.α]
+#     # α states + augmented states + controls
+#     αₜ₊₁ = zₜ₊₁[traj.components.α]
+#     αₜ = zₜ[traj.components.α]
 
-    dαₜ₊₁ = zₜ₊₁[traj.components.dα]
-    dαₜ = zₜ[traj.components.dα]
+#     dαₜ₊₁ = zₜ₊₁[traj.components.dα]
+#     dαₜ = zₜ[traj.components.dα]
 
-    ddαₜ = zₜ[traj.components.ddα]
+#     ddαₜ = zₜ[traj.components.ddα]
 
-    # time step
-    Δtₜ = zₜ[traj.components.Δt][1]
+#     # time step
+#     Δtₜ = zₜ[traj.components.Δt][1]
 
-    # controls for pade integrator
-    uₜ = [γₜ; αₜ]
-    δŨ⃗ = P(Ũ⃗ₜ₊₁, Ũ⃗ₜ, uₜ, Δtₜ)
+#     # controls for pade integrator
+#     uₜ = [γₜ; αₜ]
+#     δŨ⃗ = P(Ũ⃗ₜ₊₁, Ũ⃗ₜ, uₜ, Δtₜ)
 
-    # γ dynamics
-    δγ = γₜ₊₁ - γₜ - dγₜ * Δtₜ
-    δdγ = dγₜ₊₁ - dγₜ - ddγₜ * Δtₜ
+#     # γ dynamics
+#     δγ = γₜ₊₁ - γₜ - dγₜ * Δtₜ
+#     δdγ = dγₜ₊₁ - dγₜ - ddγₜ * Δtₜ
 
-    # α dynamics
-    δα = αₜ₊₁ - αₜ - dαₜ * Δtₜ
-    δdα = dαₜ₊₁ - dαₜ - ddαₜ * Δtₜ
+#     # α dynamics
+#     δα = αₜ₊₁ - αₜ - dαₜ * Δtₜ
+#     δdα = dαₜ₊₁ - dαₜ - ddαₜ * Δtₜ
 
-    return vcat(δŨ⃗, δγ, δdγ, δα, δdα)
-end
+#     return vcat(δŨ⃗, δγ, δdγ, δα, δdα)
+# end
 
 # quantum objective weight parameter
 Q = 1.0e2
@@ -199,17 +202,26 @@ J = QuantumObjective(:Ũ⃗, traj, loss, Q)
 
 
 # regularization parameters
-R = 1e-3
+R = 1e-1
 drive_bound_ratio = γ_bound / α_bound
 
-R_ddγ = R
-R_ddα = R * drive_bound_ratio
+R_γ = R
+R_α = R * drive_bound_ratio
 
 # addign quadratic regularization term on γ to the objective
-J += QuadraticRegularizer(:ddγ, traj, R_ddγ * ones(γ_dim))
+J += QuadraticRegularizer(:γ, traj, R_γ * ones(γ_dim))
 
 # adding quadratic regularization term on
-J += QuadraticRegularizer(:ddα, traj, R_ddα * ones(α_dim))
+J += QuadraticRegularizer(:α, traj, R_α * ones(α_dim))
+
+# R_ddγ = R
+# R_ddα = R * drive_bound_ratio
+
+# # addign quadratic regularization term on γ to the objective
+# J += QuadraticRegularizer(:ddγ, traj, R_ddγ * ones(γ_dim))
+
+# # adding quadratic regularization term on
+# J += QuadraticRegularizer(:ddα, traj, R_ddα * ones(α_dim))
 
 # Ipopt options
 options = Options(
@@ -248,23 +260,35 @@ drives = vcat(prob.trajectory.γ, prob.trajectory.α)
 ψ₁ = [1, 0]
 ψ̃₁ = ket_to_iso(ψ₁)
 ψ̃₁_goal = ket_to_iso(gate * ψ₁)
-Ψ̃₁ = rollout(ψ̃₁, drives, Δts, system)
-println("|0⟩ Rollout fidelity:   ", fidelity(Ψ̃₁[:, end], ψ̃₁_goal))
+Ψ̃₁_fourth_order_pade = rollout(ψ̃₁, drives, Δts, system)
+Ψ̃₁_exp = rollout(ψ̃₁, drives, Δts, system; integrator=exp)
+println("|0⟩ Fourth order Pade rollout fidelity:   ", fidelity(Ψ̃₁_fourth_order_pade[:, end], ψ̃₁_goal))
+println("|0⟩ Exponential rollout fidelity:         ", fidelity(Ψ̃₁_exp[:, end], ψ̃₁_goal))
+println()
+
 
 # |1⟩ rollout test
 ψ₂ = [0, 1]
 ψ̃₂ = ket_to_iso(ψ₂)
 ψ̃₂_goal = ket_to_iso(gate * ψ₂)
-Ψ̃₂ = rollout(ψ̃₂, drives, Δts, system)
-println("|1⟩ Rollout fidelity:   ", fidelity(Ψ̃₂[:, end], ψ̃₂_goal))
+Ψ̃₂_fourth_order_pade = rollout(ψ̃₂, drives, Δts, system)
+Ψ̃₂_exp = rollout(ψ̃₂, drives, Δts, system; integrator=exp)
+println("|1⟩ Fourth order Pade rollout fidelity:   ", fidelity(Ψ̃₂_fourth_order_pade[:, end], ψ̃₂_goal))
+println("|1⟩ Exponential rollout fidelity:         ", fidelity(Ψ̃₂_exp[:, end], ψ̃₂_goal))
+
 
 # new plot name with fidelity included
 experiment *= "_fidelity_$(fid)"
 plot_path = join(split(plot_path, ".")[1:end-1]) * "_fidelity_$(fid).png"
 
-add_component!(prob.trajectory, :ψ̃₁, Ψ̃₁)
+add_component!(prob.trajectory, :ψ̃₁, Ψ̃₁_exp)
 
 plot(plot_path, prob.trajectory, [:Ũ⃗, :γ, :α, :ψ̃₁];
     ignored_labels=[:Ũ⃗],
     dt_name=:Δt
 )
+
+save_dir = "examples/scripts/single_qubit/trajectories"
+save_path = generate_file_path("jld2", experiment, save_dir)
+
+save(save_path, prob.trajectory)
