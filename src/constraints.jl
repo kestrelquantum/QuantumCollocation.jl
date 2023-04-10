@@ -12,7 +12,7 @@ export TimeStepEqualityConstraint
 export TimeStepsAllEqualConstraint
 export L1SlackConstraint
 
-using ..IndexingUtils
+using TrajectoryIndexingUtils
 
 using NamedTrajectories
 using Ipopt

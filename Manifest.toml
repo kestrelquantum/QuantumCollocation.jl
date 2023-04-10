@@ -2,7 +2,7 @@
 
 julia_version = "1.8.5"
 manifest_format = "2.0"
-project_hash = "10d4eedfa2dc5fce9640078a6b980f97798c929a"
+project_hash = "565b55210ff64ab7a4ec1a9557d2d75fd46091f1"
 
 [[deps.ANSIColoredPrinters]]
 git-tree-sha1 = "574baf8110975760d391c710b6341da1afa48d8c"
@@ -1639,6 +1639,11 @@ deps = ["ExprTools", "Printf"]
 git-tree-sha1 = "f2fd3f288dfc6f507b0c3a2eb3bac009251e548b"
 uuid = "a759f4b9-e2f1-59dc-863e-4aeb61b1ea8f"
 version = "0.5.22"
+
+[[deps.TrajectoryIndexingUtils]]
+git-tree-sha1 = "108da5f045005c9b57e6713ea84aca49d77fccaa"
+uuid = "6dad8b7f-dd9a-4c28-9b70-85b9a079bfc8"
+version = "0.1.0"
 
 [[deps.TranscodingStreams]]
 deps = ["Random", "Test"]

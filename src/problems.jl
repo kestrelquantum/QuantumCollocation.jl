@@ -13,7 +13,7 @@ export generate_file_path
 export save_problem
 export load_problem
 
-using ..IndexingUtils
+using TrajectoryIndexingUtils
 using ..QuantumSystems
 using ..Integrators
 using ..Evaluators

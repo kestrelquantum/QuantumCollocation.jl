@@ -23,7 +23,7 @@ export sixth_order_pade
 export eighth_order_pade
 export tenth_order_pade
 
-using ..IndexingUtils
+using TrajectoryIndexingUtils
 using ..QuantumSystems
 using ..QuantumUtils
 

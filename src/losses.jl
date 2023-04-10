@@ -15,7 +15,7 @@ export structure
 export infidelity
 export unitary_infidelity
 
-using ..IndexingUtils
+using TrajectoryIndexingUtils
 using ..QuantumUtils
 using ..QuantumSystems
 

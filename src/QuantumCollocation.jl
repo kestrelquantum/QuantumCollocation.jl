@@ -2,9 +2,6 @@ module QuantumCollocation
 
 using Reexport
 
-include("indexing_utils.jl")
-@reexport using .IndexingUtils
-
 include("quantum_utils.jl")
 @reexport using .QuantumUtils
 
