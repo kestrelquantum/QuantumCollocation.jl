@@ -635,11 +635,11 @@ function ∂ΔtₜB_real(
         P.n_drives
     )
     return - 1 / 2 * HI + Δtₜ / 6 * (HI² - HR²)
+
 end
 
 function ∂ΔtₜB_imag(
     P::UnitaryPadeIntegrator{R},
-
     aₜ::AbstractVector,
     Δtₜ::Real
 ) where R
