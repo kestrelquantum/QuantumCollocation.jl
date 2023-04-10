@@ -5,8 +5,8 @@ using LinearAlgebra
 using Distributions
 using Manifolds
 
-max_iter = 500
-linear_solver = "pardiso"
+max_iter = 5000
+linear_solver = "mumps"
 
 U_init = 1.0 * I(8)
 
@@ -201,24 +201,24 @@ elseif load == :no_load
     u_dist = Uniform(-u_bound, u_bound)
     ddu_bound = 0.001
 
-    Ũ⃗ = unitary_geodesic(Ũ_goal, T)
+    Ũ⃗ = unitary_geodesic(U_goal, T)
 
     u = foldr(hcat, [zeros(n_drives), rand(u_dist, n_drives, T - 2), zeros(n_drives)])
-    du = randn(n_drives, T)
-    ddu = randn(n_drives, T)
+    # du = randn(n_drives, T)
+    # ddu = randn(n_drives, T)
 
 
     comps = (
         Ũ⃗ = Ũ⃗,
         u = u,
-        du = du,
-        ddu = ddu,
-        Δt = fill(dt, T)
+        # du = du,
+        # ddu = ddu,
+        Δt = fill(dt, 1, T)
     )
 
     bounds = (
         u = fill(u_bound, n_drives),
-        ddu = fill(ddu_bound, n_drives),
+        # ddu = fill(ddu_bound, n_drives),
         Δt = (Δt_min, Δt_max),
     )
 
@@ -237,9 +237,9 @@ elseif load == :no_load
 
     traj = NamedTrajectory(
         comps;
-        controls=(:ddu, :Δt),
+        controls=(:u, :Δt),
         timestep=dt,
-        dynamical_dts=true,
+        dynamical_timesteps=true,
         bounds=bounds,
         initial=initial,
         final=final,
@@ -247,26 +247,26 @@ elseif load == :no_load
     )
 end
 
-P = UnitaryFourthOrderPade(system)
+P = UnitaryFourthOrderPade(system, :Ũ⃗, :u, :Δt)
 
-@views function f(zₜ, zₜ₊₁)
-    Ũ⃗ₜ₊₁ = zₜ₊₁[traj.components.Ũ⃗]
-    uₜ₊₁ = zₜ₊₁[traj.components.u]
-    duₜ₊₁ = zₜ₊₁[traj.components.du]
+# @views function f(zₜ, zₜ₊₁)
+#     Ũ⃗ₜ₊₁ = zₜ₊₁[traj.components.Ũ⃗]
+#     uₜ₊₁ = zₜ₊₁[traj.components.u]
+#     duₜ₊₁ = zₜ₊₁[traj.components.du]
 
-    Ũ⃗ₜ = zₜ[traj.components.Ũ⃗]
-    uₜ = zₜ[traj.components.u]
-    duₜ = zₜ[traj.components.du]
+#     Ũ⃗ₜ = zₜ[traj.components.Ũ⃗]
+#     uₜ = zₜ[traj.components.u]
+#     duₜ = zₜ[traj.components.du]
 
-    dduₜ = zₜ[traj.components.ddu]
-    Δtₜ = zₜ[traj.components.Δt][1]
+#     dduₜ = zₜ[traj.components.ddu]
+#     Δtₜ = zₜ[traj.components.Δt][1]
 
-    δŨ⃗ = P(Ũ⃗ₜ₊₁, Ũ⃗ₜ, uₜ, Δtₜ)
-    δu = uₜ₊₁ - uₜ - duₜ * Δtₜ
-    δdu = duₜ₊₁ - duₜ - dduₜ * Δtₜ
+#     δŨ⃗ = P(Ũ⃗ₜ₊₁, Ũ⃗ₜ, uₜ, Δtₜ)
+#     δu = uₜ₊₁ - uₜ - duₜ * Δtₜ
+#     δdu = duₜ₊₁ - duₜ - dduₜ * Δtₜ
 
-    return vcat(δŨ⃗, δu, δdu)
-end
+#     return vcat(δŨ⃗, δu, δdu)
+# end
 
 Q = 100.0
 
@@ -278,13 +278,13 @@ R_u = 1e-2
 
 J += QuadraticRegularizer(:u, traj, R_u * ones(n_drives))
 
-R_du = 1e-2
+# R_du = 1e-2
 
-J += QuadraticRegularizer(:du, traj, R_du * ones(n_drives))
+# J += QuadraticRegularizer(:du, traj, R_du * ones(n_drives))
 
-R_ddu = 1e-2
+# R_ddu = 1e-2
 
-J += QuadraticRegularizer(:ddu, traj, R_ddu * ones(n_drives))
+# J += QuadraticRegularizer(:ddu, traj, R_ddu * ones(n_drives))
 
 
 options = Options(
