@@ -1,13 +1,14 @@
 using Revise
 using QuantumCollocation
 using NamedTrajectories
+using TrajectoryIndexingUtils
 using LinearAlgebra
 using Distributions
 using LaTeXStrings
 using CairoMakie
 using JLD2
 
-max_iter = 1700
+max_iter = 10
 linear_solver = "pardiso"
 
 
@@ -84,6 +85,7 @@ comps = (
 
 bounds = (
     u = fill(u_bound, n_controls),
+    Δt = (dt*0.8, dt*1.2)
 )
 
 
@@ -102,7 +104,7 @@ goal = (
 
 traj = NamedTrajectory(
     comps;
-    controls=(:ddu),
+    controls=(:ddu, :Δt),
     timestep=dt,
     dynamical_timesteps=false,
     bounds=bounds,
@@ -111,30 +113,29 @@ traj = NamedTrajectory(
     goal=goal
 )
 
-P10 = TenthOrderPade(system,:Ũ⃗, :u, :Δt)
+P = UnitaryPadeIntegrator(system, :Ũ⃗, :u, :Δt)
+Du = DerivativeIntegrator(:u, :du, :Δt, n_controls)
+Ddu = DerivativeIntegrator(:du, :ddu, :Δt, n_controls)
+# function f(zₜ, zₜ₊₁)
+#     uₜ₊₁ = zₜ₊₁[traj.components.u]
+#     uₜ = zₜ[traj.components.u]
 
+#     duₜ₊₁ = zₜ₊₁[traj.components.du]
+#     duₜ = zₜ[traj.components.du]
 
-function f(zₜ, zₜ₊₁)
-    Ũ⃗ₜ₊₁ = zₜ₊₁[traj.components.Ũ⃗]
-    Ũ⃗ₜ = zₜ[traj.components.Ũ⃗]
-    uₜ₊₁ = zₜ₊₁[traj.components.u]
-    uₜ = zₜ[traj.components.u]
+#     dduₜ = zₜ[traj.components.ddu]
+#     Δtₜ = zₜ[traj.components.Δt][1]
 
-    duₜ₊₁ = zₜ₊₁[traj.components.du]
-    duₜ = zₜ[traj.components.du]
+#     δŨvec = P10(zₜ, zₜ₊₁, traj)   
+#     #δŨvec = P10(Ũ⃗ₜ₊₁, Ũ⃗ₜ, uₜ, Δtₜ)
 
-    dduₜ = zₜ[traj.components.ddu]
-    Δtₜ = zₜ[traj.components.Δt][1]
+#     δu = uₜ₊₁ - uₜ - duₜ * Δtₜ
+#     δdu = duₜ₊₁ - duₜ - dduₜ * Δtₜ
 
-    δŨvec = P10(Ũ⃗ₜ₊₁, Ũ⃗ₜ, uₜ, Δtₜ, operator=true)   
-    #δŨvec = P10(Ũ⃗ₜ₊₁, Ũ⃗ₜ, uₜ, Δtₜ)
+#     return vcat(δŨvec, δu, δdu)
+# end 
 
-    δu = uₜ₊₁ - uₜ - duₜ * Δtₜ
-    δdu = duₜ₊₁ - duₜ - dduₜ * Δtₜ
-
-    return vcat(δŨvec, δu, δdu)
-end 
-
+f = [P, Du, Ddu]
 loss =:UnitaryInfidelityLoss
 
 Q = 200000.
@@ -344,7 +345,7 @@ plot_twoqubit(
     labelsize= 25,
     series_color = :Dark2_4
 )
-
+println(prob.trajectory.Δt)
 Ũ⃗₁ = operator_to_iso_vec(I(4))
 U_exp = iso_vec_to_operator(unitary_rollout(Ũ⃗₁, prob.trajectory.u, dts, system, integrator=exp)[:, T])
 U_10 = iso_vec_to_operator(unitary_rollout(Ũ⃗₁, prob.trajectory.u, dts, system, integrator=tenth_order_pade)[:, T])
