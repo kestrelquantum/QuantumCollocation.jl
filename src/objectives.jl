@@ -330,121 +330,121 @@ end
 
 
 function QuadraticSmoothnessRegularizer(;
-	indices::AbstractVector=nothing,
-	vardim::Int=nothing,
-    times::AbstractVector{Int}=nothing,
-	R=1.0,
+	name::Symbol=nothing,
+    times::AbstractVector{Int}=1:traj.T,
+    dim::Int=nothing,
+	R::AbstractVector{<:Real}=ones(traj.dims[name]),
 	eval_hessian=true
 )
-    @assert !isnothing(indices) "indices must be specified"
-    @assert !isnothing(vardim) "vardim must be specified"
+    @assert !isnothing(name) "name must be specified"
     @assert !isnothing(times) "times must be specified"
+    @assert !isnothing(dim) "dim must be specified"
 
     params = Dict(
-        :type => :QuadraticSmoothnessRegularizer,
-        :indices => indices,
-        :vardim => vardim,
+        :name => name,
         :times => times,
+        :dim => dim,
         :R => R,
         :eval_hessian => eval_hessian
     )
 
-	@views function L(Z::AbstractVector)
+	@views function L(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory)
 		∑Δv² = 0.0
-		for t in times[1:end-1]
-			vₜ₊₁ = Z[slice(t + 1, indices, vardim)]
-			vₜ = Z[slice(t, indices, vardim)]
+		for t ∈ times[1:end-1]
+			vₜ₊₁ = Z⃗[slice(t + 1, Z.components[name], Z.dim)]
+			vₜ = Z⃗[slice(t, Z.components[name], Z.dim)]
 			Δv = vₜ₊₁ - vₜ
-			∑Δv² += dot(Δv, Δv)
+			∑Δv² += 0.5 * Δv' * (R .* Δv)
 		end
-		return 0.5 * R * ∑Δv²
+		return ∑Δv²
 	end
 
-	∇L = (Z::AbstractVector) -> begin
+	@views function ∇L(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory)
+        ∇ = zeros(Z.dim * Z.T)
+		Threads.@threads for t ∈ times[1:end-1]
 
-		∇ = zeros(typeof(Z[1]), length(Z))
+			vₜ_slice = slice(t, Z.components[name], Z.dim)
+			vₜ₊₁_slice = slice(t + 1, Z.components[name], Z.dim)
 
-		for t in times[1:end-1]
-
-			vₜ_slice = slice(t, indices, vardim)
-			vₜ₊₁_slice = slice(t + 1, indices, vardim)
-
-			vₜ = Z[vₜ_slice]
-			vₜ₊₁ = Z[vₜ₊₁_slice]
+			vₜ = Z⃗[vₜ_slice]
+			vₜ₊₁ = Z⃗[vₜ₊₁_slice]
 
 			Δv = vₜ₊₁ - vₜ
 
-			∇[vₜ_slice] += -R * Δv
-			∇[vₜ₊₁_slice] += R * Δv
+			∇[vₜ_slice] += -R .* Δv
+			∇[vₜ₊₁_slice] += R .* Δv
 		end
 		return ∇
 	end
+    ∂²L = nothing
+	∂²L_structure = nothing
 
 	if eval_hessian
 
-		∂²L_structure = []
-
+		∂²L_structure = Z -> begin
+            structure = []
 		# u smoothness regularizer Hessian main diagonal structure
 
-		for t in times
+            for t ∈ times
 
-			vₜ_slice = slice(t, indices, vardim)
+                vₜ_slice = slice(t, Z.components[name], Z.dim)
 
-			# main diagonal (2 if t != 1 or T-1) * Rₛ I
-			# components: ∂²vₜSₜ
+                # main diagonal (2 if t != 1 or T-1) * Rₛ I
+                # components: ∂²vₜSₜ
 
-			append!(
-				∂²L_structure,
-				collect(
-					zip(
-						vₜ_slice,
-						vₜ_slice
-					)
-				)
-			)
-		end
-
-
-		# u smoothness regularizer Hessian off diagonal structure
-
-		for t in times[1:end-1]
-
-			vₜ_slice = slice(t, indices, vardim)
-			vₜ₊₁_slice = slice(t + 1, indices, vardim)
-
-			# off diagonal -Rₛ I components: ∂vₜ₊₁∂vₜSₜ
-
-			append!(
-				∂²L_structure,
-				collect(
-					zip(
-						vₜ_slice,
-						vₜ₊₁_slice
-					)
-				)
-			)
-		end
+                append!(
+                    structure,
+                    collect(
+                        zip(
+                            vₜ_slice,
+                            vₜ_slice
+                        )
+                    )
+                )
+            end
 
 
-		∂²L = Z::AbstractVector -> begin
+            # u smoothness regularizer Hessian off diagonal structure
+
+            for t ∈ times[1:end-1]
+
+                vₜ_slice = slice(t, Z.components[name], Z.dim)
+                vₜ₊₁_slice = slice(t + 1, Z.components[name], Z.dim)
+
+                # off diagonal -Rₛ I components: ∂vₜ₊₁∂vₜSₜ
+
+                append!(
+                    structure,
+                    collect(
+                        zip(
+                            vₜ_slice,
+                            vₜ₊₁_slice
+                        )
+                    )
+                )
+            end
+            return structure
+        end
+
+		∂²L = (Z⃗, Z) -> begin
 
 			H = []
 
 			# u smoothness regularizer Hessian main diagonal values
 
-			append!(H, R * ones(length(indices)))
+			append!(H, R)
 
 			for t in times[2:end-1]
-				append!(H, 2 * R * ones(length(indices)))
+				append!(H, 2 * R)
 			end
 
-			append!(H, R * ones(length(indices)))
+			append!(H, R)
 
 
 			# u smoothness regularizer Hessian off diagonal values
 
 			for t in times[1:end-1]
-				append!(H, -R * ones(length(indices)))
+				append!(H, -R)
 			end
 
 			return H
@@ -452,6 +452,21 @@ function QuadraticSmoothnessRegularizer(;
 	end
 
 	return Objective(L, ∇L, ∂²L, ∂²L_structure, Dict[params])
+end
+
+function QuadraticSmoothnessRegularizer(
+    name::Symbol,
+    traj::NamedTrajectory,
+    R::AbstractVector{<:Real};
+    eval_hessian=true
+)
+    return QuadraticSmoothnessRegularizer(;
+        name=name,
+        times=1:traj.T,
+        dim=traj.dim,
+        R=R,
+        eval_hessian=eval_hessian
+    )
 end
 
 
