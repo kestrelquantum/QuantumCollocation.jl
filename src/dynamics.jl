@@ -174,13 +174,21 @@ function QuantumDynamics(
         dynamics_structure(∂f̂, traj, dynamics_dim)
 
     function ∂f(zₜ, zₜ₊₁)
+
         ∂ = spzeros(dynamics_dim, 2traj.dim)
+
         for (integrator, integrator_comps) ∈ zip(integrators, dynamics_comps)
+
             if integrator isa QuantumIntegrator
+
                 x_comps, u_comps, Δt_comps = comps(integrator, traj)
-                ∂xₜf, ∂xₜ₊₁f, ∂uₜf, ∂Δtₜf = Integrators.jacobian(integrator, zₜ, zₜ₊₁, traj)
+
+                ∂xₜf, ∂xₜ₊₁f, ∂uₜf, ∂Δtₜf =
+                    Integrators.jacobian(integrator, zₜ, zₜ₊₁, traj)
+
                 ∂[integrator_comps, x_comps] = ∂xₜf
                 ∂[integrator_comps, x_comps .+ traj.dim] = ∂xₜ₊₁f
+
                 if u_comps isa Tuple
                     for (uᵢ_comps, ∂uₜᵢf) ∈ zip(u_comps, ∂uₜf)
                         ∂[integrator_comps, uᵢ_comps] = ∂uₜᵢf
@@ -188,10 +196,16 @@ function QuantumDynamics(
                 else
                     ∂[integrator_comps, u_comps] = ∂uₜf
                 end
+
                 ∂[integrator_comps, Δt_comps] = ∂Δtₜf
+
             elseif integrator isa DerivativeIntegrator
+
                 x_comps, dx_comps, Δt_comps = comps(integrator, traj)
-                ∂xₜf, ∂xₜ₊₁f, ∂dxₜf, ∂Δtₜf = Integrators.jacobian(integrator, zₜ, zₜ₊₁, traj)
+
+                ∂xₜf, ∂xₜ₊₁f, ∂dxₜf, ∂Δtₜf =
+                    Integrators.jacobian(integrator, zₜ, zₜ₊₁, traj)
+
                 ∂[integrator_comps, x_comps] = ∂xₜf
                 ∂[integrator_comps, x_comps .+ traj.dim] = ∂xₜ₊₁f
                 ∂[integrator_comps, dx_comps] = ∂dxₜf
@@ -219,33 +233,51 @@ function QuantumDynamics(
     end
 
     function μ∂²f(zₜ, zₜ₊₁, μₜ)
+
         μ∂² = spzeros(2traj.dim, 2traj.dim)
+
         for (integrator, integrator_comps) ∈ zip(integrators, dynamics_comps)
-            x_comps, u_comps, Δt_comps = comps(integrator, traj)
-            μ∂uₜ∂xₜf, μ∂²uₜf, μ∂Δtₜ∂xₜf, μ∂Δtₜ∂uₜf, μ∂²Δtₜf, μ∂xₜ₊₁∂uₜf, μ∂xₜ₊₁∂Δtₜf =
-                hessian_of_the_lagrangian(integrator, zₜ, zₜ₊₁, μₜ[integrator_comps], traj)
-            if u_comps isa Tuple
-                for (uᵢ_comps, μ∂uₜᵢ∂xₜf) ∈ zip(u_comps, μ∂uₜ∂xₜf)
-                    μ∂²[x_comps, uᵢ_comps] += μ∂uₜᵢ∂xₜf
+
+            if integrator isa QuantumIntegrator
+
+                x_comps, u_comps, Δt_comps = comps(integrator, traj)
+
+                μ∂uₜ∂xₜf, μ∂²uₜf, μ∂Δtₜ∂xₜf, μ∂Δtₜ∂uₜf, μ∂²Δtₜf, μ∂xₜ₊₁∂uₜf, μ∂xₜ₊₁∂Δtₜf =
+                    hessian_of_the_lagrangian(integrator, zₜ, zₜ₊₁, μₜ[integrator_comps], traj)
+
+                if u_comps isa Tuple
+                    for (uᵢ_comps, μ∂uₜᵢ∂xₜf) ∈ zip(u_comps, μ∂uₜ∂xₜf)
+                        μ∂²[x_comps, uᵢ_comps] += μ∂uₜᵢ∂xₜf
+                    end
+                    for (uᵢ_comps, μ∂²uₜᵢf) ∈ zip(u_comps, μ∂²uₜf)
+                        μ∂²[uᵢ_comps, uᵢ_comps] += μ∂²uₜᵢf
+                    end
+                    for (uᵢ_comps, μ∂Δtₜ∂uₜᵢf) ∈ zip(u_comps, μ∂Δtₜ∂uₜf)
+                        μ∂²[uᵢ_comps, Δt_comps] += μ∂Δtₜ∂uₜᵢf
+                    end
+                    for (uᵢ_comps, μ∂xₜ₊₁∂uₜᵢf) ∈ zip(u_comps, μ∂xₜ₊₁∂uₜf)
+                        μ∂²[uᵢ_comps, x_comps .+ traj.dim] += μ∂xₜ₊₁∂uₜᵢf
+                    end
+                else
+                    μ∂²[x_comps, u_comps] += μ∂uₜ∂xₜf
+                    μ∂²[u_comps, u_comps] += μ∂²uₜf
+                    μ∂²[u_comps, Δt_comps] += μ∂Δtₜ∂uₜf
+                    μ∂²[u_comps, x_comps .+ traj.dim] += μ∂xₜ₊₁∂uₜf
                 end
-                for (uᵢ_comps, μ∂²uₜᵢf) ∈ zip(u_comps, μ∂²uₜf)
-                    μ∂²[uᵢ_comps, uᵢ_comps] += μ∂²uₜᵢf
-                end
-                for (uᵢ_comps, μ∂Δtₜ∂uₜᵢf) ∈ zip(u_comps, μ∂Δtₜ∂uₜf)
-                    μ∂²[uᵢ_comps, Δt_comps] += μ∂Δtₜ∂uₜᵢf
-                end
-                for (uᵢ_comps, μ∂xₜ₊₁∂uₜᵢf) ∈ zip(u_comps, μ∂xₜ₊₁∂uₜf)
-                    μ∂²[uᵢ_comps, x_comps .+ traj.dim] += μ∂xₜ₊₁∂uₜᵢf
-                end
-            else
-                μ∂²[x_comps, u_comps] += μ∂uₜ∂xₜf
-                μ∂²[u_comps, u_comps] += μ∂²uₜf
-                μ∂²[u_comps, Δt_comps] += μ∂Δtₜ∂uₜf
-                μ∂²[u_comps, x_comps .+ traj.dim] += μ∂xₜ₊₁∂uₜf
+
+                μ∂²[x_comps, Δt_comps] += μ∂Δtₜ∂xₜf
+                μ∂²[Δt_comps, x_comps .+ traj.dim] += μ∂xₜ₊₁∂Δtₜf
+                μ∂²[Δt_comps, Δt_comps] .+= μ∂²Δtₜf
+
+            elseif integrator isa DerivativeIntegrator
+
+                x_comps, dx_comps, Δt_comps = comps(integrator, traj)
+
+                μ∂dxₜ∂Δtₜf = -μₜ[integrator_comps]
+
+                μ∂²[dx_comps, Δt_comps] += μ∂dxₜ∂Δtₜf
+
             end
-            μ∂²[x_comps, Δt_comps] += μ∂Δtₜ∂xₜf
-            μ∂²[Δt_comps, x_comps .+ traj.dim] += μ∂xₜ₊₁∂Δtₜf
-            μ∂²[Δt_comps, Δt_comps] .+= μ∂²Δtₜf
         end
         return μ∂²
     end

@@ -300,7 +300,7 @@ elseif load == :no_load
     )
 end
 
-P = UnitaryFourthOrderPade(system, :Ũ⃗, :u, :Δt)
+P = UnitaryPadeIntegrator(system, :Ũ⃗, :u, :Δt)
 
 # @views function f(zₜ, zₜ₊₁)
 #     Ũ⃗ₜ₊₁ = zₜ₊₁[traj.components.Ũ⃗]

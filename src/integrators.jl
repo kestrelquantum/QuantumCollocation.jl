@@ -3,8 +3,8 @@ module Integrators
 export AbstractIntegrator
 
 export QuantumIntegrator
-export QuantumStateIntegrator
-export UnitaryFourthOrderPade
+export QuantumStatePadeIntegrator
+export UnitaryPadeIntegrator
 
 export jacobian
 export hessian_of_the_lagrangian
@@ -27,24 +27,6 @@ export eighth_order_pade
 export TenthOrderPade
 export tenth_order_pade
 
-# jacobians
-export ∂ψ̃ⁱₜ
-export ∂ψ̃ⁱₜ₊₁
-export ∂aₜ
-
-# hessians of the lagrangian
-export μₜ∂²aₜ
-export μⁱₜ∂aₜ∂ψ̃ⁱₜ
-export μⁱₜ∂aₜ∂ψ̃ⁱₜ₊₁
-
-# min time jacobian and hessians of the lagrangian
-export ∂Δtₜ
-export μₜ∂²Δtₜ
-export μⁱₜ∂Δtₜ∂ψ̃ⁱₜ
-export μⁱₜ∂Δtₜ∂ψ̃ⁱₜ₊₁
-export μₜ∂Δtₜ∂aₜ
-
-
 using ..IndexingUtils
 using ..QuantumSystems
 using ..QuantumUtils
@@ -63,14 +45,6 @@ function G(
 )
     return G_drift + sum(a .* G_drives)
 end
-
-function fourth_order_pade(Gₜ::Matrix)
-    Id = I(size(Gₜ, 1))
-    Gₜ² = Gₜ^2
-    return inv(Id - 1 / 2 * Gₜ + 1 / 9 * Gₜ²) *
-        (Id + 1 / 2 * Gₜ + 1 / 9 * Gₜ²)
-end
-
 
 const Id2 = 1.0 * I(2)
 const Im2 = 1.0 * [0 -1; 1 0]
@@ -93,6 +67,10 @@ function anticomm(As::AbstractVector{<:AbstractMatrix{R}}, Bs::AbstractVector{<:
     return anticomms
 end
 
+pade(n, k) = (factorial(n + k) // (factorial(n - k) * factorial(k) * 2^n))
+pade_coeffs(n) = [pade(n, k) for k = n:-1:0][2:end] // pade(n, n)
+
+
 
 #
 # integrator types
@@ -100,11 +78,9 @@ end
 
 abstract type AbstractIntegrator end
 
-abstract type DerivativeIntegrator <: AbstractIntegrator end
-
 abstract type QuantumIntegrator <: AbstractIntegrator end
 
-abstract type QuantumStateIntegrator <: QuantumIntegrator end
+abstract type QuantumStatePadeIntegrator <: QuantumIntegrator end
 
 abstract type QuantumUnitaryIntegrator <: QuantumIntegrator end
 
@@ -124,13 +100,61 @@ end
 dim(integrator::AbstractIntegrator) = integrator.dim
 dim(integrators::AbstractVector{<:AbstractIntegrator}) = sum(dim, integrators)
 
+struct DerivativeIntegrator <: AbstractIntegrator
+    variable::Symbol
+    derivative::Symbol
+    timestep::Symbol
+    dim::Int
+end
 
+state(integrator::DerivativeIntegrator) = integrator.variable
+controls(integrator::DerivativeIntegrator) = integrator.derivative
+timestep(integrator::DerivativeIntegrator) = integrator.timestep
+
+@views function (D::DerivativeIntegrator)(
+    zₜ::AbstractVector,
+    zₜ₊₁::AbstractVector,
+    traj::NamedTrajectory
+)
+    xₜ = zₜ[traj.components[D.variable]]
+    xₜ₊₁ = zₜ₊₁[traj.components[D.variable]]
+    dxₜ = zₜ[traj.components[D.derivative]]
+    Δtₜ = zₜ[traj.components[D.timestep]][1]
+
+    return xₜ₊₁ - xₜ - Δtₜ * dxₜ
+end
+
+@views function jacobian(
+    D::DerivativeIntegrator,
+    zₜ::AbstractVector,
+    zₜ₊₁::AbstractVector,
+    traj::NamedTrajectory
+)
+    dxₜ = zₜ[traj.components[D.derivative]]
+    Δtₜ = zₜ[traj.components[D.timestep]][1]
+
+    ∂xₜD = sparse(-I(D.dim))
+    ∂xₜ₊₁D = sparse(I(D.dim))
+    ∂dxₜD = sparse(-Δtₜ * I(D.dim))
+    ∂ΔtₜD = -dxₜ
+
+    return ∂xₜD, ∂xₜ₊₁D, ∂dxₜD, ∂ΔtₜD
+end
+
+const PADE_COEFFICIENTS = Dict{Int,Vector{Float64}}(
+    4 => [1/2, 1/12],
+    6 => [1/2, 1/10, 1/120],
+    8 => [1/2, 3/28, 1/84, 1/1680],
+    10 => [1/2, 1/9, 1/72, 1/1008, 1/30240]
+)
 
 """
 """
-struct UnitaryFourthOrderPade{R} <: QuantumUnitaryIntegrator
+struct UnitaryPadeIntegrator{R} <: QuantumUnitaryIntegrator
     I_2N::SparseMatrixCSC{R, Int}
     Ω_2N::SparseMatrixCSC{R, Int}
+    G_drift::Union{Nothing, Matrix{R}}
+    G_drives::Union{Nothing, Vector{Matrix{R}}}
     H_drift_real::Matrix{R}
     H_drift_imag::Matrix{R}
     H_drives_real::Vector{Matrix{R}}
@@ -151,13 +175,17 @@ struct UnitaryFourthOrderPade{R} <: QuantumUnitaryIntegrator
     n_drives::Int
     N::Int
     dim::Int
+    order::Int
 
-    function UnitaryFourthOrderPade(
+    function UnitaryPadeIntegrator(
         sys::QuantumSystem{R},
         unitary_symb::Union{Symbol,Nothing}=nothing,
         drive_symb::Union{Symbol,Tuple{Vararg{Symbol}},Nothing}=nothing,
-        timestep_symb::Union{Symbol,Nothing}=nothing
+        timestep_symb::Union{Symbol,Nothing}=nothing;
+        order::Int=4
     ) where R <: Real
+        @assert order ∈ [4, 6, 8, 10] "order must be in [4, 6, 8, 10]"
+
         n_drives = length(sys.H_drives_real)
         N = size(sys.H_drift_real, 1)
         dim = 2N^2
@@ -188,9 +216,19 @@ struct UnitaryFourthOrderPade{R} <: QuantumUnitaryIntegrator
         H_drives_real_anticomm_H_drives_imag =
             anticomm(sys.H_drives_real, sys.H_drives_imag)
 
+        if order == 4
+            G_drift = nothing
+            G_drives = nothing
+        else
+            G_drift = sys.G_drift
+            G_drives = sys.G_drives
+        end
+
         return new{R}(
             I_2N,
             Ω_2N,
+            G_drift,
+            G_drives,
             sys.H_drift_real,
             sys.H_drift_imag,
             sys.H_drives_real,
@@ -210,14 +248,15 @@ struct UnitaryFourthOrderPade{R} <: QuantumUnitaryIntegrator
             timestep_symb,
             n_drives,
             N,
-            dim
+            dim,
+            order
         )
     end
 end
 
-state(P::UnitaryFourthOrderPade) = P.unitary_symb
-controls(P::UnitaryFourthOrderPade) = P.drive_symb
-timestep(P::UnitaryFourthOrderPade) = P.timestep_symb
+state(P::UnitaryPadeIntegrator) = P.unitary_symb
+controls(P::UnitaryPadeIntegrator) = P.drive_symb
+timestep(P::UnitaryPadeIntegrator) = P.timestep_symb
 
 @inline function squared_operator(
     a::AbstractVector{<:Real},
@@ -286,7 +325,7 @@ end
 
 
 @inline function B_real(
-    P::UnitaryFourthOrderPade{R},
+    P::UnitaryPadeIntegrator{R},
     a::AbstractVector{<:Real},
     Δt::Real
 ) where R
@@ -308,11 +347,11 @@ end
         P.n_drives
     )
 
-    return I(P.N) - Δt / 2 * HI + Δt^2 / 9 * (HI² - HR²)
+    return I(P.N) - Δt / 2 * HI + Δt^2 / 12 * (HI² - HR²)
 end
 
 @inline function B_imag(
-    P::UnitaryFourthOrderPade{R},
+    P::UnitaryPadeIntegrator{R},
     a::AbstractVector{<:Real},
     Δt::Real
 ) where R
@@ -327,11 +366,11 @@ end
         P.n_drives
     )
 
-    return Δt / 2 * HR - Δt^2 / 9 * HR_anticomm_HI
+    return Δt / 2 * HR - Δt^2 / 12 * HR_anticomm_HI
 end
 
 @inline function F_real(
-    P::UnitaryFourthOrderPade{R},
+    P::UnitaryPadeIntegrator{R},
     a::AbstractVector{<:Real},
     Δt::Real
 ) where R
@@ -353,11 +392,11 @@ end
         P.n_drives
     )
 
-    return I(P.N) + Δt / 2 * HI + Δt^2 / 9 * (HI² - HR²)
+    return I(P.N) + Δt / 2 * HI + Δt^2 / 12 * (HI² - HR²)
 end
 
 @inline function F_imag(
-    P::UnitaryFourthOrderPade{R},
+    P::UnitaryPadeIntegrator{R},
     a::AbstractVector{<:Real},
     Δt::Real
 ) where R
@@ -372,10 +411,10 @@ end
         P.n_drives
     )
 
-    return Δt / 2 * HR + Δt^2 / 9 * HR_anticomm_HI
+    return Δt / 2 * HR + Δt^2 / 12 * HR_anticomm_HI
 end
 
-# function (P::UnitaryFourthOrderPade)(
+# function (P::UnitaryPadeIntegrator)(
 #     Ũ⃗ₜ₊₁::AbstractVector,
 #     Ũ⃗ₜ::AbstractVector,
 #     aₜ::AbstractVector,
@@ -391,7 +430,8 @@ end
 # end
 
 
-@views function (P::UnitaryFourthOrderPade{R})(
+@views function fourth_order_pade(
+    P::UnitaryPadeIntegrator{R},
     Ũ⃗ₜ₊₁::AbstractVector,
     Ũ⃗ₜ::AbstractVector,
     aₜ::AbstractVector,
@@ -412,7 +452,25 @@ end
     return δŨ⃗
 end
 
-@views function(P::UnitaryFourthOrderPade{R})(
+function nth_order_pade(
+    P::UnitaryPadeIntegrator{R},
+    Ũ⃗ₜ₊₁::AbstractVector,
+    Ũ⃗ₜ::AbstractVector,
+    aₜ::AbstractVector,
+    Δt::Real
+) where R <: Real
+    Ũₜ₊₁ = iso_vec_to_iso_operator(Ũ⃗ₜ₊₁)
+    Ũₜ = iso_vec_to_iso_operator(Ũ⃗ₜ)
+    Gₜ = G(aₜ, P.G_drift, P.G_drives)
+    n = P.order ÷ 2
+    Gₜ_powers = [Gₜ^k for k in 1:n]
+    B = P.I_2N + sum([(-1)^k * PADE_COEFFICIENTS[P.order][k] * Δt^k * Gₜ_powers[k] for k in 1:n])
+    F = P.I_2N + sum([PADE_COEFFICIENTS[P.order][k] * Δt^k * Gₜ_powers[k] for k in 1:n])
+    δŨ = B * Ũₜ₊₁ - F * Ũₜ
+    return iso_operator_to_iso_vec(δŨ)
+end
+
+@views function(P::UnitaryPadeIntegrator{R})(
     zₜ::AbstractVector,
     zₜ₊₁::AbstractVector,
     traj::NamedTrajectory
@@ -425,75 +483,79 @@ end
         aₜ = zₜ[traj.components[P.drive_symb]]
     end
     Δtₜ = zₜ[traj.components[P.timestep_symb]][1]
-    return P(Ũ⃗ₜ₊₁, Ũ⃗ₜ, aₜ, Δtₜ)
+    if P.order == 4
+        return fourth_order_pade(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, aₜ, Δtₜ)
+    else
+        return nth_order_pade(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, aₜ, Δtₜ)
+    end
 end
 
 function ∂aₜʲB_real(
-    P::UnitaryFourthOrderPade{R},
+    P::UnitaryPadeIntegrator{R},
     a::AbstractVector,
     Δt::Real,
     j::Int
 ) where R
     ∂aʲBR = -Δt / 2 * P.H_drives_imag[j]
-    ∂aʲBR += Δt^2 / 9 * P.H_drift_imag_anticomm_H_drives_imag[j]
-    ∂aʲBR += -Δt^2 / 9 * P.H_drift_real_anticomm_H_drives_real[j]
+    ∂aʲBR += Δt^2 / 12 * P.H_drift_imag_anticomm_H_drives_imag[j]
+    ∂aʲBR += -Δt^2 / 12 * P.H_drift_real_anticomm_H_drives_real[j]
     for (i, aⁱ) ∈ enumerate(a)
-        ∂aʲBR += Δt^2 / 9 * aⁱ * P.H_drive_imag_anticomms[i, j]
-        ∂aʲBR += -Δt^2 / 9 * aⁱ * P.H_drive_real_anticomms[i, j]
+        ∂aʲBR += Δt^2 / 12 * aⁱ * P.H_drive_imag_anticomms[i, j]
+        ∂aʲBR += -Δt^2 / 12 * aⁱ * P.H_drive_real_anticomms[i, j]
     end
     return ∂aʲBR
 end
 
 function ∂aₜʲB_imag(
-    P::UnitaryFourthOrderPade{R},
+    P::UnitaryPadeIntegrator{R},
     a::AbstractVector,
     Δt::Real,
     j::Int
 ) where R
     ∂aʲBI = Δt / 2 * P.H_drives_real[j]
-    ∂aʲBI += -Δt^2 / 9 * P.H_drift_real_anticomm_H_drives_imag[j]
-    ∂aʲBI += -Δt^2 / 9 * P.H_drift_imag_anticomm_H_drives_real[j]
+    ∂aʲBI += -Δt^2 / 12 * P.H_drift_real_anticomm_H_drives_imag[j]
+    ∂aʲBI += -Δt^2 / 12 * P.H_drift_imag_anticomm_H_drives_real[j]
     for (i, aⁱ) ∈ enumerate(a)
-        ∂aʲBI += -Δt^2 / 9 * aⁱ * P.H_drives_real_anticomm_H_drives_imag[i, j]
-        ∂aʲBI += -Δt^2 / 9 * aⁱ * P.H_drives_real_anticomm_H_drives_imag[j, i]
+        ∂aʲBI += -Δt^2 / 12 * aⁱ * P.H_drives_real_anticomm_H_drives_imag[i, j]
+        ∂aʲBI += -Δt^2 / 12 * aⁱ * P.H_drives_real_anticomm_H_drives_imag[j, i]
     end
     return ∂aʲBI
 end
 
 function ∂aₜʲF_real(
-    P::UnitaryFourthOrderPade{R},
+    P::UnitaryPadeIntegrator{R},
     a::AbstractVector,
     Δt::Real,
     j::Int
 ) where R
     ∂aʲFR = Δt / 2 * P.H_drives_imag[j]
-    ∂aʲFR += Δt^2 / 9 * P.H_drift_imag_anticomm_H_drives_imag[j]
-    ∂aʲFR += -Δt^2 / 9 * P.H_drift_real_anticomm_H_drives_real[j]
+    ∂aʲFR += Δt^2 / 12 * P.H_drift_imag_anticomm_H_drives_imag[j]
+    ∂aʲFR += -Δt^2 / 12 * P.H_drift_real_anticomm_H_drives_real[j]
     for (i, aⁱ) ∈ enumerate(a)
-        ∂aʲFR += Δt^2 / 9 * aⁱ * P.H_drive_imag_anticomms[i, j]
-        ∂aʲFR += -Δt^2 / 9 * aⁱ * P.H_drive_real_anticomms[i, j]
+        ∂aʲFR += Δt^2 / 12 * aⁱ * P.H_drive_imag_anticomms[i, j]
+        ∂aʲFR += -Δt^2 / 12 * aⁱ * P.H_drive_real_anticomms[i, j]
     end
     return ∂aʲFR
 end
 
 function ∂aₜʲF_imag(
-    P::UnitaryFourthOrderPade{R},
+    P::UnitaryPadeIntegrator{R},
     a::AbstractVector,
     Δt::Real,
     j::Int
 ) where R
     ∂aʲFI = Δt / 2 * P.H_drives_real[j]
-    ∂aʲFI += Δt^2 / 9 * P.H_drift_real_anticomm_H_drives_imag[j]
-    ∂aʲFI += Δt^2 / 9 * P.H_drift_imag_anticomm_H_drives_real[j]
+    ∂aʲFI += Δt^2 / 12 * P.H_drift_real_anticomm_H_drives_imag[j]
+    ∂aʲFI += Δt^2 / 12 * P.H_drift_imag_anticomm_H_drives_real[j]
     for (i, aⁱ) ∈ enumerate(a)
-        ∂aʲFI += Δt^2 / 9 * aⁱ * P.H_drives_real_anticomm_H_drives_imag[i, j]
-        ∂aʲFI += Δt^2 / 9 * aⁱ * P.H_drives_real_anticomm_H_drives_imag[j, i]
+        ∂aʲFI += Δt^2 / 12 * aⁱ * P.H_drives_real_anticomm_H_drives_imag[i, j]
+        ∂aʲFI += Δt^2 / 12 * aⁱ * P.H_drives_real_anticomm_H_drives_imag[j, i]
     end
     return ∂aʲFI
 end
 
 function ∂aₜ(
-    P::UnitaryFourthOrderPade{R},
+    P::UnitaryPadeIntegrator{R},
     Ũ⃗ₜ₊₁::AbstractVector,
     Ũ⃗ₜ::AbstractVector,
     aₜ::AbstractVector,
@@ -517,7 +579,7 @@ end
 
 
 function ∂ΔtₜB_real(
-    P::UnitaryFourthOrderPade{R},
+    P::UnitaryPadeIntegrator{R},
     aₜ::AbstractVector,
     Δtₜ::Real
 ) where R
@@ -536,11 +598,11 @@ function ∂ΔtₜB_real(
         P.H_drive_real_anticomms,
         P.n_drives
     )
-    return - 1 / 2 * HI + 2Δtₜ / 9 * (HI² - HR²)
+    return - 1 / 2 * HI + Δtₜ / 6 * (HI² - HR²)
 end
 
 function ∂ΔtₜB_imag(
-    P::UnitaryFourthOrderPade{R},
+    P::UnitaryPadeIntegrator{R},
 
     aₜ::AbstractVector,
     Δtₜ::Real
@@ -554,11 +616,11 @@ function ∂ΔtₜB_imag(
         P.H_drives_real_anticomm_H_drives_imag,
         P.n_drives
     )
-    return 1 / 2 * HR - 2Δtₜ / 9 * HR_anticomm_HI
+    return 1 / 2 * HR - Δtₜ / 6 * HR_anticomm_HI
 end
 
 function ∂ΔtₜF_real(
-    P::UnitaryFourthOrderPade{R},
+    P::UnitaryPadeIntegrator{R},
     aₜ::AbstractVector,
     Δtₜ::Real
 ) where R
@@ -577,11 +639,11 @@ function ∂ΔtₜF_real(
         P.H_drive_real_anticomms,
         P.n_drives
     )
-    return 1 / 2 * HI + 2Δtₜ / 9 * (HI² - HR²)
+    return 1 / 2 * HI + Δtₜ / 6 * (HI² - HR²)
 end
 
 function ∂ΔtₜF_imag(
-    P::UnitaryFourthOrderPade{R},
+    P::UnitaryPadeIntegrator{R},
     aₜ::AbstractVector,
     Δtₜ::Real
 ) where R
@@ -594,11 +656,11 @@ function ∂ΔtₜF_imag(
         P.H_drives_real_anticomm_H_drives_imag,
         P.n_drives
     )
-    return 1 / 2 * HR + 2Δtₜ / 9 * HR_anticomm_HI
+    return 1 / 2 * HR + Δtₜ / 6 * HR_anticomm_HI
 end
 
 function ∂Δtₜ(
-    P::UnitaryFourthOrderPade{R},
+    P::UnitaryPadeIntegrator{R},
     Ũ⃗ₜ₊₁::AbstractVector,
     Ũ⃗ₜ::AbstractVector,
     aₜ::AbstractVector,
@@ -615,7 +677,7 @@ end
 
 
 function jacobian(
-    P::UnitaryFourthOrderPade,
+    P::UnitaryPadeIntegrator,
     zₜ::AbstractVector,
     zₜ₊₁::AbstractVector,
     traj::NamedTrajectory
@@ -662,7 +724,7 @@ function jacobian(
 end
 
 function μ∂aₜ∂Ũ⃗ₜ(
-    P::UnitaryFourthOrderPade,
+    P::UnitaryPadeIntegrator,
     aₜ::AbstractVector,
     Δtₜ::Real,
     μₜ::AbstractVector,
@@ -679,7 +741,7 @@ function μ∂aₜ∂Ũ⃗ₜ(
 end
 
 function μ∂Ũ⃗ₜ₊₁∂aₜ(
-    P::UnitaryFourthOrderPade,
+    P::UnitaryPadeIntegrator,
     aₜ::AbstractVector,
     Δtₜ::Real,
     μₜ::AbstractVector,
@@ -696,7 +758,7 @@ function μ∂Ũ⃗ₜ₊₁∂aₜ(
 end
 
 function μ∂²aₜ(
-    P::UnitaryFourthOrderPade,
+    P::UnitaryPadeIntegrator,
     Ũ⃗ₜ₊₁::AbstractVector,
     Ũ⃗ₜ::AbstractVector,
     Δtₜ::Real,
@@ -707,19 +769,19 @@ function μ∂²aₜ(
     μ∂²aₜP = spzeros(n_drives, n_drives)
     for j = 1:n_drives
         for i = 1:j
-            ∂aⁱ∂aʲBR = Δtₜ^2 / 9 * (
+            ∂aⁱ∂aʲBR = Δtₜ^2 / 12 * (
                 P.H_drive_imag_anticomms[drive_indices[i], drive_indices[j]] -
                 P.H_drive_real_anticomms[drive_indices[i], drive_indices[j]]
             )
-            ∂aⁱ∂aʲBI = -Δtₜ^2 / 9 * (
+            ∂aⁱ∂aʲBI = -Δtₜ^2 / 12 * (
                 P.H_drives_real_anticomm_H_drives_imag[drive_indices[i], drive_indices[j]] +
                 P.H_drives_real_anticomm_H_drives_imag[drive_indices[j], drive_indices[i]]
             )
-            ∂aⁱ∂aʲFR = Δtₜ^2 / 9 * (
+            ∂aⁱ∂aʲFR = Δtₜ^2 / 12 * (
                 P.H_drive_imag_anticomms[drive_indices[i], drive_indices[j]] -
                 P.H_drive_real_anticomms[drive_indices[i], drive_indices[j]]
             )
-            ∂aⁱ∂aʲFI = Δtₜ^2 / 9 * (
+            ∂aⁱ∂aʲFI = Δtₜ^2 / 12 * (
                 P.H_drives_real_anticomm_H_drives_imag[drive_indices[i], drive_indices[j]] +
                 P.H_drives_real_anticomm_H_drives_imag[drive_indices[j], drive_indices[i]]
             )
@@ -732,71 +794,71 @@ function μ∂²aₜ(
 end
 
 function ∂Δtₜ∂aₜʲB_real(
-    P::UnitaryFourthOrderPade{R},
+    P::UnitaryPadeIntegrator{R},
     a::AbstractVector,
     Δt::Real,
     j::Int
 ) where R
     ∂Δt∂aʲBR = -1 / 2 * P.H_drives_imag[j]
-    ∂Δt∂aʲBR += 2Δt / 9 * P.H_drift_imag_anticomm_H_drives_imag[j]
-    ∂Δt∂aʲBR += -2Δt / 9 * P.H_drift_real_anticomm_H_drives_real[j]
+    ∂Δt∂aʲBR += Δt / 6 * P.H_drift_imag_anticomm_H_drives_imag[j]
+    ∂Δt∂aʲBR += -Δt / 6 * P.H_drift_real_anticomm_H_drives_real[j]
     for (i, aⁱ) ∈ enumerate(a)
-        ∂Δt∂aʲBR += 2Δt / 9 * aⁱ * P.H_drive_imag_anticomms[i, j]
-        ∂Δt∂aʲBR += -2Δt / 9 * aⁱ * P.H_drive_real_anticomms[i, j]
+        ∂Δt∂aʲBR += Δt / 6 * aⁱ * P.H_drive_imag_anticomms[i, j]
+        ∂Δt∂aʲBR += -Δt / 6 * aⁱ * P.H_drive_real_anticomms[i, j]
     end
     return sparse(∂Δt∂aʲBR)
 end
 
 function ∂Δtₜ∂aₜʲB_imag(
-    P::UnitaryFourthOrderPade{R},
+    P::UnitaryPadeIntegrator{R},
     a::AbstractVector,
     Δt::Real,
     j::Int
 ) where R
     ∂Δt∂aʲBI = 1 / 2 * P.H_drives_real[j]
-    ∂Δt∂aʲBI += -2Δt / 9 * P.H_drift_real_anticomm_H_drives_imag[j]
-    ∂Δt∂aʲBI += -2Δt / 9 * P.H_drift_imag_anticomm_H_drives_real[j]
+    ∂Δt∂aʲBI += -Δt / 6 * P.H_drift_real_anticomm_H_drives_imag[j]
+    ∂Δt∂aʲBI += -Δt / 6 * P.H_drift_imag_anticomm_H_drives_real[j]
     for (i, aⁱ) ∈ enumerate(a)
-        ∂Δt∂aʲBI += -2Δt / 9 * aⁱ * P.H_drives_real_anticomm_H_drives_imag[i, j]
-        ∂Δt∂aʲBI += -2Δt / 9 * aⁱ * P.H_drives_real_anticomm_H_drives_imag[j, i]
+        ∂Δt∂aʲBI += -Δt / 6 * aⁱ * P.H_drives_real_anticomm_H_drives_imag[i, j]
+        ∂Δt∂aʲBI += -Δt / 6 * aⁱ * P.H_drives_real_anticomm_H_drives_imag[j, i]
     end
     return sparse(∂Δt∂aʲBI)
 end
 
 function ∂Δtₜ∂aₜʲF_real(
-    P::UnitaryFourthOrderPade{R},
+    P::UnitaryPadeIntegrator{R},
     a::AbstractVector,
     Δt::Real,
     j::Int
 ) where R
     ∂Δt∂aʲFR = 1 / 2 * P.H_drives_imag[j]
-    ∂Δt∂aʲFR += 2Δt / 9 * P.H_drift_imag_anticomm_H_drives_imag[j]
-    ∂Δt∂aʲFR += -2Δt / 9 * P.H_drift_real_anticomm_H_drives_real[j]
+    ∂Δt∂aʲFR += Δt / 6 * P.H_drift_imag_anticomm_H_drives_imag[j]
+    ∂Δt∂aʲFR += -Δt / 6 * P.H_drift_real_anticomm_H_drives_real[j]
     for (i, aⁱ) ∈ enumerate(a)
-        ∂Δt∂aʲFR += 2Δt / 9 * aⁱ * P.H_drive_imag_anticomms[i, j]
-        ∂Δt∂aʲFR += -2Δt / 9 * aⁱ * P.H_drive_real_anticomms[i, j]
+        ∂Δt∂aʲFR += Δt / 6 * aⁱ * P.H_drive_imag_anticomms[i, j]
+        ∂Δt∂aʲFR += -Δt / 6 * aⁱ * P.H_drive_real_anticomms[i, j]
     end
     return sparse(∂Δt∂aʲFR)
 end
 
 function ∂Δtₜ∂aₜʲF_imag(
-    P::UnitaryFourthOrderPade{R},
+    P::UnitaryPadeIntegrator{R},
     a::AbstractVector,
     Δt::Real,
     j::Int
 ) where R
     ∂Δt∂aʲFI = 1 / 2 * P.H_drives_real[j]
-    ∂Δt∂aʲFI += 2Δt / 9 * P.H_drift_real_anticomm_H_drives_imag[j]
-    ∂Δt∂aʲFI += 2Δt / 9 * P.H_drift_imag_anticomm_H_drives_real[j]
+    ∂Δt∂aʲFI += Δt / 6 * P.H_drift_real_anticomm_H_drives_imag[j]
+    ∂Δt∂aʲFI += Δt / 6 * P.H_drift_imag_anticomm_H_drives_real[j]
     for (i, aⁱ) ∈ enumerate(a)
-        ∂Δt∂aʲFI += 2Δt / 9 * aⁱ * P.H_drives_real_anticomm_H_drives_imag[i, j]
-        ∂Δt∂aʲFI += 2Δt / 9 * aⁱ * P.H_drives_real_anticomm_H_drives_imag[j, i]
+        ∂Δt∂aʲFI += Δt / 6 * aⁱ * P.H_drives_real_anticomm_H_drives_imag[i, j]
+        ∂Δt∂aʲFI += Δt / 6 * aⁱ * P.H_drives_real_anticomm_H_drives_imag[j, i]
     end
     return sparse(∂Δt∂aʲFI)
 end
 
 function μ∂Δtₜ∂aₜ(
-    P::UnitaryFourthOrderPade,
+    P::UnitaryPadeIntegrator,
     Ũ⃗ₜ₊₁::AbstractVector,
     Ũ⃗ₜ::AbstractVector,
     aₜ::AbstractVector,
@@ -819,7 +881,7 @@ function μ∂Δtₜ∂aₜ(
 end
 
 function μ∂Δtₜ∂Ũ⃗ₜ(
-    P::UnitaryFourthOrderPade,
+    P::UnitaryPadeIntegrator,
     aₜ::AbstractVector,
     Δtₜ::Real,
     μₜ::AbstractVector
@@ -830,7 +892,7 @@ function μ∂Δtₜ∂Ũ⃗ₜ(
 end
 
 function μ∂Ũ⃗ₜ₊₁∂Δtₜ(
-    P::UnitaryFourthOrderPade,
+    P::UnitaryPadeIntegrator,
     aₜ::AbstractVector,
     Δtₜ::Real,
     μₜ::AbstractVector
@@ -841,7 +903,7 @@ function μ∂Ũ⃗ₜ₊₁∂Δtₜ(
 end
 
 function μ∂²Δtₜ(
-    P::UnitaryFourthOrderPade,
+    P::UnitaryPadeIntegrator,
     Ũ⃗ₜ₊₁::AbstractVector,
     Ũ⃗ₜ::AbstractVector,
     aₜ::AbstractVector,
@@ -869,17 +931,17 @@ function μ∂²Δtₜ(
         P.H_drives_real_anticomm_H_drives_imag,
         P.n_drives
     )
-    ∂²ΔtₜBR = 2 / 9 * (HI² - HR²)
-    ∂²ΔtₜBI = -2 / 9 * HR_anticomm_HI
-    ∂²ΔtₜFR = 2 / 9 * (HI² - HR²)
-    ∂²ΔtₜFI = 2 / 9 * HR_anticomm_HI
+    ∂²ΔtₜBR = 1 / 6 * (HI² - HR²)
+    ∂²ΔtₜBI = -1 / 6 * HR_anticomm_HI
+    ∂²ΔtₜFR = 1 / 6 * (HI² - HR²)
+    ∂²ΔtₜFI = 1 / 6 * HR_anticomm_HI
     ∂²ΔtₜB̂ = P.I_2N ⊗ ∂²ΔtₜBR + P.Ω_2N ⊗ ∂²ΔtₜBI
     ∂²ΔtₜF̂ = P.I_2N ⊗ ∂²ΔtₜFR - P.Ω_2N ⊗ ∂²ΔtₜFI
     return μₜ' * (∂²ΔtₜB̂ * Ũ⃗ₜ₊₁ - ∂²ΔtₜF̂ * Ũ⃗ₜ)
 end
 
 function hessian_of_the_lagrangian(
-    P::UnitaryFourthOrderPade,
+    P::UnitaryPadeIntegrator,
     zₜ::AbstractVector,
     zₜ₊₁::AbstractVector,
     μₜ::AbstractVector,
@@ -953,582 +1015,20 @@ function hessian_of_the_lagrangian(
     )
 end
 
+function nth_order_pade(G::Matrix, n::Int)
+    @assert n ∈ keys(PADE_COEFFICIENTS)
+    coeffs = PADE_COEFFICIENTS[n]
+    Id = I(size(G, 1))
+    p = n ÷ 2
+    G_powers = [G^i for i = 1:p]
+    B = Id + sum((-1)^k * coeffs[i] * G_powers[i] for i = 1:p)
+    F = Id + sum(coeffs[i] * G_powers[i] for i = 1:p)
+    return inv(B) * F
 end
 
-function (integrator::Exponential)(
-    ψ̃ₜ₊₁::AbstractVector,
-    ψ̃ₜ::AbstractVector,
-    aₜ::AbstractVector,
-    Δt::Real,
-)
-    Gₜ = G(aₜ, integrator.G_drift, integrator.G_drives)
-    return ψ̃ₜ₊₁ - exp(Gₜ * Δt) * ψ̃ₜ
-end
-
-
-# 2nd order Pade integrator
-
-struct SecondOrderPade <: QuantumStateIntegrator
-    G_drift::Matrix
-    G_drives::Vector{Matrix}
-    nqstates::Int
-    isodim::Int
-
-    SecondOrderPade(sys::QuantumSystem) =
-        new(sys.G_drift, sys.G_drives, sys.nqstates, sys.isodim)
-end
-
-function (integrator::SecondOrderPade)(
-    ψ̃ₜ₊₁::AbstractVector,
-    ψ̃ₜ::AbstractVector,
-    aₜ::AbstractVector,
-    Δt::Real
-)
-    Gₜ = G(aₜ, integrator.G_drift, integrator.G_drives)
-    # Id = I(size(Gₜ, 1))
-    # return (Id - Δt / 2 * Gₜ) * ψ̃ₜ₊₁ -
-    #        (Id + Δt / 2 * Gₜ) * ψ̃ₜ
-    return ψ̃ₜ₊₁ - ψ̃ₜ - Δt / 2 * Gₜ * (ψ̃ₜ₊₁ + ψ̃ₜ)
-end
-
-function second_order_pade(Gₜ::Matrix)
-    Id = I(size(Gₜ, 1))
-    return inv(Id - 1 / 2 * Gₜ) *
-        (Id + 1 / 2 * Gₜ)
-end
-
-
-# 4th order Pade integrator
-
-struct FourthOrderPade <: QuantumStateIntegrator
-    G_drift::Matrix
-    G_drives::Vector{Matrix}
-    G_drive_anticoms::Symmetric
-    G_drift_anticoms::Vector{Matrix}
-    P̂::Matrix
-
-    function FourthOrderPade(sys::QuantumSystem)
-
-        ncontrols = length(sys.G_drives)
-
-        drive_anticoms = fill(
-            zeros(size(sys.G_drift)),
-            ncontrols,
-            ncontrols
-        )
-
-        for j = 1:ncontrols
-            for k = 1:j
-                if k == j
-                    drive_anticoms[k, k] = 2 * sys.G_drives[k]^2
-                else
-                    drive_anticoms[k, j] =
-                        anticomm(sys.G_drives[k], sys.G_drives[j])
-                end
-            end
-        end
-
-        drift_anticoms = [
-            anticomm(G_drive, sys.G_drift)
-                for G_drive in sys.G_drives
-        ]
-
-        N = size(sys.G_drift, 1) ÷ 2
-
-        P̂ = projector(N)
-
-        return new(
-            sys.G_drift,
-            sys.G_drives,
-            Symmetric(drive_anticoms),
-            drift_anticoms,
-            P̂
-        )
-    end
-end
-
-function (P::FourthOrderPade)(
-    xₜ₊₁::AbstractVector{<:Real},
-    xₜ::AbstractVector{<:Real},
-    Δt::Real;
-    kwargs...
-)
-    return P(xₜ₊₁, xₜ, zeros(eltype(xₜ), length(P.G_drives)), Δt; kwargs...)
-end
-
-
-struct SixthOrderPade <: QuantumStateIntegrator
-    G_drift::Matrix
-    G_drives::Vector{Matrix}
-
-    SixthOrderPade(sys::QuantumSystem) =
-        new(sys.G_drift, sys.G_drives)
-end
-
-
-function (P::SixthOrderPade)(
-    xₜ₊₁::AbstractVector{<:Real},
-    xₜ::AbstractVector{<:Real},
-    uₜ::AbstractVector{<:Real},
-    Δt::Real;
-    G_additional::Union{AbstractMatrix{<:Real}, Nothing}=nothing,
-    operator::Bool=false
-)
-    Gₜ = G(uₜ, P.G_drift, P.G_drives)
-    if !isnothing(G_additional)
-        Gₜ += G_additional
-    end
-    Id = I(size(Gₜ, 1))
-
-    if operator
-        Ũₜ₊₁ = iso_vec_to_iso_operator(xₜ₊₁)
-        Ũₜ = iso_vec_to_iso_operator(xₜ)
-        δŨ = (Id + Δt^2 / 9 * Gₜ^2) * (Ũₜ₊₁ - Ũₜ) -
-            (Δt / 2 * Gₜ + Δt^3 * Gₜ^3 / 72) * (Ũₜ₊₁ + Ũₜ)
-        δŨ⃗ = iso_operator_to_iso_vec(δŨ)
-        return δŨ⃗
-    else
-        δx = (Id + Δt^2 / 9 * Gₜ^2) * (xₜ₊₁ - xₜ) -
-        (Δt / 2 * Gₜ + Δt^3 * Gₜ^3 / 72) * (xₜ₊₁ + xₜ)
-        return δx
-    end
-end
-
-function (P::SixthOrderPade)(
-    xₜ₊₁::AbstractVector{<:Real},
-    xₜ::AbstractVector{<:Real},
-    Δt::Real;
-    kwargs...
-)
-    return P(xₜ₊₁, xₜ, zeros(eltype(xₜ), length(P.G_drives)), Δt; kwargs...)
-end
-
-
-struct TenthOrderPade <: QuantumStateIntegrator
-    G_drift::Matrix
-    G_drives::Vector{Matrix}
-    nqstates::Int
-    isodim::Int
-
-    TenthOrderPade(sys::QuantumSystem) =
-        new(sys.G_drift, sys.G_drives, sys.nqstates, sys.isodim)
-end
-
-
-function (P::TenthOrderPade)(
-    xₜ₊₁::AbstractVector{<:Real},
-    xₜ::AbstractVector{<:Real},
-    uₜ::AbstractVector{<:Real},
-    Δt::Real;
-    G_additional::Union{AbstractMatrix{<:Real}, Nothing}=nothing,
-    operator::Bool=false
-)
-    Gₜ = G(uₜ, P.G_drift, P.G_drives)
-    if !isnothing(G_additional)
-        Gₜ += G_additional
-    end
-    Id = I(size(Gₜ, 1))
-
-    if operator
-        Ũₜ₊₁ = iso_vec_to_iso_operator(xₜ₊₁)
-        Ũₜ = iso_vec_to_iso_operator(xₜ)
-        δŨ = (Id + Δt^2 / 9 * Gₜ^2 + Δt^4 * Gₜ^4 / 1008) * (Ũₜ₊₁ - Ũₜ) -
-            (Δt / 2 * Gₜ + Δt^3 * Gₜ^3 / 72 + Δt^5 * Gₜ^3 / 30240) * (Ũₜ₊₁ + Ũₜ)
-        δŨ⃗ = iso_operator_to_iso_vec(δŨ)
-        return δŨ⃗
-    else
-        δx = (Id + Δt^2 / 9 * Gₜ^2 + Δt^4 * Gₜ^4 / 1008) * (xₜ₊₁ - xₜ) -
-        (Δt / 2 * Gₜ + Δt^3 * Gₜ^3 / 72 + Δt^5 * Gₜ^3 / 30240) * (xₜ₊₁ + xₜ)
-        return δx
-    end
-end
-
-function (P::TenthOrderPade)(
-    xₜ₊₁::AbstractVector{<:Real},
-    xₜ::AbstractVector{<:Real},
-    Δt::Real;
-    kwargs...
-)
-    return P(xₜ₊₁, xₜ, zeros(eltype(xₜ), length(P.G_drives)), Δt; kwargs...)
-end
-
-
-
-# function (integrator::FourthOrderPade)(
-#     ψ̃ₜ₊₁::AbstractVector,
-#     ψ̃ₜ::AbstractVector,
-#     aₜ::AbstractVector,
-#     Δt::Real
-# )
-#     Gₜ = G(aₜ, integrator.G_drift, integrator.G_drives)
-#     Id = I(size(Gₜ, 1))
-#     # return (Id - Δt / 2 * Gₜ + Δt^2 / 9 * Gₜ^2) * ψ̃ₜ₊₁ -
-#     #        (Id + Δt / 2 * Gₜ + Δt^2 / 9 * Gₜ^2) * ψ̃ₜ
-#     return (Id + Δt^2 / 9 * Gₜ^2) * (ψ̃ₜ₊₁ - ψ̃ₜ) -
-#         Δt / 2 * Gₜ * (ψ̃ₜ₊₁ + ψ̃ₜ)
-# end
-
-function fourth_order_pade(Gₜ::Matrix)
-    Id = I(size(Gₜ, 1))
-    Gₜ² = Gₜ^2
-    return inv(Id - 1 / 2 * Gₜ + 1 / 9 * Gₜ²) *
-        (Id + 1 / 2 * Gₜ + 1 / 9 * Gₜ²)
-end
-
-
-function sixth_order_pade(Gₜ::Matrix)
-    Id = I(size(Gₜ, 1))
-    Gₜ² = Gₜ^2
-    Gₜ3 = Gₜ^3
-    return inv(Id - 1 / 2 * Gₜ + 1 / 9 * Gₜ² - 1/72 * Gₜ3) *
-        (Id + 1 / 2 * Gₜ + 1 / 9 * Gₜ² + 1/72 * Gₜ3)
-end
-
-function eighth_order_pade(Gₜ::Matrix)
-    Id = I(size(Gₜ, 1))
-    Gₜ² = Gₜ^2
-    Gₜ² = Gₜ^2
-    Gₜ³ = Gₜ^3
-    Gₜ⁴ = Gₜ^4
-    return inv(Id - 1 / 2 * Gₜ + 1 / 9 * Gₜ² - 1/72 * Gₜ³ + 1/1008*Gₜ4) *
-        (Id + 1 / 2 * Gₜ + 1 / 9 * Gₜ² + 1/72 * Gₜ³ + 1/1008 * Gₜ⁴)
-end
-
-function tenth_order_pade(Gₜ::Matrix)
-    Id = I(size(Gₜ, 1))
-    Gₜ² = Gₜ^2
-    Gₜ² = Gₜ^2
-    Gₜ³ = Gₜ^3
-    Gₜ⁴ = Gₜ^4
-    Gₜ⁵ = Gₜ^5
-    return inv(Id - 1 / 2 * Gₜ + 1 / 9 * Gₜ² - 1/72 * Gₜ³ + 1/1008*Gₜ⁴ - 1/30240 * Gₜ⁵) *
-        (Id + 1 / 2 * Gₜ + 1 / 9 * Gₜ² + 1/72 * Gₜ³ + 1/1008 * Gₜ⁴ + 1/30240 * Gₜ⁵)
-end
-
-#
-# Jacobians
-#
-
-
-function ∂ψ̃ⁱₜ(
-    P::SecondOrderPade,
-    aₜ::AbstractVector,
-    Δt::Real
-)
-    Gₜ = G(aₜ, P.G_drift, P.G_drives)
-    Id = I(size(Gₜ, 1))
-    return -(Id + Δt / 2 * Gₜ)
-end
-
-function ∂ψ̃ⁱₜ(
-    P::FourthOrderPade,
-    aₜ::AbstractVector,
-    Δt::Real
-)
-    Gₜ = G(aₜ, P.G_drift, P.G_drives)
-    Id = I(size(Gₜ, 1))
-    return -(Id + Δt / 2 * Gₜ + Δt^2 / 9 * Gₜ^2)
-end
-
-
-function ∂ψ̃ⁱₜ₊₁(
-    P::SecondOrderPade,
-    aₜ::AbstractVector,
-    Δt::Real
-)
-    Gₜ = G(aₜ, P.G_drift, P.G_drives)
-    Id = I(size(Gₜ, 1))
-    return Id - Δt / 2 * Gₜ
-end
-
-function ∂ψ̃ⁱₜ₊₁(
-    P::FourthOrderPade,
-    aₜ::AbstractVector,
-    Δt::Real
-)
-    Gₜ = G(aₜ, P.G_drift, P.G_drives)
-    Id = I(size(Gₜ, 1))
-    return Id - Δt / 2 * Gₜ + Δt^2 / 9 * Gₜ^2
-end
-
-
-function ∂aₜ(
-    P::SecondOrderPade,
-    ψ̃ⁱₜ₊₁::AbstractVector,
-    ψ̃ⁱₜ::AbstractVector,
-    aₜ::AbstractVector,
-    Δt::Real
-)
-    ∂aₜPⁱₜ = zeros(length(ψ̃ⁱₜ), length(aₜ))
-    for j = 1:length(aₜ)
-        Gʲ = P.G_drives[j]
-        ∂aₜPⁱₜ[:, j] = -Δt / 2 * Gʲ * (ψ̃ⁱₜ₊₁ + ψ̃ⁱₜ)
-    end
-    return ∂aₜPⁱₜ
-end
-
-function ∂aₜ(
-    P::FourthOrderPade,
-    ψ̃ⁱₜ₊₁::AbstractVector,
-    ψ̃ⁱₜ::AbstractVector,
-    aₜ::AbstractVector,
-    Δt::Real
-)
-    ∂aₜPⁱₜ = zeros(length(ψ̃ⁱₜ), length(aₜ))
-    for j = 1:length(aₜ)
-        Gʲ = P.G_drives[j]
-        Gʲ_anticom_Gₜ =
-            G(aₜ, P.G_drift_anticoms[j], P.G_drive_anticoms[:, j])
-        ∂aₜPⁱₜ[:, j] =
-            -Δt / 2 * Gʲ * (ψ̃ⁱₜ₊₁ + ψ̃ⁱₜ) +
-            Δt^2 / 9 * Gʲ_anticom_Gₜ * (ψ̃ⁱₜ₊₁ - ψ̃ⁱₜ)
-    end
-    return ∂aₜPⁱₜ
-end
-
-
-function ∂Δtₜ(
-    P::SecondOrderPade,
-    ψ̃ⁱₜ₊₁::AbstractVector,
-    ψ̃ⁱₜ::AbstractVector,
-    aₜ::AbstractVector,
-    Δtₜ::Real # not used, but kept to match 4th order method signature
-)
-    Gₜ = G(aₜ, P.G_drift, P.G_drives)
-    return - 1 / 2 * Gₜ * (ψ̃ⁱₜ₊₁ + ψ̃ⁱₜ)
-end
-
-function ∂Δtₜ(
-    P::FourthOrderPade,
-    ψ̃ⁱₜ₊₁::AbstractVector,
-    ψ̃ⁱₜ::AbstractVector,
-    aₜ::AbstractVector,
-    Δtₜ::Real
-)
-    Gₜ = G(aₜ, P.G_drift, P.G_drives)
-    return - 1 / 2 * Gₜ * (ψ̃ⁱₜ₊₁ + ψ̃ⁱₜ) +
-        2 / 9 * Δtₜ * Gₜ^2 * (ψ̃ⁱₜ₊₁ - ψ̃ⁱₜ)
-end
-
-
-#
-# Hessians of the Lagrangian
-#
-
-
-
-# for dispatching purposes
-function μₜ∂²aₜ(P::SecondOrderPade, args...)
-    ncontrols = length(P.G_drives)
-    return zeros(ncontrols, ncontrols)
-end
-
-# TODO: test and add multithreading
-
-function μₜ∂²aₜ(
-    P::FourthOrderPade,
-    μₜ::AbstractVector,
-    Ψ̃ₜ₊₁::AbstractVector,
-    Ψ̃ₜ::AbstractVector,
-    Δt::Real
-)
-    ncontrols = length(P.G_drives)
-    μₜ∂²aₜPₜ = zeros(ncontrols, ncontrols)
-    for i = 1:P.nqstates
-        ψ̃ⁱ_slice = slice(i, P.isodim)
-        ψ̃ⁱₜ₊₁ = Ψ̃ₜ₊₁[ψ̃ⁱ_slice]
-        ψ̃ⁱₜ = Ψ̃ₜ[ψ̃ⁱ_slice]
-        μⁱₜ = μₜ[ψ̃ⁱ_slice]
-        for j = 1:ncontrols # jth column
-            for k = 1:j     # kth row
-                ∂aᵏₜ∂aʲₜPⁱₜ = Δt^2 / 9 * P.G_drive_anticoms[k, j] * (ψ̃ⁱₜ₊₁ - ψ̃ⁱₜ)
-                μₜ∂²aₜPₜ[k, j] += dot(μⁱₜ, ∂aᵏₜ∂aʲₜPⁱₜ)
-            end
-        end
-    end
-    return Symmetric(μₜ∂²aₜPₜ)
-end
-
-
-function μⁱₜ∂aₜ∂ψ̃ⁱₜ(
-    P::SecondOrderPade,
-    μⁱₜ::AbstractVector,
-    aₜ::AbstractVector,
-    Δt::Real,
-)
-    μⁱₜ∂aₜ∂ψ̃ⁱₜPⁱₜ = zeros(length(μⁱₜ), length(aₜ))
-    for j = 1:length(aₜ)
-        Gʲ = P.G_drives[j]
-        ∂aₜ∂ψ̃ⁱₜPⁱₜ = -Δt / 2 * Gʲ
-        μⁱₜ∂aₜ∂ψ̃ⁱₜPⁱₜ[:, j] = (∂aₜ∂ψ̃ⁱₜPⁱₜ)' * μⁱₜ
-    end
-    return μⁱₜ∂aₜ∂ψ̃ⁱₜPⁱₜ
-end
-
-function μⁱₜ∂aₜ∂ψ̃ⁱₜ(
-    P::FourthOrderPade,
-    μⁱₜ::AbstractVector,
-    aₜ::AbstractVector,
-    Δt::Real,
-)
-    μⁱₜ∂aₜ∂ψ̃ⁱₜPⁱₜ = zeros(length(μⁱₜ), length(aₜ))
-    for j = 1:length(aₜ)
-        Gʲ = P.G_drives[j]
-        Ĝʲ = G(aₜ, P.G_drift_anticoms[j], P.G_drive_anticoms[:, j])
-        ∂aₜ∂ψ̃ⁱₜPⁱₜ = -(Δt / 2 * Gʲ + Δt^2 / 9 * Ĝʲ)
-        μⁱₜ∂aₜ∂ψ̃ⁱₜPⁱₜ[:, j] = (∂aₜ∂ψ̃ⁱₜPⁱₜ)' * μⁱₜ
-    end
-    return μⁱₜ∂aₜ∂ψ̃ⁱₜPⁱₜ
-end
-
-
-function μⁱₜ∂aₜ∂ψ̃ⁱₜ₊₁(
-    P::SecondOrderPade,
-    μⁱₜ::AbstractVector,
-    aₜ::AbstractVector,
-    Δt::Real,
-)
-    μⁱₜ∂aₜ∂ψ̃ⁱₜ₊₁Pⁱₜ = zeros(length(aₜ), length(μⁱₜ))
-    for j = 1:length(aₜ)
-        Gʲ = P.G_drives[j]
-        ∂aₜ∂ψ̃ⁱₜ₊₁Pⁱₜ = -Δt / 2 * Gʲ
-        μⁱₜ∂aₜ∂ψ̃ⁱₜ₊₁Pⁱₜ[j, :] = (μⁱₜ)' * ∂aₜ∂ψ̃ⁱₜ₊₁Pⁱₜ
-    end
-    return μⁱₜ∂aₜ∂ψ̃ⁱₜ₊₁Pⁱₜ
-end
-
-function μⁱₜ∂aₜ∂ψ̃ⁱₜ₊₁(
-    P::FourthOrderPade,
-    μⁱₜ::AbstractVector,
-    aₜ::AbstractVector,
-    Δt::Real,
-)
-    μⁱₜ∂aₜ∂ψ̃ⁱₜ₊₁Pⁱₜ = zeros(length(aₜ), length(μⁱₜ))
-    for j = 1:length(aₜ)
-        Gʲ = P.G_drives[j]
-        Ĝʲ = G(aₜ, P.G_drift_anticoms[j], P.G_drive_anticoms[:, j])
-        ∂aₜ∂ψ̃ⁱₜ₊₁Pⁱₜ = -Δt / 2 * Gʲ + Δt^2 / 9 * Ĝʲ
-        μⁱₜ∂aₜ∂ψ̃ⁱₜ₊₁Pⁱₜ[j, :] = (μⁱₜ)' * ∂aₜ∂ψ̃ⁱₜ₊₁Pⁱₜ
-    end
-    return μⁱₜ∂aₜ∂ψ̃ⁱₜ₊₁Pⁱₜ
-end
-
-
-
-#
-# min time problem hessians of the lagrangian
-#
-
-
-# for dispatching purposes
-μₜ∂²Δtₜ(P::SecondOrderPade, args...) = 0.0
-
-@views function μₜ∂²Δtₜ(
-    P::FourthOrderPade,
-    μₜ::AbstractVector,
-    Ψ̃ₜ₊₁::AbstractVector,
-    Ψ̃ₜ::AbstractVector,
-    aₜ::AbstractVector
-)
-    Gₜ = G(aₜ, P.G_drift, P.G_drives)
-    μₜ∂²ΔtₜPₜ = 0.0
-    for i = 1:P.nqstates
-        ψ̃ⁱ_slice = slice(i, P.isodim)
-        ψ̃ⁱₜ₊₁ = Ψ̃ₜ₊₁[ψ̃ⁱ_slice]
-        ψ̃ⁱₜ = Ψ̃ₜ[ψ̃ⁱ_slice]
-        μⁱₜ = μₜ[ψ̃ⁱ_slice]
-        ∂²ΔtₜPⁱₜ = 2 / 9 * Gₜ^2 * (ψ̃ⁱₜ₊₁ - ψ̃ⁱₜ)
-        μₜ∂²ΔtₜPₜ += dot(μⁱₜ, ∂²ΔtₜPⁱₜ)
-    end
-    return μₜ∂²ΔtₜPₜ
-end
-
-
-function μⁱₜ∂Δtₜ∂ψ̃ⁱₜ(
-    P::SecondOrderPade,
-    μⁱₜ::AbstractVector,
-    aₜ::AbstractVector,
-    Δtₜ::Real # kept for dispatching purposes
-)
-    Gₜ = G(aₜ, P.G_drift, P.G_drives)
-    ∂Δtₜ∂ψ̃ⁱₜPⁱₜ = -1 / 2 * Gₜ
-    return (∂Δtₜ∂ψ̃ⁱₜPⁱₜ)' * μⁱₜ
-end
-
-function μⁱₜ∂Δtₜ∂ψ̃ⁱₜ(
-    P::FourthOrderPade,
-    μⁱₜ::AbstractVector,
-    aₜ::AbstractVector,
-    Δtₜ::Real
-)
-    Gₜ = G(aₜ, P.G_drift, P.G_drives)
-    ∂Δtₜ∂ψ̃ⁱₜPⁱₜ = -(1 / 2 * Gₜ + 2 / 9 * Δtₜ * Gₜ^2)
-    return (∂Δtₜ∂ψ̃ⁱₜPⁱₜ)' * μⁱₜ
-end
-
-
-μⁱₜ∂Δtₜ∂ψ̃ⁱₜ₊₁(P::SecondOrderPade, args...) = μⁱₜ∂Δtₜ∂ψ̃ⁱₜ(P, args...)
-
-function μⁱₜ∂Δtₜ∂ψ̃ⁱₜ₊₁(
-    P::FourthOrderPade,
-    μⁱₜ::AbstractVector,
-    aₜ::AbstractVector,
-    Δtₜ::Real
-)
-    Gₜ = G(aₜ, P.G_drift, P.G_drives)
-    ∂Δtₜ∂ψ̃ⁱₜ₊₁Pⁱₜ = -1 / 2 * Gₜ + 2 / 9 * Δtₜ * Gₜ^2
-    return (∂Δtₜ∂ψ̃ⁱₜ₊₁Pⁱₜ)' * μⁱₜ
-end
-
-@views function μₜ∂Δtₜ∂aₜ(
-    P::SecondOrderPade,
-    μₜ::AbstractVector,
-    Ψ̃ₜ₊₁::AbstractVector,
-    Ψ̃ₜ::AbstractVector,
-    aₜ::AbstractVector,
-    Δtₜ::Real # kept for dispatching purposes
-)
-    μₜ∂Δtₜ∂aₜPₜ = zeros(length(aₜ))
-    for i = 1:P.nqstates
-        ψ̃ⁱ_slice = slice(i, P.isodim)
-        μⁱₜ = μₜ[ψ̃ⁱ_slice]
-        ψ̃ⁱₜ₊₁ = Ψ̃ₜ₊₁[ψ̃ⁱ_slice]
-        ψ̃ⁱₜ = Ψ̃ₜ[ψ̃ⁱ_slice]
-        for j = 1:length(aₜ)
-            Gʲ = P.G_drives[j]
-            ∂Δtₜ∂aʲₜPⁱₜ = -1 / 2 * Gʲ * (ψ̃ⁱₜ₊₁ + ψ̃ⁱₜ)
-            μₜ∂Δtₜ∂aₜPₜ[j] += dot(μⁱₜ, ∂Δtₜ∂aʲₜPⁱₜ)
-        end
-    end
-    return μₜ∂Δtₜ∂aₜPₜ
-end
-
-@views function μₜ∂Δtₜ∂aₜ(
-    P::FourthOrderPade,
-    μₜ::AbstractVector,
-    Ψ̃ₜ₊₁::AbstractVector,
-    Ψ̃ₜ::AbstractVector,
-    aₜ::AbstractVector,
-    Δtₜ::Real
-)
-    μₜ∂Δtₜ∂aₜPₜ = zeros(length(aₜ))
-    for i = 1:P.nqstates
-        ψ̃ⁱ_slice = slice(i, P.isodim)
-        μⁱₜ = μₜ[ψ̃ⁱ_slice]
-        ψ̃ⁱₜ₊₁ = Ψ̃ₜ₊₁[ψ̃ⁱ_slice]
-        ψ̃ⁱₜ = Ψ̃ₜ[ψ̃ⁱ_slice]
-        for j = 1:length(aₜ)
-            Gʲ = P.G_drives[j]
-            Ĝʲ = G(aₜ, P.G_drift_anticoms[j], P.G_drive_anticoms[:, j])
-            ∂Δtₜ∂aʲₜPⁱₜ =
-                -1 / 2 * Gʲ * (ψ̃ⁱₜ₊₁ + ψ̃ⁱₜ) +
-                2 / 9 * Δtₜ * Ĝʲ * (ψ̃ⁱₜ₊₁ - ψ̃ⁱₜ)
-            μₜ∂Δtₜ∂aₜPₜ[j] += dot(μⁱₜ, ∂Δtₜ∂aʲₜPⁱₜ)
-        end
-    end
-    return μₜ∂Δtₜ∂aₜPₜ
-end
-
-
+fourth_order_pade(Gₜ::Matrix) = nth_order_pade(Gₜ, 4)
+sixth_order_pade(Gₜ::Matrix) = nth_order_pade(Gₜ, 6)
+eighth_order_pade(Gₜ::Matrix) = nth_order_pade(Gₜ, 8)
+tenth_order_pade(Gₜ::Matrix) = nth_order_pade(Gₜ, 10)
 
 end

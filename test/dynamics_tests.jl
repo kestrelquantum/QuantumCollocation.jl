@@ -65,18 +65,22 @@
             (
                 Ũ⃗ = unitary_geodesic(U_goal, T),
                 a = randn(n_drives, T),
+                da = randn(n_drives, T),
                 Δt = fill(dt, 1, T),
             ),
-            controls=(:a, :Δt),
+            controls=(:da, :Δt),
             timestep=dt,
             goal=(Ũ⃗ = Ũ⃗_goal,)
         )
 
-        @testset "UnitaryFourthOrderPade integrator" begin
+        @testset "UnitaryPadeIntegrator integrator + DerivativeIntegrator on a & da" begin
 
-            P = UnitaryFourthOrderPade(system, :Ũ⃗, :a, :Δt)
+            P = UnitaryPadeIntegrator(system, :Ũ⃗, :a, :Δt)
+            D = DerivativeIntegrator(:a, :da, :Δt, n_drives)
 
-            dynamics = QuantumDynamics(P, Z)
+            f = [P, D]
+
+            dynamics = QuantumDynamics(f, Z)
 
             # test dynamics jacobian
             shape = (Z.dims.states * (Z.T - 1), Z.dim * Z.T)

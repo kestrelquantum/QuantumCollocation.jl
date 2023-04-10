@@ -145,7 +145,7 @@ traj = NamedTrajectory(
 )
 
 # creating fourth order pade integrator
-P = UnitaryFourthOrderPade(system, :Ũ⃗, (:γ, :α), :Δt)
+P = UnitaryPadeIntegrator(system, :Ũ⃗, (:γ, :α), :Δt)
 
 f = [P]
 
