@@ -4,4 +4,5 @@
 /docs/build/
 /examples/**/plots/
 /examples/**/trajectories/
+/examples/**/single_qubit/trajectories/
 pardiso.lic
