@@ -9,7 +9,7 @@ export QuadraticRegularizer
 export QuadraticSmoothnessRegularizer
 export L1SlackRegularizer
 
-using ..IndexingUtils
+using TrajectoryIndexingUtils
 using ..QuantumSystems
 using ..Losses
 

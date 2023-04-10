@@ -3,7 +3,7 @@ module Dynamics
 export AbstractDynamics
 export QuantumDynamics
 
-using ..IndexingUtils
+using TrajectoryIndexingUtils
 using ..QuantumUtils
 using ..QuantumSystems
 using ..Integrators
