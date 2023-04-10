@@ -22,11 +22,11 @@ This package is under active development and issues may arise -- please be patie
 
 ## Installation
 
-QuantumCollocation.jl is not yet registered, so you will need to install it manually:
+QuantumCollocation.jl is registered, so to install just use:
 
 ```julia
 using Pkg
-Pkg.add(url="https://github.com/aarontrowbridge/QuantumCollocation.jl", rev="main")
+Pkg.add(QuantumCollocation)
 ```
 
 ## Implementation Details
