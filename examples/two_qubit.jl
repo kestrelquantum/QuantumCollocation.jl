@@ -103,15 +103,15 @@ goal = (
 traj = NamedTrajectory(
     comps;
     controls=(:ddu),
-    dt=dt,
-    dynamical_dts=false,
+    timestep=dt,
+    dynamical_timesteps=false,
     bounds=bounds,
     initial=initial,
     final=final,
     goal=goal
 )
 
-P10 = SixthOrderPade(system)
+P10 = TenthOrderPade(system,:Ũ⃗, :u, :Δt)
 
 
 function f(zₜ, zₜ₊₁)
