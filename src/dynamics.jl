@@ -181,23 +181,33 @@ function QuantumDynamics(
 
             if integrator isa QuantumIntegrator
 
-                x_comps, u_comps, Δt_comps = comps(integrator, traj)
+                if integrator.autodiff
 
-                ∂xₜf, ∂xₜ₊₁f, ∂uₜf, ∂Δtₜf =
-                    Integrators.jacobian(integrator, zₜ, zₜ₊₁, traj)
+                    ∂P(z1, z2) = ForwardDiff.jacobian(
+                        zz -> integrator(zz[1:traj.dim], zz[traj.dim+1:end], traj),
+                        [z1; z2]
+                    )
 
-                ∂[integrator_comps, x_comps] = ∂xₜf
-                ∂[integrator_comps, x_comps .+ traj.dim] = ∂xₜ₊₁f
-
-                if u_comps isa Tuple
-                    for (uᵢ_comps, ∂uₜᵢf) ∈ zip(u_comps, ∂uₜf)
-                        ∂[integrator_comps, uᵢ_comps] = ∂uₜᵢf
-                    end
+                    ∂[integrator_comps, 1:2traj.dim] = sparse(∂P(zₜ, zₜ₊₁))
                 else
-                    ∂[integrator_comps, u_comps] = ∂uₜf
-                end
+                    x_comps, u_comps, Δt_comps = comps(integrator, traj)
 
-                ∂[integrator_comps, Δt_comps] = ∂Δtₜf
+                    ∂xₜf, ∂xₜ₊₁f, ∂uₜf, ∂Δtₜf =
+                        Integrators.jacobian(integrator, zₜ, zₜ₊₁, traj)
+
+                    ∂[integrator_comps, x_comps] = ∂xₜf
+                    ∂[integrator_comps, x_comps .+ traj.dim] = ∂xₜ₊₁f
+
+                    if u_comps isa Tuple
+                        for (uᵢ_comps, ∂uₜᵢf) ∈ zip(u_comps, ∂uₜf)
+                            ∂[integrator_comps, uᵢ_comps] = ∂uₜᵢf
+                        end
+                    else
+                        ∂[integrator_comps, u_comps] = ∂uₜf
+                    end
+
+                    ∂[integrator_comps, Δt_comps] = ∂Δtₜf
+                end
 
             elseif integrator isa DerivativeIntegrator
 
@@ -240,34 +250,45 @@ function QuantumDynamics(
 
             if integrator isa QuantumIntegrator
 
-                x_comps, u_comps, Δt_comps = comps(integrator, traj)
+                if integrator.autodiff
 
-                μ∂uₜ∂xₜf, μ∂²uₜf, μ∂Δtₜ∂xₜf, μ∂Δtₜ∂uₜf, μ∂²Δtₜf, μ∂xₜ₊₁∂uₜf, μ∂xₜ₊₁∂Δtₜf =
-                    hessian_of_the_lagrangian(integrator, zₜ, zₜ₊₁, μₜ[integrator_comps], traj)
+                    μ∂²P(z1, z2, μ) = ForwardDiff.hessian(
+                        zz -> μ' * integrator(zz[1:traj.dim], zz[traj.dim+1:end], traj),
+                        [z1; z2]
+                    )
 
-                if u_comps isa Tuple
-                    for (uᵢ_comps, μ∂uₜᵢ∂xₜf) ∈ zip(u_comps, μ∂uₜ∂xₜf)
-                        μ∂²[x_comps, uᵢ_comps] += μ∂uₜᵢ∂xₜf
-                    end
-                    for (uᵢ_comps, μ∂²uₜᵢf) ∈ zip(u_comps, μ∂²uₜf)
-                        μ∂²[uᵢ_comps, uᵢ_comps] += μ∂²uₜᵢf
-                    end
-                    for (uᵢ_comps, μ∂Δtₜ∂uₜᵢf) ∈ zip(u_comps, μ∂Δtₜ∂uₜf)
-                        μ∂²[uᵢ_comps, Δt_comps] += μ∂Δtₜ∂uₜᵢf
-                    end
-                    for (uᵢ_comps, μ∂xₜ₊₁∂uₜᵢf) ∈ zip(u_comps, μ∂xₜ₊₁∂uₜf)
-                        μ∂²[uᵢ_comps, x_comps .+ traj.dim] += μ∂xₜ₊₁∂uₜᵢf
-                    end
+                    μ∂²[1:2traj.dim, 1:2traj.dim] = sparse(μ∂²P(zₜ, zₜ₊₁, μₜ[integrator_comps]))
+
                 else
-                    μ∂²[x_comps, u_comps] += μ∂uₜ∂xₜf
-                    μ∂²[u_comps, u_comps] += μ∂²uₜf
-                    μ∂²[u_comps, Δt_comps] += μ∂Δtₜ∂uₜf
-                    μ∂²[u_comps, x_comps .+ traj.dim] += μ∂xₜ₊₁∂uₜf
-                end
+                    x_comps, u_comps, Δt_comps = comps(integrator, traj)
 
-                μ∂²[x_comps, Δt_comps] += μ∂Δtₜ∂xₜf
-                μ∂²[Δt_comps, x_comps .+ traj.dim] += μ∂xₜ₊₁∂Δtₜf
-                μ∂²[Δt_comps, Δt_comps] .+= μ∂²Δtₜf
+                    μ∂uₜ∂xₜf, μ∂²uₜf, μ∂Δtₜ∂xₜf, μ∂Δtₜ∂uₜf, μ∂²Δtₜf, μ∂xₜ₊₁∂uₜf, μ∂xₜ₊₁∂Δtₜf =
+                        hessian_of_the_lagrangian(integrator, zₜ, zₜ₊₁, μₜ[integrator_comps], traj)
+
+                    if u_comps isa Tuple
+                        for (uᵢ_comps, μ∂uₜᵢ∂xₜf) ∈ zip(u_comps, μ∂uₜ∂xₜf)
+                            μ∂²[x_comps, uᵢ_comps] += μ∂uₜᵢ∂xₜf
+                        end
+                        for (uᵢ_comps, μ∂²uₜᵢf) ∈ zip(u_comps, μ∂²uₜf)
+                            μ∂²[uᵢ_comps, uᵢ_comps] += μ∂²uₜᵢf
+                        end
+                        for (uᵢ_comps, μ∂Δtₜ∂uₜᵢf) ∈ zip(u_comps, μ∂Δtₜ∂uₜf)
+                            μ∂²[uᵢ_comps, Δt_comps] += μ∂Δtₜ∂uₜᵢf
+                        end
+                        for (uᵢ_comps, μ∂xₜ₊₁∂uₜᵢf) ∈ zip(u_comps, μ∂xₜ₊₁∂uₜf)
+                            μ∂²[uᵢ_comps, x_comps .+ traj.dim] += μ∂xₜ₊₁∂uₜᵢf
+                        end
+                    else
+                        μ∂²[x_comps, u_comps] += μ∂uₜ∂xₜf
+                        μ∂²[u_comps, u_comps] += μ∂²uₜf
+                        μ∂²[u_comps, Δt_comps] += μ∂Δtₜ∂uₜf
+                        μ∂²[u_comps, x_comps .+ traj.dim] += μ∂xₜ₊₁∂uₜf
+                    end
+
+                    μ∂²[x_comps, Δt_comps] += μ∂Δtₜ∂xₜf
+                    μ∂²[Δt_comps, x_comps .+ traj.dim] += μ∂xₜ₊₁∂Δtₜf
+                    μ∂²[Δt_comps, Δt_comps] .+= μ∂²Δtₜf
+                end
 
             elseif integrator isa DerivativeIntegrator
 

@@ -6,9 +6,6 @@ export QuantumIntegrator
 export QuantumStatePadeIntegrator
 export UnitaryPadeIntegrator
 
-export jacobian
-export hessian_of_the_lagrangian
-
 export DerivativeIntegrator
 
 export state
@@ -17,14 +14,13 @@ export timestep
 export comps
 export dim
 
+export jacobian
+export hessian_of_the_lagrangian
+
+export nth_order_pade
 export fourth_order_pade
-
-export SixthOrderPade
 export sixth_order_pade
-
 export eighth_order_pade
-
-export TenthOrderPade
 export tenth_order_pade
 
 using ..IndexingUtils
@@ -176,13 +172,52 @@ struct UnitaryPadeIntegrator{R} <: QuantumUnitaryIntegrator
     N::Int
     dim::Int
     order::Int
+    autodiff::Bool
 
+    """
+        UnitaryPadeIntegrator(
+            sys::QuantumSystem{R},
+            unitary_symb::Union{Symbol,Nothing}=nothing,
+            drive_symb::Union{Symbol,Tuple{Vararg{Symbol}},Nothing}=nothing,
+            timestep_symb::Union{Symbol,Nothing}=nothing;
+            order::Int=4,
+            autodiff::Bool=false
+        ) where R <: Real
+
+    Construct a `UnitaryPadeIntegrator` for the quantum system `sys`.
+
+    # Examples
+
+    ## a bare integrator
+    ```julia
+        P = UnitaryPadeIntegrator(sys)
+    ```
+
+    ## for a single drive `a` and timestep `Δt`:
+    ```julia
+        P = UnitaryPadeIntegrator(sys, :Ũ⃗, :a, :Δt)
+    ```
+
+    ## for two drives `α` and `γ`, timestep `Δt`, order `4`, and autodiffed:
+    ```julia
+        P = UnitaryPadeIntegrator(sys, :Ũ⃗, (:α, :γ), :Δt; order=4, autodiff=true)
+    ```
+
+    # Arguments
+    - `sys::QuantumSystem{R}`: the quantum system
+    - `unitary_symb::Union{Symbol,Nothing}=nothing`: the symbol for the unitary
+    - `drive_symb::Union{Symbol,Tuple{Vararg{Symbol}},Nothing}=nothing`: the symbol(s) for the drives
+    - `timestep_symb::Union{Symbol,Nothing}=nothing`: the symbol for the timestep
+    - `order::Int=4`: the order of the Pade approximation. Must be in `[4, 6, 8, 10]`. If order is not `4` and `autodiff` is `false`, then the integrator will use the hand-coded fourth order derivatives.
+    - `autodiff::Bool=false`: whether to use automatic differentiation to compute the jacobian and hessian of the lagrangian
+    """
     function UnitaryPadeIntegrator(
         sys::QuantumSystem{R},
         unitary_symb::Union{Symbol,Nothing}=nothing,
         drive_symb::Union{Symbol,Tuple{Vararg{Symbol}},Nothing}=nothing,
         timestep_symb::Union{Symbol,Nothing}=nothing;
-        order::Int=4
+        order::Int=4,
+        autodiff::Bool=false
     ) where R <: Real
         @assert order ∈ [4, 6, 8, 10] "order must be in [4, 6, 8, 10]"
 
@@ -249,7 +284,8 @@ struct UnitaryPadeIntegrator{R} <: QuantumUnitaryIntegrator
             n_drives,
             N,
             dim,
-            order
+            order,
+            autodiff
         )
     end
 end

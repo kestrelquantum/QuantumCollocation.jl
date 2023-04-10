@@ -105,6 +105,40 @@
             show_diffs(HoL_forward_diff, HoL_dynamics; atol=hessian_atol)
         end
 
+        @testset "UnitaryPadeIntegrator integrator w/ autodiff + DerivativeIntegrator on a & da" begin
+
+            P = UnitaryPadeIntegrator(system, :Ũ⃗, :a, :Δt; order=10, autodiff=true)
+            D = DerivativeIntegrator(:a, :da, :Δt, n_drives)
+
+            f = [P, D]
+
+            dynamics = QuantumDynamics(f, Z)
+
+            # test dynamics jacobian
+            shape = (Z.dims.states * (Z.T - 1), Z.dim * Z.T)
+
+            J_dynamics = dense(dynamics.∂F(Z.datavec), dynamics.∂F_structure, shape)
+
+            J_forward_diff = ForwardDiff.jacobian(dynamics.F, Z.datavec)
+            @test all(J_forward_diff .≈ J_dynamics)
+            show_diffs(J_forward_diff, J_dynamics)
+
+            # test dynamics hessian of the lagrangian
+            shape = (Z.dim * Z.T, Z.dim * Z.T)
+
+            μ = ones(Z.dims.states * (Z.T - 1))
+
+            HoL_dynamics = dense(dynamics.μ∂²F(Z.datavec, μ), dynamics.μ∂²F_structure, shape)
+
+            hessian_atol = 1e-15
+
+            HoL_forward_diff = ForwardDiff.hessian(Z⃗ -> dot(μ, dynamics.F(Z⃗)), Z.datavec)
+            @test all(isapprox.(HoL_forward_diff, HoL_dynamics; atol=hessian_atol))
+            show_diffs(HoL_forward_diff, HoL_dynamics; atol=hessian_atol)
+        end
+
+
+
         # @testset "unitary FourthOrderPade dynamics function" begin
         #     P = FourthOrderPade(system)
 
