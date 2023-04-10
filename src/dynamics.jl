@@ -3,106 +3,17 @@ module Dynamics
 export AbstractDynamics
 export QuantumDynamics
 
-using TrajectoryIndexingUtils
-using ..QuantumUtils
 using ..QuantumSystems
+using ..QuantumUtils
+using ..StructureUtils
 using ..Integrators
 
+using TrajectoryIndexingUtils
 using NamedTrajectories
 using LinearAlgebra
 using SparseArrays
-using Einsum
 using ForwardDiff
-using Symbolics
 using Zygote
-
-
-
-function upper_half_vals(A::AbstractMatrix)
-    n = size(A, 1)
-    vals = similar(A, n * (n + 1) ÷ 2)
-    k = 1
-    for j ∈ axes(A, 2)
-        for i = 1:j
-            vals[k] = A[i, j]
-            k += 1
-        end
-    end
-    return vals
-end
-
-# create an m x n sparse matrix filled with l symbolics num variables
-function random_sparse_symbolics_matrix(m, n, l)
-    A = zeros(Symbolics.Num, m * n)
-    xs = collect(Symbolics.@variables(x[1:l])...)
-    rands = randperm(m * n)[1:l]
-    for i ∈ 1:l
-        A[rands[i]] = xs[i]
-    end
-    return sparse(reshape(A, m, n))
-end
-
-function structure(A::SparseMatrixCSC; upper_half=false)
-    I, J, _ = findnz(A)
-    index_pairs = collect(zip(I, J))
-    if upper_half
-        @assert size(A, 1) == size(A, 2)
-        index_pairs = filter(p -> p[1] <= p[2], index_pairs)
-    end
-    return index_pairs
-end
-
-function jacobian_structure(∂f̂::Function, zdim::Int)
-    zz = collect(Symbolics.@variables(zz[1:2zdim])...)
-    ∂f = ∂f̂(zz)
-    return structure(sparse(∂f))
-end
-
-function hessian_of_lagrangian_structure(∂²f̂::Function, zdim::Int, μdim::Int)
-    zz = collect(Symbolics.@variables(zz[1:2zdim])...)
-    μ = collect(Symbolics.@variables(μ[1:μdim])...)
-    ∂²f = ∂²f̂(zz)
-    @einsum μ∂²f[j, k] := μ[i] * ∂²f[i, j, k]
-    return structure(sparse(μ∂²f), upper_half=true)
-end
-
-function dynamics_structure(∂f̂::Function, traj::NamedTrajectory, dynamics_dim::Int)
-    ∂²f̂(zz) = reshape(
-        ForwardDiff.jacobian(x -> vec(∂f̂(x)), zz),
-        traj.dims.states,
-        2traj.dim,
-        2traj.dim
-    )
-
-    ∂f_structure = jacobian_structure(∂f̂, traj.dim)
-
-    ∂F_structure = Tuple{Int,Int}[]
-
-    for t = 1:traj.T-1
-        ∂fₜ_structure = [
-            (
-                i + index(t, 0, dynamics_dim),
-                j + index(t, 0, traj.dim)
-            ) for (i, j) ∈ ∂f_structure
-        ]
-        append!(∂F_structure, ∂fₜ_structure)
-    end
-
-    μ∂²f_structure = hessian_of_lagrangian_structure(∂²f̂, traj.dim, dynamics_dim)
-
-    μ∂²F_structure = Tuple{Int,Int}[]
-
-    for t = 1:traj.T-1
-        μ∂²fₜ_structure = [ij .+ index(t, 0, traj.dim) for ij ∈ μ∂²f_structure]
-        append!(μ∂²F_structure, μ∂²fₜ_structure)
-    end
-
-    return ∂f_structure, ∂F_structure, μ∂²f_structure, μ∂²F_structure
-end
-
-
-
-
 
 
 abstract type AbstractDynamics end

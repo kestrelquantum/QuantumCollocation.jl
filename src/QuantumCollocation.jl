@@ -2,6 +2,9 @@ module QuantumCollocation
 
 using Reexport
 
+include("structure_utils.jl")
+@reexport using .StructureUtils
+
 include("quantum_utils.jl")
 @reexport using .QuantumUtils
 

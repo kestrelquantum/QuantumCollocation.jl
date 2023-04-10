@@ -5,6 +5,15 @@ export trajectory_constraints
 
 export AbstractConstraint
 
+export NonlinearConstraint
+
+export NonlinearInequalityConstraint
+export FinalFidelityConstraint
+export FinalUnitaryFidelityConstraint
+export FinalStateFidelityConstraint
+
+export LinearConstraint
+
 export EqualityConstraint
 export BoundsConstraint
 export TimeStepBoundsConstraint
@@ -12,7 +21,11 @@ export TimeStepEqualityConstraint
 export TimeStepsAllEqualConstraint
 export L1SlackConstraint
 
+using ..StructureUtils
+using ..QuantumUtils
+
 using TrajectoryIndexingUtils
+using ForwardDiff
 
 using NamedTrajectories
 using Ipopt
@@ -21,6 +34,44 @@ const MOI = MathOptInterface
 
 
 abstract type AbstractConstraint end
+
+abstract type NonlinearConstraint <: AbstractConstraint end
+
+abstract type NonlinearInequalityConstraint <: NonlinearConstraint end
+
+struct FinalFidelityConstraint <: NonlinearInequalityConstraint
+    g::Function
+    ∂g::Function
+    ∂g_structure::Vector{Tuple{Int, Int}}
+    μ∂²g::Function
+    μ∂²g_structure::Vector{Tuple{Int, Int}}
+    statesymb::Symbol
+    dim::Int
+
+    function FinalFidelityConstraint(
+        fid::Function,
+        value::Float64,
+        statesymb::Symbol,
+        statedim::Int
+    )
+        @assert fid(randn(statedim)) isa Float64 "fidelity function must return a scalar"
+        g(x) = [fid(x) - value]
+        ∂g(x) = ForwardDiff.jacobian(g, x)
+        ∂g_structure = jacobian_structure(∂g, statedim)
+        ∂²g(x) = reshape(ForwardDiff.hessian(x̂ -> vec(∂g(x̂)), x), 1, statedim, statedim)
+        μ∂²g_structure = hessian_of_lagrangian_structure(∂²g, statedim, 1)
+        μ∂²g(x, μ) = ForwardDiff.hessian(x̂ -> dot(μ, g(x̂)), x)
+        return new(g, ∂g, ∂g_structure, μ∂²g, μ∂²g_structure, statesymb, 1)
+    end
+end
+
+FinalUnitaryFidelityConstraint(args...; fidelity_function=unitary_fidelity) =
+    FinalFidelityConstraint(fidelity_function, args...)
+
+FinalStateFidelityConstraint(args...; fidelity_function=fidelity) =
+    FinalFidelityConstraint(fidelity_function, args...)
+
+abstract type LinearConstraint <: AbstractConstraint end
 
 function constrain!(
     opt::Ipopt.Optimizer,
@@ -87,7 +138,7 @@ end
 
 
 
-struct EqualityConstraint <: AbstractConstraint
+struct EqualityConstraint <: LinearConstraint
     ts::AbstractArray{Int}
     js::AbstractArray{Int}
     vals::Vector{R} where R
@@ -143,7 +194,7 @@ function (con::EqualityConstraint)(
     end
 end
 
-struct BoundsConstraint <: AbstractConstraint
+struct BoundsConstraint <: LinearConstraint
     ts::AbstractArray{Int}
     js::AbstractArray{Int}
     vals::Vector{Tuple{R, R}} where R <: Real
@@ -241,7 +292,7 @@ function (con::BoundsConstraint)(
     end
 end
 
-struct TimeStepBoundsConstraint <: AbstractConstraint
+struct TimeStepBoundsConstraint <: LinearConstraint
     bounds::Tuple{R, R} where R <: Real
     Δt_indices::AbstractVector{Int}
     name::String
@@ -275,7 +326,7 @@ function (con::TimeStepBoundsConstraint)(
     end
 end
 
-struct TimeStepEqualityConstraint <: AbstractConstraint
+struct TimeStepEqualityConstraint <: LinearConstraint
     val::R where R <: Real
     Δt_indices::AbstractVector{Int}
     name::String
@@ -302,7 +353,7 @@ function (con::TimeStepEqualityConstraint)(
     end
 end
 
-struct TimeStepsAllEqualConstraint <: AbstractConstraint
+struct TimeStepsAllEqualConstraint <: LinearConstraint
     Δt_indices::AbstractVector{Int}
     name::String
 
@@ -330,7 +381,7 @@ function (con::TimeStepsAllEqualConstraint)(
     end
 end
 
-struct L1SlackConstraint <: AbstractConstraint
+struct L1SlackConstraint <: LinearConstraint
     s1_indices::AbstractArray{Int}
     s2_indices::AbstractArray{Int}
     x_indices::AbstractArray{Int}

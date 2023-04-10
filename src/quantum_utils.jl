@@ -185,8 +185,6 @@ function iso_vec_to_iso_operator(Ũ⃗::AbstractVector)
 end
 
 
-
-
 function operator_to_iso_vec(U::AbstractMatrix)
     U_real = real(U)
     U_imag = imag(U)
@@ -228,8 +226,7 @@ end
 function unitary_fidelity(Ũ⃗::Vector, Ũ⃗_goal::Vector)
     U = iso_vec_to_operator(Ũ⃗)
     U_goal = iso_vec_to_operator(Ũ⃗_goal)
-    N = size(U, 1)
-    return 1 / N * abs(tr(U'U_goal))
+    return unitary_fidelity(U, U_goal)
 end
 
 """

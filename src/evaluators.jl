@@ -6,6 +6,7 @@ using ..QuantumSystems
 using ..Integrators
 using ..Dynamics
 using ..Objectives
+using ..Constraints
 
 using NamedTrajectories
 using MathOptInterface
@@ -15,6 +16,7 @@ mutable struct PicoEvaluator <: MOI.AbstractNLPEvaluator
     trajectory::NamedTrajectory
     objective::Objective
     dynamics::QuantumDynamics
+    nl_constraints::Vector{<:NonlinearConstraint}
     eval_hessian::Bool
 end
 
@@ -31,14 +33,14 @@ end
 
 # objective and gradient
 
-function MOI.eval_objective(
+@views function MOI.eval_objective(
     evaluator::PicoEvaluator,
     Z⃗::AbstractVector
 )
     return evaluator.objective.L(Z⃗, evaluator.trajectory)
 end
 
-function MOI.eval_objective_gradient(
+@views function MOI.eval_objective_gradient(
     evaluator::PicoEvaluator,
     ∇::AbstractVector,
     Z⃗::AbstractVector
@@ -50,7 +52,7 @@ end
 
 # constraints and Jacobian
 
-function MOI.eval_constraint(
+@views function MOI.eval_constraint(
     evaluator::PicoEvaluator,
     g::AbstractVector,
     Z⃗::AbstractVector
@@ -63,7 +65,7 @@ function MOI.jacobian_structure(evaluator::PicoEvaluator)
     return evaluator.dynamics.∂F_structure
 end
 
-function MOI.eval_constraint_jacobian(
+@views function MOI.eval_constraint_jacobian(
     evaluator::PicoEvaluator,
     J::AbstractVector,
     Z⃗::AbstractVector
@@ -86,7 +88,7 @@ function MOI.hessian_lagrangian_structure(evaluator::PicoEvaluator)
     return structure
 end
 
-function MOI.eval_hessian_lagrangian(
+@views function MOI.eval_hessian_lagrangian(
     evaluator::PicoEvaluator,
     H::AbstractVector{T},
     Z⃗::AbstractVector{T},
