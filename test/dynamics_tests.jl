@@ -3,7 +3,7 @@
 """
 
 @testset "Dynamics" begin
-    # initializing test trajectory
+    # initializing test system
     T = 5
     H_drift = GATES[:Z]
     H_drives = [GATES[:X], GATES[:Y]]

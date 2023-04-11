@@ -41,6 +41,17 @@ include("rollouts.jl")
 include("continuous_trajectories.jl")
 @reexport using .ContinuousTrajectories
 
+include("problem_templates.jl")
+@reexport using .ProblemTemplates
+
+include("save_load_utils.jl")
+@reexport using .SaveLoadUtils
+
+include("problem_solvers.jl")
+@reexport using .ProblemSolvers
+
+
+
 
 
 end

@@ -25,9 +25,8 @@ using ..StructureUtils
 using ..QuantumUtils
 
 using TrajectoryIndexingUtils
-using ForwardDiff
-
 using NamedTrajectories
+using ForwardDiff
 using Ipopt
 using MathOptInterface
 const MOI = MathOptInterface
@@ -36,6 +35,10 @@ const MOI = MathOptInterface
 abstract type AbstractConstraint end
 
 abstract type NonlinearConstraint <: AbstractConstraint end
+
+function NonlinearConstraint(params::Dict)
+    return eval(params[:type])(; delete!(params, :type)...)
+end
 
 abstract type NonlinearInequalityConstraint <: NonlinearConstraint end
 
@@ -47,29 +50,78 @@ struct FinalFidelityConstraint <: NonlinearInequalityConstraint
     μ∂²g_structure::Vector{Tuple{Int, Int}}
     statesymb::Symbol
     dim::Int
+    params::Dict{Symbol, Any}
 
-    function FinalFidelityConstraint(
-        fid::Function,
-        value::Float64,
-        statesymb::Symbol,
-        statedim::Int
+    function FinalFidelityConstraint(;
+        fidelity_function::Union{Function,Nothing}=nothing,
+        value::Union{Float64,Nothing}=nothing,
+        statesymb::Union{Symbol,Nothing}=nothing,
+        statedim::Union{Int,Nothing}=nothing
     )
+        @assert !isnothing(fidelity_function) "must provide a fidelity function"
+        @assert !isnothing(value) "must provide a fidelity value"
+        @assert !isnothing(statesymb) "must provide a state symbol"
+        @assert !isnothing(statedim) "must provide a state dimension"
+
         @assert fid(randn(statedim)) isa Float64 "fidelity function must return a scalar"
+
+        params = Dict{Symbol, Any}()
+
+        if Symbol(eval(:fid)) ∉ names(QuantumUtils)
+            @warn "fidelity function is not exported by QuantumUtils: will not be able to save this constraint"
+            params[:type] = :FinalFidelityConstraint
+            params[:fidelity_function] = :not_saveable
+        else
+            params[:type] = :FinalFidelityConstraint
+            params[:fidelity_function] = :fidelity_function
+            params[:value] = value
+            params[:statesymb] = statesymb
+            params[:statedim] = statedim
+        end
+
         g(x) = [fid(x) - value]
+
         ∂g(x) = ForwardDiff.jacobian(g, x)
+
         ∂g_structure = jacobian_structure(∂g, statedim)
+
         ∂²g(x) = reshape(ForwardDiff.hessian(x̂ -> vec(∂g(x̂)), x), 1, statedim, statedim)
+
         μ∂²g_structure = hessian_of_lagrangian_structure(∂²g, statedim, 1)
+
         μ∂²g(x, μ) = ForwardDiff.hessian(x̂ -> dot(μ, g(x̂)), x)
-        return new(g, ∂g, ∂g_structure, μ∂²g, μ∂²g_structure, statesymb, 1)
+
+        return new(g, ∂g, ∂g_structure, μ∂²g, μ∂²g_structure, statesymb, 1, params)
     end
 end
 
-FinalUnitaryFidelityConstraint(args...; fidelity_function=unitary_fidelity) =
-    FinalFidelityConstraint(fidelity_function, args...)
+function FinalUnitaryFidelityConstraint(
+    val::Float64,
+    statesymb::Symbol,
+    statedim::Int;
+    fidelity_function::Function=unitary_fidelity
+)
+    return FinalFidelityConstraint(;
+        fidelity_function=fidelity_function,
+        value=val,
+        statesymb=statesymb,
+        statedim=statedim
+    )
+end
 
-FinalStateFidelityConstraint(args...; fidelity_function=fidelity) =
-    FinalFidelityConstraint(fidelity_function, args...)
+function FinalStateFidelityConstraint(
+    val::Float64,
+    statesymb::Symbol,
+    statedim::Int;
+    fidelity_function::Function=fidelity
+)
+    return FinalFidelityConstraint(;
+        fidelity_function=fidelity_function,
+        value=val,
+        statesymb=statesymb,
+        statedim=statedim
+    )
+end
 
 abstract type LinearConstraint <: AbstractConstraint end
 
@@ -361,6 +413,16 @@ struct TimeStepsAllEqualConstraint <: LinearConstraint
         Δt_indices::AbstractVector{Int};
         name="unnamed time step all equal constraint"
     )
+        return new(Δt_indices, name)
+    end
+
+    function TimeStepsAllEqualConstraint(
+        Δt_symb::Symbol,
+        traj::NamedTrajectory;
+        name="unnamed time step all equal constraint"
+    )
+        Δt_comp = traj.components[Δt_symb][1]
+        Δt_indices = [index(t, Δt_comp, traj.dim) for t = 1:traj.T]
         return new(Δt_indices, name)
     end
 end

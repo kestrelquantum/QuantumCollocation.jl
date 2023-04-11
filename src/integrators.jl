@@ -1057,8 +1057,8 @@ function nth_order_pade(G::Matrix, n::Int)
     Id = I(size(G, 1))
     p = n ÷ 2
     G_powers = [G^i for i = 1:p]
-    B = Id + sum((-1)^k * coeffs[i] * G_powers[i] for i = 1:p)
-    F = Id + sum(coeffs[i] * G_powers[i] for i = 1:p)
+    B = Id + sum((-1)^k * coeffs[k] * G_powers[k] for k = 1:p)
+    F = Id + sum(coeffs[k] * G_powers[k] for k = 1:p)
     return inv(B) * F
 end
 

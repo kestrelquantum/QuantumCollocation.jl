@@ -5,15 +5,10 @@ export FixedTimeProblem
 export QuantumControlProblem
 
 export initialize_trajectory!
-export update_traj_data!
+export update_trajectory!
 export get_traj_data
-export get_variables
-export solve!
-export generate_file_path
-export save_problem
-export load_problem
+export get_datavec
 
-using TrajectoryIndexingUtils
 using ..QuantumSystems
 using ..Integrators
 using ..Evaluators
@@ -22,10 +17,9 @@ using ..Constraints
 using ..Dynamics
 using ..Objectives
 
-
-using JLD2
+using TrajectoryIndexingUtils
 using NamedTrajectories
-using Libdl
+using JLD2
 using Ipopt
 using MathOptInterface
 const MOI = MathOptInterface
@@ -33,16 +27,16 @@ const MOI = MathOptInterface
 abstract type AbstractProblem end
 
 mutable struct QuantumControlProblem <: AbstractProblem
-    system::AbstractSystem
-    variables::Matrix{MOI.VariableIndex}
     optimizer::Ipopt.Optimizer
+    variables::Matrix{MOI.VariableIndex}
     trajectory::NamedTrajectory
+    system::QuantumSystem
     params::Dict{Symbol, Any}
 end
 
 function QuantumControlProblem(
-    system::AbstractSystem,
     traj::NamedTrajectory,
+    system::QuantumSystem,
     obj::Objective,
     dynamics::AbstractDynamics;
     eval_hessian::Bool=true,
@@ -50,10 +44,12 @@ function QuantumControlProblem(
     constraints::Vector{LinearConstraint}=LinearConstraint[],
     nl_constraints::Vector{NonlinearConstraint}=NonlinearConstraint[],
     params::Dict{Symbol, Any}=Dict{Symbol, Any}(),
+    max_iter::Int=options.max_iter,
+    linear_solver::String=options.linear_solver,
     kwargs...
 )
-    optimizer = Ipopt.Optimizer()
-    set!(optimizer, options)
+    options.max_iter = max_iter
+    options.linear_solver = linear_solver
 
     evaluator = PicoEvaluator(traj, obj, dynamics, nl_constraints, eval_hessian)
 
@@ -63,6 +59,8 @@ function QuantumControlProblem(
     linear_trajectory_constraints = trajectory_constraints(traj)
 
     linear_constraints = vcat(linear_trajectory_constraints, constraints)
+
+    optimizer = Ipopt.Optimizer()
 
     variables = initialize_optimizer!(
         optimizer,
@@ -77,64 +75,79 @@ function QuantumControlProblem(
 
     params = merge(kwargs, params)
 
+    params[:eval_hessian] = eval_hessian
+    params[:options] = options
+    params[:constraints] = constraints
+    params[:nl_constraints] = [nl_constraint.params for nl_constraint ∈ nl_constraints]
+    params[:objective_terms] = obj.terms
+
     return QuantumControlProblem(
-        system,
-        variables,
         optimizer,
+        variables,
         traj,
+        system,
         params
     )
-
 end
 
 function QuantumControlProblem(
-    system::AbstractSystem,
     traj::NamedTrajectory,
+    system::QuantumSystem,
     obj::Objective,
     integrators::Vector{<:AbstractIntegrator};
+    params::Dict{Symbol,Any}=Dict{Symbol, Any}(),
     kwargs...
 )
     dynamics = QuantumDynamics(integrators, traj)
-
+    params[:dynamics] = integrators
     return QuantumControlProblem(
         system,
         traj,
         obj,
         dynamics;
+        params=params,
         kwargs...
     )
 end
 
 # constructor that accepts just an AbstractIntegrator
 function QuantumControlProblem(
-    system::AbstractSystem,
     traj::NamedTrajectory,
+    system::QuantumSystem,
     obj::Objective,
     integrator::AbstractIntegrator;
+    params::Dict{Symbol,Any}=Dict{Symbol, Any}(),
     kwargs...
 )
-    return QuantumControlProblem(
-        system,
-        traj,
-        obj,
-        [integrator];
-        kwargs...
-    )
-end
-
-function QuantumControlProblem(
-    system::AbstractSystem,
-    traj::NamedTrajectory,
-    obj::Objective,
-    f::Function;
-    kwargs...
-)
-    dynamics = QuantumDynamics(f, traj)
+    integrators = [integrator]
+    dynamics = QuantumDynamics(integratorsd, traj)
+    params[:dynamics] = integrators
     return QuantumControlProblem(
         system,
         traj,
         obj,
         dynamics;
+        params=params,
+        kwargs...
+    )
+end
+
+function QuantumControlProblem(
+    traj::NamedTrajectory,
+    system::QuantumSystem,
+    obj::Objective,
+    f::Function;
+    params::Dict{Symbol,Any}=Dict{Symbol, Any}(),
+    kwargs...
+)
+    dynamics = QuantumDynamics(f, traj)
+    params[:dynamics] = :function
+    return QuantumControlProblem(
+        system,
+        traj,
+        obj,
+        dynamics;
+        params=params,
         kwargs...
     )
 end
@@ -199,7 +212,7 @@ end
 initialize_trajectory!(prob::QuantumControlProblem) =
     initialize_trajectory!(prob, prob.trajectory)
 
-function get_variables(prob::QuantumControlProblem)
+function get_datavec(prob::QuantumControlProblem)
     Z⃗ = MOI.get(
         prob.optimizer,
         MOI.VariablePrimal(),
@@ -208,79 +221,10 @@ function get_variables(prob::QuantumControlProblem)
     return Z⃗
 end
 
-@views function update_traj_data!(prob::QuantumControlProblem)
-    Z⃗ = get_variables(prob)
+@views function update_trajectory!(prob::QuantumControlProblem)
+    Z⃗ = get_datavec(prob)
     prob.trajectory = NamedTrajectory(Z⃗, prob.trajectory)
 end
-
-
-
-
-function save_problem(prob::AbstractProblem, path::String)
-    mkpath(dirname(path))
-    @save path prob
-end
-
-function load_problem(path::String)
-    @load path prob
-    return prob
-end
-
-function solve!(
-    prob::QuantumControlProblem;
-    init_traj=prob.trajectory,
-    save_path=nothing,
-    controls_save_path=nothing,
-)
-    initialize_trajectory!(prob, init_traj)
-
-    MOI.optimize!(prob.optimizer)
-
-    update_traj_data!(prob)
-
-    if !isnothing(save_path)
-        save_problem(prob, save_path)
-    end
-
-    if !isnothing(controls_save_path)
-        save_controls(prob, controls_save_path)
-    end
-end
-
-
-function generate_file_path(extension, file_name, path)
-    # Ensure the path exists.
-    mkpath(path)
-
-    # Create a save file name based on the one given; ensure it will
-    # not conflict with others in the directory.
-    max_numeric_suffix = -1
-    for (_, _, files) in walkdir(path)
-        for file_name_ in files
-            if occursin("$(file_name)", file_name_) && occursin(".$(extension)", file_name_)
-
-                numeric_suffix = parse(
-                    Int,
-                    split(split(file_name_, "_")[end], ".")[1]
-                )
-
-                max_numeric_suffix = max(
-                    numeric_suffix,
-                    max_numeric_suffix
-                )
-            end
-        end
-    end
-
-    file_path = joinpath(
-        path,
-        file_name *
-        "_$(lpad(max_numeric_suffix + 1, 5, '0')).$(extension)"
-    )
-
-    return file_path
-end
-
 
 
 end
