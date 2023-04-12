@@ -76,7 +76,7 @@ function UnitarySmoothPulseProblem(
     )
 
     initial = (
-        Ũ⃗ = operator_to_iso_vec(I(size(U_goal, 1))),
+        Ũ⃗ = operator_to_iso_vec(1.0I(size(U_goal, 1))),
         a = zeros(n_drives),
     )
 
@@ -106,17 +106,17 @@ function UnitarySmoothPulseProblem(
 
     integrators = [
         UnitaryPadeIntegrator(system, :Ũ⃗, :a, :Δt),
-        DerivativeIntegrator(:a, :da, :Δt, traj.dims[:a]),
-        DerivativeIntegrator(:da, :dda, :Δt, traj.dims[:da]),
+        DerivativeIntegrator(:a, :da, :Δt, traj),
+        DerivativeIntegrator(:da, :dda, :Δt, traj),
     ]
 
     if timesteps_all_equal
-        push!(constraints, TimeStepsEqualConstraint(:Δt, traj))
+        push!(constraints, TimeStepsAllEqualConstraint(:Δt, traj))
     end
 
     return QuantumControlProblem(
-        traj,
         system,
+        traj,
         J,
         integrators;
         constraints=constraints,

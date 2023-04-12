@@ -13,8 +13,8 @@ using ..Problems
 function save_problem(path::String, prob::QuantumControlProblem)
     mkpath(dirname(path))
     data = Dict(
-        "trajectory" => prob.trajectory,
         "system" => prob.system,
+        "trajectory" => prob.trajectory,
         "params" => prob.params,
     )
     save(path, data)
@@ -36,8 +36,8 @@ function load_problem(path::String)
         delete!(data["params"], :objective_terms)
 
         return QuantumControlProblem(
-            data["trajectory"],
             data["system"],
+            data["trajectory"],
             objective,
             integrators;
             nl_constraints=nl_constraints,

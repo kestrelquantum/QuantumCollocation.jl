@@ -103,6 +103,15 @@ struct DerivativeIntegrator <: AbstractIntegrator
     dim::Int
 end
 
+function DerivativeIntegrator(
+    variable::Symbol,
+    derivative::Symbol,
+    timestep::Symbol,
+    traj::NamedTrajectory
+)
+    return DerivativeIntegrator(variable, derivative, timestep, traj.dims[variable])
+end
+
 state(integrator::DerivativeIntegrator) = integrator.variable
 controls(integrator::DerivativeIntegrator) = integrator.derivative
 timestep(integrator::DerivativeIntegrator) = integrator.timestep

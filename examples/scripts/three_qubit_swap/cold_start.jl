@@ -4,7 +4,7 @@ using LinearAlgebra
 using Distributions
 using Manifolds
 
-max_iter = 5000
+max_iter = 50
 linear_solver = "mumps"
 
 e0 = [1, 0]

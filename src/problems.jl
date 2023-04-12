@@ -29,14 +29,14 @@ abstract type AbstractProblem end
 mutable struct QuantumControlProblem <: AbstractProblem
     optimizer::Ipopt.Optimizer
     variables::Matrix{MOI.VariableIndex}
-    trajectory::NamedTrajectory
     system::QuantumSystem
+    trajectory::NamedTrajectory
     params::Dict{Symbol, Any}
 end
 
 function QuantumControlProblem(
-    traj::NamedTrajectory,
     system::QuantumSystem,
+    traj::NamedTrajectory,
     obj::Objective,
     dynamics::AbstractDynamics;
     eval_hessian::Bool=true,
@@ -84,15 +84,15 @@ function QuantumControlProblem(
     return QuantumControlProblem(
         optimizer,
         variables,
-        traj,
         system,
+        traj,
         params
     )
 end
 
 function QuantumControlProblem(
-    traj::NamedTrajectory,
     system::QuantumSystem,
+    traj::NamedTrajectory,
     obj::Objective,
     integrators::Vector{<:AbstractIntegrator};
     params::Dict{Symbol,Any}=Dict{Symbol, Any}(),
@@ -112,8 +112,8 @@ end
 
 # constructor that accepts just an AbstractIntegrator
 function QuantumControlProblem(
-    traj::NamedTrajectory,
     system::QuantumSystem,
+    traj::NamedTrajectory,
     obj::Objective,
     integrator::AbstractIntegrator;
     params::Dict{Symbol,Any}=Dict{Symbol, Any}(),
@@ -133,8 +133,8 @@ function QuantumControlProblem(
 end
 
 function QuantumControlProblem(
-    traj::NamedTrajectory,
     system::QuantumSystem,
+    traj::NamedTrajectory,
     obj::Objective,
     f::Function;
     params::Dict{Symbol,Any}=Dict{Symbol, Any}(),

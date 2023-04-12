@@ -244,7 +244,7 @@ experiment = "T_$(T)_Q_$(Q)_iter_$(max_iter)"
 plot_path = generate_file_path("png", experiment, plot_dir)
 
 # plotting initial trajectory
-plot(plot_path, prob.trajectory, [:Ũ⃗, :γ, :α]; ignored_labels=[:Ũ⃗], dt_name=:Δt)
+plot(plot_path, prob.trajectory, [:Ũ⃗, :γ, :α]; ignored_labels=[:Ũ⃗], timestep_name=:Δt)
 
 # solving the problem
 solve!(prob)
@@ -285,7 +285,7 @@ add_component!(prob.trajectory, :ψ̃₁, Ψ̃₁_exp)
 
 plot(plot_path, prob.trajectory, [:Ũ⃗, :γ, :α, :ψ̃₁];
     ignored_labels=[:Ũ⃗],
-    dt_name=:Δt
+    timestep_name=:Δt
 )
 
 save_dir = "examples/scripts/single_qubit/trajectories"
