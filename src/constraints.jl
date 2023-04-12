@@ -27,6 +27,7 @@ using ..QuantumUtils
 using TrajectoryIndexingUtils
 using NamedTrajectories
 using ForwardDiff
+using SparseArrays
 using Ipopt
 using MathOptInterface
 const MOI = MathOptInterface
@@ -79,17 +80,44 @@ struct FinalFidelityConstraint <: NonlinearInequalityConstraint
             params[:statedim] = statedim
         end
 
-        g(x) = [fid(x) - value]
+        state_slice = slice(traj.T, traj.components[statesymb], traj.dim)
+        col_offset = index(traj.T, 0, traj.dim)
 
-        ∂g(x) = ForwardDiff.jacobian(g, x)
+        ℱ(x) = [fidelity_function(x)]
 
-        ∂g_structure = jacobian_structure(∂g, statedim)
+        g(Z⃗) = ℱ(Z⃗[state_slice]) .- value
 
-        ∂²g(x) = reshape(ForwardDiff.hessian(x̂ -> vec(∂g(x̂)), x), 1, statedim, statedim)
+        ∂ℱ(x) = sparse(ForwardDiff.jacobian(ℱ, x))
 
-        μ∂²g_structure = hessian_of_lagrangian_structure(∂²g, statedim, 1)
+        ∂ℱ_structure = jacobian_structure(∂ℱ, statedim)
 
-        μ∂²g(x, μ) = ForwardDiff.hessian(x̂ -> dot(μ, g(x̂)), x)
+
+
+        ∂g_structure = [(i, j + col_offset) for (i, j) in ∂ℱ_structure]
+
+        @views function ∂g(Z⃗)
+            ∂ = spzeros(1, traj.dim * traj.T)
+            ∂ℱ_x = ∂ℱ(Z⃗[state_slice])
+            for (i, j) ∈ ∂ℱ_structure
+                ∂[i, j + col_offset] = ∂ℱ_x[i, j]
+            end
+            return ∂
+        end
+
+        ∂²ℱ(x) = sparse(ForwardDiff.hessian(fidelity_function, x))
+
+        ∂²ℱ_structure = hessian_of_lagrangian_structure(∂²ℱ, statedim, 1)
+
+        μ∂²g_structure = [ij .+ col_offset for ij in ∂²ℱ_structure]
+
+        @views function μ∂²g(Z⃗, μ)
+            HoL = spzeros(traj.dim * traj.T, traj.dim * traj.T)
+            μ∂²ℱ = μ[1] * ∂²ℱ(Z⃗[state_slice])
+            for (i, j) ∈ ∂²ℱ_structure
+                HoL[i + col_offset, j + col_offset] = μ∂²ℱ[i, j]
+            end
+            return HoL
+        end
 
         return new(g, ∂g, ∂g_structure, μ∂²g, μ∂²g_structure, statesymb, 1, params)
     end
@@ -109,6 +137,21 @@ function FinalUnitaryFidelityConstraint(
     )
 end
 
+function FinalUnitaryFidelityConstraint(
+    val::Float64,
+    statesymb::Symbol,
+    traj::NamedTrajectory;
+    kwargs...
+)
+    @assert statesymb ∈ traj.names
+    return FinalFidelityConstraint(;
+        fidelity_function=unitary_fidelity,
+        value=val,
+        statesymb=statesymb,
+        statedim=traj.dims[statesymb]
+    )
+end
+
 function FinalStateFidelityConstraint(
     val::Float64,
     statesymb::Symbol,
@@ -123,12 +166,36 @@ function FinalStateFidelityConstraint(
     )
 end
 
+
+struct ComplexModulusContraint
+    g::Function
+    ∂g::Function
+    ∂g_structure::Vector{Tuple{Int, Int}}
+    μ∂²g::Function
+    μ∂²g_structure::Vector{Tuple{Int, Int}}
+    symb::Symbol
+    times::Vector{Int}
+    dim::Int
+    params::Dict{Symbol, Any}
+
+    function ComplexModulusContraint(
+        symb::Symbol,
+        r::Float64,
+        traj::NamedTrajectory;
+        times::AbstractVector{Int}=1:traj.T,
+    )
+        gₜ(xₜ, yₜ) = [r^2 - xₜ^2 - yₜ^2]
+        ∂gₜ(xₜ, yₜ) = [-2xₜ, -2yₜ]
+        μₜ∂²gₜ(xₜ, yₜ, μₜ) = sparse([1, 2], [1, 2], [-2μₜ, -2μₜ])
+    end
+end
+
 abstract type LinearConstraint <: AbstractConstraint end
 
 function constrain!(
     opt::Ipopt.Optimizer,
     vars::Vector{MOI.VariableIndex},
-    cons::Vector{AbstractConstraint};
+    cons::Vector{LinearConstraint};
     verbose=false
 )
     for con in cons

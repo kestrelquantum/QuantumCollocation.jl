@@ -215,6 +215,7 @@ function QuadraticRegularizer(;
     @assert !isnothing(dim) "dim must be specified"
 
     params = Dict(
+        :type => :QuadraticRegularizer,
         :name => name,
         :times => times,
         :dim => dim,
@@ -304,6 +305,7 @@ function QuadraticSmoothnessRegularizer(;
     @assert !isnothing(times) "times must be specified"
 
     params = Dict(
+        :type => :QuadraticSmoothnessRegularizer,
         :name => name,
         :times => times,
         :R => R,

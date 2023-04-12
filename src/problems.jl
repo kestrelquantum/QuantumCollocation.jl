@@ -31,6 +31,7 @@ mutable struct QuantumControlProblem <: AbstractProblem
     variables::Matrix{MOI.VariableIndex}
     system::QuantumSystem
     trajectory::NamedTrajectory
+    options::Options
     params::Dict{Symbol, Any}
 end
 
@@ -38,36 +39,43 @@ function QuantumControlProblem(
     system::QuantumSystem,
     traj::NamedTrajectory,
     obj::Objective,
-    dynamics::AbstractDynamics;
+    dynamics::QuantumDynamics;
     eval_hessian::Bool=true,
     options::Options=Options(),
-    constraints::Vector{LinearConstraint}=LinearConstraint[],
-    nl_constraints::Vector{NonlinearConstraint}=NonlinearConstraint[],
+    constraints::Vector{<:AbstractConstraint}=AbstractConstraint[],
     params::Dict{Symbol, Any}=Dict{Symbol, Any}(),
     max_iter::Int=options.max_iter,
     linear_solver::String=options.linear_solver,
+    verbose=false,
     kwargs...
 )
     options.max_iter = max_iter
     options.linear_solver = linear_solver
 
-    evaluator = PicoEvaluator(traj, obj, dynamics, nl_constraints, eval_hessian)
+    nonlinear_constraints = NonlinearConstraint[con for con ∈ constraints if con isa NonlinearConstraint]
+
+    if verbose
+        println("   building evaluator...")
+    end
+    evaluator = PicoEvaluator(traj, obj, dynamics, nonlinear_constraints, eval_hessian)
 
     n_dynamics_constraints = dynamics.dim * (traj.T - 1)
     n_variables = traj.dim * traj.T
 
-    linear_trajectory_constraints = trajectory_constraints(traj)
-
-    linear_constraints = vcat(linear_trajectory_constraints, constraints)
+    linear_constraints = [con for con ∈ constraints if con isa LinearConstraint]
+    linear_constraints = LinearConstraint[trajectory_constraints(traj); linear_constraints]
 
     optimizer = Ipopt.Optimizer()
 
+    if verbose
+        println("   initializing optimizer...")
+    end
     variables = initialize_optimizer!(
         optimizer,
         evaluator,
         linear_constraints,
         n_dynamics_constraints,
-        nl_constraints,
+        nonlinear_constraints,
         n_variables
     )
 
@@ -77,8 +85,8 @@ function QuantumControlProblem(
 
     params[:eval_hessian] = eval_hessian
     params[:options] = options
-    params[:constraints] = constraints
-    params[:nl_constraints] = [nl_constraint.params for nl_constraint ∈ nl_constraints]
+    params[:linear_constraints] = constraints
+    params[:nonlinear_constraints] = [nl_constraint.params for nl_constraint ∈ nonlinear_constraints]
     params[:objective_terms] = obj.terms
 
     return QuantumControlProblem(
@@ -86,6 +94,7 @@ function QuantumControlProblem(
         variables,
         system,
         traj,
+        options,
         params
     )
 end
@@ -96,9 +105,13 @@ function QuantumControlProblem(
     obj::Objective,
     integrators::Vector{<:AbstractIntegrator};
     params::Dict{Symbol,Any}=Dict{Symbol, Any}(),
+    verbose=false,
     kwargs...
 )
-    dynamics = QuantumDynamics(integrators, traj)
+    if verbose
+        println("   building dynamics from integrators...")
+    end
+    dynamics = QuantumDynamics(integrators, traj; verbose=verbose)
     params[:dynamics] = integrators
     return QuantumControlProblem(
         system,
@@ -106,6 +119,7 @@ function QuantumControlProblem(
         obj,
         dynamics;
         params=params,
+        verbose=verbose,
         kwargs...
     )
 end
@@ -117,10 +131,14 @@ function QuantumControlProblem(
     obj::Objective,
     integrator::AbstractIntegrator;
     params::Dict{Symbol,Any}=Dict{Symbol, Any}(),
+    verbose=false,
     kwargs...
 )
+    if verbose
+        println("building dynamics from integrator...")
+    end
     integrators = [integrator]
-    dynamics = QuantumDynamics(integratorsd, traj)
+    dynamics = QuantumDynamics(integrators, traj; verbose=verbose)
     params[:dynamics] = integrators
     return QuantumControlProblem(
         system,
@@ -128,6 +146,7 @@ function QuantumControlProblem(
         obj,
         dynamics;
         params=params,
+        verbose=verbose,
         kwargs...
     )
 end
@@ -138,9 +157,13 @@ function QuantumControlProblem(
     obj::Objective,
     f::Function;
     params::Dict{Symbol,Any}=Dict{Symbol, Any}(),
+    verbose=false,
     kwargs...
 )
-    dynamics = QuantumDynamics(f, traj)
+    if verbose
+        println("building dynamics from function...")
+    end
+    dynamics = QuantumDynamics(f, traj; verbose=verbose)
     params[:dynamics] = :function
     return QuantumControlProblem(
         system,
@@ -148,6 +171,7 @@ function QuantumControlProblem(
         obj,
         dynamics;
         params=params,
+        verbose=verbose,
         kwargs...
     )
 end
@@ -155,29 +179,25 @@ end
 function initialize_optimizer!(
     optimizer::Ipopt.Optimizer,
     evaluator::PicoEvaluator,
-    constraints::Vector{AbstractConstraint},
+    linear_constraints::Vector{LinearConstraint},
     n_dynamics_constraints::Int,
-    nl_constraints::Vector{NonlinearConstraint},
+    nonlinear_constraints::Vector{NonlinearConstraint},
     n_variables::Int
 )
-    dynamics_cons = fill(
+    nl_cons = fill(
         MOI.NLPBoundsPair(0.0, 0.0),
         n_dynamics_constraints
     )
 
-    general_nl_cons = []
-
-    for nl_con ∈ nl_constraints
+    for nl_con ∈ nonlinear_constraints
         if nl_con isa NonlinearEqualityConstraint
-            push!(general_nl_cons, MOI.NLPBoundsPair(0.0, 0.0))
+            push!(nl_cons, MOI.NLPBoundsPair(0.0, 0.0))
         elseif nl_con isa NonlinearInequalityConstraint
-            push!(general_nl_cons, MOI.NLPBoundsPair(0.0, Inf))
+            push!(nl_cons, MOI.NLPBoundsPair(0.0, Inf))
         else
             error("Unknown nonlinear constraint type")
         end
     end
-
-    nl_cons = vcat(dynamics_cons, general_nl_cons)
 
     # build NLP block data
     block_data = MOI.NLPBlockData(nl_cons, evaluator, true)
@@ -191,8 +211,8 @@ function initialize_optimizer!(
     # add variables
     variables = MOI.add_variables(optimizer, n_variables)
 
-    # add constraints
-    constrain!(optimizer, variables, constraints, verbose=true)
+    # add linear constraints
+    constrain!(optimizer, variables, linear_constraints, verbose=true)
 
     return variables
 end

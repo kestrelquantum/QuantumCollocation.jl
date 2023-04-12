@@ -1,11 +1,24 @@
+println("loading packages...")
 using QuantumCollocation
 using NamedTrajectories
 using LinearAlgebra
 using Distributions
 using Manifolds
 
-max_iter = 50
+# problem parameters
+
+max_iter = 100000
 linear_solver = "mumps"
+
+a_bound = 2π * 0.04 # GHz, a guess!
+dda_bound = 0.01
+
+T = 200
+Δt = 1.0
+Δt_min = 0.5 * Δt
+Δt_max = 1.5 * Δt
+
+println("building hamiltonian terms...")
 
 e0 = [1, 0]
 e1 = [0, 1]
@@ -59,13 +72,7 @@ H_drives_Im = [1im * (lift(â, j, 3) - lift(â_dag, j, 3)) for j = 1:3]
 
 H_drives = vcat(H_drives_Re, H_drives_Im)
 
-a_bound = 2π * 0.04 # GHz, a guess!
-dda_bound = 0.001
-
-T = 100
-Δt = 2.0
-Δt_min = 0.5 * Δt
-Δt_max = 1.5 * Δt
+println("building problem...")
 
 prob = UnitarySmoothPulseProblem(
     H_drift,
@@ -79,21 +86,28 @@ prob = UnitarySmoothPulseProblem(
     Δt_max = Δt_max,
     max_iter = max_iter,
     linear_solver = linear_solver,
+    verbose = true,
 )
 
-experiment = "T_$(T)_Δt_$(Δt)_a_bound_$(a_bound)_dda_bound_$(dda_bound)_dt_min_$(Δt_min)_dt_max_$(Δt_max)_max_iter_$(max_iter)"
+experiment =
+    "T_$(T)_Δt_$(Δt)_a_bound_$(a_bound)_dda_bound_$(dda_bound)_" *
+    "dt_min_$(Δt_min)_dt_max_$(Δt_max)_max_iter_$(max_iter)"
 
 save_dir = joinpath(@__DIR__, "results")
 plot_dir = joinpath(@__DIR__, "plots")
 
-save_path = generate_file_path(".jld2", experiment, save_dir)
-plot_path = generate_file_path(".pdf", experiment, plot_dir)
+save_path = generate_file_path("jld2", experiment, save_dir)
+plot_path = generate_file_path("png", experiment, plot_dir)
 
-plot(plot_path, prob.trajectory, [:Ũ⃗, :a])
+println("plotting initial guess...")
 
-solve!(prob; save_path=save_path)
+plot(plot_path, prob.trajectory, [:Ũ⃗, :a]; ignored_labels=[:Ũ⃗])
 
-plot(plot_path, prob.trajectory, [:Ũ⃗, :a])
+println("solving problem...")
+solve!(prob)
+println()
+
+fid = unitary_fidelity(prob.trajectory[end].Ũ⃗, prob.trajectory.goal.Ũ⃗)
 
 println("Final fidelity: ", fid)
 
@@ -101,7 +115,22 @@ println("Final fidelity: ", fid)
 ψ = qubit_system_state("100")
 ψ̃ = ket_to_iso(ψ)
 ψ̃_goal = ket_to_iso(U_goal * ψ)
-Ψ̃ = rollout(ψ̃, prob.trajectory.u, prob.trajectory.Δt, system)
-Ψ̃_exp = rollout(ψ̃, prob.trajectory.u, prob.trajectory.Δt, system; integrator=exp)
-println("|100⟩ → U|100⟩ = |001⟩ pade rollout fidelity:  ", fidelity(Ψ̃[:, end], ψ̃_goal))
-println("|100⟩ → U|100⟩ = |001⟩ exp rollout fidelity:   ", fidelity(Ψ̃_exp[:, end], ψ̃_goal))
+Ψ̃ = rollout(ψ̃, prob.trajectory.a, prob.trajectory.Δt, prob.system)
+Ψ̃_exp = rollout(ψ̃, prob.trajectory.a, prob.trajectory.Δt, prob.system; integrator=exp)
+pade_rollout_fidelity = fidelity(Ψ̃[:, end], ψ̃_goal)
+exp_rollout_fidelity = fidelity(Ψ̃_exp[:, end], ψ̃_goal)
+println("|100⟩ → U|100⟩ = |001⟩ pade rollout fidelity:  ", pade_rollout_fidelity)
+println("|100⟩ → U|100⟩ = |001⟩ exp rollout fidelity:   ", exp_rollout_fidelity)
+
+println("plotting solution...")
+plot(plot_path, prob.trajectory, [:Ũ⃗, :a]; ignored_labels=[:Ũ⃗])
+
+info = Dict(
+    "solver fidelity" => fid,
+    "pade rollout fidelity" => pade_rollout_fidelity,
+    "exp rollout fidelity" => exp_rollout_fidelity,
+    "pulse duration" => times(prob.trajectory)[end],
+)
+
+println("saving results...")
+save_problem(save_path, prob, info)

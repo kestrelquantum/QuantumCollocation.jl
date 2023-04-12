@@ -16,8 +16,31 @@ mutable struct PicoEvaluator <: MOI.AbstractNLPEvaluator
     trajectory::NamedTrajectory
     objective::Objective
     dynamics::QuantumDynamics
-    nl_constraints::Vector{<:NonlinearConstraint}
+    n_dynamics_constraints::Int
+    nonlinear_constraints::Vector{<:NonlinearConstraint}
+    n_nonlinear_constraints::Int
     eval_hessian::Bool
+
+    function PicoEvaluator(
+        trajectory::NamedTrajectory,
+        objective::Objective,
+        dynamics::QuantumDynamics,
+        nonlinear_constraints::Vector{<:NonlinearConstraint},
+        eval_hessian::Bool
+    )
+        n_dynamics_constraints = dynamics.dim * (trajectory.T - 1)
+        n_nonlinear_constraints = sum(con.dim for con ∈ nonlinear_constraints; init=0)
+
+        return new(
+            trajectory,
+            objective,
+            dynamics,
+            n_dynamics_constraints,
+            nonlinear_constraints,
+            n_nonlinear_constraints,
+            eval_hessian
+        )
+    end
 end
 
 MOI.initialize(::PicoEvaluator, features) = nothing
@@ -57,7 +80,12 @@ end
     g::AbstractVector,
     Z⃗::AbstractVector
 )
-    g .= evaluator.dynamics.F(Z⃗)
+    g[1:evaluator.n_dynamics_constraints] .= evaluator.dynamics.F(Z⃗)
+    offset = evaluator.n_dynamics_constraints
+    for con ∈ evaluator.nonlinear_constraints
+        g[offset .+ (1:con.dim)] .= con.g(Z⃗)
+        offset += con.dim
+    end
     return nothing
 end
 

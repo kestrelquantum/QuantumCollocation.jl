@@ -4,6 +4,7 @@ export solve!
 
 using ..Problems
 using ..SaveLoadUtils
+using ..IpoptOptions
 
 using MathOptInterface
 const MOI = MathOptInterface
@@ -13,16 +14,18 @@ function solve!(
     init_traj=nothing,
     save_path=nothing,
     controls_save_path=nothing,
-    max_iter::Int=options.max_iter,
-    linear_solver::String=options.linear_solver,
+    max_iter::Int=prob.options.max_iter,
+    linear_solver::String=prob.options.linear_solver,
 )
     prob.options.max_iter = max_iter
     prob.options.linear_solver = linear_solver
 
-    set!(optimizer, prob.options)
+    set!(prob.optimizer, prob.options)
 
     if !isnothing(init_traj)
         initialize_trajectory!(prob, init_traj)
+    else
+        initialize_trajectory!(prob)
     end
 
     MOI.optimize!(prob.optimizer)

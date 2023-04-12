@@ -136,8 +136,7 @@ traj = NamedTrajectory(
     comps;
     # controls=(:ddγ, :ddα, :Δt),
     controls=(:γ, :α, :Δt),
-    timestep=dt,
-    dynamical_timesteps=true,
+    timestep=:Δt,
     bounds=bounds,
     initial=initial,
     final=final,
@@ -147,81 +146,30 @@ traj = NamedTrajectory(
 # creating fourth order pade integrator
 P = UnitaryPadeIntegrator(system, :Ũ⃗, (:γ, :α), :Δt)
 
-f = [P]
-
-# defining dynamics function
-# function f(zₜ, zₜ₊₁)
-#     Ũ⃗ₜ₊₁ = zₜ₊₁[traj.components.Ũ⃗]
-#     Ũ⃗ₜ = zₜ[traj.components.Ũ⃗]
-
-#     # γ states + augmented states + controls
-#     γₜ₊₁ = zₜ₊₁[traj.components.γ]
-#     γₜ = zₜ[traj.components.γ]
-
-#     dγₜ₊₁ = zₜ₊₁[traj.components.dγ]
-#     dγₜ = zₜ[traj.components.dγ]
-
-#     ddγₜ = zₜ[traj.components.ddγ]
-
-#     # α states + augmented states + controls
-#     αₜ₊₁ = zₜ₊₁[traj.components.α]
-#     αₜ = zₜ[traj.components.α]
-
-#     dαₜ₊₁ = zₜ₊₁[traj.components.dα]
-#     dαₜ = zₜ[traj.components.dα]
-
-#     ddαₜ = zₜ[traj.components.ddα]
-
-#     # time step
-#     Δtₜ = zₜ[traj.components.Δt][1]
-
-#     # controls for pade integrator
-#     uₜ = [γₜ; αₜ]
-#     δŨ⃗ = P(Ũ⃗ₜ₊₁, Ũ⃗ₜ, uₜ, Δtₜ)
-
-#     # γ dynamics
-#     δγ = γₜ₊₁ - γₜ - dγₜ * Δtₜ
-#     δdγ = dγₜ₊₁ - dγₜ - ddγₜ * Δtₜ
-
-#     # α dynamics
-#     δα = αₜ₊₁ - αₜ - dαₜ * Δtₜ
-#     δdα = dαₜ₊₁ - dαₜ - ddαₜ * Δtₜ
-
-#     return vcat(δŨ⃗, δγ, δdγ, δα, δdα)
-# end
-
 # quantum objective weight parameter
 Q = 1.0e2
 
-# defining unitary loss
-loss = :UnitaryInfidelityLoss
-# loss = :UnitaryTraceLoss
-
 # creating quantum objective
-J = QuantumObjective(:Ũ⃗, traj, loss, Q)
-
+J = QuantumUnitaryObjective(:Ũ⃗, traj, Q)
 
 # regularization parameters
-R = 1e-1
+R = 1e-2
+R_smoothness = 1e-1
 drive_bound_ratio = γ_bound / α_bound
 
 R_γ = R
 R_α = R * drive_bound_ratio
 
-# addign quadratic regularization term on γ to the objective
-J += QuadraticRegularizer(:γ, traj, R_γ * ones(γ_dim))
+R_γ_smoothness = R_smoothness
+R_α_smoothness = R_smoothness * drive_bound_ratio
 
-# adding quadratic regularization term on
-J += QuadraticRegularizer(:α, traj, R_α * ones(α_dim))
+# adding regularization terms on γ to the objective
+J += QuadraticRegularizer(:γ, traj, R_γ)
+J += QuadraticSmoothnessRegularizer(:γ, traj, R_γ_smoothness)
 
-# R_ddγ = R
-# R_ddα = R * drive_bound_ratio
-
-# # addign quadratic regularization term on γ to the objective
-# J += QuadraticRegularizer(:ddγ, traj, R_ddγ * ones(γ_dim))
-
-# # adding quadratic regularization term on
-# J += QuadraticRegularizer(:ddα, traj, R_ddα * ones(α_dim))
+# adding regularization terms on α to the objective
+J += QuadraticRegularizer(:α, traj, R_α)
+J += QuadraticSmoothnessRegularizer(:α, traj, R_α_smoothness)
 
 # Ipopt options
 options = Options(
@@ -229,9 +177,13 @@ options = Options(
     linear_solver=linear_solver,
 )
 
+# defining constraints
+constraints = [TimeStepsAllEqualConstraint(:Δt, traj)]
+
 # defining quantum control problem
-prob = QuantumControlProblem(system, traj, J, f;
+prob = QuantumControlProblem(system, traj, J, P;
     options=options,
+    constraints=constraints,
 )
 
 # plotting directory
@@ -244,7 +196,7 @@ experiment = "T_$(T)_Q_$(Q)_iter_$(max_iter)"
 plot_path = generate_file_path("png", experiment, plot_dir)
 
 # plotting initial trajectory
-plot(plot_path, prob.trajectory, [:Ũ⃗, :γ, :α]; ignored_labels=[:Ũ⃗], timestep_name=:Δt)
+plot(plot_path, prob.trajectory, [:Ũ⃗, :γ, :α]; ignored_labels=[:Ũ⃗])
 
 # solving the problem
 solve!(prob)
@@ -285,10 +237,9 @@ add_component!(prob.trajectory, :ψ̃₁, Ψ̃₁_exp)
 
 plot(plot_path, prob.trajectory, [:Ũ⃗, :γ, :α, :ψ̃₁];
     ignored_labels=[:Ũ⃗],
-    timestep_name=:Δt
 )
 
-save_dir = "examples/scripts/single_qubit/trajectories"
+save_dir = "examples/scripts/single_qubit/results"
 save_path = generate_file_path("jld2", experiment, save_dir)
 
-save(save_path, prob.trajectory)
+save_problem(save_path, prob)

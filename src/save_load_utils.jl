@@ -9,39 +9,92 @@ using ..Objectives
 using ..Integrators
 using ..Problems
 
+using JLD2
 
-function save_problem(path::String, prob::QuantumControlProblem)
+
+function save_problem(
+    path::String,
+    prob::QuantumControlProblem,
+    info::Dict{String,<:Any}=Dict{String, Any}()
+)
     mkpath(dirname(path))
+
     data = Dict(
         "system" => prob.system,
         "trajectory" => prob.trajectory,
+        "options" => prob.options,
         "params" => prob.params,
     )
+
+    # assert none of the keys in info are already in data
+    for key in keys(info)
+        if haskey(data, key)
+            @warn "Key $(key) in info exists in data dict, removing"
+            delete!(info, key)
+        end
+    end
+
+    merge!(data, info)
+
     save(path, data)
 end
 
-function load_problem(path::String)
+const RESERVED_KEYS = ["system", "trajectory", "options", "params"]
+
+function load_problem(path::String; verbose=true, return_data=false)
     data = load(path)
-    if data["params"]["dynamics"] == :function
-        @warn "Dynamics was built using a user defined function, which could not be saved: returning data dict instead of problem (keys = [\"trajectory\", \"system\", \"params\"]) "
+
+    if verbose
+        println("Loaded problem from $(path):\n")
+        for (key, value) ∈ data
+            if key ∉ RESERVED_KEYS
+                println("   $(key) = $(value)")
+            end
+        end
+    end
+
+    if return_data
         return data
     else
-        integrators = data["params"][:dynamics]
-        delete!(data["params"], :dynamics)
+        if data["params"][:dynamics] == :function
+            @warn "Dynamics was built using a user defined function, which could not be saved: returning data dict instead of problem (keys = [\"trajectory\", \"system\", \"params\"]) "
+            return data
+        end
 
-        nl_constraints = NonlinearConstraint.(data["params"][:nl_constraints]),
-        delete!(data["params"], :nl_constraints)
+        system = data["system"]
+        delete!(data, "system")
 
-        objective = Objective(data["params"][:objective_terms])
-        delete!(data["params"], :objective_terms)
+        trajectory = data["trajectory"]
+        delete!(data, "trajectory")
+
+        options = data["options"]
+        delete!(data, "options")
+
+        params = data["params"]
+        delete!(data, "params")
+
+        integrators = params[:dynamics]
+        delete!(params, :dynamics)
+
+        objective = Objective(params[:objective_terms])
+        delete!(params, :objective_terms)
+
+        linear_constraints = params[:linear_constraints]
+        delete!(params, :linear_constraints)
+
+        nonlinear_constraints = NonlinearConstraint.(params[:nonlinear_constraints]),
+        delete!(params, :nonlinear_constraints)
+
+        constraints = AbstractConstraint[linear_constraints; nonlinear_constraints]
 
         return QuantumControlProblem(
-            data["system"],
-            data["trajectory"],
+            system,
+            trajectory,
             objective,
             integrators;
-            nl_constraints=nl_constraints,
-            data["params"]...
+            constraints=constraints,
+            options=options,
+            params...
         )
     end
 end
@@ -49,6 +102,9 @@ end
 function generate_file_path(extension, file_name, path)
     # Ensure the path exists.
     mkpath(path)
+
+    # remove dot from extension
+    extension = split(extension, ".")[end]
 
     # Create a save file name based on the one given; ensure it will
     # not conflict with others in the directory.

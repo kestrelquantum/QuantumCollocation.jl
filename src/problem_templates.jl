@@ -36,8 +36,11 @@ function UnitarySmoothPulseProblem(
     linear_solver::String="mumps",
     constraints::Vector{<:LinearConstraint}=LinearConstraint[],
     nl_constraints::Vector{<:NonlinearConstraint}=NonlinearConstraint[],
-    timesteps_all_equal::Bool=true
+    timesteps_all_equal::Bool=true,
+    verbose=false,
 )
+    U_goal = Matrix{ComplexF64}(U_goal)
+
     n_drives = length(H_drives)
 
     system = QuantumSystem(H_drift, H_drives)
@@ -91,8 +94,7 @@ function UnitarySmoothPulseProblem(
     traj = NamedTrajectory(
         components;
         controls=(:dda, :Δt),
-        timestep=Δt[1],
-        dynamical_timesteps=true,
+        timestep=:Δt,
         bounds=bounds,
         initial=initial,
         final=final,
@@ -123,6 +125,7 @@ function UnitarySmoothPulseProblem(
         nl_constraints=nl_constraints,
         max_iter=max_iter,
         linear_solver=linear_solver,
+        verbose=verbose,
     )
 end
 

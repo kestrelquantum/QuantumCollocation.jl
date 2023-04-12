@@ -2,7 +2,7 @@
 
 julia_version = "1.8.5"
 manifest_format = "2.0"
-project_hash = "565b55210ff64ab7a4ec1a9557d2d75fd46091f1"
+project_hash = "42d58ac2d3b54e98109f36e1f716618fd92705b9"
 
 [[deps.ANSIColoredPrinters]]
 git-tree-sha1 = "574baf8110975760d391c710b6341da1afa48d8c"
@@ -604,9 +604,9 @@ version = "0.4.15"
 
 [[deps.HypergeometricFunctions]]
 deps = ["DualNumbers", "LinearAlgebra", "OpenLibm_jll", "SpecialFunctions"]
-git-tree-sha1 = "d926e9c297ef4607866e8ef5df41cde1a642917f"
+git-tree-sha1 = "432b5b03176f8182bd6841fbfc42c718506a2d5f"
 uuid = "34004b35-14d8-5ef3-9330-4cdb6864b03a"
-version = "0.3.14"
+version = "0.3.15"
 
 [[deps.IJulia]]
 deps = ["Base64", "Conda", "Dates", "InteractiveUtils", "JSON", "Libdl", "Logging", "Markdown", "MbedTLS", "Pkg", "Printf", "REPL", "Random", "SoftGlobalScope", "Test", "UUIDs", "ZMQ"]
@@ -1007,9 +1007,9 @@ version = "0.8.56"
 
 [[deps.ManifoldsBase]]
 deps = ["LinearAlgebra", "Markdown", "Random"]
-git-tree-sha1 = "bf0dd8077f7174ce2f9d3eb685d814807249f85f"
+git-tree-sha1 = "980072cb9fb6bc3ee06943b05f1d8e02888f2401"
 uuid = "3362f125-f0bb-47a3-aa74-596ffd7ef2fb"
-version = "0.14.3"
+version = "0.14.4"
 
 [[deps.MappedArrays]]
 git-tree-sha1 = "e8b359ef06ec72e8c030463fe02efe5527ee5142"
@@ -1105,7 +1105,7 @@ version = "0.2.50"
 
 [[deps.NamedTrajectories]]
 deps = ["CairoMakie", "Documenter", "JLD2", "LaTeXStrings", "Latexify", "Reexport", "Revise", "Unidecode"]
-git-tree-sha1 = "0834112810a6c54514809934e70d3a9254fac4de"
+git-tree-sha1 = "e3dc90ee1a9029890d820c0a503dbf6ed28ca2f9"
 repo-rev = "main"
 repo-url = "https://github.com/aarontrowbridge/NamedTrajectories.jl.git"
 uuid = "538bc3a1-5ab9-4fc3-b776-35ca1e893e08"
@@ -1168,9 +1168,9 @@ version = "0.8.1+0"
 
 [[deps.OpenSSL]]
 deps = ["BitFlags", "Dates", "MozillaCACerts_jll", "OpenSSL_jll", "Sockets"]
-git-tree-sha1 = "6503b77492fd7fcb9379bf73cd31035670e3c509"
+git-tree-sha1 = "e9d68fe4b5f78f215aa2f0e6e6dc9e9911d33048"
 uuid = "4d8831e6-92b7-49fb-bdf8-b643e874388c"
-version = "1.3.3"
+version = "1.3.4"
 
 [[deps.OpenSSL_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -1586,9 +1586,9 @@ version = "0.2.2"
 
 [[deps.SymbolicUtils]]
 deps = ["AbstractTrees", "Bijections", "ChainRulesCore", "Combinatorics", "ConstructionBase", "DataStructures", "DocStringExtensions", "DynamicPolynomials", "IfElse", "LabelledArrays", "LinearAlgebra", "MultivariatePolynomials", "NaNMath", "Setfield", "SparseArrays", "SpecialFunctions", "StaticArrays", "TimerOutputs", "Unityper"]
-git-tree-sha1 = "bfbd444c209b41c7b2fef36b6e146a66da0be9f1"
+git-tree-sha1 = "5cb1f963f82e7b81305102dd69472fcd3e0e1483"
 uuid = "d1185830-fcd6-423d-90d6-eec64667417b"
-version = "1.0.4"
+version = "1.0.5"
 
 [[deps.Symbolics]]
 deps = ["ArrayInterface", "ConstructionBase", "DataStructures", "DiffRules", "Distributions", "DocStringExtensions", "DomainSets", "Groebner", "IfElse", "LaTeXStrings", "LambertW", "Latexify", "Libdl", "LinearAlgebra", "MacroTools", "Markdown", "NaNMath", "RecipesBase", "Reexport", "Requires", "RuntimeGeneratedFunctions", "SciMLBase", "Setfield", "SparseArrays", "SpecialFunctions", "StaticArrays", "SymbolicUtils", "TreeViews"]
@@ -1647,9 +1647,9 @@ version = "0.1.0"
 
 [[deps.TranscodingStreams]]
 deps = ["Random", "Test"]
-git-tree-sha1 = "94f38103c984f89cf77c402f2a68dbd870f8165f"
+git-tree-sha1 = "0b829474fed270a4b0ab07117dce9b9a2fa7581a"
 uuid = "3bb67fe8-82b1-5028-8e26-92a6c54297fa"
-version = "0.9.11"
+version = "0.9.12"
 
 [[deps.TreeViews]]
 deps = ["Test"]

@@ -32,8 +32,11 @@ end
 
 function QuantumDynamics(
     integrators::Vector{<:AbstractIntegrator},
-    traj::NamedTrajectory
+    traj::NamedTrajectory;
+    verbose=false
 )
+
+
     @assert all([
         !isnothing(state(integrator)) &&
         !isnothing(controls(integrator)) &&
@@ -60,6 +63,10 @@ function QuantumDynamics(
 
     dynamics_dim = dim(integrators)
 
+    if verbose
+        println("       constructing dynamics function...")
+    end
+
     function f(zₜ, zₜ₊₁)
         δ = Vector{eltype(zₜ)}(undef, dynamics_dim)
         for (integrator, integrator_comps) ∈ zip(integrators, dynamics_comps)
@@ -78,6 +85,10 @@ function QuantumDynamics(
         return δ
     end
 
+
+    if verbose
+        println("       constructing dynamics Jacobian function...")
+    end
 
     ∂f̂(zₜzₜ₊₁) = ForwardDiff.jacobian(zz -> f(zz[1:traj.dim], zz[traj.dim+1:end]), zₜzₜ₊₁)
 
@@ -151,6 +162,10 @@ function QuantumDynamics(
             end
         end
         return ∂s
+    end
+
+    if verbose
+        println("       constructing dynamics Hessian of the Lagrangian function...")
     end
 
     function μ∂²f(zₜ, zₜ₊₁, μₜ)
@@ -233,11 +248,13 @@ function QuantumDynamics(
     return QuantumDynamics(F, ∂F, ∂F_structure, μ∂²F, μ∂²F_structure, dynamics_dim)
 end
 
-QuantumDynamics(P::AbstractIntegrator, traj::NamedTrajectory) = QuantumDynamics([P], traj)
+QuantumDynamics(P::AbstractIntegrator, traj::NamedTrajectory; kwargs...) =
+    QuantumDynamics([P], traj; kwargs...)
 
 function QuantumDynamics(
     f::Function,
-    traj::NamedTrajectory
+    traj::NamedTrajectory;
+    verbose=false,
 )
     dynamics_dim = length(f(traj[1].data, traj[2].data))
 

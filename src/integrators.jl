@@ -234,31 +234,31 @@ struct UnitaryPadeIntegrator{R} <: QuantumUnitaryIntegrator
         N = size(sys.H_drift_real, 1)
         dim = 2N^2
 
-        I_2N = sparse(I(2N))
-        Ω_2N = sparse(kron(Im2, I(N)))
+        I_2N = Threads.@spawn sparse(I(2N))
+        Ω_2N = Threads.@spawn sparse(kron(Im2, I(N)))
 
-        H_drift_real_anticomm_H_drift_imag = anticomm(sys.H_drift_real, sys.H_drift_imag)
+        H_drift_real_anticomm_H_drift_imag = Threads.@spawn anticomm(sys.H_drift_real, sys.H_drift_imag)
 
-        H_drift_real_squared = sys.H_drift_real^2
-        H_drift_imag_squared = sys.H_drift_imag^2
+        H_drift_real_squared = Threads.@spawn sys.H_drift_real^2
+        H_drift_imag_squared = Threads.@spawn sys.H_drift_imag^2
 
-        H_drive_real_anticomms = anticomm(sys.H_drives_real, sys.H_drives_real)
-        H_drive_imag_anticomms = anticomm(sys.H_drives_imag, sys.H_drives_imag)
+        H_drive_real_anticomms = Threads.@spawn anticomm(sys.H_drives_real, sys.H_drives_real)
+        H_drive_imag_anticomms = Threads.@spawn anticomm(sys.H_drives_imag, sys.H_drives_imag)
 
         H_drift_real_anticomm_H_drives_real =
-            anticomm(sys.H_drift_real, sys.H_drives_real)
+            Threads.@spawn anticomm(sys.H_drift_real, sys.H_drives_real)
 
         H_drift_real_anticomm_H_drives_imag =
-            anticomm(sys.H_drift_real, sys.H_drives_imag)
+            Threads.@spawn anticomm(sys.H_drift_real, sys.H_drives_imag)
 
         H_drift_imag_anticomm_H_drives_real =
-            anticomm(sys.H_drift_imag, sys.H_drives_real)
+            Threads.@spawn anticomm(sys.H_drift_imag, sys.H_drives_real)
 
         H_drift_imag_anticomm_H_drives_imag =
-            anticomm(sys.H_drift_imag, sys.H_drives_imag)
+            Threads.@spawn anticomm(sys.H_drift_imag, sys.H_drives_imag)
 
         H_drives_real_anticomm_H_drives_imag =
-            anticomm(sys.H_drives_real, sys.H_drives_imag)
+            Threads.@spawn anticomm(sys.H_drives_real, sys.H_drives_imag)
 
         if order == 4
             G_drift = nothing
@@ -269,24 +269,24 @@ struct UnitaryPadeIntegrator{R} <: QuantumUnitaryIntegrator
         end
 
         return new{R}(
-            I_2N,
-            Ω_2N,
+            fetch(I_2N),
+            fetch(Ω_2N),
             G_drift,
             G_drives,
             sys.H_drift_real,
             sys.H_drift_imag,
             sys.H_drives_real,
             sys.H_drives_imag,
-            H_drift_real_anticomm_H_drift_imag,
-            H_drift_real_squared,
-            H_drift_imag_squared,
-            H_drive_real_anticomms,
-            H_drive_imag_anticomms,
-            H_drift_real_anticomm_H_drives_real,
-            H_drift_real_anticomm_H_drives_imag,
-            H_drift_imag_anticomm_H_drives_real,
-            H_drift_imag_anticomm_H_drives_imag,
-            H_drives_real_anticomm_H_drives_imag,
+            fetch(H_drift_real_anticomm_H_drift_imag),
+            fetch(H_drift_real_squared),
+            fetch(H_drift_imag_squared),
+            fetch(H_drive_real_anticomms),
+            fetch(H_drive_imag_anticomms),
+            fetch(H_drift_real_anticomm_H_drives_real),
+            fetch(H_drift_real_anticomm_H_drives_imag),
+            fetch(H_drift_imag_anticomm_H_drives_real),
+            fetch(H_drift_imag_anticomm_H_drives_imag),
+            fetch(H_drives_real_anticomm_H_drives_imag),
             unitary_symb,
             drive_symb,
             timestep_symb,
@@ -508,9 +508,9 @@ function nth_order_pade(
     Ũₜ = iso_vec_to_iso_operator(Ũ⃗ₜ)
     Gₜ = G(aₜ, P.G_drift, P.G_drives)
     n = P.order ÷ 2
-    Gₜ_powers = [Gₜ^k for k in 1:n]
-    B = P.I_2N + sum([(-1)^k * PADE_COEFFICIENTS[P.order][k] * Δt^k * Gₜ_powers[k] for k in 1:n])
-    F = P.I_2N + sum([PADE_COEFFICIENTS[P.order][k] * Δt^k * Gₜ_powers[k] for k in 1:n])
+    Gₜ_powers = [Gₜ^k for k = 1:n]
+    B = P.I_2N + sum([(-1)^k * PADE_COEFFICIENTS[P.order][k] * Δt^k * Gₜ_powers[k] for k = 1:n])
+    F = P.I_2N + sum([PADE_COEFFICIENTS[P.order][k] * Δt^k * Gₜ_powers[k] for k = 1:n])
     δŨ = B * Ũₜ₊₁ - F * Ũₜ
     return iso_operator_to_iso_vec(δŨ)
 end

@@ -170,12 +170,12 @@ function iso_vec_to_operator(Ũ⃗::AbstractVector)
     U_real = reshape(U_real_vec, N, N)
     U_imag = reshape(U_imag_vec, N, N)
     U = U_real + im * U_imag
-    return U
+    return Matrix{Complex{eltype(Ũ⃗)}}(U)
 end
 
 function iso_vec_to_iso_operator(Ũ⃗::AbstractVector)
     N = Int(sqrt(length(Ũ⃗) ÷ 2))
-    Ũ = Matrix{eltype(Ũ⃗)}(undef, 2N, 2N)
+    Ũ = Matrix{Float64}(undef, 2N, 2N)
     U_real = reshape(Ũ⃗[1:N^2], N, N)
     U_imag = reshape(Ũ⃗[N^2+1:end], N, N)
     Ũ[1:N, 1:N] = U_real
@@ -192,7 +192,7 @@ function operator_to_iso_vec(U::AbstractMatrix)
     U_real_vec = vec(U_real)
     U_imag_vec = vec(U_imag)
     Ũ⃗ = [U_real_vec; U_imag_vec]
-    return Ũ⃗
+    return Vector{Float64}(Ũ⃗)
 end
 
 function iso_operator_to_iso_vec(Ũ::AbstractMatrix)
@@ -202,7 +202,7 @@ function iso_operator_to_iso_vec(Ũ::AbstractMatrix)
     U_real_vec = vec(U_real)
     U_imag_vec = vec(U_imag)
     Ũ⃗ = [U_real_vec; U_imag_vec]
-    return Ũ⃗
+    return Vector{Float64}(Ũ⃗)
 end
 
 

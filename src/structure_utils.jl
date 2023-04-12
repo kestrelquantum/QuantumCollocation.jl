@@ -65,7 +65,13 @@ function hessian_of_lagrangian_structure(∂²f::Function, xdim::Int, μdim::Int
     x = collect(Symbolics.@variables(x[1:xdim])...)
     μ = collect(Symbolics.@variables(μ[1:μdim])...)
     ∂²f_x = ∂²f(x)
-    @einsum μ∂²f[j, k] := μ[i] * ∂²f_x[i, j, k]
+    if length(size(∂²f_x)) == 3
+        @einsum μ∂²f[j, k] := μ[i] * ∂²f_x[i, j, k]
+    elseif length(size(∂²f_x)) == 2
+        μ∂²f = μ[1] * ∂²f_x
+    else
+        error("hessian of lagrangian must be 2 or 3 dimensional")
+    end
     return structure(sparse(μ∂²f), upper_half=true)
 end
 
