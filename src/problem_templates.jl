@@ -20,6 +20,7 @@ function UnitarySmoothPulseProblem(
     U_goal::AbstractMatrix{<:Number},
     T::Int,
     Δt::Float64;
+    init_trajectory::Union{NamedTrajectory, Nothing}=nothing,
     a_bound::Float64=Inf,
     a_bounds::Vector{Float64}=fill(a_bound, length(H_drives)),
     a_guess::Union{Matrix{Float64}, Nothing}=nothing,
@@ -32,10 +33,9 @@ function UnitarySmoothPulseProblem(
     R_a::Union{Float64, Vector{Float64}}=1.0e-2,
     R_da::Union{Float64, Vector{Float64}}=1.0e-2,
     R_dda::Union{Float64, Vector{Float64}}=1.0e-2,
-    max_iter::Int=100,
+    max_iter::Int=1000,
     linear_solver::String="mumps",
-    constraints::Vector{<:LinearConstraint}=LinearConstraint[],
-    nl_constraints::Vector{<:NonlinearConstraint}=NonlinearConstraint[],
+    constraints::Vector{<:AbstractConstraint}=AbstractConstraint[],
     timesteps_all_equal::Bool=true,
     verbose=false,
 )
@@ -45,61 +45,65 @@ function UnitarySmoothPulseProblem(
 
     system = QuantumSystem(H_drift, H_drives)
 
-    Ũ⃗ = unitary_geodesic(U_goal, T)
-
-    Δt = fill(Δt, 1, T)
-
-    if isnothing(a_guess)
-        a_dists =  [Uniform(-a_bounds[i], a_bounds[i]) for i = 1:n_drives]
-        a = hcat([
-            zeros(n_drives),
-            vcat([rand(a_dists[i], 1, T - 2) for i = 1:n_drives]...),
-            zeros(n_drives)
-        ]...)
-        da = randn(n_drives, T) * drive_derivative_σ
-        dda = randn(n_drives, T) * drive_derivative_σ
+    if !isnothing(init_trajectory)
+        traj = init_trajectory
     else
-        a = a_guess
-        da = derivative(a, Δt)
-        dda = derivative(da, Δt)
+        Δt = fill(Δt, 1, T)
+
+        if isnothing(a_guess)
+            Ũ⃗ = unitary_geodesic(U_goal, T)
+            a_dists =  [Uniform(-a_bounds[i], a_bounds[i]) for i = 1:n_drives]
+            a = hcat([
+                zeros(n_drives),
+                vcat([rand(a_dists[i], 1, T - 2) for i = 1:n_drives]...),
+                zeros(n_drives)
+            ]...)
+            da = randn(n_drives, T) * drive_derivative_σ
+            dda = randn(n_drives, T) * drive_derivative_σ
+        else
+            Ũ⃗ = unitary_rollout(a, Δt, system)
+            a = a_guess
+            da = derivative(a, Δt)
+            dda = derivative(da, Δt)
+        end
+
+        components = (
+            Ũ⃗ = Ũ⃗,
+            a = a,
+            da = da,
+            dda = dda,
+            Δt = Δt,
+        )
+
+        bounds = (
+            a = a_bounds,
+            dda = dda_bounds,
+            Δt = (Δt_min, Δt_max),
+        )
+
+        initial = (
+            Ũ⃗ = operator_to_iso_vec(1.0I(size(U_goal, 1))),
+            a = zeros(n_drives),
+        )
+
+        final = (
+            a = zeros(n_drives),
+        )
+
+        goal = (
+            Ũ⃗ = operator_to_iso_vec(U_goal),
+        )
+
+        traj = NamedTrajectory(
+            components;
+            controls=(:dda, :Δt),
+            timestep=:Δt,
+            bounds=bounds,
+            initial=initial,
+            final=final,
+            goal=goal
+        )
     end
-
-    components = (
-        Ũ⃗ = Ũ⃗,
-        a = a,
-        da = da,
-        dda = dda,
-        Δt = Δt,
-    )
-
-    bounds = (
-        a = a_bounds,
-        dda = dda_bounds,
-        Δt = (Δt_min, Δt_max),
-    )
-
-    initial = (
-        Ũ⃗ = operator_to_iso_vec(1.0I(size(U_goal, 1))),
-        a = zeros(n_drives),
-    )
-
-    final = (
-        a = zeros(n_drives),
-    )
-
-    goal = (
-        Ũ⃗ = operator_to_iso_vec(U_goal),
-    )
-
-    traj = NamedTrajectory(
-        components;
-        controls=(:dda, :Δt),
-        timestep=:Δt,
-        bounds=bounds,
-        initial=initial,
-        final=final,
-        goal=goal
-    )
 
     J = QuantumUnitaryObjective(:Ũ⃗, traj, Q)
     J += QuadraticRegularizer(:a, traj, R_a)
@@ -122,7 +126,6 @@ function UnitarySmoothPulseProblem(
         J,
         integrators;
         constraints=constraints,
-        nl_constraints=nl_constraints,
         max_iter=max_iter,
         linear_solver=linear_solver,
         verbose=verbose,

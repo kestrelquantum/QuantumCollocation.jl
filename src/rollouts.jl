@@ -79,6 +79,22 @@ function unitary_rollout(
     return Ũ⃗
 end
 
+function unitary_rollout(
+    controls::AbstractMatrix{Float64},
+    Δt::Union{AbstractVector{Float64}, AbstractMatrix{Float64}},
+    system::QuantumSystem;
+    integrator=Integrators.fourth_order_pade
+)
+    return unitary_rollout(
+        operator_to_iso_vec(Matrix{ComplexF64}(I(size(system.H_drift, 1)))),
+        controls,
+        Δt,
+        system;
+        integrator=integrator
+    )
+end
+
+
 function skew_symmetric(v::AbstractVector, n::Int)
     M = zeros(eltype(v), n, n)
     k = 1

@@ -55,7 +55,7 @@ function QuantumControlProblem(
     nonlinear_constraints = NonlinearConstraint[con for con ∈ constraints if con isa NonlinearConstraint]
 
     if verbose
-        println("   building evaluator...")
+        println("    building evaluator...")
     end
     evaluator = PicoEvaluator(traj, obj, dynamics, nonlinear_constraints, eval_hessian)
 
@@ -68,7 +68,7 @@ function QuantumControlProblem(
     optimizer = Ipopt.Optimizer()
 
     if verbose
-        println("   initializing optimizer...")
+        println("    initializing optimizer...")
     end
     variables = initialize_optimizer!(
         optimizer,
@@ -109,7 +109,7 @@ function QuantumControlProblem(
     kwargs...
 )
     if verbose
-        println("   building dynamics from integrators...")
+        println("    building dynamics from integrators...")
     end
     dynamics = QuantumDynamics(integrators, traj; verbose=verbose)
     params[:dynamics] = integrators
@@ -135,7 +135,7 @@ function QuantumControlProblem(
     kwargs...
 )
     if verbose
-        println("building dynamics from integrator...")
+        println("    building dynamics from integrator...")
     end
     integrators = [integrator]
     dynamics = QuantumDynamics(integrators, traj; verbose=verbose)
@@ -161,7 +161,7 @@ function QuantumControlProblem(
     kwargs...
 )
     if verbose
-        println("building dynamics from function...")
+        println("    building dynamics from function...")
     end
     dynamics = QuantumDynamics(f, traj; verbose=verbose)
     params[:dynamics] = :function

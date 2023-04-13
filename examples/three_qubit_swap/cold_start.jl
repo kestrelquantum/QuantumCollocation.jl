@@ -2,8 +2,6 @@ println("loading packages...")
 using QuantumCollocation
 using NamedTrajectories
 using LinearAlgebra
-using Distributions
-using Manifolds
 
 # problem parameters
 
@@ -11,12 +9,27 @@ max_iter = 100000
 linear_solver = "mumps"
 
 a_bound = 2π * 0.04 # GHz, a guess!
-dda_bound = 0.01
+dda_bound = 0.05
 
-T = 200
-Δt = 1.0
+duration = 200.0
+T = 500
+Δt = duration / T
 Δt_min = 0.5 * Δt
-Δt_max = 1.5 * Δt
+Δt_max = 1.0 * Δt
+
+load_trajectory = true
+load_path = "examples/three_qubit_swap/results/T_500_Δt_0.4_a_bound_0.25132741228718347_dda_bound_0.02_dt_min_0.2_dt_max_0.4_max_iter_100000_00000.jld2"
+
+if load_trajectory
+    data = load_problem(load_path; return_data=true)
+    traj = data["trajectory"]
+    new_bounds = merge(
+        traj.bounds,
+        (dda = (-fill(dda_bound, traj.dims.a), fill(dda_bound, traj.dims.a)),)
+    )
+    traj.bounds = new_bounds
+end
+
 
 println("building hamiltonian terms...")
 
@@ -80,6 +93,7 @@ prob = UnitarySmoothPulseProblem(
     U_goal,
     T,
     Δt;
+    init_trajectory = load_trajectory ? traj : nothing,
     a_bound = a_bound,
     dda_bound = dda_bound,
     Δt_min = Δt_min,
@@ -119,8 +133,8 @@ println("Final fidelity: ", fid)
 Ψ̃_exp = rollout(ψ̃, prob.trajectory.a, prob.trajectory.Δt, prob.system; integrator=exp)
 pade_rollout_fidelity = fidelity(Ψ̃[:, end], ψ̃_goal)
 exp_rollout_fidelity = fidelity(Ψ̃_exp[:, end], ψ̃_goal)
-println("|100⟩ → U|100⟩ = |001⟩ pade rollout fidelity:  ", pade_rollout_fidelity)
-println("|100⟩ → U|100⟩ = |001⟩ exp rollout fidelity:   ", exp_rollout_fidelity)
+println("|100⟩ pade rollout fidelity:  ", pade_rollout_fidelity)
+println("|100⟩ exp rollout fidelity:   ", exp_rollout_fidelity)
 
 println("plotting solution...")
 plot(plot_path, prob.trajectory, [:Ũ⃗, :a]; ignored_labels=[:Ũ⃗])

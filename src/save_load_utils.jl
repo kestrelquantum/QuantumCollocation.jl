@@ -45,7 +45,7 @@ function load_problem(path::String; verbose=true, return_data=false)
     data = load(path)
 
     if verbose
-        println("Loaded problem from $(path):\n")
+        println("Loading $(return_data ? "data dict" : "problem") from $(path):\n")
         for (key, value) ∈ data
             if key ∉ RESERVED_KEYS
                 println("   $(key) = $(value)")
@@ -82,20 +82,25 @@ function load_problem(path::String; verbose=true, return_data=false)
         linear_constraints = params[:linear_constraints]
         delete!(params, :linear_constraints)
 
-        nonlinear_constraints = NonlinearConstraint.(params[:nonlinear_constraints]),
+        nonlinear_constraints = NonlinearConstraint.(params[:nonlinear_constraints])
         delete!(params, :nonlinear_constraints)
 
         constraints = AbstractConstraint[linear_constraints; nonlinear_constraints]
 
-        return QuantumControlProblem(
+        prob = @timed QuantumControlProblem(
             system,
             trajectory,
             objective,
             integrators;
             constraints=constraints,
             options=options,
+            verbose=verbose,
             params...
         )
+
+        println("Problem loaded! Elapsed time: $(prob.time / 60) minutes")
+
+        return prob.value
     end
 end
 

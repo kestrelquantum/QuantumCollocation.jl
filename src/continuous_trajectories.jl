@@ -56,7 +56,7 @@ function (ct::ContinuousTrajectory)(nsamples::Int; return_times=false)
     if !return_times
         return ct(ts)
     else
-        return ct(ts), A
+        return ct(ts), times
     end
 end
 

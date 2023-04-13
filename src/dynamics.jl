@@ -64,7 +64,7 @@ function QuantumDynamics(
     dynamics_dim = dim(integrators)
 
     if verbose
-        println("       constructing dynamics function...")
+        println("        constructing dynamics function...")
     end
 
     function f(zₜ, zₜ₊₁)
@@ -85,15 +85,18 @@ function QuantumDynamics(
         return δ
     end
 
-
     if verbose
-        println("       constructing dynamics Jacobian function...")
+        println("        getting dynamics derivative structure...")
     end
 
     ∂f̂(zₜzₜ₊₁) = ForwardDiff.jacobian(zz -> f(zz[1:traj.dim], zz[traj.dim+1:end]), zₜzₜ₊₁)
 
     ∂f_structure, ∂F_structure, μ∂²f_structure, μ∂²F_structure =
         dynamics_structure(∂f̂, traj, dynamics_dim)
+
+    if verbose
+        println("        constructing dynamics Jacobian function...")
+    end
 
     function ∂f(zₜ, zₜ₊₁)
 
@@ -165,7 +168,7 @@ function QuantumDynamics(
     end
 
     if verbose
-        println("       constructing dynamics Hessian of the Lagrangian function...")
+        println("        constructing dynamics Hessian of the Lagrangian function...")
     end
 
     function μ∂²f(zₜ, zₜ₊₁, μₜ)
