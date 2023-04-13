@@ -9,7 +9,7 @@ max_iter = 100000
 linear_solver = "mumps"
 
 a_bound = 2π * 0.04 # GHz, a guess!
-dda_bound = 0.05
+dda_bound = 0.1
 
 duration = 200.0
 T = 500
@@ -17,7 +17,7 @@ T = 500
 Δt_min = 0.5 * Δt
 Δt_max = 1.0 * Δt
 
-load_trajectory = true
+load_trajectory = false
 load_path = "examples/three_qubit_swap/results/T_500_Δt_0.4_a_bound_0.25132741228718347_dda_bound_0.02_dt_min_0.2_dt_max_0.4_max_iter_100000_00000.jld2"
 
 if load_trajectory
