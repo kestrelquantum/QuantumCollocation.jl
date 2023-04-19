@@ -1,6 +1,7 @@
 module ProblemTemplates
 
 export UnitarySmoothPulseProblem
+export UnitaryMinimumTimeProblem
 
 using ..QuantumSystems
 using ..QuantumUtils
@@ -9,10 +10,12 @@ using ..Objectives
 using ..Constraints
 using ..Integrators
 using ..Problems
+using ..IpoptOptions
 
 using NamedTrajectories
 using LinearAlgebra
 using Distributions
+using JLD2
 
 function UnitarySmoothPulseProblem(
     H_drift::AbstractMatrix{<:Number},
@@ -35,6 +38,7 @@ function UnitarySmoothPulseProblem(
     R_dda::Union{Float64, Vector{Float64}}=1.0e-2,
     max_iter::Int=1000,
     linear_solver::String="mumps",
+    ipopt_options::Options=Options(),
     constraints::Vector{<:AbstractConstraint}=AbstractConstraint[],
     timesteps_all_equal::Bool=true,
     verbose=false,
@@ -129,9 +133,72 @@ function UnitarySmoothPulseProblem(
         max_iter=max_iter,
         linear_solver=linear_solver,
         verbose=verbose,
+        ipopt_options=ipopt_options,
     )
 end
 
+function UnitaryMinimumTimeProblem(
+    trajectory::NamedTrajectory,
+    system::QuantumSystem,
+    objective::Objective,
+    integrators::Vector{<:AbstractIntegrator},
+    constraints::Vector{<:AbstractConstraint};
+    unitary_symbol::Symbol=:Ũ⃗,
+    D=1.0,
+    verbose::Bool=false,
+    ipopt_options::Options=Options(),
+    kwargs...
+)
+    @assert unitary_symbol ∈ trajectory.names
+
+    objective += MinimumTimeObjective(trajectory; D=D)
+
+    final_fidelity = unitary_fidelity(trajectory[end].Ũ⃗, trajectory.goal.Ũ⃗)
+
+    fidelity_constraint = FinalUnitaryFidelityConstraint(
+        unitary_symbol,
+        final_fidelity,
+        trajectory
+    )
+
+    push!(constraints, fidelity_constraint)
+
+    return QuantumControlProblem(
+        system,
+        trajectory,
+        objective,
+        integrators;
+        constraints=constraints,
+        verbose=verbose,
+        ipopt_options=ipopt_options,
+        kwargs...
+    )
+end
+
+function UnitaryMinimumTimeProblem(
+    data_path::String;
+    kwargs...
+)
+    data = load(data_path)
+    system = data["system"]
+    trajectory = data["trajectory"]
+    println(trajectory.names)
+    objective = Objective(data["params"][:objective_terms])
+    integrators = data["params"][:dynamics]
+    constraints = AbstractConstraint[
+        data["params"][:linear_constraints]...,
+        NonlinearConstraint.(data["params"][:nonlinear_constraints])...
+    ]
+    return UnitaryMinimumTimeProblem(
+        trajectory,
+        system,
+        objective,
+        integrators,
+        constraints;
+        build_trajectory_constraints=false,
+        kwargs...
+    )
+end
 
 
 end

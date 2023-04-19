@@ -19,7 +19,7 @@ n_levels = 2
 U_init = 1.0 * I(n_levels)
 
 # definining goal value of unitary
-gate = σx
+gate = σy
 U_goal = gate
 
 # defining pauli ladder operators
@@ -43,11 +43,11 @@ Ũ⃗_goal = operator_to_iso_vec(U_goal)
 Ũ⃗_dim = length(Ũ⃗_init)
 
 # defining time parameters
-max_duration = 10 # μs = 10e-6 s
+max_duration = 5 # μs = 10e-6 s
 T = 100
 dt = max_duration / T
-dt_max = 2.0 * dt
-dt_min = 0.5 * dt
+dt_max = 1.0 * dt
+dt_min = 0.1 * dt
 
 # boudns on controls
 # TODO: implement nonlinear constraints for abs val of γ ∈ C
@@ -105,9 +105,9 @@ comps = (
 ddu_bound = 2e-1
 
 # defining bounds
-bounds = (
-    γ = fill(γ_bound, γ_dim),
-    α = fill(α_bound, α_dim),
+bounds = (;
+    # γ = fill(γ_bound, γ_dim),
+    # α = fill(α_bound, α_dim),
     # ddγ = fill(ddu_bound, γ_dim),
     # ddα = fill(ddu_bound, α_dim),
     Δt = (dt_min, dt_max)
@@ -178,16 +178,20 @@ options = Options(
 )
 
 # defining constraints
-constraints = [TimeStepsAllEqualConstraint(:Δt, traj)]
+constraints = [
+    TimeStepsAllEqualConstraint(:Δt, traj),
+    ComplexModulusContraint(:γ, γ_bound, traj),
+]
 
 # defining quantum control problem
 prob = QuantumControlProblem(system, traj, J, P;
     options=options,
     constraints=constraints,
+    verbose=true
 )
 
 # plotting directory
-plot_dir = "examples/scripts/plots/single_qubit/X_gate"
+plot_dir = joinpath(@__DIR__, "plots")
 
 # experiment name
 experiment = "T_$(T)_Q_$(Q)_iter_$(max_iter)"
@@ -231,15 +235,13 @@ println("|1⟩ Exponential rollout fidelity:         ", fidelity(Ψ̃₂_exp[:, 
 
 # new plot name with fidelity included
 experiment *= "_fidelity_$(fid)"
-plot_path = join(split(plot_path, ".")[1:end-1]) * "_fidelity_$(fid).png"
+plot_path = join(split(plot_path, ".")[1:end-1], ".") * "_fidelity_$(fid).png"
 
-add_component!(prob.trajectory, :ψ̃₁, Ψ̃₁_exp)
-
-plot(plot_path, prob.trajectory, [:Ũ⃗, :γ, :α, :ψ̃₁];
+plot(plot_path, prob.trajectory;
     ignored_labels=[:Ũ⃗],
 )
 
-save_dir = "examples/scripts/single_qubit/results"
+save_dir = "examples/single_qubit/results"
 save_path = generate_file_path("jld2", experiment, save_dir)
 
 save_problem(save_path, prob)

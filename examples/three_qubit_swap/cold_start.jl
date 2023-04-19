@@ -7,18 +7,22 @@ using LinearAlgebra
 
 max_iter = 100000
 linear_solver = "mumps"
+watchdog_trigger = 100
+watchdog_iter = 10
+
+Q = 200.0
 
 a_bound = 2π * 0.04 # GHz, a guess!
-dda_bound = 0.1
+dda_bound = 0.05
 
 duration = 200.0
-T = 500
+T = 600
 Δt = duration / T
 Δt_min = 0.5 * Δt
 Δt_max = 1.0 * Δt
 
 load_trajectory = false
-load_path = "examples/three_qubit_swap/results/T_500_Δt_0.4_a_bound_0.25132741228718347_dda_bound_0.02_dt_min_0.2_dt_max_0.4_max_iter_100000_00000.jld2"
+load_path = "examples/three_qubit_swap/results/T_500_Δt_0.4_a_bound_0.25132741228718347_dda_bound_0.05_dt_min_0.2_dt_max_0.4_max_iter_100000_00000.jld2"
 
 if load_trajectory
     data = load_problem(load_path; return_data=true)
@@ -94,6 +98,7 @@ prob = UnitarySmoothPulseProblem(
     T,
     Δt;
     init_trajectory = load_trajectory ? traj : nothing,
+    Q=Q,
     a_bound = a_bound,
     dda_bound = dda_bound,
     Δt_min = Δt_min,
@@ -101,10 +106,14 @@ prob = UnitarySmoothPulseProblem(
     max_iter = max_iter,
     linear_solver = linear_solver,
     verbose = true,
+    ipopt_options = Options(
+        watchdog_shortened_iter_trigger = watchdog_trigger,
+        watchdog_trial_iter_max = watchdog_iter,
+    )
 )
 
 experiment =
-    "T_$(T)_Δt_$(Δt)_a_bound_$(a_bound)_dda_bound_$(dda_bound)_" *
+    "T_$(T)_Q_$(Q)_Δt_$(Δt)_a_bound_$(a_bound)_dda_bound_$(dda_bound)" *
     "dt_min_$(Δt_min)_dt_max_$(Δt_max)_max_iter_$(max_iter)"
 
 save_dir = joinpath(@__DIR__, "results")

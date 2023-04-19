@@ -72,7 +72,7 @@ function hessian_of_lagrangian_structure(∂²f::Function, xdim::Int, μdim::Int
     else
         error("hessian of lagrangian must be 2 or 3 dimensional")
     end
-    return structure(sparse(μ∂²f), upper_half=true)
+    return structure(sparse(μ∂²f); upper_half=true)
 end
 
 dynamics_hessian_of_lagrangian_structure(∂²f::Function, zdim::Int, μdim::Int) =
@@ -102,6 +102,39 @@ function dynamics_structure(∂f̂::Function, traj::NamedTrajectory, dynamics_di
 
     μ∂²f_structure =
         dynamics_hessian_of_lagrangian_structure(∂²f̂, traj.dim, dynamics_dim)
+
+    μ∂²F_structure = Tuple{Int,Int}[]
+
+    for t = 1:traj.T-1
+        μ∂²fₜ_structure = [ij .+ index(t, 0, traj.dim) for ij ∈ μ∂²f_structure]
+        append!(μ∂²F_structure, μ∂²fₜ_structure)
+    end
+
+    return ∂f_structure, ∂F_structure, μ∂²f_structure, μ∂²F_structure
+end
+
+function dynamics_structure(∂f::Function, μ∂²f::Function, traj::NamedTrajectory, dynamics_dim::Int)
+
+    # getting symbolic variables
+    z1 = collect(Symbolics.@variables(z[1:traj.dim])...)
+    z2 = collect(Symbolics.@variables(z[1:traj.dim])...)
+    μ = collect(Symbolics.@variables(μ[1:dynamics_dim])...)
+
+    # getting inter knot point structure
+    ∂f_structure = structure(sparse(∂f(z1, z2)))
+    μ∂²f_structure = structure(sparse(μ∂²f(z1, z2, μ)); upper_half=true)
+
+    ∂F_structure = Tuple{Int,Int}[]
+
+    for t = 1:traj.T-1
+        ∂fₜ_structure = [
+            (
+                i + index(t, 0, dynamics_dim),
+                j + index(t, 0, traj.dim)
+            ) for (i, j) ∈ ∂f_structure
+        ]
+        append!(∂F_structure, ∂fₜ_structure)
+    end
 
     μ∂²F_structure = Tuple{Int,Int}[]
 

@@ -162,20 +162,20 @@ function normalize(state::Vector{C} where C <: Number)
     return state / norm(state)
 end
 
-function iso_vec_to_operator(Ũ⃗::AbstractVector)
+function iso_vec_to_operator(Ũ⃗::AbstractVector{R}) where R <: Real
     Ũ⃗_dim = div(length(Ũ⃗), 2)
     N = Int(sqrt(Ũ⃗_dim))
     U_real_vec = Ũ⃗[1:Ũ⃗_dim]
     U_imag_vec = Ũ⃗[(Ũ⃗_dim + 1):end]
     U_real = reshape(U_real_vec, N, N)
     U_imag = reshape(U_imag_vec, N, N)
-    U = U_real + im * U_imag
-    return Matrix{Complex{eltype(Ũ⃗)}}(U)
+    U = U_real +  one(R) * im * U_imag
+    return Matrix{Complex{R}}(U)
 end
 
-function iso_vec_to_iso_operator(Ũ⃗::AbstractVector)
+function iso_vec_to_iso_operator(Ũ⃗::AbstractVector{R}) where R <: Real
     N = Int(sqrt(length(Ũ⃗) ÷ 2))
-    Ũ = Matrix{Float64}(undef, 2N, 2N)
+    Ũ = Matrix{R}(undef, 2N, 2N)
     U_real = reshape(Ũ⃗[1:N^2], N, N)
     U_imag = reshape(Ũ⃗[N^2+1:end], N, N)
     Ũ[1:N, 1:N] = U_real
@@ -195,14 +195,14 @@ function operator_to_iso_vec(U::AbstractMatrix)
     return Vector{Float64}(Ũ⃗)
 end
 
-function iso_operator_to_iso_vec(Ũ::AbstractMatrix)
+function iso_operator_to_iso_vec(Ũ::AbstractMatrix{R}) where R <: Real
     N = size(Ũ, 1) ÷ 2
     U_real = Ũ[1:N, 1:N]
     U_imag = Ũ[(N + 1):2N, 1:N]
     U_real_vec = vec(U_real)
     U_imag_vec = vec(U_imag)
     Ũ⃗ = [U_real_vec; U_imag_vec]
-    return Vector{Float64}(Ũ⃗)
+    return Vector{R}(Ũ⃗)
 end
 
 
@@ -221,7 +221,7 @@ end
 
 function unitary_fidelity(U::Matrix, U_goal::Matrix)
     N = size(U, 1)
-    return 1 / N * abs(tr(U'U_goal))
+    return 1 / N * abs(tr(U_goal'U))
 end
 
 function unitary_fidelity(Ũ⃗::Vector, Ũ⃗_goal::Vector)

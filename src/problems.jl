@@ -47,6 +47,7 @@ function QuantumControlProblem(
     max_iter::Int=options.max_iter,
     linear_solver::String=options.linear_solver,
     verbose=false,
+    build_trajectory_constraints::Bool=true,
     kwargs...
 )
     options.max_iter = max_iter
@@ -62,14 +63,18 @@ function QuantumControlProblem(
     n_dynamics_constraints = dynamics.dim * (traj.T - 1)
     n_variables = traj.dim * traj.T
 
-    linear_constraints = [con for con ∈ constraints if con isa LinearConstraint]
-    linear_constraints = LinearConstraint[trajectory_constraints(traj); linear_constraints]
+    linear_constraints = LinearConstraint[con for con ∈ constraints if con isa LinearConstraint]
+
+    if build_trajectory_constraints
+        linear_constraints = LinearConstraint[trajectory_constraints(traj); linear_constraints]
+    end
 
     optimizer = Ipopt.Optimizer()
 
     if verbose
         println("    initializing optimizer...")
     end
+
     variables = initialize_optimizer!(
         optimizer,
         evaluator,
@@ -85,7 +90,7 @@ function QuantumControlProblem(
 
     params[:eval_hessian] = eval_hessian
     params[:options] = options
-    params[:linear_constraints] = constraints
+    params[:linear_constraints] = linear_constraints
     params[:nonlinear_constraints] = [nl_constraint.params for nl_constraint ∈ nonlinear_constraints]
     params[:objective_terms] = obj.terms
 
@@ -105,6 +110,7 @@ function QuantumControlProblem(
     obj::Objective,
     integrators::Vector{<:AbstractIntegrator};
     params::Dict{Symbol,Any}=Dict{Symbol, Any}(),
+    ipopt_options::Options=Options(),
     verbose=false,
     kwargs...
 )
@@ -118,6 +124,7 @@ function QuantumControlProblem(
         traj,
         obj,
         dynamics;
+        options=ipopt_options,
         params=params,
         verbose=verbose,
         kwargs...
@@ -131,6 +138,7 @@ function QuantumControlProblem(
     obj::Objective,
     integrator::AbstractIntegrator;
     params::Dict{Symbol,Any}=Dict{Symbol, Any}(),
+    ipopt_options::Options=Options(),
     verbose=false,
     kwargs...
 )
@@ -145,6 +153,7 @@ function QuantumControlProblem(
         traj,
         obj,
         dynamics;
+        options=ipopt_options,
         params=params,
         verbose=verbose,
         kwargs...
@@ -157,6 +166,7 @@ function QuantumControlProblem(
     obj::Objective,
     f::Function;
     params::Dict{Symbol,Any}=Dict{Symbol, Any}(),
+    ipopt_options::Options=Options(),
     verbose=false,
     kwargs...
 )
@@ -170,6 +180,7 @@ function QuantumControlProblem(
         traj,
         obj,
         dynamics;
+        options=ipopt_options,
         params=params,
         verbose=verbose,
         kwargs...
@@ -191,9 +202,9 @@ function initialize_optimizer!(
 
     for nl_con ∈ nonlinear_constraints
         if nl_con isa NonlinearEqualityConstraint
-            push!(nl_cons, MOI.NLPBoundsPair(0.0, 0.0))
+            append!(nl_cons, fill(MOI.NLPBoundsPair(0.0, 0.0), nl_con.dim))
         elseif nl_con isa NonlinearInequalityConstraint
-            push!(nl_cons, MOI.NLPBoundsPair(0.0, Inf))
+            append!(nl_cons, fill(MOI.NLPBoundsPair(0.0, Inf), nl_con.dim))
         else
             error("Unknown nonlinear constraint type")
         end

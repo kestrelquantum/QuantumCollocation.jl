@@ -42,6 +42,8 @@ using Base: @kwdef
     skip_finalize_solution_call = "no"
     hsllib = nothing
     linear_solver = "mumps"
+    watchdog_shortened_iter_trigger = 10
+    watchdog_trial_iter_max = 3
 end
 
 function set!(optimizer::Ipopt.Optimizer, options::Options)

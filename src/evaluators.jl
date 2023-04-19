@@ -68,7 +68,7 @@ end
     ∇::AbstractVector,
     Z⃗::AbstractVector
 )
-    ∇ .= evaluator.objective.∇L(Z⃗, evaluator.trajectory)
+    ∇[:] = evaluator.objective.∇L(Z⃗, evaluator.trajectory)
     return nothing
 end
 
@@ -80,17 +80,25 @@ end
     g::AbstractVector,
     Z⃗::AbstractVector
 )
-    g[1:evaluator.n_dynamics_constraints] .= evaluator.dynamics.F(Z⃗)
+    g[1:evaluator.n_dynamics_constraints] = evaluator.dynamics.F(Z⃗)
     offset = evaluator.n_dynamics_constraints
     for con ∈ evaluator.nonlinear_constraints
-        g[offset .+ (1:con.dim)] .= con.g(Z⃗)
+        g[offset .+ (1:con.dim)] = con.g(Z⃗)
         offset += con.dim
     end
     return nothing
 end
 
 function MOI.jacobian_structure(evaluator::PicoEvaluator)
-    return evaluator.dynamics.∂F_structure
+    dynamics_structure = evaluator.dynamics.∂F_structure
+    row_offset = evaluator.n_dynamics_constraints
+    nl_constraint_structure = []
+    for con ∈ evaluator.nonlinear_constraints
+        con_structure = [(i + row_offset, j) for (i, j) in con.∂g_structure]
+        push!(nl_constraint_structure, con_structure)
+        row_offset += con.dim
+    end
+    return vcat(dynamics_structure, nl_constraint_structure...)
 end
 
 @views function MOI.eval_constraint_jacobian(
@@ -98,9 +106,17 @@ end
     J::AbstractVector,
     Z⃗::AbstractVector
 )
-    ∂s = evaluator.dynamics.∂F(Z⃗)
-    for (k, ∇ₖ) in enumerate(∂s)
-        J[k] = ∇ₖ
+    ∂s_dynamics = evaluator.dynamics.∂F(Z⃗)
+    for (k, ∂ₖ) in enumerate(∂s_dynamics)
+        J[k] = ∂ₖ
+    end
+    offset = length(∂s_dynamics)
+    for con ∈ evaluator.nonlinear_constraints
+        ∂s_con = con.∂g(Z⃗)
+        for (k, ∂ₖ) in enumerate(∂s_con)
+            J[offset + k] = ∂ₖ
+        end
+        offset += length(∂s_con)
     end
     return nothing
 end
@@ -109,11 +125,10 @@ end
 # Hessian of the Lagrangian
 
 function MOI.hessian_lagrangian_structure(evaluator::PicoEvaluator)
-    structure = vcat(
-        evaluator.objective.∂²L_structure(evaluator.trajectory),
-        evaluator.dynamics.μ∂²F_structure
-    )
-    return structure
+    objective_structure = evaluator.objective.∂²L_structure(evaluator.trajectory)
+    dynamics_structure = evaluator.dynamics.μ∂²F_structure
+    nl_constraint_structure = [con.μ∂²g_structure for con ∈ evaluator.nonlinear_constraints]
+    return vcat(objective_structure, dynamics_structure, nl_constraint_structure...)
 end
 
 @views function MOI.eval_hessian_lagrangian(
@@ -129,12 +144,28 @@ end
         H[k] = σ∂²Lₖ
     end
 
-    μ∂²Fs = evaluator.dynamics.μ∂²F(Z⃗, μ)
+    μ_dynamics = μ[1:evaluator.n_dynamics_constraints]
+
+    μ_offset = evaluator.n_dynamics_constraints
 
     offset = length(evaluator.objective.∂²L_structure(evaluator.trajectory))
 
+    μ∂²Fs = evaluator.dynamics.μ∂²F(Z⃗, μ_dynamics)
+
     for (k, μ∂²Fₖ) in enumerate(μ∂²Fs)
         H[offset + k] = μ∂²Fₖ
+    end
+
+    offset += length(evaluator.dynamics.μ∂²F_structure)
+
+    for con ∈ evaluator.nonlinear_constraints
+        μ_con = μ[μ_offset .+ (1:con.dim)]
+        μ∂²gs = con.μ∂²g(Z⃗, μ_con)
+        for (k, μ∂²gₖ) in enumerate(μ∂²gs)
+            H[offset + k] = μ∂²gₖ
+        end
+        offset += length(μ∂²gs)
+        μ_offset += con.dim
     end
 
     return nothing

@@ -5,7 +5,7 @@ export Objective
 export QuantumObjective
 export QuantumUnitaryObjective
 
-export MinTimeObjective
+export MinimumTimeObjective
 
 export QuadraticRegularizer
 export QuadraticSmoothnessRegularizer
@@ -485,38 +485,43 @@ function L1SlackRegularizer(;
 end
 
 
-function MinTimeObjective(;
-    Δt_indices::UnitRange{Int}=nothing,
-    T::Int=nothing,
+function MinimumTimeObjective(;
+    D::Float64=1.0,
+    Δt_indices::AbstractVector{Int}=nothing,
     eval_hessian::Bool=true
 )
     @assert !isnothing(Δt_indices) "Δt_indices must be specified"
-    @assert !isnothing(T) "T must be specified"
 
     params = Dict(
-        :type => :MinTimeObjective,
+        :type => :MinimumTimeObjective,
+        :D => D,
         :Δt_indices => Δt_indices,
-        :T => T,
         :eval_hessian => eval_hessian
     )
 
-	L(Z::AbstractVector) = sum(Z[Δt_indices])
+	L(Z⃗::AbstractVector, Z::NamedTrajectory) = D * Z⃗[Δt_indices][end]
 
-	∇L = (Z::AbstractVector) -> begin
-		∇ = zeros(typeof(Z[1]), length(Z))
-		∇[Δt_indices] .= 1.0
+	∇L = (Z⃗::AbstractVector, Z::NamedTrajectory) -> begin
+		∇ = zeros(typeof(Z⃗[1]), length(Z⃗))
+		∇[Δt_indices[end]] = D
 		return ∇
 	end
 
 	if eval_hessian
-		∂²L = Z -> []
-		∂²L_structure = []
+		∂²L = (Z⃗, Z) -> []
+		∂²L_structure = Z -> []
 	else
 		∂²L = nothing
 		∂²L_structure = nothing
 	end
 
 	return Objective(L, ∇L, ∂²L, ∂²L_structure, Dict[params])
+end
+
+function MinimumTimeObjective(traj::NamedTrajectory; D=1.0)
+    @assert traj.timestep isa Symbol "trajectory does not have a dynamical timestep"
+    Δt_indices = [index(t, traj.components[traj.timestep][1], traj.dim) for t = 1:traj.T]
+    return MinimumTimeObjective(; D=D, Δt_indices=Δt_indices)
 end
 
 end

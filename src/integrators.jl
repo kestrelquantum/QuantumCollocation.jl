@@ -601,14 +601,14 @@ end
 
 function ∂aₜ(
     P::UnitaryPadeIntegrator{R},
-    Ũ⃗ₜ₊₁::AbstractVector,
-    Ũ⃗ₜ::AbstractVector,
-    aₜ::AbstractVector,
-    Δtₜ::Real,
+    Ũ⃗ₜ₊₁::AbstractVector{T},
+    Ũ⃗ₜ::AbstractVector{T},
+    aₜ::AbstractVector{T},
+    Δtₜ::T,
     drive_indices=1:P.n_drives
-) where R <: Real
+) where {R <: Real, T <: Real}
     n_drives = length(aₜ)
-    ∂a = spzeros(R, 2P.N^2, n_drives)
+    ∂a = zeros(T, 2P.N^2, n_drives)
     for j = 1:n_drives
         ∂aʲBR = ∂aₜʲB_real(P, aₜ, Δtₜ, drive_indices[j])
         ∂aʲBI = ∂aₜʲB_imag(P, aₜ, Δtₜ, drive_indices[j])
@@ -619,7 +619,7 @@ function ∂aₜ(
             (P.I_2N ⊗ ∂aʲBR + P.Ω_2N ⊗ ∂aʲBI) * Ũ⃗ₜ₊₁ -
             (P.I_2N ⊗ ∂aʲFR - P.Ω_2N ⊗ ∂aʲFI) * Ũ⃗ₜ
     end
-    return ∂a
+    return sparse(∂a)
 end
 
 
@@ -717,7 +717,7 @@ function ∂Δtₜ(
     ∂ΔtₜFI = ∂ΔtₜF_imag(P, aₜ, Δtₜ)
     ∂ΔtₜP = (P.I_2N ⊗ ∂ΔtₜBR + P.Ω_2N ⊗ ∂ΔtₜBI) * Ũ⃗ₜ₊₁ -
             (P.I_2N ⊗ ∂ΔtₜFR - P.Ω_2N ⊗ ∂ΔtₜFI) * Ũ⃗ₜ
-    return sparse(∂ΔtₜP)
+    return ∂ΔtₜP
 end
 
 
@@ -770,48 +770,48 @@ end
 
 function μ∂aₜ∂Ũ⃗ₜ(
     P::UnitaryPadeIntegrator,
-    aₜ::AbstractVector,
-    Δtₜ::Real,
-    μₜ::AbstractVector,
+    aₜ::AbstractVector{T},
+    Δtₜ::T,
+    μₜ::AbstractVector{T},
     drive_indices=1:P.n_drives
-)
+) where T <: Real
     n_drives = length(aₜ)
-    μ∂aₜ∂Ũ⃗ₜP = spzeros(2P.N^2, n_drives)
+    μ∂aₜ∂Ũ⃗ₜP = zeros(T, 2P.N^2, n_drives)
     for j = 1:n_drives
         ∂aʲFR = ∂aₜʲF_real(P, aₜ, Δtₜ, drive_indices[j])
         ∂aʲFI = ∂aₜʲF_imag(P, aₜ, Δtₜ, drive_indices[j])
         μ∂aₜ∂Ũ⃗ₜP[:, j] = -(P.I_2N ⊗ ∂aʲFR - P.Ω_2N ⊗ ∂aʲFI)' * μₜ
     end
-    return sparse(μ∂aₜ∂Ũ⃗ₜP)
+    return μ∂aₜ∂Ũ⃗ₜP
 end
 
 function μ∂Ũ⃗ₜ₊₁∂aₜ(
     P::UnitaryPadeIntegrator,
-    aₜ::AbstractVector,
-    Δtₜ::Real,
-    μₜ::AbstractVector,
+    aₜ::AbstractVector{T},
+    Δtₜ::T,
+    μₜ::AbstractVector{T},
     drive_indices=1:P.n_drives
-)
+) where T <: Real
     n_drives = length(aₜ)
-    μ∂Ũ⃗ₜ₊₁∂aₜP = spzeros(n_drives, 2P.N^2)
+    μ∂Ũ⃗ₜ₊₁∂aₜP = zeros(T, n_drives, 2P.N^2)
     for j = 1:n_drives
         ∂aʲBR = ∂aₜʲB_real(P, aₜ, Δtₜ, drive_indices[j])
         ∂aʲBI = ∂aₜʲB_imag(P, aₜ, Δtₜ, drive_indices[j])
         μ∂Ũ⃗ₜ₊₁∂aₜP[j, :] = μₜ' * (P.I_2N ⊗ ∂aʲBR + P.Ω_2N ⊗ ∂aʲBI)
     end
-    return sparse(μ∂Ũ⃗ₜ₊₁∂aₜP)
+    return μ∂Ũ⃗ₜ₊₁∂aₜP
 end
 
 function μ∂²aₜ(
     P::UnitaryPadeIntegrator,
-    Ũ⃗ₜ₊₁::AbstractVector,
-    Ũ⃗ₜ::AbstractVector,
-    Δtₜ::Real,
-    μₜ::AbstractVector,
+    Ũ⃗ₜ₊₁::AbstractVector{T},
+    Ũ⃗ₜ::AbstractVector{T},
+    Δtₜ::T,
+    μₜ::AbstractVector{T},
     drive_indices=1:P.n_drives
-)
+) where T <: Real
     n_drives = length(drive_indices)
-    μ∂²aₜP = spzeros(n_drives, n_drives)
+    μ∂²aₜP = zeros(T, n_drives, n_drives)
     for j = 1:n_drives
         for i = 1:j
             ∂aⁱ∂aʲBR = Δtₜ^2 / 12 * (
@@ -835,7 +835,7 @@ function μ∂²aₜ(
             μ∂²aₜP[i, j] = μₜ' * (∂aⁱ∂aʲB̂ * Ũ⃗ₜ₊₁ - ∂aⁱ∂aʲF̂ * Ũ⃗ₜ)
         end
     end
-    return sparse(μ∂²aₜP)
+    return μ∂²aₜP
 end
 
 function ∂Δtₜ∂aₜʲB_real(
@@ -851,7 +851,7 @@ function ∂Δtₜ∂aₜʲB_real(
         ∂Δt∂aʲBR += Δt / 6 * aⁱ * P.H_drive_imag_anticomms[i, j]
         ∂Δt∂aʲBR += -Δt / 6 * aⁱ * P.H_drive_real_anticomms[i, j]
     end
-    return sparse(∂Δt∂aʲBR)
+    return ∂Δt∂aʲBR
 end
 
 function ∂Δtₜ∂aₜʲB_imag(
@@ -867,7 +867,7 @@ function ∂Δtₜ∂aₜʲB_imag(
         ∂Δt∂aʲBI += -Δt / 6 * aⁱ * P.H_drives_real_anticomm_H_drives_imag[i, j]
         ∂Δt∂aʲBI += -Δt / 6 * aⁱ * P.H_drives_real_anticomm_H_drives_imag[j, i]
     end
-    return sparse(∂Δt∂aʲBI)
+    return ∂Δt∂aʲBI
 end
 
 function ∂Δtₜ∂aₜʲF_real(
@@ -883,7 +883,7 @@ function ∂Δtₜ∂aₜʲF_real(
         ∂Δt∂aʲFR += Δt / 6 * aⁱ * P.H_drive_imag_anticomms[i, j]
         ∂Δt∂aʲFR += -Δt / 6 * aⁱ * P.H_drive_real_anticomms[i, j]
     end
-    return sparse(∂Δt∂aʲFR)
+    return ∂Δt∂aʲFR
 end
 
 function ∂Δtₜ∂aₜʲF_imag(
@@ -899,20 +899,20 @@ function ∂Δtₜ∂aₜʲF_imag(
         ∂Δt∂aʲFI += Δt / 6 * aⁱ * P.H_drives_real_anticomm_H_drives_imag[i, j]
         ∂Δt∂aʲFI += Δt / 6 * aⁱ * P.H_drives_real_anticomm_H_drives_imag[j, i]
     end
-    return sparse(∂Δt∂aʲFI)
+    return ∂Δt∂aʲFI
 end
 
 function μ∂Δtₜ∂aₜ(
     P::UnitaryPadeIntegrator,
-    Ũ⃗ₜ₊₁::AbstractVector,
-    Ũ⃗ₜ::AbstractVector,
-    aₜ::AbstractVector,
-    Δtₜ::Real,
-    μₜ::AbstractVector,
+    Ũ⃗ₜ₊₁::AbstractVector{T},
+    Ũ⃗ₜ::AbstractVector{T},
+    aₜ::AbstractVector{T},
+    Δtₜ::T,
+    μₜ::AbstractVector{T},
     drive_indices=1:P.n_drives
-)
+) where T <: Real
     n_drives = length(aₜ)
-    μ∂Δtₜ∂aₜP = spzeros(n_drives)
+    μ∂Δtₜ∂aₜP = zeros(T, n_drives)
     for j = 1:n_drives
         ∂Δtₜ∂aʲBR = ∂Δtₜ∂aₜʲB_real(P, aₜ, Δtₜ, drive_indices[j])
         ∂Δtₜ∂aʲBI = ∂Δtₜ∂aₜʲB_imag(P, aₜ, Δtₜ, drive_indices[j])
