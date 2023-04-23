@@ -16,7 +16,7 @@ a_bound = 2π * 0.04 # GHz, a guess!
 dda_bound = 0.05
 
 duration = 200.0
-T = 600
+T = 500
 Δt = duration / T
 Δt_min = 0.5 * Δt
 Δt_max = 1.0 * Δt
@@ -116,8 +116,8 @@ experiment =
     "T_$(T)_Q_$(Q)_Δt_$(Δt)_a_bound_$(a_bound)_dda_bound_$(dda_bound)" *
     "dt_min_$(Δt_min)_dt_max_$(Δt_max)_max_iter_$(max_iter)"
 
-save_dir = joinpath(@__DIR__, "results")
-plot_dir = joinpath(@__DIR__, "plots")
+save_dir = joinpath(@__DIR__, "newresults")
+plot_dir = joinpath(@__DIR__, "newplots")
 
 save_path = generate_file_path("jld2", experiment, save_dir)
 plot_path = generate_file_path("png", experiment, plot_dir)

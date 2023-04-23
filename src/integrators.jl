@@ -47,11 +47,17 @@ const Im2 = 1.0 * [0 -1; 1 0]
 
 anticomm(A::AbstractMatrix, B::AbstractMatrix) = A * B + B * A
 
-function anticomm(A::AbstractMatrix, Bs::AbstractVector{<:AbstractMatrix})
+function anticomm(
+    A::AbstractMatrix{R},
+    Bs::AbstractVector{<:AbstractMatrix{R}}
+) where R <: Number
     return [anticomm(A, B) for B in Bs]
 end
 
-function anticomm(As::AbstractVector{<:AbstractMatrix{R}}, Bs::AbstractVector{<:AbstractMatrix{R}}) where R
+function anticomm(
+    As::AbstractVector{<:AbstractMatrix{R}},
+    Bs::AbstractVector{<:AbstractMatrix{R}}
+) where R <: Number
     @assert length(As) == length(Bs)
     n = length(As)
     anticomms = Matrix{Matrix{R}}(undef, n, n)
@@ -138,8 +144,8 @@ end
     dxₜ = zₜ[traj.components[D.derivative]]
     Δtₜ = zₜ[traj.components[D.timestep]][1]
 
-    ∂xₜD = sparse(-I(D.dim))
-    ∂xₜ₊₁D = sparse(I(D.dim))
+    ∂xₜD = sparse(-1.0I(D.dim))
+    ∂xₜ₊₁D = sparse(1.0I(D.dim))
     ∂dxₜD = sparse(-Δtₜ * I(D.dim))
     ∂ΔtₜD = -dxₜ
 

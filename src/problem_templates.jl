@@ -34,8 +34,8 @@ function UnitarySmoothPulseProblem(
     drive_derivative_σ::Float64=0.01,
     Q::Float64=100.0,
     R_a::Union{Float64, Vector{Float64}}=1.0e-2,
-    R_da::Union{Float64, Vector{Float64}}=1.0e-2,
-    R_dda::Union{Float64, Vector{Float64}}=1.0e-2,
+    R_da::Union{Float64, Vector{Float64}}=R_a,
+    R_dda::Union{Float64, Vector{Float64}}=R_a,
     max_iter::Int=1000,
     linear_solver::String="mumps",
     ipopt_options::Options=Options(),
@@ -182,7 +182,6 @@ function UnitaryMinimumTimeProblem(
     data = load(data_path)
     system = data["system"]
     trajectory = data["trajectory"]
-    println(trajectory.names)
     objective = Objective(data["params"][:objective_terms])
     integrators = data["params"][:dynamics]
     constraints = AbstractConstraint[

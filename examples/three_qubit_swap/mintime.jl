@@ -1,7 +1,7 @@
-using QuantumCollocation
 using NamedTrajectories
+using QuantumCollocation
 
-data_path = "examples/single_qubit/results/Y_gate_T_100_Q_100.0_R_0.01_R_smoothness_0.001_iter_10000_fidelity_0.9999997188819991_00000.jld2"
+data_path = "examples/three_qubit_swap/results/T_500_Δt_0.4_a_bound_0.25132741228718347_dda_bound_0.05_dt_min_0.2_dt_max_0.4_max_iter_100000_00000.jld2"
 
 experiment = join(split(split(data_path, "/")[end], ".")[1:end-1], ".")
 
@@ -30,11 +30,12 @@ drives = vcat(prob.trajectory.γ, prob.trajectory.α)
 
 
 # |0⟩ rollout test
-ψ₁ = [1, 0]
-ψ̃₁ = ket_to_iso(ψ₁)
-ψ̃₁_goal = ket_to_iso(iso_vec_to_operator(prob.trajectory.goal.Ũ⃗) * ψ₁)
-Ψ̃₁_fourth_order_pade = rollout(ψ̃₁, drives, Δts, prob.system)
-Ψ̃₁_exp = rollout(ψ̃₁, drives, Δts, prob.system; integrator=exp)
-println("|0⟩ Fourth order Pade rollout fidelity:   ", fidelity(Ψ̃₁_fourth_order_pade[:, end], ψ̃₁_goal))
-println("|0⟩ Exponential rollout fidelity:         ", fidelity(Ψ̃₁_exp[:, end], ψ̃₁_goal))
-println()
+ψ = qubit_system_state("100")
+ψ̃ = ket_to_iso(ψ)
+ψ̃_goal = ket_to_iso(U_goal * ψ)
+Ψ̃ = rollout(ψ̃, prob.trajectory.a, prob.trajectory.Δt, prob.system)
+Ψ̃_exp = rollout(ψ̃, prob.trajectory.a, prob.trajectory.Δt, prob.system; integrator=exp)
+pade_rollout_fidelity = fidelity(Ψ̃[:, end], ψ̃_goal)
+exp_rollout_fidelity = fidelity(Ψ̃_exp[:, end], ψ̃_goal)
+println("|100⟩ pade rollout fidelity:  ", pade_rollout_fidelity)
+println("|100⟩ exp rollout fidelity:   ", exp_rollout_fidelity)
