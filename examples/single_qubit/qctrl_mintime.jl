@@ -35,6 +35,18 @@ drives = vcat(prob.trajectory.γ, prob.trajectory.α)
 ψ̃₁_goal = ket_to_iso(iso_vec_to_operator(prob.trajectory.goal.Ũ⃗) * ψ₁)
 Ψ̃₁_fourth_order_pade = rollout(ψ̃₁, drives, Δts, prob.system)
 Ψ̃₁_exp = rollout(ψ̃₁, drives, Δts, prob.system; integrator=exp)
-println("|0⟩ Fourth order Pade rollout fidelity:   ", fidelity(Ψ̃₁_fourth_order_pade[:, end], ψ̃₁_goal))
-println("|0⟩ Exponential rollout fidelity:         ", fidelity(Ψ̃₁_exp[:, end], ψ̃₁_goal))
+fid_fourth_order_pade = fidelity(Ψ̃₁_fourth_order_pade[:, end], ψ̃₁_goal)
+fid_exp = fidelity(Ψ̃₁_exp[:, end], ψ̃₁_goal)
+println("|0⟩ Fourth order Pade rollout fidelity:   ", fid_fourth_order_pade)
+println("|0⟩ Exponential rollout fidelity:         ", fid_exp)
 println()
+
+save_path = joinpath(@__DIR__, "results/mintime", experiment * ".jld2")
+
+# save the problem
+info = Dict(
+    "exp fidelity" => fid_exp,
+    "duration" => times(prob.trajectory)[end],
+)
+
+save_problem(save_path, prob, info)
