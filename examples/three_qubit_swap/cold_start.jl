@@ -7,8 +7,9 @@ using LinearAlgebra
 
 max_iter = 100000
 linear_solver = "mumps"
-watchdog_trigger = 100
+watchdog_trigger = 0
 watchdog_iter = 10
+R = 1e-3
 
 Q = 200.0
 
@@ -99,6 +100,7 @@ prob = UnitarySmoothPulseProblem(
     Δt;
     init_trajectory = load_trajectory ? traj : nothing,
     Q=Q,
+    R=R,
     a_bound = a_bound,
     dda_bound = dda_bound,
     Δt_min = Δt_min,
