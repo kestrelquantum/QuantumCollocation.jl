@@ -5,7 +5,7 @@ authors:
   given-names: "Aaron"
 - family-names: "Bhardwaj"
   given-names: "Aditya"
-title: "IterativeLearningControl.jl"
+title: "QuantumCollocation.jl"
 version: 0.1.2
 date-released: 2023-02-09
 url: "https://github.com/aarontrowbridge/QuantumCollocation.jl"
