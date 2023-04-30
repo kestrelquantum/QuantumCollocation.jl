@@ -15,6 +15,7 @@ export annihilate
 export create
 export quad
 export cavity_state
+export multimode_state
 export number
 export normalize
 export fidelity

@@ -3,6 +3,9 @@ module ProblemTemplates
 export UnitarySmoothPulseProblem
 export UnitaryMinimumTimeProblem
 
+export QuantumStateSmoothPulseProblem
+export QuantumStateMinimumTimeProblem
+
 using ..QuantumSystems
 using ..QuantumUtils
 using ..Rollouts
@@ -17,18 +20,22 @@ using LinearAlgebra
 using Distributions
 using JLD2
 
+
+# -------------------------------------------
+# Unitary Problem Templates
+# -------------------------------------------
+
 function UnitarySmoothPulseProblem(
-    H_drift::AbstractMatrix{<:Number},
-    H_drives::Vector{<:AbstractMatrix{<:Number}},
+    system::QuantumSystem,
     U_goal::AbstractMatrix{<:Number},
     T::Int,
     Δt::Float64;
     init_trajectory::Union{NamedTrajectory, Nothing}=nothing,
     a_bound::Float64=Inf,
-    a_bounds::Vector{Float64}=fill(a_bound, length(H_drives)),
+    a_bounds::Vector{Float64}=fill(a_bound, length(system.G_drives)),
     a_guess::Union{Matrix{Float64}, Nothing}=nothing,
     dda_bound::Float64=Inf,
-    dda_bounds::Vector{Float64}=fill(dda_bound, length(H_drives)),
+    dda_bounds::Vector{Float64}=fill(dda_bound, length(system.G_drives)),
     Δt_min::Float64=0.5 * Δt,
     Δt_max::Float64=1.5 * Δt,
     drive_derivative_σ::Float64=0.01,
@@ -46,9 +53,7 @@ function UnitarySmoothPulseProblem(
 )
     U_goal = Matrix{ComplexF64}(U_goal)
 
-    n_drives = length(H_drives)
-
-    system = QuantumSystem(H_drift, H_drives)
+    n_drives = length(system.G_drives)
 
     if !isnothing(init_trajectory)
         traj = init_trajectory
@@ -138,6 +143,16 @@ function UnitarySmoothPulseProblem(
     )
 end
 
+function UnitarySmoothPulseProblem(
+    H_drift::AbstractMatrix{<:Number},
+    H_drives::Vector{<:AbstractMatrix{<:Number}},
+    args...;
+    kwargs...
+)
+    system = QuantumSystem(H_drift, H_drives)
+    return UnitarySmoothPulseProblem(system, args...; kwargs...)
+end
+
 function UnitaryMinimumTimeProblem(
     trajectory::NamedTrajectory,
     system::QuantumSystem,
@@ -199,6 +214,206 @@ function UnitaryMinimumTimeProblem(
         kwargs...
     )
 end
+
+# ------------------------------------------
+# Quantum State Problem Templates
+# ------------------------------------------
+
+function QuantumStateSmoothPulseProblem(
+    system::QuantumSystem,
+    ψ_init::AbstractVector{<:Number},
+    ψ_goal::AbstractVector{<:Number},
+    T::Int,
+    Δt::Float64;
+    init_trajectory::Union{NamedTrajectory, Nothing}=nothing,
+    a_bound::Float64=Inf,
+    a_bounds::Vector{Float64}=fill(a_bound, length(system.G_drives)),
+    a_guess::Union{Matrix{Float64}, Nothing}=nothing,
+    dda_bound::Float64=Inf,
+    dda_bounds::Vector{Float64}=fill(dda_bound, length(system.G_drives)),
+    Δt_min::Float64=0.5 * Δt,
+    Δt_max::Float64=1.5 * Δt,
+    drive_derivative_σ::Float64=0.01,
+    Q::Float64=100.0,
+    R=1e-2,
+    R_a::Union{Float64, Vector{Float64}}=R,
+    R_da::Union{Float64, Vector{Float64}}=R,
+    R_dda::Union{Float64, Vector{Float64}}=R,
+    max_iter::Int=1000,
+    linear_solver::String="mumps",
+    ipopt_options::Options=Options(),
+    constraints::Vector{<:AbstractConstraint}=AbstractConstraint[],
+    timesteps_all_equal::Bool=true,
+    verbose=false,
+)
+    ψ_init = Vector{ComplexF64}(ψ_init)
+    ψ̃_init = ket_to_iso(ψ_init)
+
+    ψ_goal = Vector{ComplexF64}(ψ_goal)
+    ψ̃_goal = ket_to_iso(ψ_goal)
+
+    n_drives = length(system.G_drives)
+
+    if !isnothing(init_trajectory)
+        traj = init_trajectory
+    else
+        Δt = fill(Δt, T)
+
+        if isnothing(a_guess)
+            ψ̃ = linear_interpolation(ψ̃_init, ψ̃_goal, T)
+            a_dists =  [Uniform(-a_bounds[i], a_bounds[i]) for i = 1:n_drives]
+            a = hcat([
+                zeros(n_drives),
+                vcat([rand(a_dists[i], 1, T - 2) for i = 1:n_drives]...),
+                zeros(n_drives)
+            ]...)
+            da = randn(n_drives, T) * drive_derivative_σ
+            dda = randn(n_drives, T) * drive_derivative_σ
+        else
+            ψ̃ = rollout(ψ̃_init, a_guess, Δt, system)
+            a = a_guess
+            da = derivative(a, Δt)
+            dda = derivative(da, Δt)
+        end
+
+        components = (
+            ψ̃ = ψ̃,
+            a = a,
+            da = da,
+            dda = dda,
+            Δt = Δt,
+        )
+
+        bounds = (
+            a = a_bounds,
+            dda = dda_bounds,
+            Δt = (Δt_min, Δt_max),
+        )
+
+        initial = (
+            ψ̃ = ψ̃_init,
+            a = zeros(n_drives),
+        )
+
+        final = (
+            a = zeros(n_drives),
+        )
+
+        goal = (
+            ψ̃ = ψ̃_goal,
+        )
+
+        traj = NamedTrajectory(
+            components;
+            controls=(:dda, :Δt),
+            timestep=:Δt,
+            bounds=bounds,
+            initial=initial,
+            final=final,
+            goal=goal
+        )
+    end
+
+    J = QuantumStateObjective(:ψ̃, traj, Q)
+    J += QuadraticRegularizer(:a, traj, R_a)
+    J += QuadraticRegularizer(:da, traj, R_da)
+    J += QuadraticRegularizer(:dda, traj, R_dda)
+
+    integrators = [
+        QuantumStatePadeIntegrator(system, :ψ̃, :a, :Δt),
+        DerivativeIntegrator(:a, :da, :Δt, traj),
+        DerivativeIntegrator(:da, :dda, :Δt, traj)
+    ]
+
+    if timesteps_all_equal
+        push!(constraints, TimeStepsAllEqualConstraint(:Δt, traj))
+    end
+
+    return QuantumControlProblem(
+        system,
+        traj,
+        J,
+        integrators;
+        constraints=constraints,
+        max_iter=max_iter,
+        linear_solver=linear_solver,
+        verbose=verbose,
+        ipopt_options=ipopt_options,
+    )
+end
+
+function QuantumStateSmoothPulseProblem(
+    H_drift::AbstractMatrix{<:Number},
+    H_drives::Vector{<:AbstractMatrix{<:Number}},
+    args...;
+    kwargs...
+)
+    system = QuantumSystem(H_drift, H_drives)
+    return QuantumStateSmoothPulseProblem(system, args...; kwargs...)
+end
+
+function QuantumStateMinimumTimeProblem(
+    trajectory::NamedTrajectory,
+    system::QuantumSystem,
+    objective::Objective,
+    integrators::Vector{<:AbstractIntegrator},
+    constraints::Vector{<:AbstractConstraint};
+    state_symbol::Symbol=:ψ̃,
+    D=1.0,
+    verbose::Bool=false,
+    ipopt_options::Options=Options(),
+    kwargs...
+)
+    @assert state_symbol ∈ trajectory.names
+
+    objective += MinimumTimeObjective(trajectory; D=D)
+
+    final_fidelity = fidelity(trajectory[end][state_symbol], trajectory.goal[state_symbol])
+
+    fidelity_constraint = FinalQuantumStateFidelityConstraint(
+        state_symbol,
+        final_fidelity,
+        trajectory
+    )
+
+    push!(constraints, fidelity_constraint)
+
+    return QuantumControlProblem(
+        system,
+        trajectory,
+        objective,
+        integrators;
+        constraints=constraints,
+        verbose=verbose,
+        ipopt_options=ipopt_options,
+        kwargs...
+    )
+end
+
+function QuantumStateMinimumTimeProblem(
+    data_path::String;
+    kwargs...
+)
+    data = load(data_path)
+    system = data["system"]
+    trajectory = data["trajectory"]
+    objective = Objective(data["params"][:objective_terms])
+    integrators = data["params"][:dynamics]
+    constraints = AbstractConstraint[
+        data["params"][:linear_constraints]...,
+        NonlinearConstraint.(data["params"][:nonlinear_constraints])...
+    ]
+    return QuantumStateMinimumTimeProblem(
+        trajectory,
+        system,
+        objective,
+        integrators,
+        constraints;
+        build_trajectory_constraints=false,
+        kwargs...
+    )
+end
+
 
 
 end

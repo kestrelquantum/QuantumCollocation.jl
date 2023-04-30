@@ -1167,6 +1167,37 @@ and
 \end{align*}
 
 
+\section{State Transfer}
+
+For a isomorphic quantum state $\isopsi$, we have
+
+\begin{equation*}
+  \vb{P}(\isopsi_{k+1}, \isopsi_k, \vb{a}_k, h_k) = B(\vb{a}_k, h_k) \isopsi_{k+1} - F(\vb{a}_k, h_k) \isopsi_k
+\end{equation*}
+
+\subsection{Jacobian}
+\begin{align*}
+  \pdv{\vb{P}}{\isopsi_t} &= - F \quad \text{and} \quad
+  \pdv{\vb{P}}{\isopsi_{t+1}} = B
+\end{align*}
+
+\begin{align*}
+  \pdv{\vb{P}}{a^j_k} &= \pdv{B}{a^j_k} \isopsi_{k+1} - \pdv{F}{a^j_k} \isopsi_k 
+\end{align*}
+
+\begin{align*}
+  \pdv{B}{a^j_k} &= I_2 \otimes \pdv{\BR}{a^j_k} + \Im \otimes \pdv{\BI}{a^j_k} \\
+  \pdv{F}{a^j_k} &= I_2 \otimes \pdv{\FR}{a^j_k} - \Im \otimes \pdv{\FI}{a^j_k} 
+\end{align*}
+
+\begin{align*}
+  \pdv{\vb{P}}{h_k} &= \pdv{B}{h_k} \isopsi_{k+1} - \pdv{F}{h_k} \isopsi_k
+\end{align*}
+
+\begin{align*}
+  \pdv{B}{h_k} &= I_2 \otimes \pdv{\BR}{h_k} + \Im \otimes \pdv{\BI}{h_k} \\
+  \pdv{F}{h_k} &= I_2 \otimes \pdv{\FR}{h_k} - \Im \otimes \pdv{\FI}{h_k}
+\end{align*} 
 
 
 

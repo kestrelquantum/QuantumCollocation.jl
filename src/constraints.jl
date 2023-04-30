@@ -13,7 +13,7 @@ export NonlinearInequalityConstraint
 
 export FinalFidelityConstraint
 export FinalUnitaryFidelityConstraint
-export FinalStateFidelityConstraint
+export FinalQuantumStateFidelityConstraint
 
 export ComplexModulusContraint
 
@@ -170,6 +170,25 @@ function FinalUnitaryFidelityConstraint(
         T=traj.T
     )
 end
+
+function FinalQuantumStateFidelityConstraint(
+    statesymb::Symbol,
+    val::Float64,
+    traj::NamedTrajectory
+)
+    @assert statesymb ∈ traj.names
+    return FinalFidelityConstraint(;
+        fidelity_function=fidelity,
+        value=val,
+        comps=traj.components[statesymb],
+        goal=traj.goal[statesymb],
+        statedim=traj.dims[statesymb],
+        zdim=traj.dim,
+        T=traj.T
+    )
+end
+
+
 
 # function FinalStateFidelityConstraint(
 #     val::Float64,

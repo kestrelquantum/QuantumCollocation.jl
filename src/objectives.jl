@@ -3,6 +3,7 @@ module Objectives
 export Objective
 
 export QuantumObjective
+export QuantumStateObjective
 export QuantumUnitaryObjective
 
 export MinimumTimeObjective
@@ -200,6 +201,14 @@ function QuantumUnitaryObjective(
     Q::Float64
 )
     return QuantumObjective(name, traj, :UnitaryInfidelityLoss, Q)
+end
+
+function QuantumStateObjective(
+    name::Symbol,
+    traj::NamedTrajectory,
+    Q::Float64
+)
+    return QuantumObjective(name, traj, :InfidelityLoss, Q)
 end
 
 function QuadraticRegularizer(;

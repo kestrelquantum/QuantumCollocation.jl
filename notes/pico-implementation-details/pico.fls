@@ -1,9 +1,9 @@
-PWD /home/aaron/projects/QuantumCollocation.jl/notes/pico-implementation-details
+PWD /home/aaron/projects/JuliaPackages/QuantumCollocation.jl/notes/pico-implementation-details
 INPUT /etc/texmf/web2c/texmf.cnf
 INPUT /usr/share/texmf/web2c/texmf.cnf
 INPUT /usr/share/texlive/texmf-dist/web2c/texmf.cnf
 INPUT /var/lib/texmf/web2c/pdftex/pdflatex.fmt
-INPUT /home/aaron/projects/QuantumCollocation.jl/notes/pico-implementation-details/pico.tex
+INPUT /home/aaron/projects/JuliaPackages/QuantumCollocation.jl/notes/pico-implementation-details/pico.tex
 OUTPUT pico.log
 INPUT /usr/share/texlive/texmf-dist/tex/latex/base/article.cls
 INPUT /usr/share/texlive/texmf-dist/tex/latex/base/article.cls

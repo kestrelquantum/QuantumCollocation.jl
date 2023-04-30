@@ -5,6 +5,7 @@ export unitary_rollout
 export unitary_geodesic
 export skew_symmetric
 export skew_symmetric_vec
+export linear_interpolation
 
 using ..QuantumUtils
 using ..QuantumSystems
@@ -154,5 +155,10 @@ function unitary_geodesic(U_goal, samples; kwargs...)
     return unitary_geodesic(U_init, U_goal, samples; kwargs...)
 end
 
+function linear_interpolation(ψ̃₁::AbstractVector, ψ̃₂::AbstractVector, samples::Int)
+    ts = range(0, 1; length=samples)
+    ψ̃s = [ψ̃₁ + t * (ψ̃₂ - ψ̃₁) for t ∈ ts]
+    return hcat(ψ̃s...)
+end
 
 end
