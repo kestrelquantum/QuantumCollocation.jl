@@ -5,6 +5,7 @@ export unitary_rollout
 export unitary_geodesic
 export skew_symmetric
 export skew_symmetric_vec
+export linear_interpolation
 
 using ..QuantumUtils
 using ..QuantumSystems
@@ -79,6 +80,22 @@ function unitary_rollout(
     return Ũ⃗
 end
 
+function unitary_rollout(
+    controls::AbstractMatrix{Float64},
+    Δt::Union{AbstractVector{Float64}, AbstractMatrix{Float64}},
+    system::QuantumSystem;
+    integrator=Integrators.fourth_order_pade
+)
+    return unitary_rollout(
+        operator_to_iso_vec(Matrix{ComplexF64}(I(size(system.H_drift, 1)))),
+        controls,
+        Δt,
+        system;
+        integrator=integrator
+    )
+end
+
+
 function skew_symmetric(v::AbstractVector, n::Int)
     M = zeros(eltype(v), n, n)
     k = 1
@@ -138,5 +155,10 @@ function unitary_geodesic(U_goal, samples; kwargs...)
     return unitary_geodesic(U_init, U_goal, samples; kwargs...)
 end
 
+function linear_interpolation(ψ̃₁::AbstractVector, ψ̃₂::AbstractVector, samples::Int)
+    ts = range(0, 1; length=samples)
+    ψ̃s = [ψ̃₁ + t * (ψ̃₂ - ψ̃₁) for t ∈ ts]
+    return hcat(ψ̃s...)
+end
 
 end

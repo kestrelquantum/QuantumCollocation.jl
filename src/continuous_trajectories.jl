@@ -51,12 +51,16 @@ function (ct::ContinuousTrajectory)(ts::AbstractVector{<:Real})
     return hcat([ct(tᵢ) for tᵢ in ts]...)
 end
 
-function (ct::ContinuousTrajectory)(nsamples::Int; return_times=false)
+function (ct::ContinuousTrajectory)(nsamples::Int; return_times=false, return_timestep=false)
     ts = LinRange(ct.times[1], ct.times[end], nsamples)
-    if !return_times
+    if !return_times && !return_timestep
         return ct(ts)
+    elseif return_times && !return_timestep
+        return ct(ts), ts
+    elseif !return_times && return_timestep
+        return ct(ts), ts[2] - ts[1]
     else
-        return ct(ts), A
+        return ct(ts), ts, ts[2] - ts[1]
     end
 end
 

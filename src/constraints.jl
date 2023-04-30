@@ -5,6 +5,20 @@ export trajectory_constraints
 
 export AbstractConstraint
 
+export NonlinearConstraint
+
+export NonlinearEqualityConstraint
+
+export NonlinearInequalityConstraint
+
+export FinalFidelityConstraint
+export FinalUnitaryFidelityConstraint
+export FinalQuantumStateFidelityConstraint
+
+export ComplexModulusContraint
+
+export LinearConstraint
+
 export EqualityConstraint
 export BoundsConstraint
 export TimeStepBoundsConstraint
@@ -12,9 +26,13 @@ export TimeStepEqualityConstraint
 export TimeStepsAllEqualConstraint
 export L1SlackConstraint
 
-using TrajectoryIndexingUtils
+using ..StructureUtils
+using ..QuantumUtils
 
+using TrajectoryIndexingUtils
 using NamedTrajectories
+using ForwardDiff
+using SparseArrays
 using Ipopt
 using MathOptInterface
 const MOI = MathOptInterface
@@ -22,10 +40,298 @@ const MOI = MathOptInterface
 
 abstract type AbstractConstraint end
 
+abstract type NonlinearConstraint <: AbstractConstraint end
+
+function NonlinearConstraint(params::Dict)
+    return eval(params[:type])(; delete!(params, :type)...)
+end
+
+struct NonlinearEqualityConstraint <: NonlinearConstraint
+    g::Function
+    ∂g::Function
+    ∂g_structure::Vector{Tuple{Int, Int}}
+    μ∂²g::Function
+    μ∂²g_structure::Vector{Tuple{Int, Int}}
+    dim::Int
+    params::Dict{Symbol, Any}
+end
+
+struct NonlinearInequalityConstraint <: NonlinearConstraint
+    g::Function
+    ∂g::Function
+    ∂g_structure::Vector{Tuple{Int, Int}}
+    μ∂²g::Function
+    μ∂²g_structure::Vector{Tuple{Int, Int}}
+    dim::Int
+    params::Dict{Symbol, Any}
+end
+
+function FinalFidelityConstraint(;
+    fidelity_function::Union{Function,Nothing}=nothing,
+    value::Union{Float64,Nothing}=nothing,
+    comps::Union{AbstractVector{Int},Nothing}=nothing,
+    goal::Union{AbstractVector{Float64},Nothing}=nothing,
+    statedim::Union{Int,Nothing}=nothing,
+    zdim::Union{Int,Nothing}=nothing,
+    T::Union{Int,Nothing}=nothing,
+)
+    @assert !isnothing(fidelity_function) "must provide a fidelity function"
+    @assert !isnothing(value) "must provide a fidelity value"
+    @assert !isnothing(comps) "must provide a list of components"
+    @assert !isnothing(goal) "must provide a goal state"
+    @assert !isnothing(statedim) "must provide a state dimension"
+    @assert !isnothing(zdim) "must provide a z dimension"
+    @assert !isnothing(T) "must provide a T"
+
+    fidelity_function_symbol = Symbol(fidelity_function)
+
+    fid = x -> fidelity_function(x, goal)
+
+    @assert fid(randn(statedim)) isa Float64 "fidelity function must return a scalar"
+
+    params = Dict{Symbol, Any}()
+
+    if fidelity_function_symbol ∉ names(QuantumUtils)
+        @warn "fidelity function is not exported by QuantumUtils: will not be able to save this constraint"
+        params[:type] = :FinalFidelityConstraint
+        params[:fidelity_function] = :not_saveable
+    else
+        params[:type] = :FinalFidelityConstraint
+        params[:fidelity_function] = fidelity_function_symbol
+        params[:value] = value
+        params[:comps] = comps
+        params[:statedim] = statedim
+        params[:zdim] = zdim
+        params[:T] = T
+    end
+
+    state_slice = slice(T, comps, zdim)
+
+    ℱ(x) = [fid(x)]
+
+    g(Z⃗) = ℱ(Z⃗[state_slice]) .- value
+
+    ∂ℱ(x) = ForwardDiff.jacobian(ℱ, x)
+
+    ∂ℱ_structure = jacobian_structure(∂ℱ, statedim)
+
+    col_offset = index(T, comps[1] - 1, zdim)
+
+    ∂g_structure = [(i, j + col_offset) for (i, j) in ∂ℱ_structure]
+
+    @views function ∂g(Z⃗; ipopt=true)
+        ∂ = spzeros(1, T * zdim)
+        ∂ℱ_x = ∂ℱ(Z⃗[state_slice])
+        for (i, j) ∈ ∂ℱ_structure
+            ∂[i, j + col_offset] = ∂ℱ_x[i, j]
+        end
+        if ipopt
+            return [∂[i, j] for (i, j) in ∂g_structure]
+        else
+            return ∂
+        end
+    end
+
+    ∂²ℱ(x) = ForwardDiff.hessian(fid, x)
+
+    ∂²ℱ_structure = hessian_of_lagrangian_structure(∂²ℱ, statedim, 1)
+
+    μ∂²g_structure = [ij .+ col_offset for ij in ∂²ℱ_structure]
+
+    @views function μ∂²g(Z⃗, μ; ipopt=true)
+        HoL = spzeros(T * zdim, T * zdim)
+        μ∂²ℱ = μ[1] * ∂²ℱ(Z⃗[state_slice])
+        for (i, j) ∈ ∂²ℱ_structure
+            HoL[i + col_offset, j + col_offset] = μ∂²ℱ[i, j]
+        end
+        if ipopt
+            return [HoL[i, j] for (i, j) in μ∂²g_structure]
+        else
+            return HoL
+        end
+    end
+
+    return NonlinearInequalityConstraint(g, ∂g, ∂g_structure, μ∂²g, μ∂²g_structure, 1, params)
+end
+
+function FinalUnitaryFidelityConstraint(
+    statesymb::Symbol,
+    val::Float64,
+    traj::NamedTrajectory
+)
+    @assert statesymb ∈ traj.names
+    return FinalFidelityConstraint(;
+        fidelity_function=unitary_fidelity,
+        value=val,
+        comps=traj.components[statesymb],
+        goal=traj.goal[statesymb],
+        statedim=traj.dims[statesymb],
+        zdim=traj.dim,
+        T=traj.T
+    )
+end
+
+function FinalQuantumStateFidelityConstraint(
+    statesymb::Symbol,
+    val::Float64,
+    traj::NamedTrajectory
+)
+    @assert statesymb ∈ traj.names
+    return FinalFidelityConstraint(;
+        fidelity_function=fidelity,
+        value=val,
+        comps=traj.components[statesymb],
+        goal=traj.goal[statesymb],
+        statedim=traj.dims[statesymb],
+        zdim=traj.dim,
+        T=traj.T
+    )
+end
+
+
+
+# function FinalStateFidelityConstraint(
+#     val::Float64,
+#     statesymb::Symbol,
+#     statedim::Int;
+#     fidelity_function::Function=fidelity
+# )
+#     return FinalFidelityConstraint(;
+#         fidelity_function=fidelity_function,
+#         value=val,
+#         statesymb=statesymb,
+#         statedim=statedim
+#     )
+# end
+
+
+function ComplexModulusContraint(;
+    R::Union{Float64, Nothing}=nothing,
+    comps::Union{AbstractVector{Int}, Nothing}=nothing,
+    times::Union{AbstractVector{Int}, Nothing}=nothing,
+    zdim::Union{Int, Nothing}=nothing,
+    T::Union{Int, Nothing}=nothing,
+)
+    @assert !isnothing(R) "must provide a value R, s.t. |z| <= R"
+    @assert !isnothing(comps) "must provide components of the complex number"
+    @assert !isnothing(times) "must provide times"
+    @assert !isnothing(zdim) "must provide a z dimension"
+    @assert !isnothing(T) "must provide a T"
+
+    @assert length(comps) == 2 "component must represent a complex number and have dimension 2"
+
+    params = Dict{Symbol, Any}()
+
+    params[:type] = :ComplexModulusContraint
+    params[:R] = R
+    params[:comps] = comps
+    params[:times] = times
+    params[:zdim] = zdim
+    params[:T] = T
+
+    gₜ(xₜ, yₜ) = [R^2 - xₜ^2 - yₜ^2]
+    ∂gₜ(xₜ, yₜ) = [-2xₜ, -2yₜ]
+    μₜ∂²gₜ(μₜ) = sparse([1, 2], [1, 2], [-2μₜ, -2μₜ])
+
+    @views function g(Z⃗)
+        r = zeros(length(times))
+        for (i, t) ∈ enumerate(times)
+            zₜ = Z⃗[slice(t, comps, zdim)]
+            xₜ = zₜ[1]
+            yₜ = zₜ[2]
+            r[i] = gₜ(xₜ, yₜ)[1]
+        end
+        return r
+    end
+
+    ∂g_structure = []
+
+    for (i, t) ∈ enumerate(times)
+        push!(∂g_structure, (i, index(t, comps[1], zdim)))
+        push!(∂g_structure, (i, index(t, comps[2], zdim)))
+    end
+
+    @views function ∂g(Z⃗; ipopt=true)
+        ∂ = spzeros(length(times), zdim * T)
+        for (i, t) ∈ enumerate(times)
+            zₜ = Z⃗[slice(t, comps, zdim)]
+            xₜ = zₜ[1]
+            yₜ = zₜ[2]
+            ∂[i, slice(t, comps, zdim)] = ∂gₜ(xₜ, yₜ)
+        end
+        if ipopt
+            return [∂[i, j] for (i, j) in ∂g_structure]
+        else
+            return ∂
+        end
+    end
+
+    μ∂²g_structure = []
+
+    for t ∈ times
+        push!(
+            μ∂²g_structure,
+            (
+                index(t, comps[1], zdim),
+                index(t, comps[1], zdim)
+            )
+        )
+        push!(
+            μ∂²g_structure,
+            (
+                index(t, comps[2], zdim),
+                index(t, comps[2], zdim)
+            )
+        )
+    end
+
+    function μ∂²g(Z⃗, μ; ipopt=true)
+        μ∂² = spzeros(zdim * T, zdim * T)
+        for (i, t) ∈ enumerate(times)
+            t_slice = slice(t, comps, zdim)
+            μ∂²[t_slice, t_slice] = μₜ∂²gₜ(μ[i])
+        end
+        if ipopt
+            return [μ∂²[i, j] for (i, j) in μ∂²g_structure]
+        else
+            return μ∂²
+        end
+    end
+
+    return NonlinearInequalityConstraint(
+        g,
+        ∂g,
+        ∂g_structure,
+        μ∂²g,
+        μ∂²g_structure,
+        length(times),
+        params
+    )
+end
+
+function ComplexModulusContraint(
+    symb::Symbol,
+    R::Float64,
+    traj::NamedTrajectory;
+    times=1:traj.T
+)
+    @assert symb ∈ traj.names
+    return ComplexModulusContraint(;
+        R=R,
+        comps=traj.components[symb],
+        times=times,
+        zdim=traj.dim,
+        T=traj.T
+    )
+end
+
+
+abstract type LinearConstraint <: AbstractConstraint end
+
 function constrain!(
     opt::Ipopt.Optimizer,
     vars::Vector{MOI.VariableIndex},
-    cons::Vector{AbstractConstraint};
+    cons::Vector{LinearConstraint};
     verbose=false
 )
     for con in cons
@@ -87,7 +393,7 @@ end
 
 
 
-struct EqualityConstraint <: AbstractConstraint
+struct EqualityConstraint <: LinearConstraint
     ts::AbstractArray{Int}
     js::AbstractArray{Int}
     vals::Vector{R} where R
@@ -143,7 +449,7 @@ function (con::EqualityConstraint)(
     end
 end
 
-struct BoundsConstraint <: AbstractConstraint
+struct BoundsConstraint <: LinearConstraint
     ts::AbstractArray{Int}
     js::AbstractArray{Int}
     vals::Vector{Tuple{R, R}} where R <: Real
@@ -241,7 +547,7 @@ function (con::BoundsConstraint)(
     end
 end
 
-struct TimeStepBoundsConstraint <: AbstractConstraint
+struct TimeStepBoundsConstraint <: LinearConstraint
     bounds::Tuple{R, R} where R <: Real
     Δt_indices::AbstractVector{Int}
     name::String
@@ -275,7 +581,7 @@ function (con::TimeStepBoundsConstraint)(
     end
 end
 
-struct TimeStepEqualityConstraint <: AbstractConstraint
+struct TimeStepEqualityConstraint <: LinearConstraint
     val::R where R <: Real
     Δt_indices::AbstractVector{Int}
     name::String
@@ -302,7 +608,7 @@ function (con::TimeStepEqualityConstraint)(
     end
 end
 
-struct TimeStepsAllEqualConstraint <: AbstractConstraint
+struct TimeStepsAllEqualConstraint <: LinearConstraint
     Δt_indices::AbstractVector{Int}
     name::String
 
@@ -310,6 +616,16 @@ struct TimeStepsAllEqualConstraint <: AbstractConstraint
         Δt_indices::AbstractVector{Int};
         name="unnamed time step all equal constraint"
     )
+        return new(Δt_indices, name)
+    end
+
+    function TimeStepsAllEqualConstraint(
+        Δt_symb::Symbol,
+        traj::NamedTrajectory;
+        name="unnamed time step all equal constraint"
+    )
+        Δt_comp = traj.components[Δt_symb][1]
+        Δt_indices = [index(t, Δt_comp, traj.dim) for t = 1:traj.T]
         return new(Δt_indices, name)
     end
 end
@@ -330,7 +646,7 @@ function (con::TimeStepsAllEqualConstraint)(
     end
 end
 
-struct L1SlackConstraint <: AbstractConstraint
+struct L1SlackConstraint <: LinearConstraint
     s1_indices::AbstractArray{Int}
     s2_indices::AbstractArray{Int}
     x_indices::AbstractArray{Int}

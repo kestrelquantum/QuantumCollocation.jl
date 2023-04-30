@@ -247,7 +247,7 @@ experiment = "T_$(T)_Q_$(Q)_iter_$(max_iter)"
 plot_path = generate_file_path("png", experiment, plot_dir)
 
 # plotting initial trajectory
-plot(plot_path, prob.trajectory, [:ψ̃1, :γ, :α]; dt_name=:Δt)
+plot(plot_path, prob.trajectory, [:ψ̃1, :γ, :α]; timestep_name=:Δt)
 
 # solving the problem
 solve!(prob)
@@ -279,7 +279,7 @@ println("|1⟩ Rollout fidelity: ", fidelity(Ψ̃₂[:, end], ψ̃₂_goal))
 
 # new plot name with fidelity included
 plot_path = join(split(plot_path, ".")[1:end-1]) * "_fidelity_$(fid1).png"
-plot(plot_path, prob.trajectory, [:ψ̃1, :γ, :α]; dt_name=:Δt)
+plot(plot_path, prob.trajectory, [:ψ̃1, :γ, :α]; timestep_name=:Δt)
 
 # save the trajectory
 save_dir = "examples/scripts/trajectories/single_qubit/state_transfer"

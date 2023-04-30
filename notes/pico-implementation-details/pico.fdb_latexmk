@@ -1,7 +1,7 @@
 # Fdb version 3
-["pdflatex"] 1680446231 "/home/aaron/projects/QuantumCollocation.jl/notes/pico-implementation-details/pico.tex" "pico.pdf" "pico" 1680446232
+["pdflatex"] 1682854959 "/home/aaron/projects/JuliaPackages/QuantumCollocation.jl/notes/pico-implementation-details/pico.tex" "pico.pdf" "pico" 1682854959
   "/etc/texmf/web2c/texmf.cnf" 1661381987 475 c0e671620eb5563b2130f56340a5fde8 ""
-  "/home/aaron/projects/QuantumCollocation.jl/notes/pico-implementation-details/pico.tex" 1680446213 40485 18c74ebde7c98f648f69e09fcb4a8ab1 ""
+  "/home/aaron/projects/JuliaPackages/QuantumCollocation.jl/notes/pico-implementation-details/pico.tex" 1682854959 41452 8ef4ad6b09c772c4adac40bef4ba1bb3 ""
   "/usr/share/texlive/texmf-dist/fonts/map/fontname/texfonts.map" 1577235249 3524 cb3e574dea2d1052e39280babc910dc8 ""
   "/usr/share/texlive/texmf-dist/fonts/tfm/public/amsfonts/cmextra/cmbsy5.tfm" 1246382020 1120 1e8878807317373affa7f7bba4cf2f6a ""
   "/usr/share/texlive/texmf-dist/fonts/tfm/public/amsfonts/cmextra/cmbsy7.tfm" 1246382020 1120 7f9f170e8aa57527ad6c49feafd45d54 ""
@@ -114,10 +114,10 @@
   "/usr/share/texmf/web2c/texmf.cnf" 1644012257 39432 7155514e09a3d69036fac785183a21c2 ""
   "/var/lib/texmf/fonts/map/pdftex/updmap/pdftex.map" 1661382061 166835 3237b25953d3dec94d74e36efc3a402b ""
   "/var/lib/texmf/web2c/pdftex/pdflatex.fmt" 1661382066 1435853 7dc55129da6aefe46d2d311fdea676e1 ""
-  "pico.aux" 1680446232 2662 2e15a94e0376fdd909c2153076bca8e5 "pdflatex"
-  "pico.out" 1680446232 2467 3ce298c9a221efaface2087045f69abf "pdflatex"
-  "pico.tex" 1680446213 40485 18c74ebde7c98f648f69e09fcb4a8ab1 ""
-  "pico.toc" 1680446232 1319 05eb0ec2e7dd586fbac09a2923137c26 "pdflatex"
+  "pico.aux" 1682854959 2890 fe292c2c830c3fd789711dd39da86405 "pdflatex"
+  "pico.out" 1682854959 2682 60b213b9fa15f63d21d0b695d75a95e9 "pdflatex"
+  "pico.tex" 1682854959 41452 8ef4ad6b09c772c4adac40bef4ba1bb3 ""
+  "pico.toc" 1682854959 1465 c72d4d95f20c90171a1e429076586a72 "pdflatex"
   (generated)
   "pico.aux"
   "pico.log"

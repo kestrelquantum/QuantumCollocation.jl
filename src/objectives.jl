@@ -3,7 +3,10 @@ module Objectives
 export Objective
 
 export QuantumObjective
-export MinTimeObjective
+export QuantumStateObjective
+export QuantumUnitaryObjective
+
+export MinimumTimeObjective
 
 export QuadraticRegularizer
 export QuadraticSmoothnessRegularizer
@@ -172,7 +175,6 @@ function QuantumObjective(;
 	return Objective(L, ∇L, ∂²L, ∂²L_structure, Dict[params])
 end
 
-
 function QuantumObjective(
     name::Symbol,
     traj::NamedTrajectory,
@@ -193,64 +195,21 @@ function QuantumObjective(
     return QuantumObjective(names=names, goals=goals, loss=loss, Q=Q)
 end
 
+function QuantumUnitaryObjective(
+    name::Symbol,
+    traj::NamedTrajectory,
+    Q::Float64
+)
+    return QuantumObjective(name, traj, :UnitaryInfidelityLoss, Q)
+end
 
-
-# function QuantumObjective(;
-# 	system::QuantumSystem=nothing,
-# 	loss=:infidelity_loss,
-# 	T=nothing,
-# 	Q=100.0,
-# 	eval_hessian=true
-# )
-#     @assert !isnothing(system) "system must be specified"
-#     @assert !isnothing(T) "T must be specified"
-
-#     params = Dict(
-#         :type => :QuantumObjective,
-#         :system => system,
-#         :loss => loss,
-#         :T => T,
-#         :Q => Q,
-#         :eval_hessian => eval_hessian
-#     )
-
-# 	loss = QuantumLoss(system, loss)
-
-# 	@views function L(Z::AbstractVector{F}) where F
-# 		ψ̃T = Z[slice(T, system.n_wfn_states, system.vardim)]
-# 		return Q * loss(ψ̃T)
-# 	end
-
-# 	∇c = QuantumLossGradient(loss)
-
-# 	@views function ∇L(Z::AbstractVector{F}) where F
-# 		∇ = zeros(F, length(Z))
-# 		ψ̃T_slice = slice(T, system.n_wfn_states, system.vardim)
-# 		ψ̃T = Z[ψ̃T_slice]
-# 		∇[ψ̃T_slice] = Q * ∇c(ψ̃T)
-# 		return ∇
-# 	end
-
-# 	∂²L = nothing
-# 	∂²L_structure = nothing
-
-# 	if eval_hessian
-# 		∇²c = QuantumLossHessian(loss)
-
-# 		# ℓⁱs Hessian structure (eq. 17)
-# 		∂²L_structure = structure(∇²c, T, system.vardim)
-
-# 		∂²L = Z::AbstractVector -> begin
-# 			ψ̃T = view(
-# 				Z,
-# 				slice(T, system.n_wfn_states, system.vardim)
-# 			)
-# 			return Q * ∇²c(ψ̃T)
-# 		end
-# 	end
-
-# 	return Objective(L, ∇L, ∂²L, ∂²L_structure, Dict[params])
-# end
+function QuantumStateObjective(
+    name::Symbol,
+    traj::NamedTrajectory,
+    Q::Float64
+)
+    return QuantumObjective(name, traj, :InfidelityLoss, Q)
+end
 
 function QuadraticRegularizer(;
 	name::Symbol=nothing,
@@ -265,6 +224,7 @@ function QuadraticRegularizer(;
     @assert !isnothing(dim) "dim must be specified"
 
     params = Dict(
+        :type => :QuadraticRegularizer,
         :name => name,
         :times => times,
         :dim => dim,
@@ -317,14 +277,29 @@ function QuadraticRegularizer(
     name::Symbol,
     traj::NamedTrajectory,
     R::AbstractVector{<:Real};
-    eval_hessian=true
+    kwargs...
 )
     return QuadraticRegularizer(;
         name=name,
         times=1:traj.T,
         dim=traj.dim,
         R=R,
-        eval_hessian=eval_hessian
+        kwargs...
+    )
+end
+
+function QuadraticRegularizer(
+    name::Symbol,
+    traj::NamedTrajectory,
+    R::Real;
+    kwargs...
+)
+    return QuadraticRegularizer(;
+        name=name,
+        times=1:traj.T,
+        dim=traj.dim,
+        R=R * ones(traj.dims[name]),
+        kwargs...
     )
 end
 
@@ -332,18 +307,16 @@ end
 function QuadraticSmoothnessRegularizer(;
 	name::Symbol=nothing,
     times::AbstractVector{Int}=1:traj.T,
-    dim::Int=nothing,
 	R::AbstractVector{<:Real}=ones(traj.dims[name]),
 	eval_hessian=true
 )
     @assert !isnothing(name) "name must be specified"
     @assert !isnothing(times) "times must be specified"
-    @assert !isnothing(dim) "dim must be specified"
 
     params = Dict(
+        :type => :QuadraticSmoothnessRegularizer,
         :name => name,
         :times => times,
-        :dim => dim,
         :R => R,
         :eval_hessian => eval_hessian
     )
@@ -458,17 +431,29 @@ function QuadraticSmoothnessRegularizer(
     name::Symbol,
     traj::NamedTrajectory,
     R::AbstractVector{<:Real};
-    eval_hessian=true
+    kwargs...
 )
     return QuadraticSmoothnessRegularizer(;
         name=name,
         times=1:traj.T,
-        dim=traj.dim,
         R=R,
-        eval_hessian=eval_hessian
+        kwargs...
     )
 end
 
+function QuadraticSmoothnessRegularizer(
+    name::Symbol,
+    traj::NamedTrajectory,
+    R::Real;
+    kwargs...
+)
+    return QuadraticSmoothnessRegularizer(;
+        name=name,
+        times=1:traj.T,
+        R=R * ones(traj.dims[name]),
+        kwargs...
+    )
+end
 
 function L1SlackRegularizer(;
     s1_indices::AbstractVector{Int}=nothing,
@@ -509,38 +494,43 @@ function L1SlackRegularizer(;
 end
 
 
-function MinTimeObjective(;
-    Δt_indices::UnitRange{Int}=nothing,
-    T::Int=nothing,
+function MinimumTimeObjective(;
+    D::Float64=1.0,
+    Δt_indices::AbstractVector{Int}=nothing,
     eval_hessian::Bool=true
 )
     @assert !isnothing(Δt_indices) "Δt_indices must be specified"
-    @assert !isnothing(T) "T must be specified"
 
     params = Dict(
-        :type => :MinTimeObjective,
+        :type => :MinimumTimeObjective,
+        :D => D,
         :Δt_indices => Δt_indices,
-        :T => T,
         :eval_hessian => eval_hessian
     )
 
-	L(Z::AbstractVector) = sum(Z[Δt_indices])
+	L(Z⃗::AbstractVector, Z::NamedTrajectory) = D * Z⃗[Δt_indices][end]
 
-	∇L = (Z::AbstractVector) -> begin
-		∇ = zeros(typeof(Z[1]), length(Z))
-		∇[Δt_indices] .= 1.0
+	∇L = (Z⃗::AbstractVector, Z::NamedTrajectory) -> begin
+		∇ = zeros(typeof(Z⃗[1]), length(Z⃗))
+		∇[Δt_indices[end]] = D
 		return ∇
 	end
 
 	if eval_hessian
-		∂²L = Z -> []
-		∂²L_structure = []
+		∂²L = (Z⃗, Z) -> []
+		∂²L_structure = Z -> []
 	else
 		∂²L = nothing
 		∂²L_structure = nothing
 	end
 
 	return Objective(L, ∇L, ∂²L, ∂²L_structure, Dict[params])
+end
+
+function MinimumTimeObjective(traj::NamedTrajectory; D=1.0)
+    @assert traj.timestep isa Symbol "trajectory does not have a dynamical timestep"
+    Δt_indices = [index(t, traj.components[traj.timestep][1], traj.dim) for t = 1:traj.T]
+    return MinimumTimeObjective(; D=D, Δt_indices=Δt_indices)
 end
 
 end

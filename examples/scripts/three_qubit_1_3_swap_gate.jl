@@ -31,13 +31,13 @@ U_goal = Matrix{ComplexF64}(U_goal_analytic)
 a_dag = create(2)
 a = annihilate(2)
 
-ωs = [5.18, 5.12, 5.06]
-ω_d = 5.12
+ωs = 2π * [5.18, 5.12, 5.06]
+ω_d = 2π * 5.12
 
-ξs = [0.01, 0.01, 0.01]
+ξs = 2π * [0.34, 0.34, 0.34]
 
-J_12 = 5.0e-3
-J_23 = 5.0e-3
+J_12 = 2π * 5.0e-3
+J_23 = 2π * 5.0e-3
 
 
 function lift(U, q, n; l=2)
@@ -199,9 +199,9 @@ elseif load == :no_load
     Δt_max = 2.0 * dt
     u_bound = 2π * 0.04 # GHz
     u_dist = Uniform(-u_bound, u_bound)
-    ddu_bound = 0.001
+    ddu_bound = 0.01
 
-    Ũ⃗ = unitary_geodesic(Ũ_goal, T)
+    Ũ⃗ = unitary_geodesic(U_goal, T)
 
     u = foldr(hcat, [zeros(n_drives), rand(u_dist, n_drives, T - 2), zeros(n_drives)])
     du = randn(n_drives, T)
@@ -213,65 +213,12 @@ elseif load == :no_load
         u = u,
         du = du,
         ddu = ddu,
-        Δt = fill(dt, T)
-    )
-
-    bounds = (
-        u = fill(u_bound, n_drives),
-        ddu = fill(ddu_bound, n_drives),
-        Δt = (Δt_min, Δt_max),
-    )
-
-    initial = (
-        Ũ⃗ = Ũ⃗_init,
-        u = zeros(n_drives),
-    )
-
-    final = (
-        u = zeros(n_drives),
-    )
-
-    goal = (
-        Ũ⃗ = Ũ⃗_goal,
-    )
-
-    traj = NamedTrajectory(
-        comps;
-        controls=(:ddu, :Δt),
-        timestep=dt,
-        dynamical_dts=true,
-        bounds=bounds,
-        initial=initial,
-        final=final,
-        goal=goal
-    )
-elseif load == :no_load
-    T = 100
-    dt = 2.0
-    Δt_min = 0.5 * dt
-    Δt_max = 2.0 * dt
-    u_bound = 2π * 0.04 # GHz
-    u_dist = Uniform(-u_bound, u_bound)
-    ddu_bound = 0.001
-
-    Ũ⃗ = unitary_geodesic(U_goal, T)
-
-    u = foldr(hcat, [zeros(n_drives), rand(u_dist, n_drives, T - 2), zeros(n_drives)])
-    # du = randn(n_drives, T)
-    # ddu = randn(n_drives, T)
-
-
-    comps = (
-        Ũ⃗ = Ũ⃗,
-        u = u,
-        # du = du,
-        # ddu = ddu,
         Δt = fill(dt, 1, T)
     )
 
     bounds = (
         u = fill(u_bound, n_drives),
-        # ddu = fill(ddu_bound, n_drives),
+        ddu = fill(ddu_bound, n_drives),
         Δt = (Δt_min, Δt_max),
     )
 
@@ -300,26 +247,12 @@ elseif load == :no_load
     )
 end
 
-P = UnitaryPadeIntegrator(system, :Ũ⃗, :u, :Δt)
 
-# @views function f(zₜ, zₜ₊₁)
-#     Ũ⃗ₜ₊₁ = zₜ₊₁[traj.components.Ũ⃗]
-#     uₜ₊₁ = zₜ₊₁[traj.components.u]
-#     duₜ₊₁ = zₜ₊₁[traj.components.du]
-
-#     Ũ⃗ₜ = zₜ[traj.components.Ũ⃗]
-#     uₜ = zₜ[traj.components.u]
-#     duₜ = zₜ[traj.components.du]
-
-#     dduₜ = zₜ[traj.components.ddu]
-#     Δtₜ = zₜ[traj.components.Δt][1]
-
-#     δŨ⃗ = P(Ũ⃗ₜ₊₁, Ũ⃗ₜ, uₜ, Δtₜ)
-#     δu = uₜ₊₁ - uₜ - duₜ * Δtₜ
-#     δdu = duₜ₊₁ - duₜ - dduₜ * Δtₜ
-
-#     return vcat(δŨ⃗, δu, δdu)
-# end
+f = [
+    UnitaryPadeIntegrator(system, :Ũ⃗, :u, :Δt),
+    DerivativeIntegrator(:u, :du, :Δt, traj.dims[:u]),
+    DerivativeIntegrator(:du, :ddu, :Δt, traj.dims[:du]),
+]
 
 Q = 100.0
 
@@ -331,13 +264,17 @@ R_u = 1e-2
 
 J += QuadraticRegularizer(:u, traj, R_u * ones(n_drives))
 
-# R_du = 1e-2
+# R_u_smoothness = 1e-2
 
-# J += QuadraticRegularizer(:du, traj, R_du * ones(n_drives))
+# J += QuadraticSmoothnessRegularizer(:u, traj, R_u_smoothness * ones(n_drives))
 
-# R_ddu = 1e-2
+R_du = 1e-2
 
-# J += QuadraticRegularizer(:ddu, traj, R_ddu * ones(n_drives))
+J += QuadraticRegularizer(:du, traj, R_du * ones(n_drives))
+
+R_ddu = 1e-2
+
+J += QuadraticRegularizer(:ddu, traj, R_ddu * ones(n_drives))
 
 
 options = Options(
@@ -345,7 +282,7 @@ options = Options(
     linear_solver=linear_solver,
 )
 
-prob = QuantumControlProblem(system, traj, J, P;
+prob = QuantumControlProblem(system, traj, J, f;
     options=options,
 )
 
@@ -355,7 +292,7 @@ experiment = "T_$(traj.T)_Q_$(Q)_iter_$(max_iter)"
 
 plot_path = generate_file_path("png", experiment, plot_dir)
 
-plot(plot_path, prob.trajectory, [:Ũ⃗, :u]; ignored_labels=[:Ũ⃗], dt_name=:Δt)
+plot(plot_path, prob.trajectory, [:Ũ⃗, :u]; ignored_labels=[:Ũ⃗], timestep_name=:Δt)
 
 solve!(prob)
 
@@ -371,14 +308,15 @@ println("Final fidelity: ", fid)
 ψ̃ = ket_to_iso(ψ)
 ψ̃_goal = ket_to_iso(U_goal * ψ)
 Ψ̃ = rollout(ψ̃, prob.trajectory.u, prob.trajectory.Δt, system)
-println("|100⟩ → U|100⟩ = |001⟩ Rollout fidelity:   ", fidelity(Ψ̃[:, end], ψ̃_goal))
+Ψ̃_exp = rollout(ψ̃, prob.trajectory.u, prob.trajectory.Δt, system; integrator=exp)
+println("|100⟩ → U|100⟩ = |001⟩ Pade rollout fidelity:  ", fidelity(Ψ̃[:, end], ψ̃_goal))
+println("|100⟩ → U|100⟩ = |001⟩ exp rollout fidelity:   ", fidelity(Ψ̃_exp[:, end], ψ̃_goal))
 
 plot_path = generate_file_path("png", experiment, plot_dir)
 
-
 add_component!(prob.trajectory, :ψ̃, Ψ̃)
 
-plot(plot_path, prob.trajectory, [:Ũ⃗, :ψ̃, :u]; ignored_labels=[:Ũ⃗, :ψ̃], dt_name=:Δt)
+plot(plot_path, prob.trajectory, [:Ũ⃗, :ψ̃, :u]; ignored_labels=[:Ũ⃗, :ψ̃], timestep_name=:Δt)
 
 save_dir = "examples/scripts/trajectories/three_qubits/swap_gate/" * string(load)
 save_path = generate_file_path("jld2", experiment, save_dir)

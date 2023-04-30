@@ -216,7 +216,7 @@ experiment = "T_$(T)_Q_$(Q)_iter_$(max_iter)"
 
 plot_path = generate_file_path("png", experiment, plot_dir)
 
-plot(plot_path, prob.trajectory, [:Ũ⃗, :u]; ignored_labels=[:Ũ⃗], dt_name=:Δt)
+plot(plot_path, prob.trajectory, [:Ũ⃗, :u]; ignored_labels=[:Ũ⃗], timestep_name=:Δt)
 
 solve!(prob)
 
@@ -239,7 +239,7 @@ plot_path = generate_file_path("png", experiment, plot_dir)
 
 add_component!(prob.trajectory, :ψ̃, Ψ̃)
 
-plot(plot_path, prob.trajectory, [:Ũ⃗, :ψ̃, :u]; ignored_labels=[:Ũ⃗, :ψ̃], dt_name=:Δt)
+plot(plot_path, prob.trajectory, [:Ũ⃗, :ψ̃, :u]; ignored_labels=[:Ũ⃗, :ψ̃], timestep_name=:Δt)
 
 save_dir = "examples/scripts/trajectories/three_qubits/swap_gate/continuation"
 save_path = generate_file_path("jld2", experiment, save_dir)

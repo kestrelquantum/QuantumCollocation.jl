@@ -34,11 +34,11 @@ ddA = hcat(data.trajectory.actions...)
 # dA = loaded_traj.du
 # ddA = loaded_traj.ddu
 
-H_drift = ω1*kron(number(levels), I(levels)) + ω2*kron(I(levels), number(levels)) 
-          + 1/2*alpha * kron(quad(levels), I(levels)) + 1/2*alpha*kron(I(levels), quad(levels)) 
+H_drift = ω1*kron(number(levels), I(levels)) + ω2*kron(I(levels), number(levels))
+          + 1/2*alpha * kron(quad(levels), I(levels)) + 1/2*alpha*kron(I(levels), quad(levels))
           + J*kron(create(levels) + annihilate(levels), create(levels) + annihilate(levels))
 
-H_drives = [kron(create(levels) + annihilate(levels), I(levels)), 
+H_drives = [kron(create(levels) + annihilate(levels), I(levels)),
            kron(I(levels), create(levels) + annihilate(levels)),
            kron(I(levels), number(levels))]
 
@@ -132,15 +132,22 @@ Ddu = DerivativeIntegrator(:du, :ddu, :Δt, n_controls)
 #     δu = uₜ₊₁ - uₜ - duₜ * Δtₜ
 #     δdu = duₜ₊₁ - duₜ - dduₜ * Δtₜ
 
-#     return vcat(δŨvec, δu, δdu)
-# end 
+    δŨvec = P10(Ũ⃗ₜ₊₁, Ũ⃗ₜ, uₜ, Δtₜ, operator=true)
+    #δŨvec = P10(Ũ⃗ₜ₊₁, Ũ⃗ₜ, uₜ, Δtₜ)
+
+    δu = uₜ₊₁ - uₜ - duₜ * Δtₜ
+    δdu = duₜ₊₁ - duₜ - dduₜ * Δtₜ
+
+    return vcat(δŨvec, δu, δdu)
+end
+
 
 f = [P, Du, Ddu]
 loss =:UnitaryInfidelityLoss
 
 Q = 200000.
 R = 1.
- 
+
 J = QuantumObjective(:Ũ⃗, traj, loss, Q)
 #J += QuadraticRegularizer(:u, traj, R*ones(n_controls))
 J += QuadraticRegularizer(:ddu, traj, R * ones(n_controls))
@@ -195,7 +202,7 @@ function plot_twoqubit(
     series_color::Symbol=:glasbey_bw_minc_20_n256,
     ignored_labels::Union{Symbol, Vector{Symbol}, Tuple{Vararg{Symbol}}} =
         Symbol[],
-    dt_name::Union{Symbol,Nothing}=nothing,
+    timestep_name::Union{Symbol,Nothing}=nothing,
     labelsize=15,
 )
     # convert single symbol to vector: comps
@@ -211,7 +218,7 @@ function plot_twoqubit(
     @assert all([key ∈ keys(traj.components) for key ∈ comps])
     @assert all([key ∈ keys(traj.components) for key ∈ keys(transformations)])
 
-    ts = times(traj, dt_name)
+    ts = times(traj, timestep_name)
 
     # create figure
     fig = Figure(resolution=res)
@@ -336,10 +343,10 @@ function plot_twoqubit(
 end
 
 plot_twoqubit(
-    plot_path, 
-    prob.trajectory, 
+    plot_path,
+    prob.trajectory,
     [:u];
-    ignored_labels=[:Ũ⃗], 
+    ignored_labels=[:Ũ⃗],
     transformations=transformations,
     titlesize = 20,
     labelsize= 25,
@@ -358,7 +365,3 @@ fid_6 = 1/4*abs(tr(U_6'U_goal))
 println("6th Order Pade Fidelity: $fid_6")
 println("10th Order Pade Fidelity = $fid_10")
 println("Exp Fidelity = $fid_exp")
-
-
-
-

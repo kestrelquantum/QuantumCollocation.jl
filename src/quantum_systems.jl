@@ -111,6 +111,10 @@ function QuantumSystem(
     )
 end
 
+function QuantumSystem(H_drives::Vector{<:Matrix{<:Number}}; kwargs...)
+    return QuantumSystem(zeros(eltype(H_drives[1]), size(H_drives[1])), H_drives; kwargs...)
+end
+
 
 @doc raw"""
     MultiModeSystem(
