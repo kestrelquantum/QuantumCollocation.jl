@@ -11,6 +11,9 @@ include("quantum_utils.jl")
 include("quantum_systems.jl")
 @reexport using .QuantumSystems
 
+include("constraints.jl")
+@reexport using .Constraints
+
 include("losses.jl")
 @reexport using .Losses
 
@@ -22,9 +25,6 @@ include("integrators.jl")
 
 include("dynamics.jl")
 @reexport using .Dynamics
-
-include("constraints.jl")
-@reexport using .Constraints
 
 include("evaluators.jl")
 @reexport using .Evaluators

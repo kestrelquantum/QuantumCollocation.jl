@@ -22,6 +22,7 @@ abstract type AbstractDynamics end
     QuantumDynamics <: AbstractDynamics
 """
 struct QuantumDynamics <: AbstractDynamics
+    integrators::Union{Nothing, Vector{<:AbstractIntegrator}}
     F::Function
     ∂F::Function
     ∂F_structure::Vector{Tuple{Int, Int}}
@@ -241,7 +242,7 @@ function QuantumDynamics(
         return μ∂²s
     end
 
-    return QuantumDynamics(F, ∂F, ∂F_structure, μ∂²F, μ∂²F_structure, dynamics_dim)
+    return QuantumDynamics(integrators, F, ∂F, ∂F_structure, μ∂²F, μ∂²F_structure, dynamics_dim)
 end
 
 QuantumDynamics(P::AbstractIntegrator, traj::NamedTrajectory; kwargs...) =
@@ -316,7 +317,7 @@ function QuantumDynamics(
         return μ∂²
     end
 
-    return QuantumDynamics(F, ∂F, ∂F_structure, μ∂²F, μ∂²F_structure, dynamics_dim)
+    return QuantumDynamics(nothing, F, ∂F, ∂F_structure, μ∂²F, μ∂²F_structure, dynamics_dim)
 end
 
 end

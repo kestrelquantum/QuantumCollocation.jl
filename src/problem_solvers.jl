@@ -2,10 +2,12 @@ module ProblemSolvers
 
 export solve!
 
+using ..Constraints
 using ..Problems
 using ..SaveLoadUtils
 using ..IpoptOptions
 
+using NamedTrajectories
 using MathOptInterface
 const MOI = MathOptInterface
 
@@ -31,6 +33,15 @@ function solve!(
     MOI.optimize!(prob.optimizer)
 
     update_trajectory!(prob)
+
+    slack_var_names = Symbol[]
+    for con in prob.params[:linear_constraints]
+        if con isa L1SlackConstraint
+            append!(slack_var_names, con.slack_names)
+        end
+    end
+
+    prob.trajectory = remove_components(prob.trajectory, slack_var_names)
 
     if !isnothing(save_path)
         save_problem(save_path, prob)

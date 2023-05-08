@@ -31,6 +31,7 @@ mutable struct QuantumControlProblem <: AbstractProblem
     variables::Matrix{MOI.VariableIndex}
     system::QuantumSystem
     trajectory::NamedTrajectory
+    integrators::Union{Nothing,Vector{<:AbstractIntegrator}}
     options::Options
     params::Dict{Symbol, Any}
 end
@@ -78,6 +79,7 @@ function QuantumControlProblem(
     variables = initialize_optimizer!(
         optimizer,
         evaluator,
+        traj,
         linear_constraints,
         n_dynamics_constraints,
         nonlinear_constraints,
@@ -99,6 +101,7 @@ function QuantumControlProblem(
         variables,
         system,
         traj,
+        dynamics.integrators,
         options,
         params
     )
@@ -118,7 +121,6 @@ function QuantumControlProblem(
         println("    building dynamics from integrators...")
     end
     dynamics = QuantumDynamics(integrators, traj; verbose=verbose)
-    params[:dynamics] = integrators
     return QuantumControlProblem(
         system,
         traj,
@@ -145,9 +147,7 @@ function QuantumControlProblem(
     if verbose
         println("    building dynamics from integrator...")
     end
-    integrators = [integrator]
-    dynamics = QuantumDynamics(integrators, traj; verbose=verbose)
-    params[:dynamics] = integrators
+    dynamics = QuantumDynamics(integrator, traj; verbose=verbose)
     return QuantumControlProblem(
         system,
         traj,
@@ -174,7 +174,6 @@ function QuantumControlProblem(
         println("    building dynamics from function...")
     end
     dynamics = QuantumDynamics(f, traj; verbose=verbose)
-    params[:dynamics] = :function
     return QuantumControlProblem(
         system,
         traj,
@@ -190,6 +189,7 @@ end
 function initialize_optimizer!(
     optimizer::Ipopt.Optimizer,
     evaluator::PicoEvaluator,
+    trajectory::NamedTrajectory,
     linear_constraints::Vector{LinearConstraint},
     n_dynamics_constraints::Int,
     nonlinear_constraints::Vector{NonlinearConstraint},
@@ -223,7 +223,7 @@ function initialize_optimizer!(
     variables = MOI.add_variables(optimizer, n_variables)
 
     # add linear constraints
-    constrain!(optimizer, variables, linear_constraints, verbose=true)
+    constrain!(optimizer, variables, linear_constraints, trajectory, verbose=true)
 
     return variables
 end
