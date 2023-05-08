@@ -4,7 +4,7 @@ using LinearAlgebra
 using Distributions
 
 # setting maximum number of iterations
-max_iter = 10000
+max_iter = 1000
 linear_solver = "mumps"
 
 # defining levels for single qubit system
@@ -27,7 +27,7 @@ U_goal = GATES[gate]
 σ₊ = 0.5 * (σx - 1im * σy)
 
 # defining drive Hamiltonians for system
-H_drives = [σ₋ + σ₊, 1im * (σ₋ - σ₊), σz]
+H_drives = 1 / 2 * [σ₋ + σ₊, 1im * (σ₋ - σ₊), σz]
 
 # building quantum system (no drift term)
 system = QuantumSystem(H_drives)
@@ -40,7 +40,7 @@ Ũ⃗_goal = operator_to_iso_vec(U_goal)
 Ũ⃗_dim = length(Ũ⃗_init)
 
 # defining time parameters
-max_duration = 5 # μs = 10e-6 s
+max_duration =  1.678
 T = 100
 dt = max_duration / T
 dt_max = 1.0 * dt
@@ -60,59 +60,63 @@ dt_min = 0.1 * dt
 α_dist = Uniform(-α_bound, α_bound)
 
 # load saved trajectory
-load_saved_traj = false
+load_saved_traj = true
 
+if load_saved_traj
+    data_path = "examples/single_qubit/results/mintime/Y_gate_T_100_Q_100.0_R_0.0001_R_smoothness_0.001_iter_10000_fidelity_0.9999999962678012_00000.jld2"
+    traj = load_problem(data_path; return_data=true)["trajectory"]
+    new_bounds = (Δt = (fill(0.1traj.Δt[end], T), fill(traj.Δt[end], T)),)
+    traj.bounds = merge(traj.bounds, new_bounds)
+else
+    γ = foldr(hcat, [zeros(γ_dim), rand(γ_dist, γ_dim, T - 2), zeros(γ_dim)])
+    α = foldr(hcat, [zeros(α_dim), rand(α_dist, α_dim, T - 2), zeros(α_dim)])
+    Δt = dt * ones(1, T)
 
-γ = foldr(hcat, [zeros(γ_dim), rand(γ_dist, γ_dim, T - 2), zeros(γ_dim)])
-α = foldr(hcat, [zeros(α_dim), rand(α_dist, α_dim, T - 2), zeros(α_dim)])
-Δt = dt * ones(1, T)
+    Ũ⃗ = unitary_geodesic(U_goal, T; return_generator=false)
 
-Ũ⃗ = unitary_geodesic(U_goal, T; return_generator=false)
+    # defining components for trajectory
+    comps = (
+        Ũ⃗ = Ũ⃗,
+        γ = γ,
+        α = α,
+        Δt = Δt
+    )
 
-# defining components for trajectory
-comps = (
-    Ũ⃗ = Ũ⃗,
-    γ = γ,
-    α = α,
-    Δt = Δt
-)
+    # defining bounds
+    bounds = (;
+        Δt = (dt_min, dt_max)
+    )
 
-ddu_bound = 2e-1
+    # defining initial values
+    initial = (
+        Ũ⃗ = Ũ⃗_init,
+        γ = zeros(γ_dim),
+        α = zeros(α_dim)
+    )
 
-# defining bounds
-bounds = (;
-    Δt = (dt_min, dt_max)
-)
+    # defining final values
+    final = (
+        γ = zeros(γ_dim),
+        α = zeros(α_dim),
+    )
 
-# defining initial values
-initial = (
-    Ũ⃗ = Ũ⃗_init,
-    γ = zeros(γ_dim),
-    α = zeros(α_dim)
-)
+    # defining goal states
+    goal = (
+        Ũ⃗ = Ũ⃗_goal,
+    )
 
-# defining final values
-final = (
-    γ = zeros(γ_dim),
-    α = zeros(α_dim),
-)
-
-# defining goal states
-goal = (
-    Ũ⃗ = Ũ⃗_goal,
-)
-
-# creating named trajectory
-traj = NamedTrajectory(
-    comps;
-    # controls=(:ddγ, :ddα, :Δt),
-    controls=(:γ, :α, :Δt),
-    timestep=:Δt,
-    bounds=bounds,
-    initial=initial,
-    final=final,
-    goal=goal
-)
+    # creating named trajectory
+    traj = NamedTrajectory(
+        comps;
+        # controls=(:ddγ, :ddα, :Δt),
+        controls=(:γ, :α, :Δt),
+        timestep=:Δt,
+        bounds=bounds,
+        initial=initial,
+        final=final,
+        goal=goal
+    )
+end
 
 # creating fourth order pade integrator
 P = UnitaryPadeIntegrator(system, :Ũ⃗, (:γ, :α), :Δt)
@@ -124,7 +128,7 @@ Q = 1.0e2
 J = QuantumUnitaryObjective(:Ũ⃗, traj, Q)
 
 # regularization parameters
-R = 1e-2
+R = 1e-4
 R_smoothness = 1e-3
 drive_bound_ratio = γ_bound / α_bound
 
@@ -136,11 +140,11 @@ R_α_smoothness = R_smoothness * drive_bound_ratio
 
 # adding regularization terms on γ to the objective
 J += QuadraticRegularizer(:γ, traj, R_γ)
-J += QuadraticSmoothnessRegularizer(:γ, traj, R_γ_smoothness)
+# J += QuadraticSmoothnessRegularizer(:γ, traj, R_γ_smoothness)
 
 # adding regularization terms on α to the objective
 J += QuadraticRegularizer(:α, traj, R_α)
-J += QuadraticSmoothnessRegularizer(:α, traj, R_α_smoothness)
+# J += QuadraticSmoothnessRegularizer(:α, traj, R_α_smoothness)
 
 # Ipopt options
 options = Options(
@@ -206,6 +210,9 @@ println()
 println("|1⟩ Fourth order Pade rollout fidelity:   ", fidelity(Ψ̃₂_fourth_order_pade[:, end], ψ̃₂_goal))
 println("|1⟩ Exponential rollout fidelity:         ", fidelity(Ψ̃₂_exp[:, end], ψ̃₂_goal))
 
+
+println()
+println("duration: ", times(prob.trajectory)[end])
 
 # new plot name with fidelity included
 experiment *= "_fidelity_$(fid)"

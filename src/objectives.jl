@@ -10,11 +10,12 @@ export MinimumTimeObjective
 
 export QuadraticRegularizer
 export QuadraticSmoothnessRegularizer
-export L1SlackRegularizer
+export L1Regularizer
 
 using TrajectoryIndexingUtils
 using ..QuantumSystems
 using ..Losses
+using ..Constraints
 
 using NamedTrajectories
 using LinearAlgebra
@@ -455,42 +456,88 @@ function QuadraticSmoothnessRegularizer(
     )
 end
 
-function L1SlackRegularizer(;
-    s1_indices::AbstractVector{Int}=nothing,
-    s2_indices::AbstractVector{Int}=nothing,
-    α::Vector{Float64}=fill(1.0, length(s1_indices)),
+function L1Regularizer(;
+    name=nothing,
+    R::Vector{Float64}=nothing,
+    times=nothing,
     eval_hessian=true
 )
+    @assert !isnothing(name) "name must be specified"
+    @assert !isnothing(R) "R must be specified"
+    @assert !isnothing(times) "times must be specified"
 
-    @assert !isnothing(s1_indices) "s1_indices must be specified"
-    @assert !isnothing(s2_indices) "s2_indices must be specified"
+    s1_name = Symbol("s1_$name")
+    s2_name = Symbol("s2_$name")
 
     params = Dict(
-        :type => :L1SlackRegularizer,
-        :s1_indices => s1_indices,
-        :s2_indices => s2_indices,
-        :α => α,
+        :type => :L1Regularizer,
+        :name => name,
+        :R => R,
         :eval_hessian => eval_hessian
     )
 
-    L(Z) = dot(α, Z[s1_indices] + Z[s2_indices])
+    L = (Z⃗, Z) -> sum(
+        dot(
+            R,
+            Z⃗[slice(t, Z.components[s1_name], Z.dim)] +
+            Z⃗[slice(t, Z.components[s2_name], Z.dim)]
+        ) for t ∈ times
+    )
 
-    ∇L = Z -> begin
-        ∇ = zeros(typeof(Z[1]), length(Z))
-        ∇[s1_indices] += α
-        ∇[s2_indices] += α
+    ∇L = (Z⃗, Z) -> begin
+        ∇ = zeros(typeof(Z⃗[1]), length(Z⃗))
+        Threads.@threads for t ∈ times
+            ∇[slice(t, Z.components[s1_name], Z.dim)] += R
+            ∇[slice(t, Z.components[s2_name], Z.dim)] += R
+        end
         return ∇
     end
 
     if eval_hessian
-        ∂²L_structure = []
-        ∂²L = Z -> []
+        ∂²L = (_, _)  -> []
+        ∂²L_structure = _ -> []
     else
-        ∂²L_structure = nothing
         ∂²L = nothing
+        ∂²L_structure = nothing
     end
 
     return Objective(L, ∇L, ∂²L, ∂²L_structure, Dict[params])
+end
+
+@doc raw"""
+    L1Regularizer(
+        name::Symbol;
+        R_value::Float64=10.0,
+        R::Vector{Float64}=fill(R_value, length(indices)),
+        eval_hessian=true
+    )
+
+Create an L1 regularizer for the trajectory component `name` with regularization
+strength `R`. The regularizer is defined as
+
+```math
+J_{L1}(u) = \sum_t \abs{R \cdot u_t}
+```
+"""
+function L1Regularizer(
+    name::Symbol,
+    traj::NamedTrajectory;
+    indices::AbstractVector{Int}=1:traj.dims[name],
+    times=(name ∈ keys(traj.initial) ? 2 : 1):traj.T,
+    R_value::Float64=10.0,
+    R::Vector{Float64}=fill(R_value, length(indices)),
+    eval_hessian=true
+)
+    J = L1Regularizer(;
+        name=name,
+        R=R,
+        times=times,
+        eval_hessian=eval_hessian
+    )
+
+    slack_con = L1SlackConstraint(name, traj; indices=indices, times=times)
+
+    return J, slack_con
 end
 
 

@@ -126,20 +126,20 @@ Ddu = DerivativeIntegrator(:du, :ddu, :Δt, n_controls)
 #     dduₜ = zₜ[traj.components.ddu]
 #     Δtₜ = zₜ[traj.components.Δt][1]
 
-#     δŨvec = P10(zₜ, zₜ₊₁, traj)   
+#     δŨvec = P10(zₜ, zₜ₊₁, traj)
 #     #δŨvec = P10(Ũ⃗ₜ₊₁, Ũ⃗ₜ, uₜ, Δtₜ)
 
 #     δu = uₜ₊₁ - uₜ - duₜ * Δtₜ
 #     δdu = duₜ₊₁ - duₜ - dduₜ * Δtₜ
 
-    δŨvec = P10(Ũ⃗ₜ₊₁, Ũ⃗ₜ, uₜ, Δtₜ, operator=true)
-    #δŨvec = P10(Ũ⃗ₜ₊₁, Ũ⃗ₜ, uₜ, Δtₜ)
+#     δŨvec = P10(Ũ⃗ₜ₊₁, Ũ⃗ₜ, uₜ, Δtₜ, operator=true)
+#     #δŨvec = P10(Ũ⃗ₜ₊₁, Ũ⃗ₜ, uₜ, Δtₜ)
 
-    δu = uₜ₊₁ - uₜ - duₜ * Δtₜ
-    δdu = duₜ₊₁ - duₜ - dduₜ * Δtₜ
+#     δu = uₜ₊₁ - uₜ - duₜ * Δtₜ
+#     δdu = duₜ₊₁ - duₜ - dduₜ * Δtₜ
 
-    return vcat(δŨvec, δu, δdu)
-end
+#     return vcat(δŨvec, δu, δdu)
+# end
 
 
 f = [P, Du, Ddu]

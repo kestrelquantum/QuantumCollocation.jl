@@ -331,14 +331,15 @@ abstract type LinearConstraint <: AbstractConstraint end
 function constrain!(
     opt::Ipopt.Optimizer,
     vars::Vector{MOI.VariableIndex},
-    cons::Vector{LinearConstraint};
+    cons::Vector{LinearConstraint},
+    traj::NamedTrajectory;
     verbose=false
 )
     for con in cons
         if verbose
-            println("applying constraint: ", con.name)
+            println("applying constraint: ", con.label)
         end
-        con(opt, vars)
+        con(opt, vars, traj)
     end
 end
 
@@ -351,8 +352,8 @@ function trajectory_constraints(traj::NamedTrajectory)
     for (name, val) ∈ pairs(traj.initial)
         ts = [1]
         js = traj.components[name]
-        con_name = "initial value of $name"
-        eq_con = EqualityConstraint(ts, js, val, traj.dim; name=con_name)
+        con_label = "initial value of $name"
+        eq_con = EqualityConstraint(ts, js, val, traj.dim; label=con_label)
         push!(cons, eq_con)
         push!(init_names, name)
     end
@@ -363,8 +364,8 @@ function trajectory_constraints(traj::NamedTrajectory)
     for (name, val) ∈ pairs(traj.final)
         ts = [traj.T]
         js = traj.components[name]
-        con_name = "final value of $name"
-        eq_con = EqualityConstraint(ts, js, val, traj.dim; name=con_name)
+        con_label = "final value of $name"
+        eq_con = EqualityConstraint(ts, js, val, traj.dim; label=con_label)
         push!(cons, eq_con)
         push!(final_names, name)
     end
@@ -381,9 +382,9 @@ function trajectory_constraints(traj::NamedTrajectory)
             ts = 1:traj.T
         end
         js = traj.components[name]
-        con_name = "bounds on $name"
+        con_label = "bounds on $name"
         bounds = collect(zip(bound[1], bound[2]))
-        bounds_con = BoundsConstraint(ts, js, bounds, traj.dim; name=con_name)
+        bounds_con = BoundsConstraint(ts, js, bounds, traj.dim; label=con_label)
         push!(cons, bounds_con)
     end
 
@@ -398,7 +399,7 @@ struct EqualityConstraint <: LinearConstraint
     js::AbstractArray{Int}
     vals::Vector{R} where R
     vardim::Int
-    name::String
+    label::String
 end
 
 function EqualityConstraint(
@@ -406,7 +407,7 @@ function EqualityConstraint(
     j::Union{Int, AbstractArray{Int}},
     val::Union{R, Vector{R}},
     vardim::Int;
-    name="unnamed equality constraint"
+    label="unlabeled equality constraint"
 ) where R
 
     @assert !(isa(val, Vector{R}) && isa(j, Int))
@@ -429,14 +430,15 @@ function EqualityConstraint(
         [j...],
         [val...],
         vardim,
-        name
+        label
     )
 end
 
 
 function (con::EqualityConstraint)(
     opt::Ipopt.Optimizer,
-    vars::Vector{MOI.VariableIndex}
+    vars::Vector{MOI.VariableIndex},
+    traj::NamedTrajectory
 )
     for t in con.ts
         for (j, val) in zip(con.js, con.vals)
@@ -454,7 +456,7 @@ struct BoundsConstraint <: LinearConstraint
     js::AbstractArray{Int}
     vals::Vector{Tuple{R, R}} where R <: Real
     vardim::Int
-    name::String
+    label::String
 end
 
 function BoundsConstraint(
@@ -462,7 +464,7 @@ function BoundsConstraint(
     j::Union{Int, AbstractArray{Int}},
     val::Union{Tuple{R, R}, Vector{Tuple{R, R}}},
     vardim::Int;
-    name="unnamed bounds constraint"
+    label="unlabeled bounds constraint"
 ) where R <: Real
 
     @assert !(isa(val, Vector{Tuple{R, R}}) && isa(j, Int))
@@ -486,7 +488,7 @@ function BoundsConstraint(
         j,
         val,
         vardim,
-        name
+        label
     )
 end
 
@@ -495,7 +497,7 @@ function BoundsConstraint(
     j::Union{Int, AbstractArray{Int}},
     val::Union{R, Vector{R}},
     vardim::Int;
-    name="unnamed bounds constraint"
+    label="unlabeled bounds constraint"
 ) where R <: Real
 
     @assert !(isa(val, Vector{R}) && isa(j, Int))
@@ -523,13 +525,14 @@ function BoundsConstraint(
         j,
         val,
         vardim,
-        name
+        label
     )
 end
 
 function (con::BoundsConstraint)(
     opt::Ipopt.Optimizer,
-    vars::Vector{MOI.VariableIndex}
+    vars::Vector{MOI.VariableIndex},
+    traj::NamedTrajectory
 )
     for t in con.ts
         for (j, (lb, ub)) in zip(con.js, con.vals)
@@ -550,22 +553,23 @@ end
 struct TimeStepBoundsConstraint <: LinearConstraint
     bounds::Tuple{R, R} where R <: Real
     Δt_indices::AbstractVector{Int}
-    name::String
+    label::String
 
     function TimeStepBoundsConstraint(
         bounds::Tuple{R, R} where R <: Real,
         Δt_indices::AbstractVector{Int},
         T::Int;
-        name="unnamed time step bounds constraint"
+        label="time step bounds constraint"
     )
         @assert bounds[1] < bounds[2] "lower bound must be less than upper bound"
-        return new(bounds, Δt_indices, name)
+        return new(bounds, Δt_indices, label)
     end
 end
 
 function (con::TimeStepBoundsConstraint)(
     opt::Ipopt.Optimizer,
-    vars::Vector{MOI.VariableIndex}
+    vars::Vector{MOI.VariableIndex},
+    traj::NamedTrajectory
 )
     for i ∈ con.Δt_indices
         MOI.add_constraints(
@@ -584,20 +588,21 @@ end
 struct TimeStepEqualityConstraint <: LinearConstraint
     val::R where R <: Real
     Δt_indices::AbstractVector{Int}
-    name::String
+    label::String
 
     function TimeStepEqualityConstraint(
         val::R where R <: Real,
         Δt_indices::AbstractVector{Int};
-        name="unnamed time step equality constraint"
+        label="unlabeled time step equality constraint"
     )
-        return new(val, Δt_indices, name)
+        return new(val, Δt_indices, label)
     end
 end
 
 function (con::TimeStepEqualityConstraint)(
     opt::Ipopt.Optimizer,
-    vars::Vector{MOI.VariableIndex}
+    vars::Vector{MOI.VariableIndex},
+    traj::NamedTrajectory
 )
     for i ∈ con.Δt_indices
         MOI.add_constraints(
@@ -610,29 +615,30 @@ end
 
 struct TimeStepsAllEqualConstraint <: LinearConstraint
     Δt_indices::AbstractVector{Int}
-    name::String
+    label::String
 
     function TimeStepsAllEqualConstraint(
         Δt_indices::AbstractVector{Int};
-        name="unnamed time step all equal constraint"
+        label="time step all equal constraint"
     )
-        return new(Δt_indices, name)
+        return new(Δt_indices, label)
     end
 
     function TimeStepsAllEqualConstraint(
         Δt_symb::Symbol,
         traj::NamedTrajectory;
-        name="unnamed time step all equal constraint"
+        label="time step all equal constraint"
     )
         Δt_comp = traj.components[Δt_symb][1]
         Δt_indices = [index(t, Δt_comp, traj.dim) for t = 1:traj.T]
-        return new(Δt_indices, name)
+        return new(Δt_indices, label)
     end
 end
 
 function (con::TimeStepsAllEqualConstraint)(
     opt::Ipopt.Optimizer,
-    vars::Vector{MOI.VariableIndex}
+    vars::Vector{MOI.VariableIndex},
+    traj::NamedTrajectory
 )
     N = length(con.Δt_indices)
     for i = 1:N-1
@@ -647,49 +653,59 @@ function (con::TimeStepsAllEqualConstraint)(
 end
 
 struct L1SlackConstraint <: LinearConstraint
-    s1_indices::AbstractArray{Int}
-    s2_indices::AbstractArray{Int}
-    x_indices::AbstractArray{Int}
-    name::String
+    var_name::Symbol
+    slack_names::Vector{Symbol}
+    indices::AbstractVector{Int}
+    times::AbstractVector{Int}
+    label::String
 
     function L1SlackConstraint(
-        s1_indices::AbstractArray{Int},
-        s2_indices::AbstractArray{Int},
-        x_indices::AbstractArray{Int};
-        name="unmamed L1 slack constraint"
+        name::Symbol,
+        traj::NamedTrajectory;
+        indices=1:traj.dims[name],
+        times=(name ∈ keys(traj.initial) ? 2 : 1):traj.T,
+        label="L1 slack constraint on $name"
     )
-        @assert length(s1_indices) == length(s2_indices) == length(x_indices)
-        return new(s1_indices, s2_indices, x_indices, name)
+        @assert all(i ∈ 1:traj.dims[name] for i ∈ indices)
+        s1_name = Symbol("s1_$name")
+        s2_name = Symbol("s2_$name")
+        slack_names = [s1_name, s2_name]
+        add_component!(traj, s1_name, rand(length(indices), traj.T))
+        add_component!(traj, s2_name, rand(length(indices), traj.T))
+        return new(name, slack_names, indices, times, label)
     end
 end
 
 function (con::L1SlackConstraint)(
     opt::Ipopt.Optimizer,
-    vars::Vector{MOI.VariableIndex}
+    vars::Vector{MOI.VariableIndex},
+    traj::NamedTrajectory
 )
-    for (s1, s2, x) in zip(
-        con.s1_indices,
-        con.s2_indices,
-        con.x_indices
-    )
-        MOI.add_constraints(
-            opt,
-            vars[s1],
-            MOI.GreaterThan(0.0)
+    for t ∈ con.times
+        for (s1, s2, x) in zip(
+            slice(t, traj.components[con.slack_names[1]], traj.dim),
+            slice(t, traj.components[con.slack_names[2]], traj.dim),
+            slice(t, traj.components[con.var_name][con.indices], traj.dim)
         )
-        MOI.add_constraints(
-            opt,
-            vars[s2],
-            MOI.GreaterThan(0.0)
-        )
-        t1 = MOI.ScalarAffineTerm(1.0, vars[s1])
-        t2 = MOI.ScalarAffineTerm(-1.0, vars[s2])
-        t3 = MOI.ScalarAffineTerm(-1.0, vars[x])
-        MOI.add_constraints(
-            opt,
-            MOI.ScalarAffineFunction([t1, t2, t3], 0.0),
-            MOI.EqualTo(0.0)
-        )
+            MOI.add_constraints(
+                opt,
+                vars[s1],
+                MOI.GreaterThan(0.0)
+            )
+            MOI.add_constraints(
+                opt,
+                vars[s2],
+                MOI.GreaterThan(0.0)
+            )
+            t1 = MOI.ScalarAffineTerm(1.0, vars[s1])
+            t2 = MOI.ScalarAffineTerm(-1.0, vars[s2])
+            t3 = MOI.ScalarAffineTerm(-1.0, vars[x])
+            MOI.add_constraints(
+                opt,
+                MOI.ScalarAffineFunction([t1, t2, t3], 0.0),
+                MOI.EqualTo(0.0)
+            )
+        end
     end
 end
 

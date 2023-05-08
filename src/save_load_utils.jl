@@ -22,6 +22,7 @@ function save_problem(
     data = Dict(
         "system" => prob.system,
         "trajectory" => prob.trajectory,
+        "integrators" => prob.integrators,
         "options" => prob.options,
         "params" => prob.params,
     )
@@ -56,7 +57,7 @@ function load_problem(path::String; verbose=true, return_data=false)
     if return_data
         return data
     else
-        if data["params"][:dynamics] == :function
+        if isnothing(data["integrators"])
             @warn "Dynamics was built using a user defined function, which could not be saved: returning data dict instead of problem (keys = [\"trajectory\", \"system\", \"params\"]) "
             return data
         end
@@ -73,8 +74,8 @@ function load_problem(path::String; verbose=true, return_data=false)
         params = data["params"]
         delete!(data, "params")
 
-        integrators = params[:dynamics]
-        delete!(params, :dynamics)
+        integrators = data["integrators"]
+        delete!(data, "integrators")
 
         objective = Objective(params[:objective_terms])
         delete!(params, :objective_terms)

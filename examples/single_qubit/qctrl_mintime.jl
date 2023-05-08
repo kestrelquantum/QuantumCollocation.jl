@@ -1,15 +1,21 @@
 using QuantumCollocation
 using NamedTrajectories
 
-data_path = "examples/single_qubit/results/Y_gate_T_100_Q_100.0_R_0.01_R_smoothness_0.001_iter_10000_fidelity_0.9999997188819991_00000.jld2"
+data_path = "examples/single_qubit/results/Y_gate_T_100_Q_100.0_R_0.0001_R_smoothness_0.001_iter_10000_fidelity_0.9999999962678012_00000.jld2"
 
 experiment = join(split(split(data_path, "/")[end], ".")[1:end-1], ".")
 
 plot_path = joinpath(@__DIR__, "plots/mintime", experiment * ".png")
 
-D = 1.0e3
+D = 1.0e9
 
-prob = UnitaryMinimumTimeProblem(data_path; D=D)
+tol = 1e-12
+
+options = Options(tol=tol)
+
+fidelity_bound = 0.999995
+
+prob = UnitaryMinimumTimeProblem(data_path; options=options, D=D, final_fidelity=fidelity_bound)
 
 
 plot(plot_path, prob.trajectory, [:Ũ⃗, :γ, :α]; ignored_labels=[:Ũ⃗])
