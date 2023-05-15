@@ -17,9 +17,9 @@ end
 function cubic_spline_coeffs(aᵢ, ȧᵢ, aᵢ₊₁, ȧᵢ₊₁, tᵢ, tᵢ₊₁)
     M = [
         1  tᵢ    tᵢ^2    tᵢ^3   ;
-        0   1   2tᵢ     3tᵢ^2   ;
+        0  1     2tᵢ     3tᵢ^2  ;
         1  tᵢ₊₁  tᵢ₊₁^2  tᵢ₊₁^3 ;
-        0   1   2tᵢ₊₁   3tᵢ₊₁^2
+        0  1     2tᵢ₊₁   3tᵢ₊₁^2
     ]
     A = vcat(transpose.([aᵢ, ȧᵢ, aᵢ₊₁, ȧᵢ₊₁])...)
     B = inv(M) * A
