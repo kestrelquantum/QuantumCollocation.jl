@@ -40,7 +40,7 @@ function save_problem(
     save(path, data)
 end
 
-const RESERVED_KEYS = ["system", "trajectory", "options", "params"]
+const RESERVED_KEYS = ["system", "trajectory", "options", "params", "integrators"]
 
 function load_problem(path::String; verbose=true, return_data=false)
     data = load(path)

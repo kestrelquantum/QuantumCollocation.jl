@@ -16,7 +16,7 @@ Q = 200.0
 a_bound = 2π * 0.04 # GHz, a guess!
 dda_bound = 0.05
 
-duration = 200.0
+duration = 200.0 # ns
 T = 500
 Δt = duration / T
 Δt_min = 0.5 * Δt
