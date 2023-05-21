@@ -45,6 +45,13 @@ function rollout(
     return Ψ̃
 end
 
+function rollout(
+    ψ̃₁s::AbstractVector{AbstractVector}, args...; kwargs...
+)
+    return vcat([rollout(ψ̃₁, args...; kwargs...) for ψ̃₁ ∈ ψ̃₁s]...)
+end
+
+
 function unitary_rollout(
     Ũ⃗₁::AbstractVector{<:Real},
     controls::AbstractMatrix{Float64},
