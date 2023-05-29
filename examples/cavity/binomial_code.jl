@@ -29,9 +29,10 @@ T = 200
 Δt_min = 0.2Δt
 Q = 200.0
 R_L1 = 1.0
-max_iter = 2000
+max_iter = 1
 cavity_forbidden_states = cavity_levels .* [1, 2, 3, 4]
-transmon_forbidden_states = 2 * (transmon_levels - 1) * cavity_levels + 1 : 2 * transmon_levels * cavity_levels
+transmon_forbidden_states = [collect((2 * transmon_levels - 1) * cavity_levels + 1 : 2 * transmon_levels * cavity_levels); 
+                             collect((transmon_levels - 1) * cavity_levels + 1: cavity_levels * transmon_levels)
 
 forbidden_states = [transmon_forbidden_states; cavity_forbidden_states]
 
