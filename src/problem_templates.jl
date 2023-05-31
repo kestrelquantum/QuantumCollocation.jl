@@ -61,6 +61,7 @@ function UnitarySmoothPulseProblem(
         Δt = fill(Δt, 1, T)
 
         if isnothing(a_guess)
+            # TODO: add warning in case U_goal is not unitary
             Ũ⃗ = unitary_geodesic(U_goal, T)
             a_dists =  [Uniform(-a_bounds[i], a_bounds[i]) for i = 1:n_drives]
             a = hcat([

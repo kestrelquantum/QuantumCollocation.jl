@@ -28,15 +28,29 @@ data_path = "/home/aditya/oc_projects/QuantumCollocation.jl/examples/cavity/data
 
 # a_bounds = [qubit_a_bound, qubit_a_bound, cavity_a_bound, cavity_a_bound]
 
-# T = 200
-# Δt = 15.
-# Δt_max = 2*Δt
-# Δt_min = 0.8*Δt
-# Q = 200.0
-# R_L1 = 10.0
-# max_iter = 4000
-# cavity_forbidden_states = cavity_levels .* [1, 2, 3, 4, 5, 6,]
-# #transmon_forbidden_states = (2 * (transmon_levels - 1) * cavity_levels + 1) : (2 * transmon_levels * cavity_levels)
+T = 200
+Δt = 15.0
+Δt_max = Δt
+Δt_min = 0.2Δt
+Q = 200.0
+R_L1 = 10.0
+max_iter = 2000
+
+ketdim = transmon_levels * cavity_levels
+
+cavity_forbidden_states = [
+    cavity_levels .* (1:(transmon_levels - 1));
+    ketdim .+ (
+        cavity_levels .* (1:(transmon_levels - 1))
+    )
+]
+
+transmon_forbidden_states = [
+    (cavity_levels * (transmon_levels - 1) + 1) : ketdim;
+    ketdim .+ (
+        (cavity_levels * (transmon_levels - 1) + 1) : ketdim
+    )
+]
 
 # forbidden_states = cavity_forbidden_states #[transmon_forbidden_states; cavity_forbidden_states]
 
