@@ -105,6 +105,14 @@ function load_problem(path::String; verbose=true, return_data=false)
     end
 end
 
+function save_h5(prob::QuantumControlProblem, save_path::String; verbose=true)
+    traj = prob.trajectory
+    
+    result = Dict(
+        
+    )
+end
+
 function generate_file_path(extension, file_name, path)
     # Ensure the path exists.
     mkpath(path)
