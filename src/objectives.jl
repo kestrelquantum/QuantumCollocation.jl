@@ -473,11 +473,7 @@ function L1Regularizer(;
         :type => :L1Regularizer,
         :name => name,
         :R => R,
-<<<<<<< HEAD
         :eval_hessian => eval_hessian,
-=======
-        :eval_hessian => eval_hessian
->>>>>>> 6b6f803e60568ff5cd67080786c97f9fa7c474e0
         :times => times,
     )
 
