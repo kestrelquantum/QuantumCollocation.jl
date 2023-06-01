@@ -473,7 +473,8 @@ function L1Regularizer(;
         :type => :L1Regularizer,
         :name => name,
         :R => R,
-        :eval_hessian => eval_hessian
+        :eval_hessian => eval_hessian,
+        :times => times,
     )
 
     L = (Z⃗, Z) -> sum(

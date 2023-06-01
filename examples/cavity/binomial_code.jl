@@ -26,6 +26,14 @@ A = read(controls_file, "controls")
 data = load_problem(data_path; return_data=true)
 init_traj = data["trajectory"]
 
+#data_path = "/home/aditya/oc_projects/QuantumCollocation.jl/examples/cavity/data/binomial_code/transmon_3_T_200_dt_15.0_Q_200.0_R_L1_10.0_max_iter_5000_dda_bound_1.0e-5_00000.jld2"
+
+data_path = "/home/aditya/oc_projects/QuantumCollocation.jl/examples/cavity/data/binomial_code/T_200_dt_15.0_Q_200.0_R_L1_1.0_max_iter_1600_dda_bound_0.0001_00000.jld2"
+
+data = load_problem(data_path; return_data=true)
+init_traj = data["trajectory"]
+
+
 system = MultiModeSystem(transmon_levels, cavity_levels)
 
 g0 = multimode_state("g0", transmon_levels, cavity_levels)
@@ -35,6 +43,11 @@ g1 = multimode_state("g1", transmon_levels, cavity_levels)
 g2 = multimode_state("g2", transmon_levels, cavity_levels)
 g4 = multimode_state("g4", transmon_levels, cavity_levels)
 
+println(e0)
+println(g0)
+println(g1)
+println(g2)
+println(g4)
 ψ_init = [g0, e0]
 ψ_goal = [(g0 + g4) / √2, g2]
 
@@ -82,13 +95,13 @@ prob = QuantumStateSmoothPulseProblem(system, ψ_init, ψ_goal, T, Δt;
 
 experiment = "transmon_$(transmon_levels)_T_$(T)_dt_$(Δt)_Q_$(Q)_R_L1_$(R_L1)_max_iter_$(max_iter)_dda_bound_$(dda_bound)"
 
-plot_dir = joinpath(@__DIR__, "plots/binomial_code")
-save_dir = joinpath(@__DIR__, "data/binomial_code")
+# plot_dir = joinpath(@__DIR__, "plots/binomial_code")
+# save_dir = joinpath(@__DIR__, "data/binomial_code")
 
-plot_path = generate_file_path("png", experiment, plot_dir)
-save_path = generate_file_path("jld2", experiment, save_dir)
+# plot_path = generate_file_path("png", experiment, plot_dir)
+# save_path = generate_file_path("jld2", experiment, save_dir)
 
-plot(plot_path, prob.trajectory, [:ψ̃1, :ψ̃2, :a]; ignored_labels=[:ψ̃1, :ψ̃2])
+# plot(plot_path, prob.trajectory, [:ψ̃1, :ψ̃2, :a]; ignored_labels=[:ψ̃1, :ψ̃2])
 
 # solve!(prob; max_iter=max_iter)
 
