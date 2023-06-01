@@ -61,6 +61,7 @@ function UnitarySmoothPulseProblem(
         Δt = fill(Δt, 1, T)
 
         if isnothing(a_guess)
+            # TODO: add warning in case U_goal is not unitary
             Ũ⃗ = unitary_geodesic(U_goal, T)
             a_dists =  [Uniform(-a_bounds[i], a_bounds[i]) for i = 1:n_drives]
             a = hcat([
@@ -286,7 +287,10 @@ function QuantumStateSmoothPulseProblem(
             da = randn(n_drives, T) * drive_derivative_σ
             dda = randn(n_drives, T) * drive_derivative_σ
         else
-            ψ̃ = rollout(ψ̃_init, a_guess, Δt, system)
+            ψ̃s = NamedTuple([
+                Symbol("ψ̃$i") => rollout(ψ̃_init, a_guess, Δt, system)
+                    for (i, ψ̃_init) in enumerate(ψ̃_inits)
+            ])
             a = a_guess
             da = derivative(a, Δt)
             dda = derivative(da, Δt)
