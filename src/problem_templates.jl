@@ -287,7 +287,10 @@ function QuantumStateSmoothPulseProblem(
             da = randn(n_drives, T) * drive_derivative_σ
             dda = randn(n_drives, T) * drive_derivative_σ
         else
-            ψ̃ = rollout(ψ̃_init, a_guess, Δt, system)
+            ψ̃s = NamedTuple([
+                Symbol("ψ̃$i") => rollout(ψ̃_init, a_guess, Δt, system)
+                    for (i, ψ̃_init) in enumerate(ψ̃_inits)
+            ])
             a = a_guess
             da = derivative(a, Δt)
             dda = derivative(da, Δt)
