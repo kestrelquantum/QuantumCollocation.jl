@@ -15,7 +15,7 @@ using Manifolds
 using LinearAlgebra
 
 function rollout(
-    ψ̃₁::AbstractVector,
+    ψ̃₁::AbstractVector{<:Number},
     controls::AbstractMatrix{Float64},
     Δt::Union{AbstractVector{Float64}, AbstractMatrix{Float64}},
     system::QuantumSystem;
@@ -46,7 +46,7 @@ function rollout(
 end
 
 function rollout(
-    ψ̃₁s::AbstractVector{AbstractVector}, args...; kwargs...
+    ψ̃₁s::AbstractVector{<:AbstractVector}, args...; kwargs...
 )
     return vcat([rollout(ψ̃₁, args...; kwargs...) for ψ̃₁ ∈ ψ̃₁s]...)
 end
