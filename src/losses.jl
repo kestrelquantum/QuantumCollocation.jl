@@ -15,12 +15,14 @@ export structure
 export infidelity
 export unitary_infidelity
 
-using TrajectoryIndexingUtils
 using ..QuantumUtils
 using ..QuantumSystems
+using ..StructureUtils
+
 
 using NamedTrajectories
 
+using TrajectoryIndexingUtils
 using LinearAlgebra
 using SparseArrays
 using ForwardDiff
@@ -161,33 +163,34 @@ struct UnitaryInfidelityLoss <: AbstractLoss
         name::Symbol,
         Ũ⃗_goal::AbstractVector
     )
-        l = Ũ⃗ -> unitary_infidelity(Ũ⃗, Ũ⃗_goal)
-        ∇l = Ũ⃗ -> ForwardDiff.gradient(l, Ũ⃗)
-
-        Symbolics.@variables Ũ⃗[1:length(Ũ⃗_goal)]
-        Ũ⃗ = collect(Ũ⃗)
-
-        ∇²l_symbolic = Symbolics.sparsehessian(l(Ũ⃗), Ũ⃗)
-        K, J, _ = findnz(∇²l_symbolic)
-        kjs = collect(zip(K, J))
-        filter!(((k, j),) -> k ≤ j, kjs)
-        ∇²l_structure = kjs
-
-        ∇²l_expression = Symbolics.build_function(∇²l_symbolic, Ũ⃗)
-        ∇²l = eval(∇²l_expression[1])
-
         # l = Ũ⃗ -> unitary_infidelity(Ũ⃗, Ũ⃗_goal)
         # ∇l = Ũ⃗ -> ForwardDiff.gradient(l, Ũ⃗)
-        # ∇²l = Ũ⃗ -> ForwardDiff.hessian(l, Ũ⃗)
-        # Ũ⃗_dim = length(Ũ⃗_goal)
 
-        # ∇²l_structure = []
+        # Symbolics.@variables Ũ⃗[1:length(Ũ⃗_goal)]
+        # Ũ⃗ = collect(Ũ⃗)
 
-        # for (i, j) ∈ Iterators.product(1:Ũ⃗_dim, 1:Ũ⃗_dim)
-        #     if i ≤ j
-        #         push!(∇²l_structure, (i, j))
-        #     end
-        # end
+        # ∇²l_symbolic = Symbolics.sparsehessian(l(Ũ⃗), Ũ⃗)
+        # K, J, _ = findnz(∇²l_symbolic)
+        # kjs = collect(zip(K, J))
+        # filter!(((k, j),) -> k ≤ j, kjs)
+        # ∇²l_structure = kjs
+
+        # ∇²l_expression = Symbolics.build_function(∇²l_symbolic, Ũ⃗)
+        # ∇²l = eval(∇²l_expression[1])
+
+        l = Ũ⃗ -> unitary_infidelity(Ũ⃗, Ũ⃗_goal)
+        ∇l = Ũ⃗ -> ForwardDiff.gradient(l, Ũ⃗)
+        ∇²l = Ũ⃗ -> ForwardDiff.hessian(l, Ũ⃗)
+        Ũ⃗_dim = length(Ũ⃗_goal)
+
+        # ∇²l_structure = loss_hessian_structure(∇²l, Ũ⃗_dim)
+
+        ∇²l_structure = []
+        for (i, j) ∈ Iterators.product(1:Ũ⃗_dim, 1:Ũ⃗_dim)
+            if i ≤ j
+                push!(∇²l_structure, (i, j))
+            end
+        end
 
         return new(l, ∇l, ∇²l, ∇²l_structure, name)
     end

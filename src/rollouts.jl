@@ -94,7 +94,7 @@ function unitary_rollout(
     integrator=Integrators.fourth_order_pade
 )
     return unitary_rollout(
-        operator_to_iso_vec(Matrix{ComplexF64}(I(size(system.H_drift, 1)))),
+        operator_to_iso_vec(Matrix{ComplexF64}(I(size(system.H_drift_real, 1)))),
         controls,
         Δt,
         system;

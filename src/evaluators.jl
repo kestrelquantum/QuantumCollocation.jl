@@ -138,6 +138,7 @@ end
     σ::T,
     μ::AbstractVector{T}
 ) where T
+
     σ∂²Ls = σ * evaluator.objective.∂²L(Z⃗, evaluator.trajectory)
 
     for (k, σ∂²Lₖ) in enumerate(σ∂²Ls)
