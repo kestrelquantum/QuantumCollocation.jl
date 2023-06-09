@@ -38,12 +38,18 @@ H_drift =
     sum(H_q(i) for i = 1:qubits) +
     sum(H_c_ij(i, j) for i = 1:qubits, j = 1:qubits if j > i)
 
+H_drift *= 2π
+
 # make vector of drive hamiltonians: [H_d_real(1), H_d_imag(1), H_d_real(2), ...]
 # there's probably a cleaner way to do this lol
-H_drives = collect.(vec(vcat(
-    transpose(Matrix{ComplexF64}.([H_d_real(i) for i = 1:qubits])),
-    transpose(Matrix{ComplexF64}.([H_d_imag(i) for i = 1:qubits]))
-)))
+# H_drives = collect.(vec(vcat(
+#     transpose(Matrix{ComplexF64}.([H_d_real(i) for i = 1:qubits])),
+#     transpose(Matrix{ComplexF64}.([H_d_imag(i) for i = 1:qubits]))
+# )))
+
+# H_drives = Matrix{ComplexF64}.([H_d_real(1), H_d_imag(1), H_d_real(2), H_d_imag(2)])
+H_drives = Matrix{ComplexF64}.([H_d_real(2), H_d_imag(2)])
+H_drives .*= 2π
 
 # make quantum system
 system = QuantumSystem(H_drift, H_drives)
@@ -61,33 +67,45 @@ duration = 100.0 # ns
 T = 100
 Δt = duration / T
 Δt_max = 1.2 * Δt
-Δt_min = 0.5 * Δt
+Δt_min = 0.1 * Δt
 
 # drive constraint: 20 MHz (linear units)
-a_bound = 2π * 20 * 1e-3 # GHz
+a_bound = 20 * 1e-3 # GHz
 
 # pulse acceleration (used to control smoothness)
-dda_bound = 1e-4
+dda_bound = 2e-3
 
 # maximum number of iterations
-max_iter = 100
+max_iter = 500
+
+# warm start
+warm_start = false
+
+if warm_start
+    data_path = joinpath(@__DIR__, "data/limited_drives_T_100_dt_1.0_dda_0.001_a_0.02_max_iter_500_00000.jld2")
+    data = load_problem(data_path; return_data=true)
+    init_traj = data["trajectory"]
+    init_drives = init_traj.a
+    init_Δt = init_traj.Δt[end]
+end
 
 prob = UnitarySmoothPulseProblem(
     system,
     U_goal,
     T,
-    Δt;
+    warm_start ? init_Δt : Δt;
     Δt_max=Δt_max,
     Δt_min=Δt_min,
     a_bound=a_bound,
     dda_bound=dda_bound,
-    max_iter=max_iter
+    max_iter=max_iter,
+    a_guess=warm_start ? init_drives : nothing,
 )
 
 save_dir = joinpath(@__DIR__, "data")
 plot_dir = joinpath(@__DIR__, "plots")
 
-experiment_name = "T_$(T)_dt_$(Δt)_dda_$(dda_bound)_a_$(a_bound)_max_iter_$(max_iter)"
+experiment_name = "limited_drives_T_$(T)_dt_$(Δt)_dda_$(dda_bound)_a_$(a_bound)_max_iter_$(max_iter)"
 
 save_path = generate_file_path("jld2", experiment_name, save_dir)
 plot_path = generate_file_path("png", experiment_name, plot_dir)
