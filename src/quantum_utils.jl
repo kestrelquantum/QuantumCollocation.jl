@@ -214,10 +214,14 @@ end
     quantum metrics
 """
 
-function fidelity(ψ̃, ψ̃_goal)
+function fidelity(ψ, ψ_goal)
+    return abs2(ψ_goal'ψ)
+end
+
+function iso_fidelity(ψ̃, ψ̃_goal)
     ψ = iso_to_ket(ψ̃)
     ψ_goal = iso_to_ket(ψ̃_goal)
-    return abs2(ψ_goal'ψ)
+    return fidelity(ψ, ψ_goal)
 end
 
 function unitary_fidelity(U::Matrix, U_goal::Matrix)
