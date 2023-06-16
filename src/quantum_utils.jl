@@ -19,6 +19,7 @@ export multimode_state
 export number
 export normalize
 export fidelity
+export iso_fidelity
 export unitary_fidelity
 export population
 export populations
