@@ -89,8 +89,13 @@ function qubit_system_state(ket::String)
     return ψ
 end
 
-function lift(U, q, n; l=2)
-    Is = Matrix{Number}[I(l) for i in 1:n]
+function lift(
+    U::AbstractMatrix{<:Number},
+    q::Int,
+    n::Int;
+    l::Int=2
+)
+    Is = Matrix{Number}[I(l) for _ = 1:n]
     Is[q] = U
     return foldr(kron, Is)
 end
