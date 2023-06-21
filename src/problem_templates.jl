@@ -72,7 +72,8 @@ function UnitarySmoothPulseProblem(
             da = randn(n_drives, T) * drive_derivative_σ
             dda = randn(n_drives, T) * drive_derivative_σ
         else
-            Ũ⃗ = unitary_rollout(a, Δt, system)
+            Ũ⃗ = unitary_rollout(a_guess, Δt, system)
+            Δt = vec(Δt)
             a = a_guess
             da = derivative(a, Δt)
             dda = derivative(da, Δt)

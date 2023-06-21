@@ -12,6 +12,8 @@ export dynamics_jacobian_structure
 export dynamics_hessian_of_lagrangian_structure
 export dynamics_structure
 
+export loss_hessian_structure
+
 using NamedTrajectories
 using TrajectoryIndexingUtils
 using LinearAlgebra
@@ -144,6 +146,12 @@ function dynamics_structure(∂f::Function, μ∂²f::Function, traj::NamedTraje
     end
 
     return ∂f_structure, ∂F_structure, μ∂²f_structure, μ∂²F_structure
+end
+
+function loss_hessian_structure(∂²l::Function, xdim::Int)
+    x = collect(Symbolics.@variables(x[1:xdim])...)
+    ∂²l_x = ∂²l(x)
+    return structure(sparse(∂²l); upper_half=true)
 end
 
 end

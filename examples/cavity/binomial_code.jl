@@ -13,7 +13,7 @@ max_iter = 2000
 
 
 
-data_path = "/home/aditya/oc_projects/QuantumCollocation.jl/examples/cavity/data/binomial_code/transmon_3_T_200_dt_15.0_Q_200.0_R_L1_10.0_max_iter_5000_dda_bound_1.0e-5_00000.jld2"
+# data_path = "/home/aditya/oc_projects/QuantumCollocation.jl/examples/cavity/data/binomial_code/transmon_3_T_200_dt_15.0_Q_200.0_R_L1_10.0_max_iter_5000_dda_bound_1.0e-5_00000.jld2"
 
 controls_guess_path = joinpath(@__DIR__, "binomial_T_210_dt_12.5_R_0.1_iter_470ubound_0.0002_00000.h5")
 
@@ -21,10 +21,10 @@ controls_file = h5open(controls_guess_path, "r")
 
 T = read(controls_file, "T")
 Δt = read(controls_file, "delta_t")
-A = read(controls_file, "controls")
+A = read(controls_file, "controls") |> transpose |> collect
 
-data = load_problem(data_path; return_data=true)
-init_traj = data["trajectory"]
+# data = load_problem(data_path; return_data=true)
+# init_traj = data["trajectory"]
 
 #data_path = "/home/aditya/oc_projects/QuantumCollocation.jl/examples/cavity/data/binomial_code/transmon_3_T_200_dt_15.0_Q_200.0_R_L1_10.0_max_iter_5000_dda_bound_1.0e-5_00000.jld2"
 
