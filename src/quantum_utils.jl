@@ -112,7 +112,7 @@ function annihilate(levels::Int)
 end
 
 function create(levels::Int)
-    return (annihilate(levels))'
+    return (annihilate(levels))' |> collect
 end
 
 function number(levels::Int)
