@@ -49,8 +49,8 @@ function UnitarySmoothPulseProblem(
     ipopt_options::Options=Options(),
     constraints::Vector{<:AbstractConstraint}=AbstractConstraint[],
     timesteps_all_equal::Bool=true,
-    verbose=false,
-    U_init=Union{AbstractMatrix{<:Number}, Nothing}=nothing,
+    verbose::Bool=false,
+    U_init::Union{AbstractMatrix{<:Number},Nothing}=nothing,
 )
     U_goal = Matrix{ComplexF64}(U_goal)
 
