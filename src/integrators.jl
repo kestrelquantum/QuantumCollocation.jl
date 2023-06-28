@@ -158,8 +158,12 @@ function comps(P::AbstractIntegrator, traj::NamedTrajectory)
     else
         control_comps = traj.components[u]
     end
-    timestep_comp = traj.components[timestep(P)]
-    return state_comps, control_comps, timestep_comp
+    if traj.timestep isa Float64
+        return state_comps, control_comps
+    else
+        timestep_comp = traj.components[traj.timestep]
+        return state_comps, control_comps, timestep_comp
+    end
 end
 
 dim(integrator::AbstractIntegrator) = integrator.dim
@@ -168,22 +172,19 @@ dim(integrators::AbstractVector{<:AbstractIntegrator}) = sum(dim, integrators)
 struct DerivativeIntegrator <: AbstractIntegrator
     variable::Symbol
     derivative::Symbol
-    timestep::Symbol
     dim::Int
 end
 
 function DerivativeIntegrator(
     variable::Symbol,
     derivative::Symbol,
-    timestep::Symbol,
     traj::NamedTrajectory
 )
-    return DerivativeIntegrator(variable, derivative, timestep, traj.dims[variable])
+    return DerivativeIntegrator(variable, derivative, traj.dims[variable])
 end
 
 state(integrator::DerivativeIntegrator) = integrator.variable
 controls(integrator::DerivativeIntegrator) = integrator.derivative
-timestep(integrator::DerivativeIntegrator) = integrator.timestep
 
 @views function (D::DerivativeIntegrator)(
     zₜ::AbstractVector,
@@ -193,8 +194,11 @@ timestep(integrator::DerivativeIntegrator) = integrator.timestep
     xₜ = zₜ[traj.components[D.variable]]
     xₜ₊₁ = zₜ₊₁[traj.components[D.variable]]
     dxₜ = zₜ[traj.components[D.derivative]]
-    Δtₜ = zₜ[traj.components[D.timestep]][1]
-
+    if traj.timestep isa Symbol
+        Δtₜ = zₜ[traj.components[traj.timestep]][1]
+    else
+        Δtₜ = traj.timestep
+    end
     return xₜ₊₁ - xₜ - Δtₜ * dxₜ
 end
 
@@ -205,13 +209,15 @@ end
     traj::NamedTrajectory
 )
     dxₜ = zₜ[traj.components[D.derivative]]
-    Δtₜ = zₜ[traj.components[D.timestep]][1]
-
+    if traj.timestep isa Symbol
+        Δtₜ = zₜ[traj.components[traj.timestep]][1]
+    else
+        Δtₜ = traj.timestep
+    end
     ∂xₜD = sparse(-1.0I(D.dim))
     ∂xₜ₊₁D = sparse(1.0I(D.dim))
     ∂dxₜD = sparse(-Δtₜ * I(D.dim))
     ∂ΔtₜD = -dxₜ
-
     return ∂xₜD, ∂xₜ₊₁D, ∂dxₜD, ∂ΔtₜD
 end
 
@@ -245,7 +251,6 @@ struct UnitaryPadeIntegrator{R} <: QuantumPadeIntegrator
     H_drives_real_anticomm_H_drives_imag::Matrix{Matrix{R}}
     unitary_symb::Union{Symbol,Nothing}
     drive_symb::Union{Symbol,Tuple{Vararg{Symbol}},Nothing}
-    timestep_symb::Union{Symbol,Nothing}
     n_drives::Int
     N::Int
     dim::Int
@@ -255,11 +260,10 @@ struct UnitaryPadeIntegrator{R} <: QuantumPadeIntegrator
     """
         UnitaryPadeIntegrator(
             sys::QuantumSystem{R},
-            unitary_symb::Union{Symbol,Nothing}=nothing,
-            drive_symb::Union{Symbol,Tuple{Vararg{Symbol}},Nothing}=nothing,
-            timestep_symb::Union{Symbol,Nothing}=nothing;
+            unitary_symb::Symbol,
+            drive_symb::Union{Symbol,Tuple{Vararg{Symbol}}};
             order::Int=4,
-            autodiff::Bool=false
+            autodiff::Bool=order != 4
         ) where R <: Real
 
     Construct a `UnitaryPadeIntegrator` for the quantum system `sys`.
@@ -271,33 +275,34 @@ struct UnitaryPadeIntegrator{R} <: QuantumPadeIntegrator
         P = UnitaryPadeIntegrator(sys)
     ```
 
-    ## for a single drive `a` and timestep `Δt`:
+    ## for a single drive `a`:
     ```julia
-        P = UnitaryPadeIntegrator(sys, :Ũ⃗, :a, :Δt)
+        P = UnitaryPadeIntegrator(sys, :Ũ⃗, :a)
     ```
 
-    ## for two drives `α` and `γ`, timestep `Δt`, order `4`, and autodiffed:
+    ## for two drives `α` and `γ`, order `4`, and autodiffed:
     ```julia
-        P = UnitaryPadeIntegrator(sys, :Ũ⃗, (:α, :γ), :Δt; order=4, autodiff=true)
+        P = UnitaryPadeIntegrator(sys, :Ũ⃗, (:α, :γ); order=4, autodiff=true)
     ```
 
     # Arguments
     - `sys::QuantumSystem{R}`: the quantum system
     - `unitary_symb::Union{Symbol,Nothing}=nothing`: the symbol for the unitary
     - `drive_symb::Union{Symbol,Tuple{Vararg{Symbol}},Nothing}=nothing`: the symbol(s) for the drives
-    - `timestep_symb::Union{Symbol,Nothing}=nothing`: the symbol for the timestep
     - `order::Int=4`: the order of the Pade approximation. Must be in `[4, 6, 8, 10]`. If order is not `4` and `autodiff` is `false`, then the integrator will use the hand-coded fourth order derivatives.
-    - `autodiff::Bool=false`: whether to use automatic differentiation to compute the jacobian and hessian of the lagrangian
+    - `autodiff::Bool=order != 4`: whether to use automatic differentiation to compute the jacobian and hessian of the lagrangian
+
     """
     function UnitaryPadeIntegrator(
         sys::QuantumSystem{R},
         unitary_symb::Union{Symbol,Nothing}=nothing,
         drive_symb::Union{Symbol,Tuple{Vararg{Symbol}},Nothing}=nothing,
-        timestep_symb::Union{Symbol,Nothing}=nothing;
         order::Int=4,
         autodiff::Bool=false
     ) where R <: Real
         @assert order ∈ [4, 6, 8, 10] "order must be in [4, 6, 8, 10]"
+        @assert !isnothing(unitary_symb) "must specify unitary symbol"
+        @assert !isnothing(drive_symb) "must specify drive symbol"
 
         n_drives = length(sys.H_drives_real)
         N = size(sys.H_drift_real, 1)
@@ -358,7 +363,6 @@ struct UnitaryPadeIntegrator{R} <: QuantumPadeIntegrator
             fetch(H_drives_real_anticomm_H_drives_imag),
             unitary_symb,
             drive_symb,
-            timestep_symb,
             n_drives,
             N,
             dim,
@@ -370,7 +374,6 @@ end
 
 state(P::UnitaryPadeIntegrator) = P.unitary_symb
 controls(P::UnitaryPadeIntegrator) = P.drive_symb
-timestep(P::UnitaryPadeIntegrator) = P.timestep_symb
 
 struct QuantumStatePadeIntegrator{R} <: QuantumPadeIntegrator
     G_drift::Union{Nothing, Matrix{R}}
@@ -391,7 +394,6 @@ struct QuantumStatePadeIntegrator{R} <: QuantumPadeIntegrator
     H_drives_real_anticomm_H_drives_imag::Matrix{Matrix{R}}
     state_symb::Union{Symbol,Nothing}
     drive_symb::Union{Symbol,Tuple{Vararg{Symbol}},Nothing}
-    timestep_symb::Union{Symbol,Nothing}
     n_drives::Int
     N::Int
     dim::Int
@@ -412,38 +414,33 @@ struct QuantumStatePadeIntegrator{R} <: QuantumPadeIntegrator
 
     # Examples
 
-    ## a bare integrator
+    ## for a single drive `a`:
     ```julia
-        P = QuantumstatePadeIntegrator(sys)
+        P = QuantumstatePadeIntegrator(sys, :ψ̃, :a)
     ```
 
-    ## for a single drive `a` and timestep `Δt`:
+    ## for two drives `α` and `γ`, order `8`, and autodiffed:
     ```julia
-        P = QuantumstatePadeIntegrator(sys, :ψ̃, :a, :Δt)
-    ```
-
-    ## for two drives `α` and `γ`, timestep `Δt`, order `8`, and autodiffed:
-    ```julia
-        P = QuantumstatePadeIntegrator(sys, :ψ̃, (:α, :γ), :Δt; order=8, autodiff=true)
+        P = QuantumstatePadeIntegrator(sys, :ψ̃, (:α, :γ); order=8, autodiff=true)
     ```
 
     # Arguments
     - `sys::QuantumSystem{R}`: the quantum system
-    - `state_symb::Union{Symbol,Nothing}=nothing`: the symbol for the quantum state
-    - `drive_symb::Union{Symbol,Tuple{Vararg{Symbol}},Nothing}=nothing`: the symbol(s) for the drives
-    - `timestep_symb::Union{Symbol,Nothing}=nothing`: the symbol for the timestep
+    - `state_symb::Symbol`: the symbol for the quantum state
+    - `drive_symb::Union{Symbol,Tuple{Vararg{Symbol}}}`: the symbol(s) for the drives
     - `order::Int=4`: the order of the Pade approximation. Must be in `[4, 6, 8, 10]`. If order is not `4` and `autodiff` is `false`, then the integrator will use the hand-coded fourth order derivatives.
     - `autodiff::Bool=false`: whether to use automatic differentiation to compute the jacobian and hessian of the lagrangian
     """
     function QuantumStatePadeIntegrator(
         sys::QuantumSystem{R},
         state_symb::Union{Symbol,Nothing}=nothing,
-        drive_symb::Union{Symbol,Tuple{Vararg{Symbol}},Nothing}=nothing,
-        timestep_symb::Union{Symbol,Nothing}=nothing;
+        drive_symb::Union{Symbol,Tuple{Vararg{Symbol}},Nothing}=nothing;
         order::Int=4,
-        autodiff::Bool=false
+        autodiff::Bool=order != 4
     ) where R <: Real
         @assert order ∈ [4, 6, 8, 10] "order must be in [4, 6, 8, 10]"
+        @assert !isnothing(state_symb) "state_symb must be specified"
+        @assert !isnothing(drive_symb) "drive_symb must be specified"
 
         n_drives = length(sys.H_drives_real)
         N = size(sys.H_drift_real, 1)
@@ -499,7 +496,6 @@ struct QuantumStatePadeIntegrator{R} <: QuantumPadeIntegrator
             fetch(H_drives_real_anticomm_H_drives_imag),
             state_symb,
             drive_symb,
-            timestep_symb,
             n_drives,
             N,
             dim,
@@ -511,9 +507,6 @@ end
 
 state(P::QuantumStatePadeIntegrator) = P.state_symb
 controls(P::QuantumStatePadeIntegrator) = P.drive_symb
-timestep(P::QuantumStatePadeIntegrator) = P.timestep_symb
-
-
 
 @inline function squared_operator(
     a::AbstractVector{<:Real},
@@ -649,6 +642,7 @@ end
     return δŨ⃗
 end
 
+
 function nth_order_pade(
     P::UnitaryPadeIntegrator{R},
     Ũ⃗ₜ₊₁::AbstractVector,
@@ -674,12 +668,16 @@ end
 ) where R <: Real
     Ũ⃗ₜ₊₁ = zₜ₊₁[traj.components[P.unitary_symb]]
     Ũ⃗ₜ = zₜ[traj.components[P.unitary_symb]]
+    if traj.timestep isa Symbol
+        Δtₜ = zₜ[traj.components[traj.timestep]][1]
+    else
+        Δtₜ = traj.timestep
+    end
     if P.drive_symb isa Tuple
         aₜ = vcat([zₜ[traj.components[s]] for s in P.drive_symb]...)
     else
         aₜ = zₜ[traj.components[P.drive_symb]]
     end
-    Δtₜ = zₜ[traj.components[P.timestep_symb]][1]
     if P.order == 4
         return fourth_order_pade(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, aₜ, Δtₜ)
     else
@@ -734,7 +732,11 @@ end
     else
         aₜ = zₜ[traj.components[P.drive_symb]]
     end
-    Δtₜ = zₜ[traj.components[P.timestep_symb]][1]
+    if traj.timestep isa Symbol
+        Δtₜ = zₜ[traj.components[traj.timestep]][1]
+    else
+        Δtₜ = traj.timestep
+    end
     if P.order == 4
         return fourth_order_pade(P, ψ̃ₜ₊₁, ψ̃ₜ, aₜ, Δtₜ)
     else
@@ -812,7 +814,7 @@ function ∂aₜ(
     Ũ⃗ₜ₊₁::AbstractVector{T},
     Ũ⃗ₜ::AbstractVector{T},
     aₜ::AbstractVector{T},
-    Δtₜ::T,
+    Δtₜ::Real,
     drive_indices=1:P.n_drives
 ) where {R <: Real, T <: Real}
     n_drives = length(aₜ)
@@ -834,7 +836,7 @@ function ∂aₜ(
     ψ̃ₜ₊₁::AbstractVector{T},
     ψ̃ₜ::AbstractVector{T},
     aₜ::AbstractVector{T},
-    Δtₜ::T,
+    Δtₜ::Real,
     drive_indices=1:P.n_drives
 ) where {R <: Real, T <: Real}
     n_drives = length(aₜ)
@@ -973,9 +975,16 @@ end
     zₜ₊₁::AbstractVector,
     traj::NamedTrajectory
 )
+    free_time = traj.timestep isa Symbol
+
     Ũ⃗ₜ₊₁ = zₜ₊₁[traj.components[P.unitary_symb]]
     Ũ⃗ₜ = zₜ[traj.components[P.unitary_symb]]
-    Δtₜ = zₜ[traj.components[P.timestep_symb]][1]
+
+    if free_time
+        Δtₜ = zₜ[traj.components[traj.timestep]][1]
+    else
+        Δtₜ = traj.timestep
+    end
 
     if P.drive_symb isa Tuple
         aₜs = Tuple(zₜ[traj.components[s]] for s ∈ P.drive_symb)
@@ -990,6 +999,9 @@ end
             end
         end
         ∂aₜP = tuple(∂aₜPs...)
+        if free_time
+            ∂ΔtₜP = ∂Δtₜ(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, vcat(aₜs...), Δtₜ)
+        end
         ∂ΔtₜP = ∂Δtₜ(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, vcat(aₜs...), Δtₜ)
         BR = B_real(P, vcat(aₜs...), Δtₜ)
         BI = B_imag(P, vcat(aₜs...), Δtₜ)
@@ -998,7 +1010,9 @@ end
     else
         aₜ = zₜ[traj.components[P.drive_symb]]
         ∂aₜP = ∂aₜ(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, aₜ, Δtₜ)
-        ∂ΔtₜP = ∂Δtₜ(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, aₜ, Δtₜ)
+        if free_time
+            ∂ΔtₜP = ∂Δtₜ(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, aₜ, Δtₜ)
+        end
         BR = B_real(P, aₜ, Δtₜ)
         BI = B_imag(P, aₜ, Δtₜ)
         FR = F_real(P, aₜ, Δtₜ)
@@ -1011,7 +1025,11 @@ end
     ∂Ũ⃗ₜP = -F̂
     ∂Ũ⃗ₜ₊₁P = B̂
 
-    return ∂Ũ⃗ₜP, ∂Ũ⃗ₜ₊₁P, ∂aₜP, ∂ΔtₜP
+    if free_time
+        return ∂Ũ⃗ₜP, ∂Ũ⃗ₜ₊₁P, ∂aₜP, ∂ΔtₜP
+    else
+        return ∂Ũ⃗ₜP, ∂Ũ⃗ₜ₊₁P, ∂aₜP
+    end
 end
 
 @views function jacobian(
@@ -1020,9 +1038,16 @@ end
     zₜ₊₁::AbstractVector,
     traj::NamedTrajectory
 )
+    free_time = !isnothing(P.timestep_symb)
+
     ψ̃ₜ₊₁ = zₜ₊₁[traj.components[P.state_symb]]
     ψ̃ₜ = zₜ[traj.components[P.state_symb]]
-    Δtₜ = zₜ[traj.components[P.timestep_symb]][1]
+
+    if free_time
+        Δtₜ = zₜ[traj.components[traj.timestep]][1]
+    else
+        Δtₜ = traj.timestep
+    end
 
     if P.drive_symb isa Tuple
         aₜs = Tuple(zₜ[traj.components[s]] for s ∈ P.drive_symb)
@@ -1037,7 +1062,9 @@ end
             end
         end
         ∂aₜP = tuple(∂aₜPs...)
-        ∂ΔtₜP = ∂Δtₜ(P, ψ̃ₜ₊₁, ψ̃ₜ, vcat(aₜs...), Δtₜ)
+        if free_time
+            ∂ΔtₜP = ∂Δtₜ(P, ψ̃ₜ₊₁, ψ̃ₜ, vcat(aₜs...), Δtₜ)
+        end
         BR = B_real(P, vcat(aₜs...), Δtₜ)
         BI = B_imag(P, vcat(aₜs...), Δtₜ)
         FR = F_real(P, vcat(aₜs...), Δtₜ)
@@ -1045,7 +1072,9 @@ end
     else
         aₜ = zₜ[traj.components[P.drive_symb]]
         ∂aₜP = ∂aₜ(P, ψ̃ₜ₊₁, ψ̃ₜ, aₜ, Δtₜ)
-        ∂ΔtₜP = ∂Δtₜ(P, ψ̃ₜ₊₁, ψ̃ₜ, aₜ, Δtₜ)
+        if free_time
+            ∂ΔtₜP = ∂Δtₜ(P, ψ̃ₜ₊₁, ψ̃ₜ, aₜ, Δtₜ)
+        end
         BR = B_real(P, aₜ, Δtₜ)
         BI = B_imag(P, aₜ, Δtₜ)
         FR = F_real(P, aₜ, Δtₜ)
@@ -1058,7 +1087,11 @@ end
     ∂ψ̃ₜP = -F
     ∂ψ̃ₜ₊₁P = B
 
-    return ∂ψ̃ₜP, ∂ψ̃ₜ₊₁P, ∂aₜP, ∂ΔtₜP
+    if free_time
+        return ∂ψ̃ₜP, ∂ψ̃ₜ₊₁P, ∂aₜP, ∂ΔtₜP
+    else
+        return ∂ψ̃ₜP, ∂ψ̃ₜ₊₁P, ∂aₜP
+    end
 end
 
 
@@ -1070,7 +1103,7 @@ end
 function μ∂aₜ∂Ũ⃗ₜ(
     P::UnitaryPadeIntegrator,
     aₜ::AbstractVector{T},
-    Δtₜ::T,
+    Δtₜ::Real,
     μₜ::AbstractVector{T},
     drive_indices=1:P.n_drives
 ) where T <: Real
@@ -1088,7 +1121,7 @@ end
 function μ∂Ũ⃗ₜ₊₁∂aₜ(
     P::UnitaryPadeIntegrator,
     aₜ::AbstractVector{T},
-    Δtₜ::T,
+    Δtₜ::Real,
     μₜ::AbstractVector{T},
     drive_indices=1:P.n_drives
 ) where T <: Real
@@ -1106,7 +1139,7 @@ end
 function μ∂aₜ∂ψ̃ₜ(
     P::QuantumStatePadeIntegrator,
     aₜ::AbstractVector{T},
-    Δtₜ::T,
+    Δtₜ::Real,
     μₜ::AbstractVector{T},
     drive_indices=1:P.n_drives
 ) where T <: Real
@@ -1124,7 +1157,7 @@ end
 function μ∂ψ̃ₜ₊₁∂aₜ(
     P::QuantumStatePadeIntegrator,
     aₜ::AbstractVector{T},
-    Δtₜ::T,
+    Δtₜ::Real,
     μₜ::AbstractVector{T},
     drive_indices=1:P.n_drives
 ) where T <: Real
@@ -1143,7 +1176,7 @@ function μ∂²aₜ(
     P::UnitaryPadeIntegrator,
     Ũ⃗ₜ₊₁::AbstractVector{T},
     Ũ⃗ₜ::AbstractVector{T},
-    Δtₜ::T,
+    Δtₜ::Real,
     μₜ::AbstractVector{T},
     drive_indices=1:P.n_drives
 ) where T <: Real
@@ -1179,7 +1212,7 @@ function μ∂²aₜ(
     P::QuantumStatePadeIntegrator,
     ψ̃ₜ₊₁::AbstractVector{T},
     ψ̃ₜ::AbstractVector{T},
-    Δtₜ::T,
+    Δtₜ::Real,
     μₜ::AbstractVector{T},
     drive_indices=1:P.n_drives
 ) where T <: Real
@@ -1448,17 +1481,25 @@ end
     μₜ::AbstractVector,
     traj::NamedTrajectory
 )
+    free_time = traj.timestep isa Symbol
+
     Ũ⃗ₜ₊₁ = zₜ₊₁[traj.components[P.unitary_symb]]
     Ũ⃗ₜ = zₜ[traj.components[P.unitary_symb]]
 
-    Δtₜ = zₜ[traj.components[P.timestep_symb]][1]
+    if free_time
+        Δtₜ = zₜ[traj.components[traj.timestep]][1]
+    else
+        Δtₜ = traj.timestep
+    end
 
     if P.drive_symb isa Tuple
         aₜ = Tuple(zₜ[traj.components[s]] for s ∈ P.drive_symb)
 
         μ∂aₜᵢ∂Ũ⃗ₜPs = []
         μ∂²aₜᵢPs = []
-        μ∂Δtₜ∂aₜᵢPs = []
+        if free_time
+            μ∂Δtₜ∂aₜᵢPs = []
+        end
         μ∂Ũ⃗ₜ₊₁∂aₜᵢPs = []
 
         H_drive_mark = 0
@@ -1474,8 +1515,10 @@ end
             μ∂²aₜᵢP = μ∂²aₜ(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, Δtₜ, μₜ, drive_indices)
             push!(μ∂²aₜᵢPs, μ∂²aₜᵢP)
 
-            μ∂Δtₜ∂aₜᵢP = μ∂Δtₜ∂aₜ(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, aₜᵢ, Δtₜ, μₜ, drive_indices)
-            push!(μ∂Δtₜ∂aₜᵢPs, μ∂Δtₜ∂aₜᵢP)
+            if free_time
+                μ∂Δtₜ∂aₜᵢP = μ∂Δtₜ∂aₜ(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, aₜᵢ, Δtₜ, μₜ, drive_indices)
+                push!(μ∂Δtₜ∂aₜᵢPs, μ∂Δtₜ∂aₜᵢP)
+            end
 
             μ∂Ũ⃗ₜ₊₁∂aₜᵢP = μ∂Ũ⃗ₜ₊₁∂aₜ(P, aₜᵢ, Δtₜ, μₜ, drive_indices)
             push!(μ∂Ũ⃗ₜ₊₁∂aₜᵢPs, μ∂Ũ⃗ₜ₊₁∂aₜᵢP)
@@ -1485,7 +1528,9 @@ end
 
         μ∂aₜ∂Ũ⃗ₜP = tuple(μ∂aₜᵢ∂Ũ⃗ₜPs...)
         μ∂²aₜP = tuple(μ∂²aₜᵢPs...)
-        μ∂Δtₜ∂aₜP = tuple(μ∂Δtₜ∂aₜᵢPs...)
+        if free_time
+            μ∂Δtₜ∂aₜP = tuple(μ∂Δtₜ∂aₜᵢPs...)
+        end
         μ∂Ũ⃗ₜ₊₁∂aₜP = tuple(μ∂Ũ⃗ₜ₊₁∂aₜᵢPs...)
 
     else
@@ -1493,7 +1538,9 @@ end
 
         μ∂aₜ∂Ũ⃗ₜP = μ∂aₜ∂Ũ⃗ₜ(P, aₜ, Δtₜ, μₜ)
         μ∂²aₜP = μ∂²aₜ(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, Δtₜ, μₜ)
-        μ∂Δtₜ∂aₜP = μ∂Δtₜ∂aₜ(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, aₜ, Δtₜ, μₜ)
+        if free_time
+            μ∂Δtₜ∂aₜP = μ∂Δtₜ∂aₜ(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, aₜ, Δtₜ, μₜ)
+        end
         μ∂Ũ⃗ₜ₊₁∂aₜP = μ∂Ũ⃗ₜ₊₁∂aₜ(P, aₜ, Δtₜ, μₜ)
     end
 
@@ -1501,19 +1548,26 @@ end
         aₜ = vcat(aₜ...)
     end
 
-    μ∂Δtₜ∂Ũ⃗ₜP = μ∂Δtₜ∂Ũ⃗ₜ(P, aₜ, Δtₜ, μₜ)
-    μ∂²ΔtₜP = μ∂²Δtₜ(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, aₜ, μₜ)
-    μ∂Ũ⃗ₜ₊₁∂ΔtₜP = μ∂Ũ⃗ₜ₊₁∂Δtₜ(P, aₜ, Δtₜ, μₜ)
-
-    return (
-        μ∂aₜ∂Ũ⃗ₜP,
-        μ∂²aₜP,
-        μ∂Δtₜ∂Ũ⃗ₜP,
-        μ∂Δtₜ∂aₜP,
-        μ∂²ΔtₜP,
-        μ∂Ũ⃗ₜ₊₁∂aₜP,
-        μ∂Ũ⃗ₜ₊₁∂ΔtₜP
-    )
+    if free_time
+        μ∂Δtₜ∂Ũ⃗ₜP = μ∂Δtₜ∂Ũ⃗ₜ(P, aₜ, Δtₜ, μₜ)
+        μ∂²ΔtₜP = μ∂²Δtₜ(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, aₜ, μₜ)
+        μ∂Ũ⃗ₜ₊₁∂ΔtₜP = μ∂Ũ⃗ₜ₊₁∂Δtₜ(P, aₜ, Δtₜ, μₜ)
+        return (
+            μ∂aₜ∂Ũ⃗ₜP,
+            μ∂²aₜP,
+            μ∂Δtₜ∂Ũ⃗ₜP,
+            μ∂Δtₜ∂aₜP,
+            μ∂²ΔtₜP,
+            μ∂Ũ⃗ₜ₊₁∂aₜP,
+            μ∂Ũ⃗ₜ₊₁∂ΔtₜP
+        )
+    else
+        return (
+            μ∂aₜ∂Ũ⃗ₜP,
+            μ∂²aₜP,
+            μ∂Ũ⃗ₜ₊₁∂aₜP
+        )
+    end
 end
 
 @views function hessian_of_the_lagrangian(
@@ -1523,17 +1577,23 @@ end
     μₜ::AbstractVector,
     traj::NamedTrajectory
 )
+    free_time = traj.timestep isa Symbol
+
     ψ̃ₜ₊₁ = zₜ₊₁[traj.components[P.state_symb]]
     ψ̃ₜ = zₜ[traj.components[P.state_symb]]
 
-    Δtₜ = zₜ[traj.components[P.timestep_symb]][1]
+    if free_time
+        Δtₜ = zₜ[traj.components[traj.timestep]][1]
+    end
 
     if P.drive_symb isa Tuple
         aₜ = Tuple(zₜ[traj.components[s]] for s ∈ P.drive_symb)
 
         μ∂aₜᵢ∂ψ̃ₜPs = []
         μ∂²aₜᵢPs = []
-        μ∂Δtₜ∂aₜᵢPs = []
+        if free_time
+            μ∂Δtₜ∂aₜᵢPs = []
+        end
         μ∂ψ̃ₜ₊₁∂aₜᵢPs = []
 
         H_drive_mark = 0
@@ -1549,8 +1609,10 @@ end
             μ∂²aₜᵢP = μ∂²aₜ(P, ψ̃ₜ₊₁, ψ̃ₜ, Δtₜ, μₜ, drive_indices)
             push!(μ∂²aₜᵢPs, μ∂²aₜᵢP)
 
-            μ∂Δtₜ∂aₜᵢP = μ∂Δtₜ∂aₜ(P, ψ̃ₜ₊₁, ψ̃ₜ, aₜᵢ, Δtₜ, μₜ, drive_indices)
-            push!(μ∂Δtₜ∂aₜᵢPs, μ∂Δtₜ∂aₜᵢP)
+            if free_time
+                μ∂Δtₜ∂aₜᵢP = μ∂Δtₜ∂aₜ(P, ψ̃ₜ₊₁, ψ̃ₜ, aₜᵢ, Δtₜ, μₜ, drive_indices)
+                push!(μ∂Δtₜ∂aₜᵢPs, μ∂Δtₜ∂aₜᵢP)
+            end
 
             μ∂ψ̃ₜ₊₁∂aₜᵢP = μ∂ψ̃ₜ₊₁∂aₜ(P, aₜᵢ, Δtₜ, μₜ, drive_indices)
             push!(μ∂ψ̃ₜ₊₁∂aₜᵢPs, μ∂ψ̃ₜ₊₁∂aₜᵢP)
@@ -1560,7 +1622,9 @@ end
 
         μ∂aₜ∂ψ̃ₜP = tuple(μ∂aₜᵢ∂ψ̃ₜPs...)
         μ∂²aₜP = tuple(μ∂²aₜᵢPs...)
-        μ∂Δtₜ∂aₜP = tuple(μ∂Δtₜ∂aₜᵢPs...)
+        if free_time
+            μ∂Δtₜ∂aₜP = tuple(μ∂Δtₜ∂aₜᵢPs...)
+        end
         μ∂ψ̃ₜ₊₁∂aₜP = tuple(μ∂ψ̃ₜ₊₁∂aₜᵢPs...)
 
     else
@@ -1568,7 +1632,9 @@ end
 
         μ∂aₜ∂ψ̃ₜP = μ∂aₜ∂ψ̃ₜ(P, aₜ, Δtₜ, μₜ)
         μ∂²aₜP = μ∂²aₜ(P, ψ̃ₜ₊₁, ψ̃ₜ, Δtₜ, μₜ)
-        μ∂Δtₜ∂aₜP = μ∂Δtₜ∂aₜ(P, ψ̃ₜ₊₁, ψ̃ₜ, aₜ, Δtₜ, μₜ)
+        if free_time
+            μ∂Δtₜ∂aₜP = μ∂Δtₜ∂aₜ(P, ψ̃ₜ₊₁, ψ̃ₜ, aₜ, Δtₜ, μₜ)
+        end
         μ∂ψ̃ₜ₊₁∂aₜP = μ∂ψ̃ₜ₊₁∂aₜ(P, aₜ, Δtₜ, μₜ)
     end
 
@@ -1576,19 +1642,27 @@ end
         aₜ = vcat(aₜ...)
     end
 
-    μ∂Δtₜ∂ψ̃ₜP = μ∂Δtₜ∂ψ̃ₜ(P, aₜ, Δtₜ, μₜ)
-    μ∂²ΔtₜP = μ∂²Δtₜ(P, ψ̃ₜ₊₁, ψ̃ₜ, aₜ, μₜ)
-    μ∂ψ̃ₜ₊₁∂ΔtₜP = μ∂ψ̃ₜ₊₁∂Δtₜ(P, aₜ, Δtₜ, μₜ)
+    if free_time
+        μ∂Δtₜ∂ψ̃ₜP = μ∂Δtₜ∂ψ̃ₜ(P, aₜ, Δtₜ, μₜ)
+        μ∂²ΔtₜP = μ∂²Δtₜ(P, ψ̃ₜ₊₁, ψ̃ₜ, aₜ, μₜ)
+        μ∂ψ̃ₜ₊₁∂ΔtₜP = μ∂ψ̃ₜ₊₁∂Δtₜ(P, aₜ, Δtₜ, μₜ)
 
-    return (
-        μ∂aₜ∂ψ̃ₜP,
-        μ∂²aₜP,
-        μ∂Δtₜ∂ψ̃ₜP,
-        μ∂Δtₜ∂aₜP,
-        μ∂²ΔtₜP,
-        μ∂ψ̃ₜ₊₁∂aₜP,
-        μ∂ψ̃ₜ₊₁∂ΔtₜP
-    )
+        return (
+            μ∂aₜ∂ψ̃ₜP,
+            μ∂²aₜP,
+            μ∂Δtₜ∂ψ̃ₜP,
+            μ∂Δtₜ∂aₜP,
+            μ∂²ΔtₜP,
+            μ∂ψ̃ₜ₊₁∂aₜP,
+            μ∂ψ̃ₜ₊₁∂ΔtₜP
+        )
+    else
+        return (
+            μ∂aₜ∂ψ̃ₜP,
+            μ∂²aₜP,
+            μ∂ψ̃ₜ₊₁∂aₜP
+        )
+    end
 end
 
 

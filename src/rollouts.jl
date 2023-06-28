@@ -17,13 +17,15 @@ using LinearAlgebra
 function rollout(
     ψ̃₁::AbstractVector{<:Number},
     controls::AbstractMatrix{Float64},
-    Δt::Union{AbstractVector{Float64}, AbstractMatrix{Float64}},
+    Δt::Union{AbstractVector{Float64}, AbstractMatrix{Float64}, Float64},
     system::QuantumSystem;
     integrator=Integrators.fourth_order_pade
 )
     if Δt isa AbstractMatrix
         @assert size(Δt, 1) == 1
         Δt = vec(Δt)
+    elseif Δt isa Float64
+        Δt = fill(Δt, size(controls, 2))
     end
 
     T = size(controls, 2)
@@ -55,13 +57,15 @@ end
 function unitary_rollout(
     Ũ⃗₁::AbstractVector{<:Real},
     controls::AbstractMatrix{Float64},
-    Δt::Union{AbstractVector{Float64}, AbstractMatrix{Float64}},
+    Δt::Union{AbstractVector{Float64}, AbstractMatrix{Float64}, Float64},
     system::QuantumSystem;
     integrator=Integrators.fourth_order_pade
 )
     if Δt isa AbstractMatrix
         @assert size(Δt, 1) == 1
         Δt = vec(Δt)
+    elseif Δt isa Float64
+        Δt = fill(Δt, size(controls, 2))
     end
 
     T = size(controls, 2)
@@ -89,7 +93,7 @@ end
 
 function unitary_rollout(
     controls::AbstractMatrix{Float64},
-    Δt::Union{AbstractVector{Float64}, AbstractMatrix{Float64}},
+    Δt::Union{AbstractVector{Float64}, AbstractMatrix{Float64}, Float64},
     system::QuantumSystem;
     integrator=Integrators.fourth_order_pade
 )
