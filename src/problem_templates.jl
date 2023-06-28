@@ -30,6 +30,7 @@ function UnitarySmoothPulseProblem(
     U_goal::AbstractMatrix{<:Number},
     T::Int,
     Δt::Float64;
+    free_time=true,
     init_trajectory::Union{NamedTrajectory, Nothing}=nothing,
     a_bound::Float64=Inf,
     a_bounds::Vector{Float64}=fill(a_bound, length(system.G_drives)),
@@ -49,52 +50,57 @@ function UnitarySmoothPulseProblem(
     ipopt_options::Options=Options(),
     constraints::Vector{<:AbstractConstraint}=AbstractConstraint[],
     timesteps_all_equal::Bool=true,
-    verbose=false,
+    verbose::Bool=false,
+    U_init::Union{AbstractMatrix{<:Number},Nothing}=nothing,
 )
     U_goal = Matrix{ComplexF64}(U_goal)
+
+    if isnothing(U_init)
+        Ũ⃗_init = operator_to_iso_vec(1.0I(size(U_goal, 1)))
+    else
+        Ũ⃗_init = operator_to_iso_vec(U_init)
+    end
 
     n_drives = length(system.G_drives)
 
     if !isnothing(init_trajectory)
         traj = init_trajectory
     else
-        Δt = fill(Δt, 1, T)
+        if free_time
+            Δt = fill(Δt, 1, T)
+        end
 
         if isnothing(a_guess)
             # TODO: add warning in case U_goal is not unitary
-            Ũ⃗ = unitary_geodesic(U_goal, T)
             a_dists =  [Uniform(-a_bounds[i], a_bounds[i]) for i = 1:n_drives]
             a = hcat([
                 zeros(n_drives),
                 vcat([rand(a_dists[i], 1, T - 2) for i = 1:n_drives]...),
                 zeros(n_drives)
             ]...)
+            try
+                Ũ⃗ = unitary_geodesic(U_goal, T)
+            catch e
+                @warn "Could not find geodesic. Rolling out unitary from random intial controls."
+                Ũ⃗ = unitary_rollout(Ũ⃗_init, a, Δt, system)
+            end
             da = randn(n_drives, T) * drive_derivative_σ
             dda = randn(n_drives, T) * drive_derivative_σ
         else
-            Ũ⃗ = unitary_rollout(a_guess, Δt, system)
-            Δt = vec(Δt)
+            Ũ⃗ = unitary_rollout(Ũ⃗_init, a_guess, Δt, system)
             a = a_guess
             da = derivative(a, Δt)
             dda = derivative(da, Δt)
         end
 
-        components = (
-            Ũ⃗ = Ũ⃗,
-            a = a,
-            da = da,
-            dda = dda,
-            Δt = Δt,
-        )
-
-        bounds = (
-            a = a_bounds,
-            dda = dda_bounds,
-            Δt = (Δt_min, Δt_max),
-        )
+        if isnothing(U_init)
+            Ũ⃗_init = operator_to_iso_vec(1.0I(size(U_goal, 1)))
+        else
+            Ũ⃗_init = operator_to_iso_vec(U_init)
+        end
 
         initial = (
-            Ũ⃗ = operator_to_iso_vec(1.0I(size(U_goal, 1))),
+            Ũ⃗ = Ũ⃗_init,
             a = zeros(n_drives),
         )
 
@@ -106,15 +112,53 @@ function UnitarySmoothPulseProblem(
             Ũ⃗ = operator_to_iso_vec(U_goal),
         )
 
-        traj = NamedTrajectory(
-            components;
-            controls=(:dda, :Δt),
-            timestep=:Δt,
-            bounds=bounds,
-            initial=initial,
-            final=final,
-            goal=goal
-        )
+        if free_time
+            components = (
+                Ũ⃗ = Ũ⃗,
+                a = a,
+                da = da,
+                dda = dda,
+                Δt = Δt,
+            )
+
+            bounds = (
+                a = a_bounds,
+                dda = dda_bounds,
+                Δt = (Δt_min, Δt_max),
+            )
+
+            traj = NamedTrajectory(
+                components;
+                controls=(:dda, :Δt),
+                timestep=:Δt,
+                bounds=bounds,
+                initial=initial,
+                final=final,
+                goal=goal
+            )
+        else
+            components = (
+                Ũ⃗ = Ũ⃗,
+                a = a,
+                da = da,
+                dda = dda,
+            )
+
+            bounds = (
+                a = a_bounds,
+                dda = dda_bounds,
+            )
+
+            traj = NamedTrajectory(
+                components;
+                controls=(:dda,),
+                timestep=Δt,
+                bounds=bounds,
+                initial=initial,
+                final=final,
+                goal=goal
+            )
+        end
     end
 
     J = QuantumUnitaryObjective(:Ũ⃗, traj, Q)
@@ -122,14 +166,24 @@ function UnitarySmoothPulseProblem(
     J += QuadraticRegularizer(:da, traj, R_da)
     J += QuadraticRegularizer(:dda, traj, R_dda)
 
-    integrators = [
-        UnitaryPadeIntegrator(system, :Ũ⃗, :a, :Δt),
-        DerivativeIntegrator(:a, :da, :Δt, traj),
-        DerivativeIntegrator(:da, :dda, :Δt, traj),
-    ]
+    if free_time
+        integrators = [
+            UnitaryPadeIntegrator(system, :Ũ⃗, :a, :Δt),
+            DerivativeIntegrator(:a, :da, :Δt, traj),
+            DerivativeIntegrator(:da, :dda, :Δt, traj),
+        ]
+    else
+        integrators = [
+            UnitaryPadeIntegrator(system, :Ũ⃗, :a),
+            DerivativeIntegrator(:a, :da, traj),
+            DerivativeIntegrator(:da, :dda, traj),
+        ]
+    end
 
-    if timesteps_all_equal
-        push!(constraints, TimeStepsAllEqualConstraint(:Δt, traj))
+    if free_time
+        if timesteps_all_equal
+            push!(constraints, TimeStepsAllEqualConstraint(:Δt, traj))
+        end
     end
 
     return QuantumControlProblem(
@@ -226,6 +280,7 @@ function QuantumStateSmoothPulseProblem(
     ψ_goal::Union{AbstractVector{<:Number}, Vector{<:AbstractVector{<:Number}}},
     T::Int,
     Δt::Float64;
+    free_time=true,
     init_trajectory::Union{NamedTrajectory, Nothing}=nothing,
     a_bound::Float64=Inf,
     a_bounds::Vector{Float64}=fill(a_bound, length(system.G_drives)),
@@ -272,7 +327,9 @@ function QuantumStateSmoothPulseProblem(
     if !isnothing(init_trajectory)
         traj = init_trajectory
     else
-        Δt = fill(Δt, T)
+        if free_time
+            Δt = fill(Δt, T)
+        end
 
         if isnothing(a_guess)
             ψ̃s = NamedTuple([
@@ -297,21 +354,6 @@ function QuantumStateSmoothPulseProblem(
             dda = derivative(da, Δt)
         end
 
-        control_components = (
-            a = a,
-            da = da,
-            dda = dda,
-            Δt = Δt,
-        )
-
-        components = merge(ψ̃s, control_components)
-
-        bounds = (
-            a = a_bounds,
-            dda = dda_bounds,
-            Δt = (Δt_min, Δt_max),
-        )
-
         ψ̃_initial = NamedTuple([
             Symbol("ψ̃$i") => ψ̃_init
                 for (i, ψ̃_init) in enumerate(ψ̃_inits)
@@ -332,15 +374,56 @@ function QuantumStateSmoothPulseProblem(
                 for (i, ψ̃_goal) in enumerate(ψ̃_goals)
         ])
 
-        traj = NamedTrajectory(
-            components;
-            controls=(:dda, :Δt),
-            timestep=:Δt,
-            bounds=bounds,
-            initial=initial,
-            final=final,
-            goal=goal
-        )
+        if free_time
+
+            control_components = (
+                a = a,
+                da = da,
+                dda = dda,
+                Δt = Δt,
+            )
+
+            components = merge(ψ̃s, control_components)
+
+            bounds = (
+                a = a_bounds,
+                dda = dda_bounds,
+                Δt = (Δt_min, Δt_max),
+            )
+
+            traj = NamedTrajectory(
+                components;
+                controls=(:dda, :Δt),
+                timestep=:Δt,
+                bounds=bounds,
+                initial=initial,
+                final=final,
+                goal=goal
+            )
+        else
+            control_components = (
+                a = a,
+                da = da,
+                dda = dda,
+            )
+
+            components = merge(ψ̃s, control_components)
+
+            bounds = (
+                a = a_bounds,
+                dda = dda_bounds,
+            )
+
+            traj = NamedTrajectory(
+                components;
+                controls=(:dda,),
+                timestep=Δt,
+                bounds=bounds,
+                initial=initial,
+                final=final,
+                goal=goal
+            )
+        end
     end
 
     J = QuadraticRegularizer(:a, traj, R_a)
@@ -365,19 +448,35 @@ function QuantumStateSmoothPulseProblem(
 
     append!(constraints, L1_slack_constraints)
 
-    ψ̃_integrators = [
-        QuantumStatePadeIntegrator(system, Symbol("ψ̃$i"), :a, :Δt)
-            for i = 1:length(ψ_inits)
-    ]
+    if free_time
 
-    integrators = [
-        ψ̃_integrators...,
-        DerivativeIntegrator(:a, :da, :Δt, traj),
-        DerivativeIntegrator(:da, :dda, :Δt, traj)
-    ]
+        ψ̃_integrators = [
+            QuantumStatePadeIntegrator(system, Symbol("ψ̃$i"), :a, :Δt)
+                for i = 1:length(ψ_inits)
+        ]
 
-    if timesteps_all_equal
-        push!(constraints, TimeStepsAllEqualConstraint(:Δt, traj))
+        integrators = [
+            ψ̃_integrators...,
+            DerivativeIntegrator(:a, :da, :Δt, traj),
+            DerivativeIntegrator(:da, :dda, :Δt, traj)
+        ]
+    else
+        ψ̃_integrators = [
+            QuantumStatePadeIntegrator(system, Symbol("ψ̃$i"), :a)
+                for i = 1:length(ψ_inits)
+        ]
+
+        integrators = [
+            ψ̃_integrators...,
+            DerivativeIntegrator(:a, :da, traj),
+            DerivativeIntegrator(:da, :dda, traj)
+        ]
+    end
+
+    if free_time
+        if timesteps_all_equal
+            push!(constraints, TimeStepsAllEqualConstraint(:Δt, traj))
+        end
     end
 
     return QuantumControlProblem(

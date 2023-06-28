@@ -20,8 +20,8 @@ system = QuantumSystem(
     H_drives
 )
 
-T = 400
-Δt = 0.1
+T = 100
+Δt = 0.4
 Q = 200.
 R = 0.01
 R_L1 = 1.0
@@ -36,7 +36,10 @@ max_iter = 500
 
 time = T * Δt
 
+free_time = false
+
 prob = UnitarySmoothPulseProblem(system, U_goal, T, Δt;
+    free_time=free_time,
     a_bounds=a_bounds,
     dda_bound=dda_bound,
     max_iter=max_iter,
@@ -47,7 +50,9 @@ prob = UnitarySmoothPulseProblem(system, U_goal, T, Δt;
 
 solve!(prob)
 
-println("fidelity = ", unitary_fidelity(prob.trajectory[end].Ũ⃗, prob.trajectory.goal.Ũ⃗))
+Ũ⃗_final = unitary_rollout(prob.trajectory.initial.Ũ⃗, prob.trajectory.a, prob.trajectory.timestep, system)[:, end]
+
+println("fidelity = ", unitary_fidelity(Ũ⃗_final, prob.trajectory.goal.Ũ⃗))
 
 plot_dir = joinpath(@__DIR__, "plots/pi_gate/")
 
