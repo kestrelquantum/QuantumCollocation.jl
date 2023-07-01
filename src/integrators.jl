@@ -960,7 +960,7 @@ function ∂Δtₜ(
     aₜ::AbstractVector,
     Δtₜ::Real
 ) where R <: Real
-    if isnothing(P.G) && P.order==4 
+    if isnothing(P.G) && P.order == 4 
         ∂ΔtₜBR = ∂ΔtₜB_real(P, aₜ, Δtₜ)
         ∂ΔtₜBI = ∂ΔtₜB_imag(P, aₜ, Δtₜ)
         ∂ΔtₜFR = ∂ΔtₜF_real(P, aₜ, Δtₜ)
@@ -973,7 +973,7 @@ function ∂Δtₜ(
         Gₜ = isnothing(P.G) ? G(aₜ, P.G_drift, P.G_drives) : P.G(aₜ)
         Ũₜ₊₁ = iso_vec_to_iso_operator(Ũ⃗ₜ₊₁)
         Ũₜ = iso_vec_to_iso_operator(Ũ⃗ₜ)
-        if P.order==4
+        if P.order == 4
             ∂ΔtₜP_operator = -1/2 * Gₜ * (Ũₜ₊₁ + Ũₜ) + 1/6 * Δtₜ * Gₜ^2 * (Ũₜ₊₁ - Ũₜ)
             ∂ΔtₜP = iso_operator_to_iso_vec(∂ΔtₜP_operator)
         else 
