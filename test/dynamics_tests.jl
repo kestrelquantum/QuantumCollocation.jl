@@ -66,7 +66,7 @@
                 da = randn(n_drives, T),
                 Δt = fill(dt, 1, T),
             ),
-            controls=(:da, :Δt),
+            controls=(:da,),
             timestep=:Δt,
             goal=(Ũ⃗ = Ũ⃗_goal,)
         )
@@ -88,10 +88,9 @@
             # display(Z.data)
             # println(Z.dim)
             #display(Z.datavec)
-            size(dynamics.F(Z.datavec)) |> display
             J_forward_diff = ForwardDiff.jacobian(dynamics.F, Z.datavec)
-            # display(J_dynamics)
-            # display(J_forward_diff)
+            display(J_dynamics)
+            display(J_forward_diff)
             @test all(J_forward_diff .≈ J_dynamics)
             show_diffs(J_forward_diff, J_dynamics)
 
