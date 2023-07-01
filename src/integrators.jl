@@ -394,8 +394,36 @@ struct UnitaryPadeIntegrator{R <: Number} <: QuantumPadeIntegrator
         G_drift = sys.G_drift
         G_drives = sys.G_drives
 
-        drive_anticomms, drift_anticomms =
-            order == 4 ? build_anticomms(G_drift, G_drives, n_drives) : (nothing, nothing)
+        H_drift_real_squared = Threads.@spawn sys.H_drift_real^2
+        H_drift_imag_squared = Threads.@spawn sys.H_drift_imag^2
+
+        H_drive_real_anticomms = Threads.@spawn anticomm(sys.H_drives_real, sys.H_drives_real)
+        H_drive_imag_anticomms = Threads.@spawn anticomm(sys.H_drives_imag, sys.H_drives_imag)
+
+        H_drift_real_anticomm_H_drives_real =
+            Threads.@spawn anticomm(sys.H_drift_real, sys.H_drives_real)
+
+        H_drift_real_anticomm_H_drives_imag =
+            Threads.@spawn anticomm(sys.H_drift_real, sys.H_drives_imag)
+
+        H_drift_imag_anticomm_H_drives_real =
+            Threads.@spawn anticomm(sys.H_drift_imag, sys.H_drives_real)
+
+        H_drift_imag_anticomm_H_drives_imag =
+            Threads.@spawn anticomm(sys.H_drift_imag, sys.H_drives_imag)
+
+        H_drives_real_anticomm_H_drives_imag =
+            Threads.@spawn anticomm(sys.H_drives_real, sys.H_drives_imag)
+
+        # if order == 4 && isnothing(G)
+        #     G_drift = nothing
+        #     G_drives = nothing
+        # else
+        #     G_drift = sys.G_drift
+        #     G_drives = sys.G_drives
+        # end
+        G_drift = sys.G_drift
+        G_drives = sys.G_drives
 
         return new{R}(
             I_2N,
@@ -482,8 +510,34 @@ struct QuantumStatePadeIntegrator{R <: Number} <: QuantumPadeIntegrator
 
         H_drift_real_anticomm_H_drift_imag = Threads.@spawn anticomm(sys.H_drift_real, sys.H_drift_imag)
 
-        drive_anticomms, drift_anticomms =
-            order == 4 ? build_anticomms(G_drift, G_drives, n_drives) : (nothing, nothing)
+        H_drift_real_squared = Threads.@spawn sys.H_drift_real^2
+        H_drift_imag_squared = Threads.@spawn sys.H_drift_imag^2
+
+        H_drive_real_anticomms = Threads.@spawn anticomm(sys.H_drives_real, sys.H_drives_real)
+        H_drive_imag_anticomms = Threads.@spawn anticomm(sys.H_drives_imag, sys.H_drives_imag)
+
+        H_drift_real_anticomm_H_drives_real =
+            Threads.@spawn anticomm(sys.H_drift_real, sys.H_drives_real)
+
+        H_drift_real_anticomm_H_drives_imag =
+            Threads.@spawn anticomm(sys.H_drift_real, sys.H_drives_imag)
+
+        H_drift_imag_anticomm_H_drives_real =
+            Threads.@spawn anticomm(sys.H_drift_imag, sys.H_drives_real)
+
+        H_drift_imag_anticomm_H_drives_imag =
+            Threads.@spawn anticomm(sys.H_drift_imag, sys.H_drives_imag)
+
+        H_drives_real_anticomm_H_drives_imag =
+            Threads.@spawn anticomm(sys.H_drives_real, sys.H_drives_imag)
+
+        if order == 4 && isnothing(G)
+            G_drift = nothing
+            G_drives = nothing
+        else
+            G_drift = sys.G_drift
+            G_drives = sys.G_drives
+        end
 
         return new{R}(
             I_2N,
@@ -601,26 +655,6 @@ function ∂aₜ(
         # which handles nonlinear G and higher order Pade integrators
         f(a) = nth_order_pade(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, a, Δtₜ)
         ∂aP = ForwardDiff.jacobian(f, aₜ)
-
-    # otherwise we don't have a nonlinear G or are fine with using
-    # the fourth order derivatives
-
-    elseif P.order == 4
-        n_drives = length(aₜ)
-        ∂aP = Array{T}(undef, P.dim, n_drives)
-        isodim = 2*P.N
-        for j = 1:n_drives
-            Gʲ = P.G_drives[j]
-            Gʲ_anticomm_Gₜ =
-                G(aₜ, P.G_drift_anticomms[j], P.G_drive_anticomms[:, j])
-            for i = 0:P.N-1
-                ψ̃ⁱₜ₊₁ = @view Ũ⃗ₜ₊₁[i * isodim .+ (1:isodim)]
-                ψ̃ⁱₜ = @view Ũ⃗ₜ[i * isodim .+ (1:isodim)]
-                ∂aP[i*isodim .+ (1:isodim), j] =
-                    -Δtₜ / 2 * Gʲ * (ψ̃ⁱₜ₊₁ + ψ̃ⁱₜ) +
-                    Δtₜ^2 / 12 * Gʲ_anticomm_Gₜ * (ψ̃ⁱₜ₊₁ - ψ̃ⁱₜ)
-            end
-        end
     else
         n_drives = length(aₜ)
         ∂aP = zeros(T, P.dim, n_drives)
