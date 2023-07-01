@@ -960,33 +960,32 @@ function ∂Δtₜ(
     aₜ::AbstractVector,
     Δtₜ::Real
 ) where R <: Real
-    # if isnothing(P.G) && P.order==4 
-    #     ∂ΔtₜBR = ∂ΔtₜB_real(P, aₜ, Δtₜ)
-    #     ∂ΔtₜBI = ∂ΔtₜB_imag(P, aₜ, Δtₜ)
-    #     ∂ΔtₜFR = ∂ΔtₜF_real(P, aₜ, Δtₜ)
-    #     ∂ΔtₜFI = ∂ΔtₜF_imag(P, aₜ, Δtₜ)
-    #     ∂ΔtₜP =
-    #         (P.I_2N ⊗ ∂ΔtₜBR + P.Ω_2N ⊗ ∂ΔtₜBI) * Ũ⃗ₜ₊₁ -
-    #         (P.I_2N ⊗ ∂ΔtₜFR - P.Ω_2N ⊗ ∂ΔtₜFI) * Ũ⃗ₜ
-    # otherwise integrator is higher order or has nonlinear G"
-    Gₜ = isnothing(P.G) ? G(aₜ, P.G_drift, P.G_drives) : P.G(aₜ)
-    Ũₜ₊₁ = iso_vec_to_iso_operator(Ũ⃗ₜ₊₁)
-    Ũₜ = iso_vec_to_iso_operator(Ũ⃗ₜ)
-    ∂ΔtₜP_operator = -1/2 * Gₜ * (Ũₜ₊₁ - Ũₜ) + 2/9 * Δtₜ * Gₜ^2 * (Ũₜ₊₁ - Ũₜ)
-    ∂ΔtₜP = iso_operator_to_iso_vec(∂ΔtₜP_operator)
-    display(∂ΔtₜP)
-    # else
-    #     Gₜ = isnothing(P.G) ? G(aₜ, P.G_drift, P.G_drives) : P.G(aₜ)
-    #     Ũₜ₊₁ = iso_vec_to_iso_operator(Ũ⃗ₜ₊₁)
-    #     Ũₜ = iso_vec_to_iso_operator(Ũ⃗ₜ)
-    #     Id = 1.0I(size(Gₜ, 1))
-    #     if P.order == 4
-    #         ∂ΔtₜP_operator = -1/2 * Gₜ * (Ũₜ₊₁ - Ũₜ) + 2/9 * Δtₜ * Gₜ^2 * (Ũₜ₊₁ - Ũₜ)
-    #         ∂ΔtₜP = iso_operator_to_iso_vec(∂ΔtₜP_operator)
-    #     else 
-        
-    #     end
-    # end
+    if isnothing(P.G) && P.order==4 
+        ∂ΔtₜBR = ∂ΔtₜB_real(P, aₜ, Δtₜ)
+        ∂ΔtₜBI = ∂ΔtₜB_imag(P, aₜ, Δtₜ)
+        ∂ΔtₜFR = ∂ΔtₜF_real(P, aₜ, Δtₜ)
+        ∂ΔtₜFI = ∂ΔtₜF_imag(P, aₜ, Δtₜ)
+        ∂ΔtₜP =
+            (P.I_2N ⊗ ∂ΔtₜBR + P.Ω_2N ⊗ ∂ΔtₜBI) * Ũ⃗ₜ₊₁ -
+            (P.I_2N ⊗ ∂ΔtₜFR - P.Ω_2N ⊗ ∂ΔtₜFI) * Ũ⃗ₜ
+    # otherwise integrator is higher order or has nonlinear G
+    else
+        Gₜ = isnothing(P.G) ? G(aₜ, P.G_drift, P.G_drives) : P.G(aₜ)
+        Ũₜ₊₁ = iso_vec_to_iso_operator(Ũ⃗ₜ₊₁)
+        Ũₜ = iso_vec_to_iso_operator(Ũ⃗ₜ)
+        if P.order==4
+            ∂ΔtₜP_operator = -1/2 * Gₜ * (Ũₜ₊₁ + Ũₜ) + 1/6 * Δtₜ * Gₜ^2 * (Ũₜ₊₁ - Ũₜ)
+            ∂ΔtₜP = iso_operator_to_iso_vec(∂ΔtₜP_operator)
+        else 
+            n = P.order ÷ 2
+            Gₜ_powers = [Gₜ^i for i in 1:n]
+            B = sum([(-1)^k * k * PADE_COEFFICIENTS[P.order][k] * Δt^(k-1) * Gₜ_powers[k] for k = 1:n])
+            F = sum([k * PADE_COEFFICIENTS[P.order][k] * Δt^(k-1) * Gₜ_powers[k] for k = 1:n])
+            ∂ΔtₜP_operator = B*Ũₜ₊₁ - F*Ũₜ
+            ∂ΔtₜP = iso_operator_to_iso_vec(∂ΔtₜP_operator)
+        end
+    end
+
     return ∂ΔtₜP
 end
 
@@ -997,13 +996,27 @@ function ∂Δtₜ(
     aₜ::AbstractVector,
     Δtₜ::Real
 ) where R <: Real
-    ∂ΔtₜBR = ∂ΔtₜB_real(P, aₜ, Δtₜ)
-    ∂ΔtₜBI = ∂ΔtₜB_imag(P, aₜ, Δtₜ)
-    ∂ΔtₜFR = ∂ΔtₜF_real(P, aₜ, Δtₜ)
-    ∂ΔtₜFI = ∂ΔtₜF_imag(P, aₜ, Δtₜ)
-    ∂ΔtₜP =
-        (Id2 ⊗ ∂ΔtₜBR + Im2 ⊗ ∂ΔtₜBI) * ψ̃ₜ₊₁ -
-        (Id2 ⊗ ∂ΔtₜFR - Im2 ⊗ ∂ΔtₜFI) * ψ̃ₜ
+    if isnothing(P.G) && P.order==4
+        ∂ΔtₜBR = ∂ΔtₜB_real(P, aₜ, Δtₜ)
+        ∂ΔtₜBI = ∂ΔtₜB_imag(P, aₜ, Δtₜ)
+        ∂ΔtₜFR = ∂ΔtₜF_real(P, aₜ, Δtₜ)
+        ∂ΔtₜFI = ∂ΔtₜF_imag(P, aₜ, Δtₜ)
+        ∂ΔtₜP =
+            (Id2 ⊗ ∂ΔtₜBR + Im2 ⊗ ∂ΔtₜBI) * ψ̃ₜ₊₁ -
+            (Id2 ⊗ ∂ΔtₜFR - Im2 ⊗ ∂ΔtₜFI) * ψ̃ₜ
+    # otherwise integrator is higher order or has nonlinear G
+    else
+        Gₜ = isnothing(P.G) ? G(aₜ, P.G_drift, P.G_drives) : P.G(aₜ)
+        if P.order==4
+            ∂ΔtₜP = -1/2 * Gₜ * (ψ̃ₜ₊₁ + ψ̃ₜ) + 1/6 * Δtₜ * Gₜ^2 * (ψ̃ₜ₊₁ - ψ̃ₜ)
+        else 
+            n = P.order ÷ 2
+            Gₜ_powers = [Gₜ^i for i in 1:n]
+            B = sum([(-1)^k * k * PADE_COEFFICIENTS[P.order][k] * Δt^(k-1) * Gₜ_powers[k] for k = 1:n])
+            F = sum([k * PADE_COEFFICIENTS[P.order][k] * Δt^(k-1) * Gₜ_powers[k] for k = 1:n])
+            ∂ΔtₜP= B*ψ̃ₜ₊₁ - F*ψ̃ₜ
+        end
+    end
     return ∂ΔtₜP
 end
 
