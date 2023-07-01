@@ -661,7 +661,6 @@ function ∂aₜ(
     Δtₜ::Real,
 ) where {R <: Real, T <: Real}
 
-
     if P.autodiff || !isnothing(P.G)
 
         # then we need to use the nth_order_pade function
