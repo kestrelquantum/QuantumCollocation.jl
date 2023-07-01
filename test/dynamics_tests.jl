@@ -1,8 +1,4 @@
-<<<<<<< HEAD
 # Testing dynamics derivatives
-=======
-# Testing dynamics derivatives
->>>>>>> 254bc67 (random derivatie stuff broken)
 
 @testset "Dynamics" begin
     # initializing test system
