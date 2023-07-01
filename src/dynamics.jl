@@ -42,20 +42,20 @@ function QuantumDynamics(
 
     free_time = traj.timestep isa Symbol
 
-    if free_time
-        @assert all([
-            !isnothing(state(integrator)) &&
-            !isnothing(controls(integrator)) &&
-            !isnothing(timestep(integrator))
-                for integrator ∈ integrators
-        ])
-    else
-        @assert all([
-            !isnothing(state(integrator)) &&
-            !isnothing(controls(integrator))
-                for integrator ∈ integrators
-        ])
-    end
+    # if free_time
+    #     @assert all([
+    #         !isnothing(state(integrator)) &&
+    #         !isnothing(controls(integrator)) &&
+    #         !isnothing(timestep(integrator))
+    #             for integrator ∈ integrators
+    #     ])
+    # else
+    #     @assert all([
+    #         !isnothing(state(integrator)) &&
+    #         !isnothing(controls(integrator))
+    #             for integrator ∈ integrators
+    #     ])
+    # end
 
     for integrator ∈ integrators
         if integrator isa QuantumIntegrator && controls(integrator) isa Tuple
@@ -75,7 +75,6 @@ function QuantumDynamics(
     end
 
     dynamics_dim = dim(integrators)
-
     function f(zₜ, zₜ₊₁)
         δ = Vector{eltype(zₜ)}(undef, dynamics_dim)
         for (integrator, integrator_comps) ∈ zip(integrators, dynamics_comps)

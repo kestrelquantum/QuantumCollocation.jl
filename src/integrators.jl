@@ -256,6 +256,7 @@ struct UnitaryPadeIntegrator{R} <: QuantumPadeIntegrator
     dim::Int
     order::Int
     autodiff::Bool
+    G::Union{Function, Nothing}
 
     """
         UnitaryPadeIntegrator(
@@ -298,7 +299,8 @@ struct UnitaryPadeIntegrator{R} <: QuantumPadeIntegrator
         unitary_symb::Union{Symbol,Nothing}=nothing,
         drive_symb::Union{Symbol,Tuple{Vararg{Symbol}},Nothing}=nothing,
         order::Int=4,
-        autodiff::Bool=false
+        autodiff::Bool=false,
+        G::Union{Function, Nothing}=nothing,
     ) where R <: Real
         @assert order ∈ [4, 6, 8, 10] "order must be in [4, 6, 8, 10]"
         @assert !isnothing(unitary_symb) "must specify unitary symbol"
@@ -334,13 +336,15 @@ struct UnitaryPadeIntegrator{R} <: QuantumPadeIntegrator
         H_drives_real_anticomm_H_drives_imag =
             Threads.@spawn anticomm(sys.H_drives_real, sys.H_drives_imag)
 
-        if order == 4
-            G_drift = nothing
-            G_drives = nothing
-        else
-            G_drift = sys.G_drift
-            G_drives = sys.G_drives
-        end
+        # if order == 4 && isnothing(G)
+        #     G_drift = nothing
+        #     G_drives = nothing
+        # else
+        #     G_drift = sys.G_drift
+        #     G_drives = sys.G_drives
+        # end
+        G_drift = sys.G_drift
+        G_drives = sys.G_drives
 
         return new{R}(
             fetch(I_2N),
@@ -367,7 +371,8 @@ struct UnitaryPadeIntegrator{R} <: QuantumPadeIntegrator
             N,
             dim,
             order,
-            autodiff
+            autodiff, 
+            G,
         )
     end
 end
@@ -469,7 +474,7 @@ struct QuantumStatePadeIntegrator{R} <: QuantumPadeIntegrator
         H_drives_real_anticomm_H_drives_imag =
             Threads.@spawn anticomm(sys.H_drives_real, sys.H_drives_imag)
 
-        if order == 4
+        if order == 4 && isnothing(G)
             G_drift = nothing
             G_drives = nothing
         else
@@ -817,16 +822,23 @@ function ∂aₜ(
     Δtₜ::Real,
     drive_indices=1:P.n_drives
 ) where {R <: Real, T <: Real}
-    n_drives = length(aₜ)
-    ∂aP = zeros(T, P.dim, n_drives)
-    for j = 1:n_drives
-        ∂aʲBR = ∂aₜʲB_real(P, aₜ, Δtₜ, drive_indices[j])
-        ∂aʲBI = ∂aₜʲB_imag(P, aₜ, Δtₜ, drive_indices[j])
-        ∂aʲFR = ∂aₜʲF_real(P, aₜ, Δtₜ, drive_indices[j])
-        ∂aʲFI = ∂aₜʲF_imag(P, aₜ, Δtₜ, drive_indices[j])
-        ∂aP[:, j] =
-            (P.I_2N ⊗ ∂aʲBR + P.Ω_2N ⊗ ∂aʲBI) * Ũ⃗ₜ₊₁ -
-            (P.I_2N ⊗ ∂aʲFR - P.Ω_2N ⊗ ∂aʲFI) * Ũ⃗ₜ
+    
+    if P.autodiff || !isnothing(P.G)
+        f(a) = P.order == 4 ? fourth_order_pade(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, a, Δtₜ) :
+                              nth_order_pade(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, a, Δtₜ)
+        ∂aP = ForwardDiff.jacobian(f, aₜ)
+    else
+        n_drives = length(aₜ)
+        ∂aP = zeros(T, P.dim, n_drives)
+        for j = 1:n_drives
+            ∂aʲBR = ∂aₜʲB_real(P, aₜ, Δtₜ, drive_indices[j])
+            ∂aʲBI = ∂aₜʲB_imag(P, aₜ, Δtₜ, drive_indices[j])
+            ∂aʲFR = ∂aₜʲF_real(P, aₜ, Δtₜ, drive_indices[j])
+            ∂aʲFI = ∂aₜʲF_imag(P, aₜ, Δtₜ, drive_indices[j])
+            ∂aP[:, j] =
+                (P.I_2N ⊗ ∂aʲBR + P.Ω_2N ⊗ ∂aʲBI) * Ũ⃗ₜ₊₁ -
+                (P.I_2N ⊗ ∂aʲFR - P.Ω_2N ⊗ ∂aʲFI) * Ũ⃗ₜ
+        end
     end
     return ∂aP
 end
@@ -839,16 +851,22 @@ function ∂aₜ(
     Δtₜ::Real,
     drive_indices=1:P.n_drives
 ) where {R <: Real, T <: Real}
-    n_drives = length(aₜ)
-    ∂aP = zeros(T, P.dim, n_drives)
-    for j = 1:n_drives
-        ∂aʲBR = ∂aₜʲB_real(P, aₜ, Δtₜ, drive_indices[j])
-        ∂aʲBI = ∂aₜʲB_imag(P, aₜ, Δtₜ, drive_indices[j])
-        ∂aʲFR = ∂aₜʲF_real(P, aₜ, Δtₜ, drive_indices[j])
-        ∂aʲFI = ∂aₜʲF_imag(P, aₜ, Δtₜ, drive_indices[j])
-        ∂aP[:, j] =
-            (Id2 ⊗ ∂aʲBR + Im2 ⊗ ∂aʲBI) * ψ̃ₜ₊₁ -
-            (Id2 ⊗ ∂aʲFR - Im2 ⊗ ∂aʲFI) * ψ̃ₜ
+    if P.autodiff || isnothing(P.G)
+        f(a) = P.order == 4 ? fourth_order_pade(P, ψ̃ₜ₊₁, ψ̃ₜ, a, Δtₜ) :
+                              nth_order_pade(P, ψ̃ₜ₊₁, ψ̃ₜ, a, Δtₜ)
+        ∂aP = ForwardDiff.jacobian(f, aₜ)
+    else
+        n_drives = length(aₜ)
+        ∂aP = zeros(T, P.dim, n_drives)
+        for j = 1:n_drives
+            ∂aʲBR = ∂aₜʲB_real(P, aₜ, Δtₜ, drive_indices[j])
+            ∂aʲBI = ∂aₜʲB_imag(P, aₜ, Δtₜ, drive_indices[j])
+            ∂aʲFR = ∂aₜʲF_real(P, aₜ, Δtₜ, drive_indices[j])
+            ∂aʲFI = ∂aₜʲF_imag(P, aₜ, Δtₜ, drive_indices[j])
+            ∂aP[:, j] =
+                (Id2 ⊗ ∂aʲBR + Im2 ⊗ ∂aʲBI) * ψ̃ₜ₊₁ -
+                (Id2 ⊗ ∂aʲFR - Im2 ⊗ ∂aʲFI) * ψ̃ₜ
+        end
     end
     return ∂aP
 end
@@ -942,13 +960,33 @@ function ∂Δtₜ(
     aₜ::AbstractVector,
     Δtₜ::Real
 ) where R <: Real
-    ∂ΔtₜBR = ∂ΔtₜB_real(P, aₜ, Δtₜ)
-    ∂ΔtₜBI = ∂ΔtₜB_imag(P, aₜ, Δtₜ)
-    ∂ΔtₜFR = ∂ΔtₜF_real(P, aₜ, Δtₜ)
-    ∂ΔtₜFI = ∂ΔtₜF_imag(P, aₜ, Δtₜ)
-    ∂ΔtₜP =
-        (P.I_2N ⊗ ∂ΔtₜBR + P.Ω_2N ⊗ ∂ΔtₜBI) * Ũ⃗ₜ₊₁ -
-        (P.I_2N ⊗ ∂ΔtₜFR - P.Ω_2N ⊗ ∂ΔtₜFI) * Ũ⃗ₜ
+    # if isnothing(P.G) && P.order==4 
+    #     ∂ΔtₜBR = ∂ΔtₜB_real(P, aₜ, Δtₜ)
+    #     ∂ΔtₜBI = ∂ΔtₜB_imag(P, aₜ, Δtₜ)
+    #     ∂ΔtₜFR = ∂ΔtₜF_real(P, aₜ, Δtₜ)
+    #     ∂ΔtₜFI = ∂ΔtₜF_imag(P, aₜ, Δtₜ)
+    #     ∂ΔtₜP =
+    #         (P.I_2N ⊗ ∂ΔtₜBR + P.Ω_2N ⊗ ∂ΔtₜBI) * Ũ⃗ₜ₊₁ -
+    #         (P.I_2N ⊗ ∂ΔtₜFR - P.Ω_2N ⊗ ∂ΔtₜFI) * Ũ⃗ₜ
+    # otherwise integrator is higher order or has nonlinear G"
+    Gₜ = isnothing(P.G) ? G(aₜ, P.G_drift, P.G_drives) : P.G(aₜ)
+    Ũₜ₊₁ = iso_vec_to_iso_operator(Ũ⃗ₜ₊₁)
+    Ũₜ = iso_vec_to_iso_operator(Ũ⃗ₜ)
+    ∂ΔtₜP_operator = -1/2 * Gₜ * (Ũₜ₊₁ - Ũₜ) + 2/9 * Δtₜ * Gₜ^2 * (Ũₜ₊₁ - Ũₜ)
+    ∂ΔtₜP = iso_operator_to_iso_vec(∂ΔtₜP_operator)
+    display(∂ΔtₜP)
+    # else
+    #     Gₜ = isnothing(P.G) ? G(aₜ, P.G_drift, P.G_drives) : P.G(aₜ)
+    #     Ũₜ₊₁ = iso_vec_to_iso_operator(Ũ⃗ₜ₊₁)
+    #     Ũₜ = iso_vec_to_iso_operator(Ũ⃗ₜ)
+    #     Id = 1.0I(size(Gₜ, 1))
+    #     if P.order == 4
+    #         ∂ΔtₜP_operator = -1/2 * Gₜ * (Ũₜ₊₁ - Ũₜ) + 2/9 * Δtₜ * Gₜ^2 * (Ũₜ₊₁ - Ũₜ)
+    #         ∂ΔtₜP = iso_operator_to_iso_vec(∂ΔtₜP_operator)
+    #     else 
+        
+    #     end
+    # end
     return ∂ΔtₜP
 end
 
