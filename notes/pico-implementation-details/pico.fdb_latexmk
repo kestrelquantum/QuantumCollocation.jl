@@ -17,6 +17,7 @@
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 =======
 >>>>>>> 44713e4 (fix derivative logic)
@@ -56,9 +57,13 @@
 =======
 >>>>>>> 47b9df9 (fix derivative logic)
 =======
+>>>>>>> 4f9f9ab (fix derivative logic)
+=======
 >>>>>>> 44713e4 (fix derivative logic)
 =======
 >>>>>>> cbc4fc0 (fix derivative logic)
+=======
+>>>>>>> 0377057 (fix derivative logic)
 ["pdflatex"] 1688260156 "/home/aditya/oc_projects/QuantumCollocation.jl/notes/pico-implementation-details/pico.tex" "pico.pdf" "pico" 1688260156
   "/etc/texmf/web2c/texmf.cnf" 1661381987 475 c0e671620eb5563b2130f56340a5fde8 ""
   "/home/aditya/oc_projects/QuantumCollocation.jl/notes/pico-implementation-details/pico.tex" 1688260155 41515 fb5dc28a2b4c07cbe909fc022334310d ""
@@ -67,7 +72,12 @@
 =======
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 >>>>>>> 139e1a2 (fix derivative logic)
+=======
+=======
+>>>>>>> a319800 (fix derivative logic)
+>>>>>>> 4f9f9ab (fix derivative logic)
 ["pdflatex"] 1688260156 "/home/aditya/oc_projects/QuantumCollocation.jl/notes/pico-implementation-details/pico.tex" "pico.pdf" "pico" 1688260156
   "/etc/texmf/web2c/texmf.cnf" 1661381987 475 c0e671620eb5563b2130f56340a5fde8 ""
   "/home/aditya/oc_projects/QuantumCollocation.jl/notes/pico-implementation-details/pico.tex" 1688260155 41515 fb5dc28a2b4c07cbe909fc022334310d ""
@@ -146,6 +156,7 @@
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 >>>>>>> 611c9c7 (fix derivative logic)
 =======
 >>>>>>> 7941f66 (fix derivative logic)
@@ -165,6 +176,8 @@
 >>>>>>> 17e2a66 (fix derivative logic)
 =======
 >>>>>>> 139e1a2 (fix derivative logic)
+=======
+>>>>>>> 4f9f9ab (fix derivative logic)
 =======
 ["pdflatex"] 1688260156 "/home/aditya/oc_projects/QuantumCollocation.jl/notes/pico-implementation-details/pico.tex" "pico.pdf" "pico" 1688260156
   "/etc/texmf/web2c/texmf.cnf" 1661381987 475 c0e671620eb5563b2130f56340a5fde8 ""
@@ -218,6 +231,8 @@
 >>>>>>> df856a5 (fix derivative logic)
 =======
 =======
+=======
+>>>>>>> 0377057 (fix derivative logic)
 >>>>>>> 611c9c7 (fix derivative logic)
 <<<<<<< HEAD
 >>>>>>> 44713e4 (fix derivative logic)
@@ -263,6 +278,7 @@
   "/home/aditya/oc_projects/QuantumCollocation.jl/notes/pico-implementation-details/pico.tex" 1688260155 41515 fb5dc28a2b4c07cbe909fc022334310d ""
 >>>>>>> 58d603b (fix derivative logic)
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 >>>>>>> 7191e18 (fix derivative logic)
 =======
@@ -276,6 +292,13 @@
 =======
 >>>>>>> cbc4fc0 (fix derivative logic)
 >>>>>>> 47b9df9 (fix derivative logic)
+=======
+>>>>>>> cbc4fc0 (fix derivative logic)
+=======
+=======
+>>>>>>> a319800 (fix derivative logic)
+>>>>>>> 0377057 (fix derivative logic)
+>>>>>>> 4f9f9ab (fix derivative logic)
   "/usr/share/texlive/texmf-dist/fonts/map/fontname/texfonts.map" 1577235249 3524 cb3e574dea2d1052e39280babc910dc8 ""
   "/usr/share/texlive/texmf-dist/fonts/tfm/public/amsfonts/cmextra/cmbsy5.tfm" 1246382020 1120 1e8878807317373affa7f7bba4cf2f6a ""
   "/usr/share/texlive/texmf-dist/fonts/tfm/public/amsfonts/cmextra/cmbsy7.tfm" 1246382020 1120 7f9f170e8aa57527ad6c49feafd45d54 ""
@@ -481,6 +504,7 @@
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 <<<<<<< HEAD
 <<<<<<< HEAD
@@ -498,6 +522,8 @@
 >>>>>>> 16a3dea (fix derivative logic)
 =======
 >>>>>>> 47b9df9 (fix derivative logic)
+=======
+>>>>>>> 4f9f9ab (fix derivative logic)
 =======
 >>>>>>> 5f1d1e7 (fix derivative logic)
 <<<<<<< HEAD
@@ -571,6 +597,8 @@
 =======
 >>>>>>> cbc4fc0 (fix derivative logic)
 =======
+>>>>>>> 0377057 (fix derivative logic)
+=======
 <<<<<<< HEAD
 <<<<<<< HEAD
 >>>>>>> 611c9c7 (fix derivative logic)
@@ -595,8 +623,16 @@
 =======
 =======
 >>>>>>> 58d603b (fix derivative logic)
+<<<<<<< HEAD
 >>>>>>> cbc4fc0 (fix derivative logic)
+<<<<<<< HEAD
 >>>>>>> 47b9df9 (fix derivative logic)
+=======
+=======
+=======
+>>>>>>> a319800 (fix derivative logic)
+>>>>>>> 0377057 (fix derivative logic)
+>>>>>>> 4f9f9ab (fix derivative logic)
   "pico.aux" 1688260156 2890 fe292c2c830c3fd789711dd39da86405 "pdflatex"
   "pico.out" 1688260156 2682 60b213b9fa15f63d21d0b695d75a95e9 "pdflatex"
   "pico.tex" 1688260155 41515 fb5dc28a2b4c07cbe909fc022334310d ""
@@ -673,6 +709,7 @@
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 >>>>>>> 611c9c7 (fix derivative logic)
 =======
 >>>>>>> 58d603b (fix derivative logic)
@@ -713,8 +750,12 @@
 >>>>>>> df856a5 (fix derivative logic)
 =======
 =======
+>>>>>>> 4f9f9ab (fix derivative logic)
+=======
 >>>>>>> 5f1d1e7 (fix derivative logic)
 =======
+=======
+>>>>>>> 0377057 (fix derivative logic)
 >>>>>>> 611c9c7 (fix derivative logic)
 <<<<<<< HEAD
 >>>>>>> 44713e4 (fix derivative logic)
@@ -776,8 +817,16 @@
 =======
 =======
 >>>>>>> 58d603b (fix derivative logic)
+<<<<<<< HEAD
 >>>>>>> cbc4fc0 (fix derivative logic)
+<<<<<<< HEAD
 >>>>>>> 47b9df9 (fix derivative logic)
+=======
+=======
+=======
+>>>>>>> a319800 (fix derivative logic)
+>>>>>>> 0377057 (fix derivative logic)
+>>>>>>> 4f9f9ab (fix derivative logic)
   (generated)
   "pico.aux"
   "pico.log"
