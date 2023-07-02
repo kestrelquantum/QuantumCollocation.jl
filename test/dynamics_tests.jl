@@ -81,7 +81,7 @@
             dynamics = QuantumDynamics(f, Z)
 
             # test dynamics jacobian
-            shape = ((Z.dims.states - 1) * (Z.T - 1), Z.dim * Z.T)
+            shape = (Z.dims.states * (Z.T - 1), Z.dim * Z.T)
 
             J_dynamics = dense(dynamics.∂F(Z.datavec), dynamics.∂F_structure, shape)
             # display(Z.data)

@@ -27,7 +27,7 @@
 
 
 \title{QuantumCollocation.jl Implementation Notes}
-\author{Aaron Trowbridge}
+\author{Aaron Trowbridge and Aditya Bhardwaj}
 \date{}
 
 \setcounter{section}{-1}
@@ -187,8 +187,8 @@ We define (and implement) just the $m \in \{2, 4\}$ order Pad\'e integrators $\v
 
 \begin{align*}
   \vb{P}^{(2)}(\isopsi^i_{t+1}, \isopsi^i_t, \vb{a}_t) &= \left(I - \frac{\Delta t}{2} G(\vb{a}_t) \right) \isopsi^i_{t+1} -  \left(I + \frac{\Delta t}{2} G(\vb{a}_t) \right) \isopsi^i_{t}\\   
-  \vb{P}^{(4)}(\isopsi^i_{t+1}, \isopsi^i_t, \vb{a}_t) &= \left(I - \frac{\Delta t}{2} G(\vb{a}_t) + \frac{(\Delta t)^2}{9} G(\vb{a}_t)^2\right) \isopsi^i_{t+1} \\ 
-  &- \left(I + \frac{\Delta t}{2} G(\vb{a}_t) + \frac{(\Delta t)^2}{9} G(\vb{a}_t)^2\right) \isopsi^i_t 
+  \vb{P}^{(4)}(\isopsi^i_{t+1}, \isopsi^i_t, \vb{a}_t) &= \left(I - \frac{\Delta t}{2} G(\vb{a}_t) + \frac{(\Delta t)^2}{12} G(\vb{a}_t)^2\right) \isopsi^i_{t+1} \\ 
+  &- \left(I + \frac{\Delta t}{2} G(\vb{a}_t) + \frac{(\Delta t)^2}{12} G(\vb{a}_t)^2\right) \isopsi^i_t 
 \end{align*}
 
 Where again 
@@ -337,8 +337,8 @@ For the $\isopsi^i$ components, we have, for $m = 2$,
 and, for $m = 4$,
 
 \begin{align}
-  \pdv{\vb{P}_t^{(4),i}}{\isopsi^i_t} &= -\qty(I + \frac{\Delta t}{2}G(\vb{a}_t) + \frac{(\Delta t)^2}{9} G(\vb{a}_t)^2) \\
-  \pdv{\vb{P}_t^{(4),i}}{\isopsi^i_{t+1}} &= I - \frac{\Delta t}{2}G(\vb{a}_t) + \frac{(\Delta t)^2}{9} G(\vb{a}_t)^2.
+  \pdv{\vb{P}_t^{(4),i}}{\isopsi^i_t} &= -\qty(I + \frac{\Delta t}{2}G(\vb{a}_t) + \frac{(\Delta t)^2}{12} G(\vb{a}_t)^2) \\
+  \pdv{\vb{P}_t^{(4),i}}{\isopsi^i_{t+1}} &= I - \frac{\Delta t}{2}G(\vb{a}_t) + \frac{(\Delta t)^2}{12} G(\vb{a}_t)^2.
 \end{align}
 
 
@@ -353,7 +353,7 @@ and, for $m = 4$,
 
 \begin{equation}
   \pdv{\vb{P}_t^{(4),i}}{a^j_t} 
-    = \frac{-\Delta t}{2} G^j_{\text{drive}} \qty(\isopsi^i_{t+1} + \isopsi^i_{t}) + \frac{\qty(\Delta t)^2}{9} \qty{G^j_{\text{drive}}, G(\vb{a}_t)}\qty(\isopsi^i_{t+1} - \isopsi^i_{t})
+    = \frac{-\Delta t}{2} G^j_{\text{drive}} \qty(\isopsi^i_{t+1} + \isopsi^i_{t}) + \frac{\qty(\Delta t)^2}{12} \qty{G^j_{\text{drive}}, G(\vb{a}_t)}\qty(\isopsi^i_{t+1} - \isopsi^i_{t})
 \end{equation}
 
 where $\qty{A, B} = AB + BA$ is the anticommutator. 
@@ -425,7 +425,7 @@ we have
 with
 
 \begin{equation}
-  \pdv{\vb{P}_t^{(4), i}}{a_t^k}{a_t^j} = \frac{\qty(\Delta t)^2}{9}\qty{G^j_{\text{drive}}, G^k_{\text{drive}}} \qty(\isopsi^i_{t+1} - \isopsi^i_t)
+  \pdv{\vb{P}_t^{(4), i}}{a_t^k}{a_t^j} = \frac{\qty(\Delta t)^2}{12}\qty{G^j_{\text{drive}}, G^k_{\text{drive}}} \qty(\isopsi^i_{t+1} - \isopsi^i_t)
 \end{equation}
 
 \hfill
@@ -449,8 +449,8 @@ For the mixed partials we have:
 and 
 
 \begin{align}
-  \pdv{\vb{P}_t^{(4), i}}{\isopsi_t^i}{a^j_t} &= -\frac{\Delta t}{2} G^j_{\text{drive}} - \frac{\qty(\Delta t)^2}{9}\bigg( \qty{G^j_{\text{drive}}, G_{\text{drift}}} + \vb{a}_t \vdot \qty{G^j_{\text{drive}}, \vb{G}_{\text{drive}}} \bigg)\\
-  \pdv{\vb{P}_t^{(4), i}}{\isopsi_{t+1}^i}{a^j_t} &= -\frac{\Delta t}{2} G^j_{\text{drive}} + \frac{\qty(\Delta t)^2}{9}\bigg( \qty{G^j_{\text{drive}}, G_{\text{drift}}} + \vb{a}_t \vdot \qty{G^j_{\text{drive}}, \vb{G}_{\text{drive}}} \bigg)
+  \pdv{\vb{P}_t^{(4), i}}{\isopsi_t^i}{a^j_t} &= -\frac{\Delta t}{2} G^j_{\text{drive}} - \frac{\qty(\Delta t)^2}{12}\bigg( \qty{G^j_{\text{drive}}, G_{\text{drift}}} + \vb{a}_t \vdot \qty{G^j_{\text{drive}}, \vb{G}_{\text{drive}}} \bigg)\\
+  \pdv{\vb{P}_t^{(4), i}}{\isopsi_{t+1}^i}{a^j_t} &= -\frac{\Delta t}{2} G^j_{\text{drive}} + \frac{\qty(\Delta t)^2}{12}\bigg( \qty{G^j_{\text{drive}}, G_{\text{drift}}} + \vb{a}_t \vdot \qty{G^j_{\text{drive}}, \vb{G}_{\text{drive}}} \bigg)
 \end{align}
 
 \section{Minimum Time Problem}
@@ -582,9 +582,9 @@ and
 
 \begin{align}
   \pdv{\vb{P}^{(4),i}_t}{\Delta t_t} 
-  &= \qty( -\frac{1}{2} G(\vb{a}_t) + \frac{2 \Delta t_t}{9} G(\vb{a}_t)^2) \isopsi^i_{t+1}
-  - \qty(\frac{1}{2} G(\vb{a}_t) + \frac{2\Delta t_t}{9} G(\vb{a}_t)^2) \isopsi^i_t \nonumber\\
-  &= -\frac{1}{2} G(\vb{a}_t) \qty(\isopsi^i_{t+1} + \isopsi^i_t) + \frac{2\Delta t_t}{9} G(\vb{a}_t)^2 \qty(\isopsi^i_{t+1} - \isopsi^i_t) \\
+  &= \qty( -\frac{1}{2} G(\vb{a}_t) + \frac{2 \Delta t_t}{12} G(\vb{a}_t)^2) \isopsi^i_{t+1}
+  - \qty(\frac{1}{2} G(\vb{a}_t) + \frac{2\Delta t_t}{12} G(\vb{a}_t)^2) \isopsi^i_t \nonumber\\
+  &= -\frac{1}{2} G(\vb{a}_t) \qty(\isopsi^i_{t+1} + \isopsi^i_t) + \frac{2\Delta t_t}{12} G(\vb{a}_t)^2 \qty(\isopsi^i_{t+1} - \isopsi^i_t) \\
   \pdv{\vb{P}^{(2),i}_t}{\Delta t_t} 
   &=  -\frac{1}{2} G(\vb{a}_t) \qty(\isopsi^i_{t+1} + \isopsi^i_t)
 \end{align}
@@ -688,7 +688,7 @@ with
 
 \begin{align}
   \pdv[2]{\vb{P}^{(4),i}_t}{\Delta t_t} 
-  &= \frac{2}{9} G(\vb{a}_t)^2 \qty(\isopsi^i_{t+1} - \isopsi^i_t) \\
+  &= \frac{2}{12} G(\vb{a}_t)^2 \qty(\isopsi^i_{t+1} - \isopsi^i_t) \\
   \pdv[2]{\vb{P}^{(2),i}_t}{\Delta t_t} 
   &= \vb{0} 
 \end{align}
@@ -745,9 +745,9 @@ with
 
 \begin{align}
   \pdv{\vb{P}^{(4),i}_t}{\Delta t_t}{\isopsi^i_t}
-  &= -\qty(\frac{1}{2} G(\vb{a}_t) + \frac{2 \Delta t_t}{9} G(\vb{a}_t)^2) \\ 
+  &= -\qty(\frac{1}{2} G(\vb{a}_t) + \frac{2 \Delta t_t}{12} G(\vb{a}_t)^2) \\ 
   \pdv{\vb{P}^{(4),i}_t}{\Delta t_t}{\isopsi^i_{t+1}}
-  &= -\frac{1}{2} G(\vb{a}_t) + \frac{2 \Delta t_t}{9} G(\vb{a}_t)^2 
+  &= -\frac{1}{2} G(\vb{a}_t) + \frac{2 \Delta t_t}{12} G(\vb{a}_t)^2 
 \end{align}
 
 and 
@@ -764,7 +764,7 @@ and for the $j$th column of $\pdv{\vb{P}^{(n),i}_t}{\Delta t_t}{\vb{a}_t}$ we ha
 \begin{equation}
   \pdv{\vb{P}_t^{(4),i}}{\Delta t_t}{a^j_t} 
     = -\frac{1}{2} G^j_{\text{drive}} \qty(\isopsi^i_{t+1} + \isopsi^i_{t}) 
-    + \frac{2 \Delta t_t}{9} \qty{G^j_{\text{drive}}, G(\vb{a}_t)}\qty(\isopsi^i_{t+1} - \isopsi^i_{t})
+    + \frac{2 \Delta t_t}{12} \qty{G^j_{\text{drive}}, G(\vb{a}_t)}\qty(\isopsi^i_{t+1} - \isopsi^i_{t})
 \end{equation}
 
 and
@@ -800,16 +800,16 @@ Here
 along with
 
 \begin{align*}
-  \BR(\vb{a}_t, h_t) &= I - \frac{h_t}{2} \HI(\vb{a}_t) + \frac{h_t^2}{9}\qty(\qty(\HI(\vb{a}_t))^2 - \qty(\HR(\vb{a}_t))^2) \\
-  \BI(\vb{a}_t, h_t) &= \frac{h_t}{2} \HR(\vb{a}_t) - \frac{h_t^2}{9}\qty{\HR(\vb{a}_t),\HI(\vb{a}_t)},
+  \BR(\vb{a}_t, h_t) &= I - \frac{h_t}{2} \HI(\vb{a}_t) + \frac{h_t^2}{12}\qty(\qty(\HI(\vb{a}_t))^2 - \qty(\HR(\vb{a}_t))^2) \\
+  \BI(\vb{a}_t, h_t) &= \frac{h_t}{2} \HR(\vb{a}_t) - \frac{h_t^2}{12}\qty{\HR(\vb{a}_t),\HI(\vb{a}_t)},
 \end{align*}
 
 \noindent
 and
 
 \begin{align*}
-  \FR(\vb{a}_t, h_t) &= I + \frac{h_t}{2} \HI(\vb{a}_t) + \frac{h_t^2}{9}\qty(\qty(\HI(\vb{a}_t))^2 - \qty(\HR(\vb{a}_t))^2) \\
-  \FI(\vb{a}_t, h_t) &= \frac{h_t}{2} \HR(\vb{a}_t) + \frac{h_t^2}{9}\qty{\HR(\vb{a}_t),\HI(\vb{a}_t)}.
+  \FR(\vb{a}_t, h_t) &= I + \frac{h_t}{2} \HI(\vb{a}_t) + \frac{h_t^2}{12}\qty(\qty(\HI(\vb{a}_t))^2 - \qty(\HR(\vb{a}_t))^2) \\
+  \FI(\vb{a}_t, h_t) &= \frac{h_t}{2} \HR(\vb{a}_t) + \frac{h_t^2}{12}\qty{\HR(\vb{a}_t),\HI(\vb{a}_t)}.
 \end{align*}
 
 
@@ -916,7 +916,7 @@ We can then conclude that
 
 \newpage
 \subsubsection*{Isomorphic Pad\'e Dynamics}
-Our motivation here is to compute the unitary Pad\'e dynamics on the isomorphic vector representation of the unitary, $\isovecU = \isovec(\isoU) = \hat P \ \text{vec}(\isoU) = \hat P \ \text{vec}(\text{iso}(U))$. We can write these dynamics As
+Our motivation here is to compute the unitary Pad\'e dynamics on the isomorphic vector representation of the unitary, $\isovecU = \isovec(\isoU) = \hat P \ \text{vec}(\isoU) = \hat P \ \text{vec}(\text{iso}(U))$. We can write these dynamics as
 
 \begin{align*}
   f(z_t, z_{t+1}) &= f(\isovecU_t, \vb{a}_t, h_t, \isovecU_{t+1}, \vb{a}_{t+1}, h_{t+1}) \\
@@ -984,19 +984,19 @@ For the drives we have
 where, writing $\partial_{a^j_t} H = H_j$, we have 
 
 \begin{align*}
-  \pdv{\BR}{a^j_t} &= -\frac{h_t}{2} \HI_j + \frac{h_t^2}{9} \qty(\qty{\HI,\HI_j} - \qty{\HR, \HR_j}) \\
-  &= -\frac{h_t}{2} \HI_j + \frac{h_t^2}{9} \qty(\qty{\HI_0, \HI_j} - \qty{\HR_0, \HR_j} + \sum_{i=0}^d a^i_t \qty(\qty{\HI_i, \HI_j} - \qty{\HR_i, \HR_j})) \\
-  \pdv{\BI}{a^j_t} &= \frac{h_t}{2} \HR_j - \frac{h_t^2}{9} \qty(\qty{\HR,\HI_j} + \qty{\HI,\HR_j}) \\
-  &= \frac{h_t}{2} \HR_j - \frac{h_t^2}{9} \qty(\qty{\HR_0,\HI_j} + \qty{\HI_0,\HR_j} + \sum_i a^i_t \qty(\qty{\HR_i,\HI_j} + \qty{\HI_i,\HR_j})) \\
+  \pdv{\BR}{a^j_t} &= -\frac{h_t}{2} \HI_j + \frac{h_t^2}{12} \qty(\qty{\HI,\HI_j} - \qty{\HR, \HR_j}) \\
+  &= -\frac{h_t}{2} \HI_j + \frac{h_t^2}{12} \qty(\qty{\HI_0, \HI_j} - \qty{\HR_0, \HR_j} + \sum_{i=0}^d a^i_t \qty(\qty{\HI_i, \HI_j} - \qty{\HR_i, \HR_j})) \\
+  \pdv{\BI}{a^j_t} &= \frac{h_t}{2} \HR_j - \frac{h_t^2}{12} \qty(\qty{\HR,\HI_j} + \qty{\HI,\HR_j}) \\
+  &= \frac{h_t}{2} \HR_j - \frac{h_t^2}{12} \qty(\qty{\HR_0,\HI_j} + \qty{\HI_0,\HR_j} + \sum_i a^i_t \qty(\qty{\HR_i,\HI_j} + \qty{\HI_i,\HR_j})) \\
 \end{align*}
 
 and 
 
 \begin{align*}
-  \pdv{\FR}{a^j_t} &= \frac{h_t}{2} \HI_j + \frac{h_t^2}{9} \qty(\qty{\HI,\HI_j} - \qty{\HR, \HR_j}) \\
-  &= \frac{h_t}{2} \HI_j + \frac{h_t^2}{9} \qty(\qty{\HI_0, \HI_j} - \qty{\HR_0, \HR_j} + \sum_i a^i_t \qty(\qty{\HI_i, \HI_j} - \qty{\HR_i, \HR_j})) \\
-  \pdv{\FI}{a^j_t} &= \frac{h_t}{2} \HR_j + \frac{h_t^2}{9} \qty(\qty{\HR,\HI_j} + \qty{\HI,\HR_j})\\
-  &= \frac{h_t}{2} \HR_j + \frac{h_t^2}{9} \qty(\qty{\HR_0,\HI_j} + \qty{\HI_0,\HR_j} + \sum_i a^i_t \qty(\qty{\HR_i,\HI_j} + \qty{\HI_i,\HR_j})) \\
+  \pdv{\FR}{a^j_t} &= \frac{h_t}{2} \HI_j + \frac{h_t^2}{12} \qty(\qty{\HI,\HI_j} - \qty{\HR, \HR_j}) \\
+  &= \frac{h_t}{2} \HI_j + \frac{h_t^2}{12} \qty(\qty{\HI_0, \HI_j} - \qty{\HR_0, \HR_j} + \sum_i a^i_t \qty(\qty{\HI_i, \HI_j} - \qty{\HR_i, \HR_j})) \\
+  \pdv{\FI}{a^j_t} &= \frac{h_t}{2} \HR_j + \frac{h_t^2}{12} \qty(\qty{\HR,\HI_j} + \qty{\HI,\HR_j})\\
+  &= \frac{h_t}{2} \HR_j + \frac{h_t^2}{12} \qty(\qty{\HR_0,\HI_j} + \qty{\HI_0,\HR_j} + \sum_i a^i_t \qty(\qty{\HR_i,\HI_j} + \qty{\HI_i,\HR_j})) \\
 \end{align*}
 
 For the timestep $h_t$ we have
@@ -1017,15 +1017,15 @@ For the timestep $h_t$ we have
 where 
 
 \begin{align*} 
-  \pdv{\BR}{h_t} &= -\frac{1}{2} \HI + \frac{2h_t}{9} \qty(\qty(\HI)^2 - \qty(\HR)^2) \\
-  \pdv{\BI}{h_t} &= \frac{1}{2} \HR - \frac{2h_t}{9} \qty{\HR,\HI}
+  \pdv{\BR}{h_t} &= -\frac{1}{2} \HI + \frac{2h_t}{12} \qty(\qty(\HI)^2 - \qty(\HR)^2) \\
+  \pdv{\BI}{h_t} &= \frac{1}{2} \HR - \frac{2h_t}{12} \qty{\HR,\HI}
 \end{align*}
 
 and
 
 \begin{align*}
-  \pdv{\FR}{h_t} &= \frac{1}{2} \HI + \frac{2h_t}{9} \qty(\qty(\HI)^2 - \qty(\HR)^2) \\
-  \pdv{\FI}{h_t} &= \frac{1}{2} \HR + \frac{2h_t}{9} \qty{\HR,\HI}.
+  \pdv{\FR}{h_t} &= \frac{1}{2} \HI + \frac{2h_t}{12} \qty(\qty(\HI)^2 - \qty(\HR)^2) \\
+  \pdv{\FI}{h_t} &= \frac{1}{2} \HR + \frac{2h_t}{12} \qty{\HR,\HI}.
 \end{align*}
 
 So we then have, with $z_t = \mqty(\isovecU_t & \vb{a}_t & h_t)^\top$
@@ -1101,15 +1101,15 @@ So we then have, with $z_t = \mqty(\isovecU_t & \vb{a}_t & h_t)^\top$
 \end{align*}
 
 \begin{align*}
-  \pdv{\BR}{a^i_t}{a^j_t} &= \frac{h_t^2}{9}\qty(\qty{\HI_i, \HI_j} - \qty{\HR_i, \HR_j})\\
-  \pdv{\BI}{a^i_t}{a^j_t} &= -\frac{h_t^2}{9}\qty(\qty{\HR_i, \HI_j} + \qty{\HI_i, \HR_j})\\
+  \pdv{\BR}{a^i_t}{a^j_t} &= \frac{h_t^2}{12}\qty(\qty{\HI_i, \HI_j} - \qty{\HR_i, \HR_j})\\
+  \pdv{\BI}{a^i_t}{a^j_t} &= -\frac{h_t^2}{12}\qty(\qty{\HR_i, \HI_j} + \qty{\HI_i, \HR_j})\\
 \end{align*}
 
 and
 
 \begin{align*}
-  \pdv{\FR}{a^i_t}{a^j_t} &= \frac{h_t^2}{9}\qty(\qty{\HI_i, \HI_j} - \qty{\HR_i, \HR_j})\\
-  \pdv{\FI}{a^i_t}{a^j_t} &= \frac{h_t^2}{9}\qty(\qty{\HR_i, \HI_j} + \qty{\HI_i, \HR_j})\\
+  \pdv{\FR}{a^i_t}{a^j_t} &= \frac{h_t^2}{12}\qty(\qty{\HI_i, \HI_j} - \qty{\HR_i, \HR_j})\\
+  \pdv{\FI}{a^i_t}{a^j_t} &= \frac{h_t^2}{12}\qty(\qty{\HR_i, \HI_j} + \qty{\HI_i, \HR_j})\\
 \end{align*}
 
 \begin{align*}
@@ -1134,15 +1134,15 @@ and
 \end{align*}
 
 \begin{align*}
-  \pdv{\BR}{h_t}{a^j_t} &= -\frac{1}{2}\HI_j + \frac{2h_t}{9}\qty(\qty{\HI, \HI_j} - \qty{\HR, \HR_j})\\
-  \pdv{\BI}{h_t}{a^j_t} &= \frac{1}{2}\HR_j - \frac{2h_t}{9}\qty(\qty{\HR, \HI_j} + \qty{\HI, \HR_j})\\
+  \pdv{\BR}{h_t}{a^j_t} &= -\frac{1}{2}\HI_j + \frac{2h_t}{12}\qty(\qty{\HI, \HI_j} - \qty{\HR, \HR_j})\\
+  \pdv{\BI}{h_t}{a^j_t} &= \frac{1}{2}\HR_j - \frac{2h_t}{12}\qty(\qty{\HR, \HI_j} + \qty{\HI, \HR_j})\\
 \end{align*}
 
 and
 
 \begin{align*}
-  \pdv{\FR}{h_t}{a^j_t} &= \frac{1}{2}\HI_j + \frac{2h_t}{9}\qty(\qty{\HI, \HI_j} - \qty{\HR, \HR_j})\\
-  \pdv{\FI}{h_t}{a^j_t} &= \frac{1}{2}\HR_j + \frac{2h_t}{9}\qty(\qty{\HR, \HI_j} + \qty{\HI, \HR_j})\\
+  \pdv{\FR}{h_t}{a^j_t} &= \frac{1}{2}\HI_j + \frac{2h_t}{12}\qty(\qty{\HI, \HI_j} - \qty{\HR, \HR_j})\\
+  \pdv{\FI}{h_t}{a^j_t} &= \frac{1}{2}\HR_j + \frac{2h_t}{12}\qty(\qty{\HR, \HI_j} + \qty{\HI, \HR_j})\\
 \end{align*}
 
 \begin{align*}
@@ -1155,15 +1155,15 @@ and
 where
 
 \begin{align*}
-  \pdv[2]{\BR}{h_t} &= \frac{2}{9}\qty(\qty(\HI)^2 - \qty(\HR)^2)\\
-  \pdv[2]{\BI}{h_t} &= -\frac{2}{9}\qty{\HR, \HI}\\
+  \pdv[2]{\BR}{h_t} &= \frac{2}{12}\qty(\qty(\HI)^2 - \qty(\HR)^2)\\
+  \pdv[2]{\BI}{h_t} &= -\frac{2}{12}\qty{\HR, \HI}\\
 \end{align*}
 
 and 
 
 \begin{align*}
-  \pdv[2]{\FR}{h_t} &= \frac{2}{9}\qty(\qty(\HI)^2 - \qty(\HR)^2)\\
-  \pdv[2]{\FI}{h_t} &= \frac{2}{9}\qty{\HR, \HI}\\
+  \pdv[2]{\FR}{h_t} &= \frac{2}{12}\qty(\qty(\HI)^2 - \qty(\HR)^2)\\
+  \pdv[2]{\FI}{h_t} &= \frac{2}{12}\qty{\HR, \HI}\\
 \end{align*}
 
 
