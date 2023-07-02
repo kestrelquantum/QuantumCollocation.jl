@@ -824,12 +824,16 @@ function ∂aₜ(
 ) where {R <: Real, T <: Real}
     
     if P.autodiff || !isnothing(P.G)
+
         # then we need to use the nth_order_pade function 
         # which handles nonlinear G and higher order Pade integrators
+
         f(a) = nth_order_pade(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, a, Δtₜ)
         ∂aP = ForwardDiff.jacobian(f, aₜ)
+
     # otherwise we don't have a nonlinear G or are fine with using 
     # the fourth order derivatives
+
     else
         n_drives = length(aₜ)
         ∂aP = zeros(T, P.dim, n_drives)
@@ -855,12 +859,16 @@ function ∂aₜ(
     drive_indices=1:P.n_drives
 ) where {R <: Real, T <: Real}
     if P.autodiff || !isnothing(P.G)
+
         # then we need to use the nth_order_pade function 
         # which handles nonlinear G and higher order Pade integrators
+
         f(a) = nth_order_pade(P, ψ̃ₜ₊₁, ψ̃ₜ, a, Δtₜ)
         ∂aP = ForwardDiff.jacobian(f, aₜ)
+
     # otherwise we don't have a nonlinear G or are fine with using 
     # the fourth order derivatives
+
     else
         n_drives = length(aₜ)
         ∂aP = zeros(T, P.dim, n_drives)
@@ -1050,7 +1058,8 @@ end
         aₜs = Tuple(zₜ[traj.components[s]] for s ∈ P.drive_symb)
         ∂aₜPs = []
         let H_drive_mark = 0
-            for aₜᵢ ∈ aₜs                n_aᵢ_drives = length(aₜᵢ)
+            for aₜᵢ ∈ aₜs                
+                n_aᵢ_drives = length(aₜᵢ)
                 drive_indices = (H_drive_mark + 1):(H_drive_mark + n_aᵢ_drives)
                 ∂aₜᵢP = ∂aₜ(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, aₜᵢ, Δtₜ, drive_indices)
                 push!(∂aₜPs, ∂aₜᵢP)
@@ -1087,8 +1096,28 @@ end
     else
         ∂Ũ⃗ₜP = spzeros(P.dim, P.dim)
         ∂Ũ⃗ₜ₊₁P = spzeros(P.dim, P.dim)
-        
+        Gₜ = isnothing(P.G) ? G(aₜ, P.G_drift, P.G_drives) : P.G(aₜ, P.G_drift, P.G_drives)
+        n = P.order ÷ 2
+        Gₜ_powers = [Gₜ^k for k = 1:n]
+        B = P.I_2N + sum([(-1)^k * PADE_COEFFICIENTS[P.order][k] * Δt^k * Gₜ_powers[k] for k = 1:n])
+        F = P.I_2N + sum([PADE_COEFFICIENTS[P.order][k] * Δt^k * Gₜ_powers[k] for k = 1:n])
+        N = P.N
+        H_Re_F = @view F[1:N, 1:N]
+        H_Im_F = @view F[(N+1):end, 1:N]
+        H_Re_B = @view B[1:N, 1:N]
+        H_Im_B = @view B[(N+1):end, 1:N]
+        for i = 1:N
+            ∂Ũ⃗ₜP[(i-1)*N .+ (1:N), (i-1)*N .+ (1:N)] .= H_Re_F
+            ∂Ũ⃗ₜP[(i-1)*N .+ (1:N), (N^2 + (i-1)*N) .+ (1:N)] .= -H_Im_F            
+            ∂Ũ⃗ₜP[(N^2 + (i-1)*N) .+ (1:N), (i-1)*N .+ (1:N)] .= H_Im_F
+            ∂Ũ⃗ₜP[(N^2 + (i-1)*N) .+ (1:N), (N^2 + (i-1)*N) .+ (1:N)] .= H_Re_F
 
+            ∂Ũ⃗ₜ₊₁P[(i-1)*N .+ (1:N), (i-1)*N .+ (1:N)] .= H_Re_B
+            ∂Ũ⃗ₜ₊₁P[(i-1)*N .+ (1:N), (N^2 + (i-1)*N) .+ (1:N)] .= -H_Im_B
+            ∂Ũ⃗ₜ₊₁P[(N^2 + (i-1)*N) .+ (1:N), (i-1)*N .+ (1:N)] .= H_Im_B
+            ∂Ũ⃗ₜ₊₁P[(N^2 + (i-1)*N) .+ (1:N), (N^2 + (i-1)*N) .+ (1:N)] .= H_Re_B
+        end
+        ∂Ũ⃗ₜP = -∂Ũ⃗ₜP
     if free_time
         return ∂Ũ⃗ₜP, ∂Ũ⃗ₜ₊₁P, ∂aₜP, ∂ΔtₜP
     else
