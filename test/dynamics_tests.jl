@@ -81,9 +81,8 @@
             dynamics = QuantumDynamics(f, Z)
 
             # test dynamics jacobian
-            shape = ((Z.dims.states - 1) * (Z.T - 1), Z.dim * Z.T)
-            #TODO: Z.datavec is not quite right because it includes the timestep so ForwardDiff.jacobian
-            #      gives the wrong result. Need to fix this.
+            shape = (Z.dims.states * (Z.T - 1), Z.dim * Z.T)
+
             J_dynamics = dense(dynamics.∂F(Z.datavec), dynamics.∂F_structure, shape)
             # display(Z.data)
             # println(Z.dim)
