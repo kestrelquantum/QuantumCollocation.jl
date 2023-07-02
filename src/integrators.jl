@@ -1098,10 +1098,13 @@ end
         ∂Ũ⃗ₜ₊₁P = spzeros(P.dim, P.dim)
         Gₜ = isnothing(P.G) ? G(aₜ, P.G_drift, P.G_drives) : P.G(aₜ, P.G_drift, P.G_drives)
         n = P.order ÷ 2
+
+        # can memoize this chunk of code
         Gₜ_powers = [Gₜ^k for k = 1:n]
         B = P.I_2N + sum([(-1)^k * PADE_COEFFICIENTS[P.order][k] * Δt^k * Gₜ_powers[k] for k = 1:n])
         F = P.I_2N + sum([PADE_COEFFICIENTS[P.order][k] * Δt^k * Gₜ_powers[k] for k = 1:n])
         N = P.N
+        
         H_Re_F = @view F[1:N, 1:N]
         H_Im_F = @view F[(N+1):end, 1:N]
         H_Re_B = @view B[1:N, 1:N]
