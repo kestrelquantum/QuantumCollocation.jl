@@ -19,6 +19,7 @@
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 >>>>>>> 0edbc5b (fix derivative logic)
 =======
@@ -31,6 +32,8 @@
 >>>>>>> 13c8448 (fix derivative logic)
 =======
 >>>>>>> 9e5a812 (fix derivative logic)
+=======
+>>>>>>> 16688d6 (fix derivative logic)
 This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (preloaded format=pdflatex 2022.8.24)  1 JUL 2023 21:09
 =======
 <<<<<<< HEAD
@@ -106,6 +109,8 @@ This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (prel
 >>>>>>> 799fd5f (fix derivative logic)
 =======
 >>>>>>> 3cd286e (fix derivative logic)
+=======
+>>>>>>> ddd4cb5 (fix derivative logic)
 This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (preloaded format=pdflatex 2022.8.24)  1 JUL 2023 21:09
 =======
 <<<<<<< HEAD
@@ -273,7 +278,9 @@ This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (prel
 >>>>>>> 611c9c7 (fix derivative logic)
 >>>>>>> 44713e4 (fix derivative logic)
 >>>>>>> 3257bc1 (fix derivative logic)
+<<<<<<< HEAD
 >>>>>>> 3cd286e (fix derivative logic)
+<<<<<<< HEAD
 >>>>>>> 16a3dea (fix derivative logic)
 =======
 This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (preloaded format=pdflatex 2022.8.24)  1 JUL 2023 21:09
@@ -328,6 +335,13 @@ This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (prel
 >>>>>>> 3257bc1 (fix derivative logic)
 >>>>>>> 3cd286e (fix derivative logic)
 >>>>>>> 9e5a812 (fix derivative logic)
+=======
+=======
+=======
+This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (preloaded format=pdflatex 2022.8.24)  1 JUL 2023 21:09
+>>>>>>> 58d603b (fix derivative logic)
+>>>>>>> ddd4cb5 (fix derivative logic)
+>>>>>>> 16688d6 (fix derivative logic)
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
@@ -942,6 +956,7 @@ Output written on pico.pdf (23 pages, 311996 bytes).
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 =======
 =======
@@ -956,6 +971,8 @@ Output written on pico.pdf (23 pages, 311996 bytes).
 >>>>>>> 47b9df9 (fix derivative logic)
 =======
 >>>>>>> 9e5a812 (fix derivative logic)
+=======
+>>>>>>> 16688d6 (fix derivative logic)
 =======
 <<<<<<< HEAD
 =======
@@ -1237,7 +1254,9 @@ Output written on pico.pdf (23 pages, 311996 bytes).
 >>>>>>> 611c9c7 (fix derivative logic)
 >>>>>>> 44713e4 (fix derivative logic)
 >>>>>>> 3257bc1 (fix derivative logic)
+<<<<<<< HEAD
 >>>>>>> 3cd286e (fix derivative logic)
+<<<<<<< HEAD
 >>>>>>> 16a3dea (fix derivative logic)
 =======
 >>>>>>> 58d603b (fix derivative logic)
@@ -1295,6 +1314,12 @@ Output written on pico.pdf (23 pages, 311996 bytes).
 >>>>>>> 3257bc1 (fix derivative logic)
 >>>>>>> 3cd286e (fix derivative logic)
 >>>>>>> 9e5a812 (fix derivative logic)
+=======
+=======
+=======
+>>>>>>> 58d603b (fix derivative logic)
+>>>>>>> ddd4cb5 (fix derivative logic)
+>>>>>>> 16688d6 (fix derivative logic)
 PDF statistics:
  400 PDF objects out of 1000 (max. 8388607)
  324 compressed objects within 4 object streams
