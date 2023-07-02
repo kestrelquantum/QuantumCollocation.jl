@@ -569,7 +569,11 @@ end
     else
         aₜ = zₜ[traj.components[P.drive_symb]]
     end
-    return nth_order_pade(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, aₜ, Δtₜ)
+    if P.order == 4 && isnothing(P.G)
+        return fourth_order_pade(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, aₜ, Δtₜ)
+    else
+        return nth_order_pade(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, aₜ, Δtₜ)
+    end
 end
 
 
@@ -690,9 +694,12 @@ function ∂aₜ(
 ) where {R <: Real, T <: Real}
 
     if P.autodiff || !isnothing(P.G)
-        f(a) = P.order == 4 ? fourth_order_pade(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, a, Δtₜ) :
-                              nth_order_pade(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, a, Δtₜ)
+        # then we need to use the nth_order_pade function
+        # which handles nonlinear G and higher order Pade integrators
+        f(a) = nth_order_pade(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, a, Δtₜ)
         ∂aP = ForwardDiff.jacobian(f, aₜ)
+    # otherwise we don't have a nonlinear G or are fine with using
+    # the fourth order derivatives
     else
         n_drives = length(aₜ)
         ∂aP = zeros(T, P.dim, n_drives)
@@ -811,8 +818,25 @@ end
     Δtₜ = free_time ? zₜ[traj.components[traj.timestep]][1] : traj.timestep
 
     if P.drive_symb isa Tuple
-        inds = [traj.components[s] for s in P.drive_symb]
-        inds = vcat(collect.(inds)...)
+        aₜs = Tuple(zₜ[traj.components[s]] for s ∈ P.drive_symb)
+        ∂aₜPs = []
+        let H_drive_mark = 0
+            for aₜᵢ ∈ aₜs                n_aᵢ_drives = length(aₜᵢ)
+                drive_indices = (H_drive_mark + 1):(H_drive_mark + n_aᵢ_drives)
+                ∂aₜᵢP = ∂aₜ(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, aₜᵢ, Δtₜ, drive_indices)
+                push!(∂aₜPs, ∂aₜᵢP)
+                H_drive_mark += n_aᵢ_drives
+            end
+        end
+        ∂aₜP = tuple(∂aₜPs...)
+        if free_time
+            ∂ΔtₜP = ∂Δtₜ(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, vcat(aₜs...), Δtₜ)
+        end
+        ∂ΔtₜP = ∂Δtₜ(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, vcat(aₜs...), Δtₜ)
+        BR = B_real(P, vcat(aₜs...), Δtₜ)
+        BI = B_imag(P, vcat(aₜs...), Δtₜ)
+        FR = F_real(P, vcat(aₜs...), Δtₜ)
+        FI = F_imag(P, vcat(aₜs...), Δtₜ)
     else
         inds = traj.components[P.drive_symb]
     end
@@ -820,28 +844,13 @@ end
         F̂ = P.I_2N ⊗ FR - P.Ω_2N ⊗ FI
         B̂ = P.I_2N ⊗ BR + P.Ω_2N ⊗ BI
 
-    for i = 1:length(inds) - 1
-        @assert inds[i] + 1 == inds[i + 1] "Controls must be in order"
-    end
+        ∂Ũ⃗ₜP = -F̂
+        ∂Ũ⃗ₜ₊₁P = B̂
+        display(∂Ũ⃗ₜP)
+    else
+        ∂Ũ⃗ₜP = spzeros(P.dim, P.dim)
+        ∂Ũ⃗ₜ₊₁P = spzeros(P.dim, P.dim)
 
-    aₜ = zₜ[inds]
-    ∂aₜP = ∂aₜ(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, aₜ, Δtₜ)
-    if free_time
-        ∂ΔtₜP = ∂Δtₜ(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, aₜ, Δtₜ)
-    end
-
-    ∂Ũ⃗ₜP = spzeros(T, P.dim, P.dim)
-    ∂Ũ⃗ₜ₊₁P = spzeros(T, P.dim, P.dim)
-    Gₜ = isnothing(P.G) ? G(aₜ, P.G_drift, P.G_drives) : P.G(aₜ, P.G_drift, P.G_drives)
-    n = P.order ÷ 2
-
-    # can memoize this chunk of code, prly memoize G powers
-    Gₜ_powers = compute_powers(Gₜ, n)
-    B = P.I_2N + sum([(-1)^k * PADE_COEFFICIENTS[P.order][k] * Δtₜ^k * Gₜ_powers[k] for k = 1:n])
-    F = P.I_2N + sum([PADE_COEFFICIENTS[P.order][k] * Δtₜ^k * Gₜ_powers[k] for k = 1:n])
-
-    ∂Ũ⃗ₜ₊₁P = blockdiag(fill(sparse(B), P.N)...)
-    ∂Ũ⃗ₜP = blockdiag(fill(sparse(-F), P.N)...)
 
     if free_time
         return ∂Ũ⃗ₜP, ∂Ũ⃗ₜ₊₁P, ∂aₜP, ∂ΔtₜP
