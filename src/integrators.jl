@@ -657,7 +657,7 @@ function nth_order_pade(
 ) where R <: Real
     Ũₜ₊₁ = iso_vec_to_iso_operator(Ũ⃗ₜ₊₁)
     Ũₜ = iso_vec_to_iso_operator(Ũ⃗ₜ)
-    Gₜ = G(aₜ, P.G_drift, P.G_drives)
+    Gₜ = isnothing(P.G) ? G(aₜ, P.G_drift, P.G_drives) : P.G(aₜ, P.G_drift, P.G_drives)
     n = P.order ÷ 2
     Gₜ_powers = [Gₜ^k for k = 1:n]
     B = P.I_2N + sum([(-1)^k * PADE_COEFFICIENTS[P.order][k] * Δt^k * Gₜ_powers[k] for k = 1:n])
@@ -683,7 +683,7 @@ end
     else
         aₜ = zₜ[traj.components[P.drive_symb]]
     end
-    if P.order == 4
+    if P.order == 4 && isnothing(P.G)
         return fourth_order_pade(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, aₜ, Δtₜ)
     else
         return nth_order_pade(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, aₜ, Δtₜ)
@@ -714,7 +714,7 @@ function nth_order_pade(
     aₜ::AbstractVector,
     Δt::Real
 ) where R <: Real
-    Gₜ = G(aₜ, P.G_drift, P.G_drives)
+    Gₜ = isnothing(P.G) ? G(aₜ, P.G_drift, P.G_drives) : P.G(aₜ, P.G_drift, P.G_drives)
     n = P.order ÷ 2
     Gₜ_powers = [Gₜ^k for k = 1:n]
     Id = 1.0I(2P.N)
@@ -742,7 +742,7 @@ end
     else
         Δtₜ = traj.timestep
     end
-    if P.order == 4
+    if P.order == 4 && isnothing(P.G)
         return fourth_order_pade(P, ψ̃ₜ₊₁, ψ̃ₜ, aₜ, Δtₜ)
     else
         return nth_order_pade(P, ψ̃ₜ₊₁, ψ̃ₜ, aₜ, Δtₜ)
@@ -824,9 +824,12 @@ function ∂aₜ(
 ) where {R <: Real, T <: Real}
     
     if P.autodiff || !isnothing(P.G)
-        f(a) = P.order == 4 ? fourth_order_pade(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, a, Δtₜ) :
-                              nth_order_pade(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, a, Δtₜ)
+        # then we need to use the nth_order_pade function 
+        # which handles nonlinear G and higher order Pade integrators
+        f(a) = nth_order_pade(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, a, Δtₜ)
         ∂aP = ForwardDiff.jacobian(f, aₜ)
+    # otherwise we don't have a nonlinear G or are fine with using 
+    # the fourth order derivatives
     else
         n_drives = length(aₜ)
         ∂aP = zeros(T, P.dim, n_drives)
@@ -851,10 +854,13 @@ function ∂aₜ(
     Δtₜ::Real,
     drive_indices=1:P.n_drives
 ) where {R <: Real, T <: Real}
-    if P.autodiff || isnothing(P.G)
-        f(a) = P.order == 4 ? fourth_order_pade(P, ψ̃ₜ₊₁, ψ̃ₜ, a, Δtₜ) :
-                              nth_order_pade(P, ψ̃ₜ₊₁, ψ̃ₜ, a, Δtₜ)
+    if P.autodiff || !isnothing(P.G)
+        # then we need to use the nth_order_pade function 
+        # which handles nonlinear G and higher order Pade integrators
+        f(a) = nth_order_pade(P, ψ̃ₜ₊₁, ψ̃ₜ, a, Δtₜ)
         ∂aP = ForwardDiff.jacobian(f, aₜ)
+    # otherwise we don't have a nonlinear G or are fine with using 
+    # the fourth order derivatives
     else
         n_drives = length(aₜ)
         ∂aP = zeros(T, P.dim, n_drives)
@@ -968,7 +974,9 @@ function ∂Δtₜ(
         ∂ΔtₜP =
             (P.I_2N ⊗ ∂ΔtₜBR + P.Ω_2N ⊗ ∂ΔtₜBI) * Ũ⃗ₜ₊₁ -
             (P.I_2N ⊗ ∂ΔtₜFR - P.Ω_2N ⊗ ∂ΔtₜFI) * Ũ⃗ₜ
+
     # otherwise integrator is higher order or has nonlinear G
+
     else
         Gₜ = isnothing(P.G) ? G(aₜ, P.G_drift, P.G_drives) : P.G(aₜ)
         Ũₜ₊₁ = iso_vec_to_iso_operator(Ũ⃗ₜ₊₁)
@@ -1014,11 +1022,12 @@ function ∂Δtₜ(
             Gₜ_powers = [Gₜ^i for i in 1:n]
             B = sum([(-1)^k * k * PADE_COEFFICIENTS[P.order][k] * Δt^(k-1) * Gₜ_powers[k] for k = 1:n])
             F = sum([k * PADE_COEFFICIENTS[P.order][k] * Δt^(k-1) * Gₜ_powers[k] for k = 1:n])
-            ∂ΔtₜP= B*ψ̃ₜ₊₁ - F*ψ̃ₜ
+            ∂ΔtₜP = B*ψ̃ₜ₊₁ - F*ψ̃ₜ
         end
     end
     return ∂ΔtₜP
 end
+
 
 @views function jacobian(
     P::UnitaryPadeIntegrator,
@@ -1041,8 +1050,7 @@ end
         aₜs = Tuple(zₜ[traj.components[s]] for s ∈ P.drive_symb)
         ∂aₜPs = []
         let H_drive_mark = 0
-            for aₜᵢ ∈ aₜs
-                n_aᵢ_drives = length(aₜᵢ)
+            for aₜᵢ ∈ aₜs                n_aᵢ_drives = length(aₜᵢ)
                 drive_indices = (H_drive_mark + 1):(H_drive_mark + n_aᵢ_drives)
                 ∂aₜᵢP = ∂aₜ(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, aₜᵢ, Δtₜ, drive_indices)
                 push!(∂aₜPs, ∂aₜᵢP)
@@ -1069,12 +1077,17 @@ end
         FR = F_real(P, aₜ, Δtₜ)
         FI = F_imag(P, aₜ, Δtₜ)
     end
+    if P.order==4 && isnothing(P.G)
+        F̂ = P.I_2N ⊗ FR - P.Ω_2N ⊗ FI
+        B̂ = P.I_2N ⊗ BR + P.Ω_2N ⊗ BI
 
-    F̂ = P.I_2N ⊗ FR - P.Ω_2N ⊗ FI
-    B̂ = P.I_2N ⊗ BR + P.Ω_2N ⊗ BI
-
-    ∂Ũ⃗ₜP = -F̂
-    ∂Ũ⃗ₜ₊₁P = B̂
+        ∂Ũ⃗ₜP = -F̂
+        ∂Ũ⃗ₜ₊₁P = B̂
+        display(∂Ũ⃗ₜP)
+    else
+        ∂Ũ⃗ₜP = spzeros(P.dim, P.dim)
+        ∂Ũ⃗ₜ₊₁P = spzeros(P.dim, P.dim)
+        
 
     if free_time
         return ∂Ũ⃗ₜP, ∂Ũ⃗ₜ₊₁P, ∂aₜP, ∂ΔtₜP
