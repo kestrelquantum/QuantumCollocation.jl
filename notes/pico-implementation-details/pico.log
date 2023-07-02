@@ -18,6 +18,7 @@
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 >>>>>>> 0edbc5b (fix derivative logic)
 =======
@@ -28,6 +29,8 @@
 >>>>>>> 4f9f9ab (fix derivative logic)
 =======
 >>>>>>> 13c8448 (fix derivative logic)
+=======
+>>>>>>> 9e5a812 (fix derivative logic)
 This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (preloaded format=pdflatex 2022.8.24)  1 JUL 2023 21:09
 =======
 <<<<<<< HEAD
@@ -101,6 +104,8 @@ This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (prel
 >>>>>>> 0377057 (fix derivative logic)
 =======
 >>>>>>> 799fd5f (fix derivative logic)
+=======
+>>>>>>> 3cd286e (fix derivative logic)
 This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (preloaded format=pdflatex 2022.8.24)  1 JUL 2023 21:09
 =======
 <<<<<<< HEAD
@@ -115,6 +120,7 @@ This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (prel
 =======
 =======
 >>>>>>> 7941f66 (fix derivative logic)
+<<<<<<< HEAD
 >>>>>>> 13c8448 (fix derivative logic)
 This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (preloaded format=pdflatex 2022.8.24)  1 JUL 2023 21:09
 =======
@@ -123,6 +129,22 @@ This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (prel
 This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (preloaded format=pdflatex 2022.8.24)  1 JUL 2023 21:09
 =======
 >>>>>>> 139e1a2 (fix derivative logic)
+=======
+=======
+>>>>>>> 3257bc1 (fix derivative logic)
+This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (preloaded format=pdflatex 2022.8.24)  1 JUL 2023 21:09
+=======
+<<<<<<< HEAD
+=======
+=======
+This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (preloaded format=pdflatex 2022.8.24)  1 JUL 2023 21:09
+=======
+<<<<<<< HEAD
+<<<<<<< HEAD
+This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (preloaded format=pdflatex 2022.8.24)  1 JUL 2023 21:09
+=======
+>>>>>>> 3cd286e (fix derivative logic)
+>>>>>>> 9e5a812 (fix derivative logic)
 >>>>>>> 44713e4 (fix derivative logic)
 This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (preloaded format=pdflatex 2022.8.24)  24 JUL 2023 16:58
 >>>>>>> origin
@@ -143,6 +165,7 @@ This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (prel
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 >>>>>>> 611c9c7 (fix derivative logic)
 =======
 This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (preloaded format=pdflatex 2022.8.24)  1 JUL 2023 21:09
@@ -192,6 +215,8 @@ This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (prel
 =======
 >>>>>>> 13c8448 (fix derivative logic)
 =======
+>>>>>>> 9e5a812 (fix derivative logic)
+=======
 This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (preloaded format=pdflatex 2022.8.24)  1 JUL 2023 21:09
 >>>>>>> 5f1d1e7 (fix derivative logic)
 =======
@@ -199,6 +224,8 @@ This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (prel
 >>>>>>> 0377057 (fix derivative logic)
 =======
 >>>>>>> 799fd5f (fix derivative logic)
+=======
+>>>>>>> 3cd286e (fix derivative logic)
 >>>>>>> 611c9c7 (fix derivative logic)
 <<<<<<< HEAD
 >>>>>>> 44713e4 (fix derivative logic)
@@ -285,8 +312,22 @@ This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (prel
 This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (preloaded format=pdflatex 2022.8.24)  1 JUL 2023 21:09
 >>>>>>> 5f1d1e7 (fix derivative logic)
 >>>>>>> 7941f66 (fix derivative logic)
+<<<<<<< HEAD
 >>>>>>> 799fd5f (fix derivative logic)
+<<<<<<< HEAD
 >>>>>>> 13c8448 (fix derivative logic)
+=======
+=======
+=======
+=======
+This is pdfTeX, Version 3.141592653-2.6-1.40.22 (TeX Live 2022/dev/Debian) (preloaded format=pdflatex 2022.8.24)  1 JUL 2023 21:09
+>>>>>>> 5f1d1e7 (fix derivative logic)
+=======
+>>>>>>> 611c9c7 (fix derivative logic)
+>>>>>>> 44713e4 (fix derivative logic)
+>>>>>>> 3257bc1 (fix derivative logic)
+>>>>>>> 3cd286e (fix derivative logic)
+>>>>>>> 9e5a812 (fix derivative logic)
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
@@ -900,6 +941,7 @@ Output written on pico.pdf (23 pages, 311996 bytes).
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 =======
 =======
@@ -913,6 +955,8 @@ Output written on pico.pdf (23 pages, 311996 bytes).
 =======
 >>>>>>> 47b9df9 (fix derivative logic)
 =======
+>>>>>>> 9e5a812 (fix derivative logic)
+=======
 <<<<<<< HEAD
 =======
 >>>>>>> 44713e4 (fix derivative logic)
@@ -930,10 +974,17 @@ Output written on pico.pdf (23 pages, 311996 bytes).
 =======
 >>>>>>> 139e1a2 (fix derivative logic)
 =======
+=======
+<<<<<<< HEAD
+=======
+>>>>>>> 44713e4 (fix derivative logic)
+>>>>>>> 3257bc1 (fix derivative logic)
+=======
  21227 strings out of 480171
  399894 string characters out of 5894489
  692120 words of memory out of 5000000
  38705 multiletter control sequences out of 15000+600000
+<<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
@@ -955,6 +1006,10 @@ Output written on pico.pdf (23 pages, 311996 bytes).
 =======
 >>>>>>> 13c8448 (fix derivative logic)
 =======
+=======
+>>>>>>> 3cd286e (fix derivative logic)
+>>>>>>> 9e5a812 (fix derivative logic)
+=======
 >>>>>>> 5f1d1e7 (fix derivative logic)
  481811 words of font info for 77 fonts, out of 8000000 for 9000
  59 hyphenation exceptions out of 8191
@@ -963,6 +1018,7 @@ Output written on pico.pdf (23 pages, 311996 bytes).
 <<<<<<< HEAD
 <<<<<<< HEAD
 =======
+<<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
@@ -991,6 +1047,8 @@ Output written on pico.pdf (23 pages, 311996 bytes).
 =======
 >>>>>>> 13c8448 (fix derivative logic)
 =======
+>>>>>>> 9e5a812 (fix derivative logic)
+=======
 =======
 >>>>>>> 5f1d1e7 (fix derivative logic)
 >>>>>>> 799fd5f (fix derivative logic)
@@ -1009,6 +1067,7 @@ Output written on pico.pdf (23 pages, 311996 bytes).
 =======
 <<<<<<< HEAD
 >>>>>>> 799fd5f (fix derivative logic)
+<<<<<<< HEAD
 <<<<<<< HEAD
 >>>>>>> 11fd526 (fix derivative logic)
 =======
@@ -1048,6 +1107,16 @@ Output written on pico.pdf (23 pages, 311996 bytes).
 <<<<<<< HEAD
 >>>>>>> 799fd5f (fix derivative logic)
 >>>>>>> 13c8448 (fix derivative logic)
+=======
+=======
+ 481811 words of font info for 77 fonts, out of 8000000 for 9000
+ 59 hyphenation exceptions out of 8191
+ 100i,21n,104p,610b,629s stack positions out of 5000i,500n,10000p,200000b,80000s
+</usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmbsy10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx12.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx7.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmex10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cmextra/cmex7.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi5.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi7.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmib10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr12.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr17.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr5.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr7.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmss10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmss8.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy5.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy7.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmti10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/symbols/msbm10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/rsfs/rsfs10.pfb>
+<<<<<<< HEAD
+>>>>>>> 44713e4 (fix derivative logic)
+>>>>>>> 3cd286e (fix derivative logic)
+>>>>>>> 9e5a812 (fix derivative logic)
 Output written on pico.pdf (24 pages, 314713 bytes).
 >>>>>>> origin
 =======
@@ -1067,6 +1136,7 @@ Output written on pico.pdf (24 pages, 315825 bytes).
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 >>>>>>> 611c9c7 (fix derivative logic)
 =======
 >>>>>>> 58d603b (fix derivative logic)
@@ -1114,6 +1184,8 @@ Output written on pico.pdf (23 pages, 311996 bytes).
 =======
 >>>>>>> 13c8448 (fix derivative logic)
 =======
+>>>>>>> 9e5a812 (fix derivative logic)
+=======
 Output written on pico.pdf (23 pages, 311996 bytes).
 >>>>>>> 5f1d1e7 (fix derivative logic)
 =======
@@ -1121,6 +1193,8 @@ Output written on pico.pdf (23 pages, 311996 bytes).
 >>>>>>> 0377057 (fix derivative logic)
 =======
 >>>>>>> 799fd5f (fix derivative logic)
+=======
+>>>>>>> 3cd286e (fix derivative logic)
 >>>>>>> 611c9c7 (fix derivative logic)
 <<<<<<< HEAD
 >>>>>>> 44713e4 (fix derivative logic)
@@ -1205,8 +1279,22 @@ Output written on pico.pdf (23 pages, 311996 bytes).
 Output written on pico.pdf (23 pages, 311996 bytes).
 >>>>>>> 5f1d1e7 (fix derivative logic)
 >>>>>>> 7941f66 (fix derivative logic)
+<<<<<<< HEAD
 >>>>>>> 799fd5f (fix derivative logic)
+<<<<<<< HEAD
 >>>>>>> 13c8448 (fix derivative logic)
+=======
+=======
+=======
+=======
+Output written on pico.pdf (23 pages, 311996 bytes).
+>>>>>>> 5f1d1e7 (fix derivative logic)
+=======
+>>>>>>> 611c9c7 (fix derivative logic)
+>>>>>>> 44713e4 (fix derivative logic)
+>>>>>>> 3257bc1 (fix derivative logic)
+>>>>>>> 3cd286e (fix derivative logic)
+>>>>>>> 9e5a812 (fix derivative logic)
 PDF statistics:
  400 PDF objects out of 1000 (max. 8388607)
  324 compressed objects within 4 object streams
