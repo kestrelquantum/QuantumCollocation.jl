@@ -738,6 +738,9 @@ end
     else
         inds = traj.components[P.drive_symb]
     end
+    if P.order==4 && isnothing(P.G)
+        F̂ = P.I_2N ⊗ FR - P.Ω_2N ⊗ FI
+        B̂ = P.I_2N ⊗ BR + P.Ω_2N ⊗ BI
 
     for i = 1:length(inds) - 1
         @assert inds[i] + 1 == inds[i + 1] "Controls must be in order"
