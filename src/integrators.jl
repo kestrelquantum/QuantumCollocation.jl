@@ -148,9 +148,6 @@ end
 end
 
 
-
-
-
 #
 # integrator types
 #
@@ -238,6 +235,9 @@ end
     return ∂xₜD, ∂xₜ₊₁D, ∂dxₜD, ∂ΔtₜD
 end
 
+# key is the order of the integrator
+# and the value are the Pade coefficients
+# for each term
 const PADE_COEFFICIENTS = Dict{Int,Vector{Float64}}(
     4 => [1/2, 1/12],
     6 => [1/2, 1/10, 1/120],
