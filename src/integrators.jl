@@ -655,57 +655,41 @@ end
             ∂ΔtₜP = ∂Δtₜ(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, vcat(aₜs...), Δtₜ)
         end
         ∂ΔtₜP = ∂Δtₜ(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, vcat(aₜs...), Δtₜ)
-        BR = B_real(P, vcat(aₜs...), Δtₜ)
-        BI = B_imag(P, vcat(aₜs...), Δtₜ)
-        FR = F_real(P, vcat(aₜs...), Δtₜ)
-        FI = F_imag(P, vcat(aₜs...), Δtₜ)
     else
         aₜ = zₜ[traj.components[P.drive_symb]]
         ∂aₜP = ∂aₜ(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, aₜ, Δtₜ)
         if free_time
             ∂ΔtₜP = ∂Δtₜ(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, aₜ, Δtₜ)
         end
-        BR = B_real(P, aₜ, Δtₜ)
-        BI = B_imag(P, aₜ, Δtₜ)
-        FR = F_real(P, aₜ, Δtₜ)
-        FI = F_imag(P, aₜ, Δtₜ)
     end
-    if P.order==4 && isnothing(P.G)
-        F̂ = P.I_2N ⊗ FR - P.Ω_2N ⊗ FI
-        B̂ = P.I_2N ⊗ BR + P.Ω_2N ⊗ BI
 
-        ∂Ũ⃗ₜP = -F̂
-        ∂Ũ⃗ₜ₊₁P = B̂
-        display(∂Ũ⃗ₜP)
-    else
-        ∂Ũ⃗ₜP = spzeros(P.dim, P.dim)
-        ∂Ũ⃗ₜ₊₁P = spzeros(P.dim, P.dim)
-        Gₜ::AbstractMatrix = isnothing(P.G) ? G(aₜ, P.G_drift, P.G_drives) : P.G(aₜ, P.G_drift, P.G_drives)
-        n = P.order ÷ 2
+    ∂Ũ⃗ₜP = spzeros(P.dim, P.dim)
+    ∂Ũ⃗ₜ₊₁P = spzeros(P.dim, P.dim)
+    Gₜ::AbstractMatrix = isnothing(P.G) ? G(aₜ, P.G_drift, P.G_drives) : P.G(aₜ, P.G_drift, P.G_drives)
+    n = P.order ÷ 2
 
-        # can memoize this chunk of code
-        Gₜ_powers = [Gₜ^k for k = 1:n]
-        B = P.I_2N + sum([(-1)^k * PADE_COEFFICIENTS[P.order][k] * Δt^k * Gₜ_powers[k] for k = 1:n])
-        F = P.I_2N + sum([PADE_COEFFICIENTS[P.order][k] * Δt^k * Gₜ_powers[k] for k = 1:n])
-        N = P.N
+    # can memoize this chunk of code, prly memoize G powers
+    Gₜ_powers = compute_powers(Gₜ, n)
+    B = P.I_2N + sum([(-1)^k * PADE_COEFFICIENTS[P.order][k] * Δt^k * Gₜ_powers[k] for k = 1:n])
+    F = P.I_2N + sum([PADE_COEFFICIENTS[P.order][k] * Δt^k * Gₜ_powers[k] for k = 1:n])
+    N = P.N
 
-        H_Re_F = F[1:N, 1:N]
-        H_Im_F = F[(N+1):end, 1:N]
-        H_Re_B = B[1:N, 1:N]
-        H_Im_B = B[(N+1):end, 1:N]
-        for i = 1:N
-            ∂Ũ⃗ₜP[(i-1)*N .+ (1:N), (i-1)*N .+ (1:N)] .= H_Re_F
-            ∂Ũ⃗ₜP[(i-1)*N .+ (1:N), (N^2 + (i-1)*N) .+ (1:N)] .= -H_Im_F            
-            ∂Ũ⃗ₜP[(N^2 + (i-1)*N) .+ (1:N), (i-1)*N .+ (1:N)] .= H_Im_F
-            ∂Ũ⃗ₜP[(N^2 + (i-1)*N) .+ (1:N), (N^2 + (i-1)*N) .+ (1:N)] .= H_Re_F
+    H_Re_F = F[1:N, 1:N]
+    H_Im_F = F[(N+1):end, 1:N]
+    H_Re_B = B[1:N, 1:N]
+    H_Im_B = B[(N+1):end, 1:N]
+    for i = 1:N
+        ∂Ũ⃗ₜP[(i-1)*N .+ (1:N), (i-1)*N .+ (1:N)] .= H_Re_F
+        ∂Ũ⃗ₜP[(i-1)*N .+ (1:N), (N^2 + (i-1)*N) .+ (1:N)] .= -H_Im_F            
+        ∂Ũ⃗ₜP[(N^2 + (i-1)*N) .+ (1:N), (i-1)*N .+ (1:N)] .= H_Im_F
+        ∂Ũ⃗ₜP[(N^2 + (i-1)*N) .+ (1:N), (N^2 + (i-1)*N) .+ (1:N)] .= H_Re_F
 
-            ∂Ũ⃗ₜ₊₁P[(i-1)*N .+ (1:N), (i-1)*N .+ (1:N)] .= H_Re_B
-            ∂Ũ⃗ₜ₊₁P[(i-1)*N .+ (1:N), (N^2 + (i-1)*N) .+ (1:N)] .= -H_Im_B
-            ∂Ũ⃗ₜ₊₁P[(N^2 + (i-1)*N) .+ (1:N), (i-1)*N .+ (1:N)] .= H_Im_B
-            ∂Ũ⃗ₜ₊₁P[(N^2 + (i-1)*N) .+ (1:N), (N^2 + (i-1)*N) .+ (1:N)] .= H_Re_B
-        end
+        ∂Ũ⃗ₜ₊₁P[(i-1)*N .+ (1:N), (i-1)*N .+ (1:N)] .= H_Re_B
+        ∂Ũ⃗ₜ₊₁P[(i-1)*N .+ (1:N), (N^2 + (i-1)*N) .+ (1:N)] .= -H_Im_B
+        ∂Ũ⃗ₜ₊₁P[(N^2 + (i-1)*N) .+ (1:N), (i-1)*N .+ (1:N)] .= H_Im_B
+        ∂Ũ⃗ₜ₊₁P[(N^2 + (i-1)*N) .+ (1:N), (N^2 + (i-1)*N) .+ (1:N)] .= H_Re_B
+    end
         ∂Ũ⃗ₜP = -∂Ũ⃗ₜP
-    end
     if free_time
         return ∂Ũ⃗ₜP, ∂Ũ⃗ₜ₊₁P, ∂aₜP, ∂ΔtₜP
     else
@@ -746,24 +730,20 @@ end
         if free_time
             ∂ΔtₜP = ∂Δtₜ(P, ψ̃ₜ₊₁, ψ̃ₜ, vcat(aₜs...), Δtₜ)
         end
-        BR = B_real(P, vcat(aₜs...), Δtₜ)
-        BI = B_imag(P, vcat(aₜs...), Δtₜ)
-        FR = F_real(P, vcat(aₜs...), Δtₜ)
-        FI = F_imag(P, vcat(aₜs...), Δtₜ)
+
     else
         aₜ = zₜ[traj.components[P.drive_symb]]
         ∂aₜP = ∂aₜ(P, ψ̃ₜ₊₁, ψ̃ₜ, aₜ, Δtₜ)
         if free_time
             ∂ΔtₜP = ∂Δtₜ(P, ψ̃ₜ₊₁, ψ̃ₜ, aₜ, Δtₜ)
         end
-        BR = B_real(P, aₜ, Δtₜ)
-        BI = B_imag(P, aₜ, Δtₜ)
-        FR = F_real(P, aₜ, Δtₜ)
-        FI = F_imag(P, aₜ, Δtₜ)
     end
-
-    F = Id2 ⊗ FR - Im2 ⊗ FI
-    B = Id2 ⊗ BR + Im2 ⊗ BI
+    
+    Gₜ::AbstractMatrix = isnothing(P.G) ? G(aₜ, P.G_drift, P.G_drives) : P.G(aₜ, P.G_drift, P.G_drives)
+    n = P.order ÷ 2
+    Gₜ_powers = compute_powers(Gₜ, n)
+    B = P.I_2N + sum([(-1)^k * PADE_COEFFICIENTS[P.order][k] * Δt^k * Gₜ_powers[k] for k = 1:n])
+    F = P.I_2N + sum([PADE_COEFFICIENTS[P.order][k] * Δt^k * Gₜ_powers[k] for k = 1:n])
 
     ∂ψ̃ₜP = -F
     ∂ψ̃ₜ₊₁P = B
