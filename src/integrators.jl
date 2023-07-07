@@ -47,6 +47,8 @@ function nth_order_pade(Gₜ::Matrix, n::Int)
     return inv(B) * F
 end
 
+
+
 fourth_order_pade(Gₜ::Matrix) = nth_order_pade(Gₜ, 4)
 sixth_order_pade(Gₜ::Matrix) = nth_order_pade(Gₜ, 6)
 eighth_order_pade(Gₜ::Matrix) = nth_order_pade(Gₜ, 8)
@@ -666,6 +668,24 @@ function nth_order_pade(
     return iso_operator_to_iso_vec(δŨ)
 end
 
+function fth_order_pade(
+    P::UnitaryPadeIntegrator{R},
+    Ũ⃗ₜ₊₁::AbstractVector,
+    Ũ⃗ₜ::AbstractVector,
+    aₜ::AbstractVector,
+    Δt::Real
+) where R <: Real
+    Ũₜ₊₁ = iso_vec_to_iso_operator(Ũ⃗ₜ₊₁)
+    Ũₜ = iso_vec_to_iso_operator(Ũ⃗ₜ)
+    Gₜ = isnothing(P.G) ? G(aₜ, P.G_drift, P.G_drives) : P.G(aₜ, P.G_drift, P.G_drives)
+    n = P.order ÷ 2
+    Gₜ_powers = [Gₜ^k for k = 1:n]
+    B = P.I_2N - Δt/2 * Gₜ + Δt^2/12 * Gₜ^2
+    F = P.I_2N + Δt/2 * Gₜ + Δt^2/12 * Gₜ^2
+    δŨ = B * Ũₜ₊₁ - F * Ũₜ
+    return iso_operator_to_iso_vec(δŨ)
+end
+
 @views function(P::UnitaryPadeIntegrator{R})(
     zₜ::AbstractVector,
     zₜ₊₁::AbstractVector,
@@ -683,11 +703,12 @@ end
     else
         aₜ = zₜ[traj.components[P.drive_symb]]
     end
-    if P.order == 4 && isnothing(P.G)
-        return fourth_order_pade(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, aₜ, Δtₜ)
-    else
-        return nth_order_pade(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, aₜ, Δtₜ)
-    end
+    # if P.order == 4 && isnothing(P.G)
+    #     return fourth_order_pade(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, aₜ, Δtₜ)
+    # else
+    #     return nth_order_pade(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, aₜ, Δtₜ)
+    # end
+    return nth_order_pade(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, aₜ, Δtₜ)
 end
 
 @views function fourth_order_pade(
@@ -1096,7 +1117,7 @@ end
     else
         ∂Ũ⃗ₜP = spzeros(P.dim, P.dim)
         ∂Ũ⃗ₜ₊₁P = spzeros(P.dim, P.dim)
-        Gₜ = isnothing(P.G) ? G(aₜ, P.G_drift, P.G_drives) : P.G(aₜ, P.G_drift, P.G_drives)
+        Gₜ::AbstractMatrix = isnothing(P.G) ? G(aₜ, P.G_drift, P.G_drives) : P.G(aₜ, P.G_drift, P.G_drives)
         n = P.order ÷ 2
 
         # can memoize this chunk of code
@@ -1104,11 +1125,11 @@ end
         B = P.I_2N + sum([(-1)^k * PADE_COEFFICIENTS[P.order][k] * Δt^k * Gₜ_powers[k] for k = 1:n])
         F = P.I_2N + sum([PADE_COEFFICIENTS[P.order][k] * Δt^k * Gₜ_powers[k] for k = 1:n])
         N = P.N
-        
-        H_Re_F = @view F[1:N, 1:N]
-        H_Im_F = @view F[(N+1):end, 1:N]
-        H_Re_B = @view B[1:N, 1:N]
-        H_Im_B = @view B[(N+1):end, 1:N]
+
+        H_Re_F = F[1:N, 1:N]
+        H_Im_F = F[(N+1):end, 1:N]
+        H_Re_B = B[1:N, 1:N]
+        H_Im_B = B[(N+1):end, 1:N]
         for i = 1:N
             ∂Ũ⃗ₜP[(i-1)*N .+ (1:N), (i-1)*N .+ (1:N)] .= H_Re_F
             ∂Ũ⃗ₜP[(i-1)*N .+ (1:N), (N^2 + (i-1)*N) .+ (1:N)] .= -H_Im_F            
@@ -1121,6 +1142,7 @@ end
             ∂Ũ⃗ₜ₊₁P[(N^2 + (i-1)*N) .+ (1:N), (N^2 + (i-1)*N) .+ (1:N)] .= H_Re_B
         end
         ∂Ũ⃗ₜP = -∂Ũ⃗ₜP
+    end
     if free_time
         return ∂Ũ⃗ₜP, ∂Ũ⃗ₜ₊₁P, ∂aₜP, ∂ΔtₜP
     else
