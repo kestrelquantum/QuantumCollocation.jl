@@ -75,7 +75,7 @@ end
 const Id2 = 1.0 * I(2)
 const Im2 = 1.0 * [0 -1; 1 0]
 
-anticomm(A::AbstractMatrix, B::AbstractMatrix) = A * B + B * A
+anticomm(A::Matrix{R}, B::Matrix{R}) where R <: Number = A * B + B * A
 
 function anticomm(
     A::AbstractMatrix{R},
@@ -147,6 +147,35 @@ end
     return A_anticomm_Bⱼ
 end
 
+function build_anticomms(
+    G_drift::Matrix{R}, 
+    G_drives::Matrix{R}, 
+    n_drives::Int) where R <: Number
+
+    drive_anticomms = fill(
+            zeros(size(sys.G_drift)),
+            n_drives,
+            n_drives
+        )
+
+        for j = 1:n_drives
+            for k = 1:j
+                if k == j
+                    drive_anticomms[k, k] = 2 * sys.G_drives[k]^2
+                else
+                    drive_anticomms[k, j] =
+                        anticomm(sys.G_drives[k], sys.G_drives[j])
+                end
+            end
+        end
+
+        drift_anticomms = [
+            anticomm(G_drive, sys.G_drift)
+                for G_drive in sys.G_drives
+        ]
+
+    return Symmetric(drive_anticomms), drift_anticomms
+end
 
 #
 # integrator types
@@ -251,8 +280,8 @@ struct UnitaryPadeIntegrator{R <: Number} <: QuantumPadeIntegrator
     I_2N::SparseMatrixCSC{R, Int}
     G_drift::Matrix{R}
     G_drives::Vector{Matrix{R}}
-    G_drive_anticoms::Symmetric
-    G_drift_anticoms::Vector{Matrix}
+    G_drive_anticomms::Symmetric
+    G_drift_anticomms::Vector{Matrix{R}}
     unitary_symb::Union{Symbol, Nothing}
     drive_symb::Union{Symbol, Tuple{Vararg{Symbol}}, Nothing}
     n_drives::Int
@@ -319,10 +348,15 @@ struct UnitaryPadeIntegrator{R <: Number} <: QuantumPadeIntegrator
         G_drift = sys.G_drift
         G_drives = sys.G_drives
 
+        drive_anticomms, drift_anticomms = build_anticomms(G_drift, G_drives, n_drives)
+        
+
         return new{R}(
             I_2N,
             G_drift,
             G_drives,
+            drive_anticomms,
+            drift_anticomms,
             unitary_symb,
             drive_symb,
             n_drives,
@@ -342,6 +376,8 @@ struct QuantumStatePadeIntegrator{R <: Number} <: QuantumPadeIntegrator
     I_2N::SparseMatrixCSC{R, Int}
     G_drift::Matrix{R}
     G_drives::Vector{Matrix{R}}
+    G_drive_anticomms::Symmetric
+    G_drift_anticomms::Vector{Matrix{R}}
     state_symb::Union{Symbol,Nothing}
     drive_symb::Union{Symbol,Tuple{Vararg{Symbol}},Nothing}
     n_drives::Int
@@ -402,10 +438,15 @@ struct QuantumStatePadeIntegrator{R <: Number} <: QuantumPadeIntegrator
         G_drift = sys.G_drift
         G_drives = sys.G_drives
 
+        drive_anticomms, drift_anticomms = build_anticomms(G_drift, G_drives, n_drives)
+
+
         return new{R}(
             I_2N,
             G_drift,
             G_drives,
+            drive_anticomms,
+            drift_anticomms,
             state_symb,
             drive_symb,
             n_drives,
@@ -417,6 +458,7 @@ struct QuantumStatePadeIntegrator{R <: Number} <: QuantumPadeIntegrator
         )
     end
 end
+
 
 state(P::QuantumStatePadeIntegrator) = P.state_symb
 controls(P::QuantumStatePadeIntegrator) = P.drive_symb
@@ -673,8 +715,9 @@ end
     N = P.N
     isodim = 2N
     for i = 0:N-1
-        ∂Ũ⃗ₜP[i*isodim .+ (1:isodim), i*isodim .+ (1:isodim)] .= -F
-        ∂Ũ⃗ₜ₊₁P[i*isodim .+ (1:isodim), i*isodim .+ (1:isodim)] .= B
+        inds = i*isodim .+ (1:isodim)
+        ∂Ũ⃗ₜP[inds, inds] .= -F
+        ∂Ũ⃗ₜ₊₁P[inds, inds] .= B
     end
     if free_time
         return ∂Ũ⃗ₜP, ∂Ũ⃗ₜ₊₁P, ∂aₜP, ∂ΔtₜP
