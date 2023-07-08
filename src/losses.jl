@@ -43,7 +43,7 @@ abstract type AbstractLoss end
 function infidelity(ψ̃::AbstractVector, ψ̃goal::AbstractVector)
     ψ = iso_to_ket(ψ̃)
     ψgoal = iso_to_ket(ψ̃goal)
-    return abs(1 - abs2(ψ'ψgoal))
+    return abs(1 - abs2(ψgoal'ψ))
 end
 
 function unitary_infidelity(Ũ⃗::AbstractVector, Ũ⃗_goal::AbstractVector)
