@@ -671,23 +671,11 @@ end
     B = P.I_2N + sum([(-1)^k * PADE_COEFFICIENTS[P.order][k] * Δt^k * Gₜ_powers[k] for k = 1:n])
     F = P.I_2N + sum([PADE_COEFFICIENTS[P.order][k] * Δt^k * Gₜ_powers[k] for k = 1:n])
     N = P.N
-
-    H_Re_F = F[1:N, 1:N]
-    H_Im_F = F[(N+1):end, 1:N]
-    H_Re_B = B[1:N, 1:N]
-    H_Im_B = B[(N+1):end, 1:N]
-    for i = 1:N
-        ∂Ũ⃗ₜP[(i-1)*N .+ (1:N), (i-1)*N .+ (1:N)] .= H_Re_F
-        ∂Ũ⃗ₜP[(i-1)*N .+ (1:N), (N^2 + (i-1)*N) .+ (1:N)] .= -H_Im_F            
-        ∂Ũ⃗ₜP[(N^2 + (i-1)*N) .+ (1:N), (i-1)*N .+ (1:N)] .= H_Im_F
-        ∂Ũ⃗ₜP[(N^2 + (i-1)*N) .+ (1:N), (N^2 + (i-1)*N) .+ (1:N)] .= H_Re_F
-
-        ∂Ũ⃗ₜ₊₁P[(i-1)*N .+ (1:N), (i-1)*N .+ (1:N)] .= H_Re_B
-        ∂Ũ⃗ₜ₊₁P[(i-1)*N .+ (1:N), (N^2 + (i-1)*N) .+ (1:N)] .= -H_Im_B
-        ∂Ũ⃗ₜ₊₁P[(N^2 + (i-1)*N) .+ (1:N), (i-1)*N .+ (1:N)] .= H_Im_B
-        ∂Ũ⃗ₜ₊₁P[(N^2 + (i-1)*N) .+ (1:N), (N^2 + (i-1)*N) .+ (1:N)] .= H_Re_B
+    isodim = 2N
+    for i = 0:N-1
+        ∂Ũ⃗ₜP[i*isodim .+ (1:isodim), i*isodim .+ (1:isodim)] .= -F
+        ∂Ũ⃗ₜ₊₁P[i*isodim .+ (1:isodim), i*isodim .+ (1:isodim)] .= B
     end
-        ∂Ũ⃗ₜP = -∂Ũ⃗ₜP
     if free_time
         return ∂Ũ⃗ₜP, ∂Ũ⃗ₜ₊₁P, ∂aₜP, ∂ΔtₜP
     else
