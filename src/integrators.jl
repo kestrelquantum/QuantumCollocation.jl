@@ -570,8 +570,17 @@ function ∂aₜ(
         ∂aP = zeros(T, P.dim, n_drives)
         for j = 1:n_drives
             Gʲ = P.G_drives[j]
-
-        end
+            Gʲ_anticomm_Gₜ =
+                G(aₜ, P.G_drift_anticomms[j], P.G_drive_anticomms[:, j])
+            isodim = 2*P.N
+            for i = 0:P.N-1
+                ψ̃ⁱₜ₊₁ = @view Ũ⃗ₜ₊₁[i * isodim .+ (1:isodim)]
+                ψ̃ⁱₜ = @view Ũ⃗ₜ[i * isodim .+ (1:isodim)]
+                ∂aP[i*isodim .+ (1:isodim): j] =
+                    -Δt / 2 * Gʲ * (ψ̃ⁱₜ₊₁ + ψ̃ⁱₜ) +
+                    Δt^2 / 12 * Gʲ_anticomm_Gₜ * (ψ̃ⁱₜ₊₁ - ψ̃ⁱₜ)
+            end
+        end   
     end
     return ∂aP
 end
@@ -598,12 +607,16 @@ function ∂aₜ(
     elseif P.order == 4
         n_drives = length(aₜ)
         ∂aP = zeros(T, P.dim, n_drives)
-        for i=1:n_drives    
-            Gʲ = P.G_drives[i]   
+        for j = 1:n_drives
+            Gʲ = P.G_drives[j]
+            Gʲ_anticomm_Gₜ =
+                G(aₜ, P.G_drift_anticomms[j], P.G_drive_anticomms[:, j])
+            ∂aP[:, j] =
+                -Δt / 2 * Gʲ * (ψ̃ₜ₊₁ + ψ̃ₜ) +
+                Δt^2 / 12 * Gʲ_anticomm_Gₜ * (ψ̃ₜ₊₁ - ψ̃ₜ)
         end
-    
     else 
-        test
+        ### code for arbitrary Pade goes here
     end
     return ∂aP
 end
