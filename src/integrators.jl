@@ -153,7 +153,7 @@ function build_anticomms(
     n_drives::Int) where R <: Number
 
     drive_anticomms = fill(
-            zeros(size(sys.G_drift)),
+            zeros(size(G_drift)),
             n_drives,
             n_drives
         )
@@ -161,17 +161,17 @@ function build_anticomms(
         for j = 1:n_drives
             for k = 1:j
                 if k == j
-                    drive_anticomms[k, k] = 2 * sys.G_drives[k]^2
+                    drive_anticomms[k, k] = 2 * G_drives[k]^2
                 else
                     drive_anticomms[k, j] =
-                        anticomm(sys.G_drives[k], sys.G_drives[j])
+                        anticomm(G_drives[k], G_drives[j])
                 end
             end
         end
 
         drift_anticomms = [
-            anticomm(G_drive, sys.G_drift)
-                for G_drive in sys.G_drives
+            anticomm(G_drive, G_drift)
+                for G_drive in G_drives
         ]
 
     return Symmetric(drive_anticomms), drift_anticomms
@@ -440,7 +440,6 @@ struct QuantumStatePadeIntegrator{R <: Number} <: QuantumPadeIntegrator
 
         drive_anticomms, drift_anticomms = build_anticomms(G_drift, G_drives, n_drives)
 
-
         return new{R}(
             I_2N,
             G_drift,
@@ -501,7 +500,7 @@ end
     else
         aₜ = zₜ[traj.components[P.drive_symb]]
     end
-    return nth_order_pade(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, aₜ, Δtₜ)
+    return nth_order_pade(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, aₜ, Δtₜ) 
 end
 
 
@@ -597,15 +596,12 @@ function ∂aₜ(
     elseif P.order == 4
         n_drives = length(aₜ)
         ∂aP = zeros(T, P.dim, n_drives)
-        for j = 1:n_drives
-            ∂aʲBR = ∂aₜʲB_real(P, aₜ, Δtₜ, drive_indices[j])
-            ∂aʲBI = ∂aₜʲB_imag(P, aₜ, Δtₜ, drive_indices[j])
-            ∂aʲFR = ∂aₜʲF_real(P, aₜ, Δtₜ, drive_indices[j])
-            ∂aʲFI = ∂aₜʲF_imag(P, aₜ, Δtₜ, drive_indices[j])
-            ∂aP[:, j] =
-                (Id2 ⊗ ∂aʲBR + Im2 ⊗ ∂aʲBI) * ψ̃ₜ₊₁ -
-                (Id2 ⊗ ∂aʲFR - Im2 ⊗ ∂aʲFI) * ψ̃ₜ
+        for i=1:n_drives    
+            Gʲ = P.G_drives[i]   
         end
+    
+    else 
+        test
     end
     return ∂aP
 end
