@@ -544,14 +544,13 @@ end
     return nth_order_pade(P, ψ̃ₜ₊₁, ψ̃ₜ, aₜ, Δtₜ) 
 end
 
-
+# aₜ should be a vector with all the controls. concatenate alll teh named traj controls
 function ∂aₜ(
     P::UnitaryPadeIntegrator{R},
     Ũ⃗ₜ₊₁::AbstractVector{T},
     Ũ⃗ₜ::AbstractVector{T},
     aₜ::AbstractVector{T},
     Δtₜ::Real,
-    drive_indices=1:P.n_drives
 ) where {R <: Real, T <: Real}
     
     if P.autodiff || !isnothing(P.G)
@@ -591,7 +590,6 @@ function ∂aₜ(
     ψ̃ₜ::AbstractVector{T},
     aₜ::AbstractVector{T},
     Δtₜ::Real,
-    drive_indices=1:P.n_drives
 ) where {R <: Real, T <: Real}
     if P.autodiff || !isnothing(P.G)
 
