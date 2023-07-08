@@ -219,9 +219,6 @@ function iso_operator_to_iso_vec(Ũ::AbstractMatrix{R}) where R <: Real
 end
 
 
-
-
-
 """
     quantum metrics
 """
