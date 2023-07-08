@@ -251,6 +251,8 @@ struct UnitaryPadeIntegrator{R <: Number} <: QuantumPadeIntegrator
     I_2N::SparseMatrixCSC{R, Int}
     G_drift::Matrix{R}
     G_drives::Vector{Matrix{R}}
+    G_drive_anticoms::Symmetric
+    G_drift_anticoms::Vector{Matrix}
     unitary_symb::Union{Symbol, Nothing}
     drive_symb::Union{Symbol, Tuple{Vararg{Symbol}}, Nothing}
     n_drives::Int
@@ -410,7 +412,8 @@ struct QuantumStatePadeIntegrator{R <: Number} <: QuantumPadeIntegrator
             N,
             dim,
             order,
-            autodiff
+            autodiff,
+            G
         )
     end
 end
@@ -523,13 +526,8 @@ function ∂aₜ(
         n_drives = length(aₜ)
         ∂aP = zeros(T, P.dim, n_drives)
         for j = 1:n_drives
-            ∂aʲBR = ∂aₜʲB_real(P, aₜ, Δtₜ, drive_indices[j])
-            ∂aʲBI = ∂aₜʲB_imag(P, aₜ, Δtₜ, drive_indices[j])
-            ∂aʲFR = ∂aₜʲF_real(P, aₜ, Δtₜ, drive_indices[j])
-            ∂aʲFI = ∂aₜʲF_imag(P, aₜ, Δtₜ, drive_indices[j])
-            ∂aP[:, j] =
-                (P.I_2N ⊗ ∂aʲBR + P.Ω_2N ⊗ ∂aʲBI) * Ũ⃗ₜ₊₁ -
-                (P.I_2N ⊗ ∂aʲFR - P.Ω_2N ⊗ ∂aʲFI) * Ũ⃗ₜ
+            Gʲ = P.G_drives[j]
+
         end
     end
     return ∂aP
@@ -554,7 +552,7 @@ function ∂aₜ(
     # otherwise we don't have a nonlinear G or are fine with using 
     # the fourth order derivatives
 
-    else
+    elseif P.order == 4
         n_drives = length(aₜ)
         ∂aP = zeros(T, P.dim, n_drives)
         for j = 1:n_drives
@@ -760,7 +758,7 @@ end
 # Hessian of the Lagrangian
 # ---------------------------------------
 
-
+#calculate a deriv first and then indexing game
 function μ∂aₜ∂Ũ⃗ₜ(
     P::UnitaryPadeIntegrator,
     aₜ::AbstractVector{T},
