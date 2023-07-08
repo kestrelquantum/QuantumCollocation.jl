@@ -213,8 +213,6 @@ function iso_operator_to_iso_vec(Ũ::AbstractMatrix{R}) where R <: Real
     for i=0:N-1
         Ũ⃗[i*2N .+ (1:N)] .= @view Ũ[:, i+1]
     end
-    U_real = @view Ũ[1:N, 1:N]
-    U_imag = @view Ũ[(N + 1):2N, 1:N]
     return Ũ⃗
 end
 
