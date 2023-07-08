@@ -247,12 +247,12 @@ const PADE_COEFFICIENTS = Dict{Int,Vector{Float64}}(
 
 """
 """
-struct UnitaryPadeIntegrator{R} <: QuantumPadeIntegrator
+struct UnitaryPadeIntegrator{R <: Number} <: QuantumPadeIntegrator
     I_2N::SparseMatrixCSC{R, Int}
     G_drift::Union{Nothing, Matrix{R}}
     G_drives::Union{Nothing, Vector{Matrix{R}}}
-    unitary_symb::Union{Symbol,Nothing}
-    drive_symb::Union{Symbol,Tuple{Vararg{Symbol}},Nothing}
+    unitary_symb::Union{Symbol, Nothing}
+    drive_symb::Union{Symbol, Tuple{Vararg{Symbol}},Nothing}
     n_drives::Int
     N::Int
     dim::Int
@@ -336,7 +336,7 @@ end
 state(P::UnitaryPadeIntegrator) = P.unitary_symb
 controls(P::UnitaryPadeIntegrator) = P.drive_symb
 
-struct QuantumStatePadeIntegrator{R} <: QuantumPadeIntegrator
+struct QuantumStatePadeIntegrator{R <: Number} <: QuantumPadeIntegrator
     I_2N::SparseMatrixCSC{R, Int}
     G_drift::Union{Nothing, Matrix{R}}
     G_drives::Union{Nothing, Vector{Matrix{R}}}
