@@ -211,8 +211,7 @@ function QuantumDynamics(
     if free_time
         @assert all([
             !isnothing(state(integrator)) &&
-            !isnothing(controls(integrator)) &&
-            !isnothing(timestep(integrator))
+            !isnothing(controls(integrator))
                 for integrator ∈ integrators
         ])
     else
