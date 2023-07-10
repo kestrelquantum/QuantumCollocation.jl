@@ -194,9 +194,7 @@ function UnitaryInfidelityObjective(;
 
     names = (name,)
 
-    if goals isa AbstractVector
-        goals = (goal,)
-    end
+    goals = (goal,)
 
     if Q isa Float64
         Q = ones(length(names)) * Q
