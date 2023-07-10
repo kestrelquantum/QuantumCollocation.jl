@@ -82,8 +82,6 @@ function sparse_to_moi(A::SparseMatrixCSC)
     vals = [A[i,j] for (i,j) ∈ inds]
     return (inds, vals)
 end
-
-
 """
     QuantumObjective
 
@@ -172,6 +170,75 @@ function QuantumObjective(;
             return H
         end
     end
+
+	return Objective(L, ∇L, ∂²L, ∂²L_structure, Dict[params])
+end
+
+
+
+"""
+    UnitaryInfidelityObjective
+
+
+"""
+function UnitaryInfidelityObjective(;
+    names::Union{Nothing,Tuple{Vararg{Symbol}}}=nothing,
+    name::Union{Nothing,Symbol}=nothing,
+    goals::Union{Nothing,AbstractVector{<:Real},Tuple{Vararg{AbstractVector{<:Real}}}}=nothing,
+	Q::Union{Float64, Vector{Float64}}=100.0,
+	eval_hessian::Bool=true
+)
+    @assert !(isnothing(names) && isnothing(name)) "name or names must be specified"
+    @assert !isnothing(goals) "goals corresponding to names must be specified"
+
+    loss = :UnitaryInfidelityLoss
+
+    if isnothing(names)
+        names = (name,)
+    end
+
+    if goals isa AbstractVector
+        goals = (goals,)
+    end
+
+    if Q isa Float64
+        Q = ones(length(names)) * Q
+    else
+        @assert length(Q) == length(names)
+    end
+
+    params = Dict(
+        :type => :QuantumObjective,
+        :names => names,
+        :goals => goals,
+        :loss => loss,
+        :Q => Q,
+        :eval_hessian => eval_hessian,
+    )
+
+    losses = [eval(loss)(name, goal) for (name, goal) ∈ zip(names, goals)]
+
+	@views function L(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory)
+        loss = 0.0
+        for (Qᵢ, lᵢ, name) ∈ zip(Q, losses, names)
+            name_slice = slice(Z.T, Z.components[name], Z.dim)
+            loss += Qᵢ * lᵢ(Z⃗[name_slice])
+        end
+        return loss
+    end
+
+    @views function ∇L(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory)
+        ∇ = zeros(Z.dim * Z.T)
+        for (Qᵢ, lᵢ, name) ∈ zip(Q, losses, names)
+            name_slice = slice(Z.T, Z.components[name], Z.dim)
+            ∇[name_slice] = Qᵢ * lᵢ(Z⃗[name_slice]; gradient=true)
+        end
+        return ∇
+    end
+
+    ∂²L_structure(Z::NamedTrajectory) = []
+
+    ∂²L(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory) = []
 
 	return Objective(L, ∇L, ∂²L, ∂²L_structure, Dict[params])
 end

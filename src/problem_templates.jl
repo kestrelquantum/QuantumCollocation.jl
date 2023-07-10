@@ -161,7 +161,7 @@ function UnitarySmoothPulseProblem(
         end
     end
 
-    J = QuantumUnitaryObjective(:Ũ⃗, traj, Q)
+    J = UnitaryInfidelityObjective(:Ũ⃗, traj, Q)
     J += QuadraticRegularizer(:a, traj, R_a)
     J += QuadraticRegularizer(:da, traj, R_da)
     J += QuadraticRegularizer(:dda, traj, R_dda)
