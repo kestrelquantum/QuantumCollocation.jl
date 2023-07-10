@@ -5,6 +5,7 @@ export Objective
 export QuantumObjective
 export QuantumStateObjective
 export QuantumUnitaryObjective
+export UnitaryInfidelityObjective
 
 export MinimumTimeObjective
 
