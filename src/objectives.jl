@@ -188,14 +188,11 @@ function UnitaryInfidelityObjective(;
 	Q::Union{Float64, Vector{Float64}}=100.0,
 	eval_hessian::Bool=true
 )
-    @assert !(isnothing(names) && isnothing(name)) "name or names must be specified"
     @assert !isnothing(goals) "goals corresponding to names must be specified"
 
     loss = :UnitaryInfidelityLoss
 
-    if isnothing(names)
-        names = (name,)
-    end
+    names = (name,)
 
     if goals isa AbstractVector
         goals = (goal,)
