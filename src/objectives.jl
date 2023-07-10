@@ -183,9 +183,8 @@ end
 
 """
 function UnitaryInfidelityObjective(;
-    names::Union{Nothing,Tuple{Vararg{Symbol}}}=nothing,
     name::Union{Nothing,Symbol}=nothing,
-    goals::Union{Nothing,AbstractVector{<:Real},Tuple{Vararg{AbstractVector{<:Real}}}}=nothing,
+    goal::Union{Nothing,AbstractVector{<:Real}}=nothing,
 	Q::Union{Float64, Vector{Float64}}=100.0,
 	eval_hessian::Bool=true
 )
@@ -199,7 +198,7 @@ function UnitaryInfidelityObjective(;
     end
 
     if goals isa AbstractVector
-        goals = (goals,)
+        goals = (goal,)
     end
 
     if Q isa Float64
@@ -211,7 +210,7 @@ function UnitaryInfidelityObjective(;
     params = Dict(
         :type => :QuantumObjective,
         :names => names,
-        :goals => goals,
+        :goals => goal,
         :loss => loss,
         :Q => Q,
         :eval_hessian => eval_hessian,
@@ -252,6 +251,14 @@ function QuantumObjective(
 )
     goal = traj.goal[name]
     return QuantumObjective(name=name, goals=goal, loss=loss, Q=Q)
+end
+
+function UnitaryInfidelityObjective(
+    name::Symbol,
+    traj::NamedTrajectory,
+    Q::Float64
+)
+    return UnitaryInfidelityObjective(name=name, goal=traj.goal[name], Q=Q)
 end
 
 function QuantumObjective(
