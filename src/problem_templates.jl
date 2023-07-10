@@ -168,9 +168,9 @@ function UnitarySmoothPulseProblem(
 
     if free_time
         integrators = [
-            UnitaryPadeIntegrator(system, :Ũ⃗, :a, :Δt),
-            DerivativeIntegrator(:a, :da, :Δt, traj),
-            DerivativeIntegrator(:da, :dda, :Δt, traj),
+            UnitaryPadeIntegrator(system, :Ũ⃗, :a),
+            DerivativeIntegrator(:a, :da, traj),
+            DerivativeIntegrator(:da, :dda, traj),
         ]
     else
         integrators = [
@@ -451,14 +451,14 @@ function QuantumStateSmoothPulseProblem(
     if free_time
 
         ψ̃_integrators = [
-            QuantumStatePadeIntegrator(system, Symbol("ψ̃$i"), :a, :Δt)
+            QuantumStatePadeIntegrator(system, Symbol("ψ̃$i"), :a)
                 for i = 1:length(ψ_inits)
         ]
 
         integrators = [
             ψ̃_integrators...,
-            DerivativeIntegrator(:a, :da, :Δt, traj),
-            DerivativeIntegrator(:da, :dda, :Δt, traj)
+            DerivativeIntegrator(:a, :da, traj),
+            DerivativeIntegrator(:da, :dda, traj)
         ]
     else
         ψ̃_integrators = [
