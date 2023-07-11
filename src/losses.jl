@@ -47,11 +47,26 @@ function infidelity(ψ̃::AbstractVector, ψ̃goal::AbstractVector)
 end
 
 function unitary_infidelity(Ũ⃗::AbstractVector, Ũ⃗_goal::AbstractVector)
-    U = iso_vec_to_operator(Ũ⃗)
-    Ugoal = iso_vec_to_operator(Ũ⃗_goal)
-    N = size(U, 1)
-    return abs(1 - 1 / N * abs(tr(Ugoal'U)))
+    Ũ = iso_vec_to_iso_operator(Ũ⃗)
+    Ũ_goal = iso_vec_to_iso_operator(Ũ⃗_goal)
+    N = size(Ũ, 1)
+    x̄ = vec(Ũ)
+    x = vec(Ũ_goal)
+    x̄x = x̄'x
+    # TODO: test if internal abs is necessary
+    return abs(1 - 1 / N * abs(x̄x))
 end
+
+function unitary_infidelity_gradient(Ũ⃗::AbstractVector, Ũ⃗_goal::AbstractVector)
+    Ũ = iso_vec_to_iso_operator(Ũ⃗)
+    Ũ_goal = iso_vec_to_iso_operator(Ũ⃗_goal)
+    N = size(Ũ, 1)
+    x̄ = vec(Ũ)
+    x = vec(Ũ_goal)
+    x̄x = x̄'x
+    return - 1 / N * sign(1 - 1 / N * abs(x̄x)) * sign(x̄x) * x̄x
+end
+
 
 function unitary_trace_loss(Ũ⃗::AbstractVector, Ũ⃗_goal::AbstractVector)
     U = iso_vec_to_operator(Ũ⃗)
@@ -163,35 +178,10 @@ struct UnitaryInfidelityLoss <: AbstractLoss
         name::Symbol,
         Ũ⃗_goal::AbstractVector
     )
-        # l = Ũ⃗ -> unitary_infidelity(Ũ⃗, Ũ⃗_goal)
-        # ∇l = Ũ⃗ -> ForwardDiff.gradient(l, Ũ⃗)
-
-        # Symbolics.@variables Ũ⃗[1:length(Ũ⃗_goal)]
-        # Ũ⃗ = collect(Ũ⃗)
-
-        # ∇²l_symbolic = Symbolics.sparsehessian(l(Ũ⃗), Ũ⃗)
-        # K, J, _ = findnz(∇²l_symbolic)
-        # kjs = collect(zip(K, J))
-        # filter!(((k, j),) -> k ≤ j, kjs)
-        # ∇²l_structure = kjs
-
-        # ∇²l_expression = Symbolics.build_function(∇²l_symbolic, Ũ⃗)
-        # ∇²l = eval(∇²l_expression[1])
-
         l = Ũ⃗ -> unitary_infidelity(Ũ⃗, Ũ⃗_goal)
-        ∇l = Ũ⃗ -> ForwardDiff.gradient(l, Ũ⃗)
-        ∇²l = Ũ⃗ -> ForwardDiff.hessian(l, Ũ⃗)
-        Ũ⃗_dim = length(Ũ⃗_goal)
-
-        # ∇²l_structure = loss_hessian_structure(∇²l, Ũ⃗_dim)
-
+        ∇l = Ũ⃗ -> unitary_infidelity_gradient(Ũ⃗, Ũ⃗_goal)
+        ∇²l = Ũ⃗ -> []
         ∇²l_structure = []
-        for (i, j) ∈ Iterators.product(1:Ũ⃗_dim, 1:Ũ⃗_dim)
-            if i ≤ j
-                push!(∇²l_structure, (i, j))
-            end
-        end
-
         return new(l, ∇l, ∇²l, ∇²l_structure, name)
     end
 end
@@ -202,7 +192,6 @@ function (loss::UnitaryInfidelityLoss)(
     hessian=false
 )
     @assert !(gradient && hessian)
-
     if !(gradient || hessian)
         return loss.l(Ũ⃗_end)
     elseif gradient

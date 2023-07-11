@@ -185,49 +185,33 @@ end
 function UnitaryInfidelityObjective(;
     name::Union{Nothing,Symbol}=nothing,
     goal::Union{Nothing,AbstractVector{<:Real}}=nothing,
-	Q::Union{Float64, Vector{Float64}}=100.0,
+	Q::Float64=100.0,
 	eval_hessian::Bool=true
 )
     @assert !isnothing(goal) "unitary goal name must be specified"
 
     loss = :UnitaryInfidelityLoss
-
-    names = (name,)
-
-    goals = (goal,)
-
-    if Q isa Float64
-        Q = ones(length(names)) * Q
-    else
-        @assert length(Q) == length(names)
-    end
+    l = eval(loss)(name, goal)
 
     params = Dict(
-        :type => :QuantumObjective,
-        :names => names,
+        :type => :UnitaryInfidelityObjective,
+        :names => name,
         :goals => goal,
         :loss => loss,
         :Q => Q,
         :eval_hessian => eval_hessian,
     )
 
-    losses = [eval(loss)(name, goal) for (name, goal) ∈ zip(names, goals)]
-
 	@views function L(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory)
-        loss = 0.0
-        for (Qᵢ, lᵢ, name) ∈ zip(Q, losses, names)
-            name_slice = slice(Z.T, Z.components[name], Z.dim)
-            loss += Qᵢ * lᵢ(Z⃗[name_slice])
-        end
-        return loss
+        return Q * l(Z⃗[name_slice])
     end
 
     @views function ∇L(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory)
         ∇ = zeros(Z.dim * Z.T)
-        for (Qᵢ, lᵢ, name) ∈ zip(Q, losses, names)
-            name_slice = slice(Z.T, Z.components[name], Z.dim)
-            ∇[name_slice] = Qᵢ * lᵢ(Z⃗[name_slice]; gradient=true)
-        end
+        Ũ⃗_slice = slice(Z.T, Z.components[name], Z.dim)
+        Ũ⃗ = Z⃗[Ũ⃗_slice]
+        ∇l = l(Ũ⃗; gradient=true)
+        ∇[Ũ⃗_slice] = Q * ∇l
         return ∇
     end
 
