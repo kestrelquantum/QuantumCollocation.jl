@@ -848,11 +848,12 @@ function μ∂aₜ∂ψ̃ₜ(
     n_drives = length(aₜ)
     μ∂aₜ∂ψ̃ₜP = zeros(T, P.dim, n_drives)
     for j = 1:n_drives
-        ∂aʲFR = ∂aₜʲF_real(P, aₜ, Δtₜ, drive_indices[j])
-        ∂aʲFI = ∂aₜʲF_imag(P, aₜ, Δtₜ, drive_indices[j])
-        ∂aʲF = Id2 ⊗ ∂aʲFR - Im2 ⊗ ∂aʲFI
-        μ∂aₜ∂ψ̃ₜP[:, j] = -∂aʲF' * μₜ
-    end
+        dr_ind = drive_indices[j]
+        Gʲ = P.G_drives[dr_ind]
+        Ĝʲ = G(aₜ, P.G_drift_anticoms[dr_ind], P.G_drive_anticoms[:, dr_ind])
+        ∂aₜ∂ψ̃ₜP = -(Δt / 2 * Gʲ + Δt^2 / 9 * Ĝʲ)
+        μ∂aₜ∂ψ̃ₜP[:, j] = ∂aₜ∂ψ̃ₜP' * μₜ
+     end
     return μ∂aₜ∂ψ̃ₜP
 end
 
@@ -866,10 +867,11 @@ function μ∂ψ̃ₜ₊₁∂aₜ(
     n_drives = length(aₜ)
     μ∂ψ̃ₜ₊₁∂aₜP = zeros(T, n_drives, P.dim)
     for j = 1:n_drives
-        ∂aʲBR = ∂aₜʲB_real(P, aₜ, Δtₜ, drive_indices[j])
-        ∂aʲBI = ∂aₜʲB_imag(P, aₜ, Δtₜ, drive_indices[j])
-        ∂aʲB = Id2 ⊗ ∂aʲBR + Im2 ⊗ ∂aʲBI
-        μ∂ψ̃ₜ₊₁∂aₜP[j, :] = μₜ' * ∂aʲB
+        dr_ind = drive_indices[j]
+        Gʲ = P.G_drives[dr_ind]
+        Ĝʲ = G(aₜ, P.G_drift_anticoms[dr_ind], P.G_drive_anticoms[:, dr_ind])
+        ∂ψ̃ₜ₊₁∂aₜP = -Δt / 2 * Gʲ +  Δt^2 / 9 * Ĝʲ
+        μ∂ψ̃ₜ₊₁∂aₜP[j, :] = μₜ' * ∂ψ̃ₜ₊₁∂aₜP
     end
     return μ∂ψ̃ₜ₊₁∂aₜP
 end
