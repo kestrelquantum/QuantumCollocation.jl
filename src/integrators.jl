@@ -812,10 +812,13 @@ function μ∂aₜ∂Ũ⃗ₜ(
     n_drives = length(aₜ)
     μ∂aₜ∂Ũ⃗ₜP = zeros(T, P.dim, n_drives)
     for j = 1:n_drives
-        ∂aʲFR = ∂aₜʲF_real(P, aₜ, Δtₜ, drive_indices[j])
-        ∂aʲFI = ∂aₜʲF_imag(P, aₜ, Δtₜ, drive_indices[j])
-        ∂aʲF̂ = P.I_2N ⊗ ∂aʲFR - P.Ω_2N ⊗ ∂aʲFI
-        μ∂aₜ∂Ũ⃗ₜP[:, j] = -∂aʲF̂' * μₜ
+        dr_ind = drive_indices[j]
+        Gʲ = P.G_drives[dr_ind]
+        Ĝʲ = G(aₜ, P.G_drift_anticoms[dr_ind], P.G_drive_anticoms[:, dr_ind])
+        ∂aₜ∂Ũ⃗ₜ_block_i = -(Δt / 2 * Gʲ + Δt^2 / 12 * Ĝʲ)
+        # sparse is necessary since blockdiag doesn't accept dense matrices
+        ∂aₜ∂Ũ⃗ₜ = blockdiag(fill(sparse(∂aₜ∂Ũ⃗ₜ_block_i), P.N)...)
+        μ∂aₜ∂Ũ⃗ₜP[:, j] = ∂aₜ∂Ũ⃗ₜ * μₜ
     end
     return μ∂aₜ∂Ũ⃗ₜP
 end
@@ -830,10 +833,13 @@ function μ∂Ũ⃗ₜ₊₁∂aₜ(
     n_drives = length(aₜ)
     μ∂Ũ⃗ₜ₊₁∂aₜP = zeros(T, n_drives, P.dim)
     for j = 1:n_drives
-        ∂aʲBR = ∂aₜʲB_real(P, aₜ, Δtₜ, drive_indices[j])
-        ∂aʲBI = ∂aₜʲB_imag(P, aₜ, Δtₜ, drive_indices[j])
-        ∂aʲB̂ = P.I_2N ⊗ ∂aʲBR + P.Ω_2N ⊗ ∂aʲBI
-        μ∂Ũ⃗ₜ₊₁∂aₜP[j, :] = μₜ' * ∂aʲB̂
+        dr_ind = drive_indices[j]
+        Gʲ = P.G_drives[dr_ind]
+        Ĝʲ = G(aₜ, P.G_drift_anticoms[dr_ind], P.G_drive_anticoms[:, dr_ind])
+        ∂Ũ⃗ₜ₊₁∂aₜ_block_i = -(Δt / 2 * Gʲ + Δt^2 / 12 * Ĝʲ)
+        # sparse is necessary since blockdiag doesn't accept dense matrices
+        ∂Ũ⃗ₜ₊₁∂aₜ = blockdiag(fill(sparse(∂Ũ⃗ₜ₊₁∂aₜ_block_i), P.N)...)
+        μ∂Ũ⃗ₜ₊₁∂aₜP[j, :] = μₜ' * ∂Ũ⃗ₜ₊₁∂aₜ
     end
     return μ∂Ũ⃗ₜ₊₁∂aₜP
 end
@@ -851,7 +857,7 @@ function μ∂aₜ∂ψ̃ₜ(
         dr_ind = drive_indices[j]
         Gʲ = P.G_drives[dr_ind]
         Ĝʲ = G(aₜ, P.G_drift_anticoms[dr_ind], P.G_drive_anticoms[:, dr_ind])
-        ∂aₜ∂ψ̃ₜP = -(Δt / 2 * Gʲ + Δt^2 / 9 * Ĝʲ)
+        ∂aₜ∂ψ̃ₜP = -(Δt / 2 * Gʲ + Δt^2 / 12 * Ĝʲ)
         μ∂aₜ∂ψ̃ₜP[:, j] = ∂aₜ∂ψ̃ₜP' * μₜ
      end
     return μ∂aₜ∂ψ̃ₜP
@@ -870,9 +876,10 @@ function μ∂ψ̃ₜ₊₁∂aₜ(
         dr_ind = drive_indices[j]
         Gʲ = P.G_drives[dr_ind]
         Ĝʲ = G(aₜ, P.G_drift_anticoms[dr_ind], P.G_drive_anticoms[:, dr_ind])
-        ∂ψ̃ₜ₊₁∂aₜP = -Δt / 2 * Gʲ +  Δt^2 / 9 * Ĝʲ
+        ∂ψ̃ₜ₊₁∂aₜP = -Δt / 2 * Gʲ +  Δt^2 / 12 * Ĝʲ
         μ∂ψ̃ₜ₊₁∂aₜP[j, :] = μₜ' * ∂ψ̃ₜ₊₁∂aₜP
     end
+    #can add if else for higher order derivatives
     return μ∂ψ̃ₜ₊₁∂aₜP
 end
 
