@@ -43,15 +43,65 @@ abstract type AbstractLoss end
 function infidelity(ψ̃::AbstractVector, ψ̃goal::AbstractVector)
     ψ = iso_to_ket(ψ̃)
     ψgoal = iso_to_ket(ψ̃goal)
-    return abs(1 - abs2(ψ'ψgoal))
+    return abs(1 - abs2(ψgoal'ψ))
 end
 
-function unitary_infidelity(Ũ⃗::AbstractVector, Ũ⃗_goal::AbstractVector)
-    U = iso_vec_to_operator(Ũ⃗)
-    Ugoal = iso_vec_to_operator(Ũ⃗_goal)
-    N = size(U, 1)
-    return abs(1 - 1 / N * abs(tr(Ugoal'U)))
+@inline @views function isovec_unitary_fidelity(Ũ⃗::AbstractVector, Ũ⃗_goal::AbstractVector)
+    n = Int(sqrt(length(Ũ⃗) ÷ 2))
+    U⃗ᵣ = Ũ⃗[1:end ÷ 2]
+    U⃗ᵢ = Ũ⃗[end ÷ 2 + 1:end]
+    Ū⃗ᵣ = Ũ⃗_goal[1:end ÷ 2]
+    Ū⃗ᵢ = Ũ⃗_goal[end ÷ 2 + 1:end]
+    Tᵣ = Ū⃗ᵣ' * U⃗ᵣ + Ū⃗ᵢ' * U⃗ᵢ
+    Tᵢ = Ū⃗ᵣ' * U⃗ᵢ - Ū⃗ᵢ' * U⃗ᵣ
+    return 1 / n * sqrt(Tᵣ^2 + Tᵢ^2)
 end
+
+@views function unitary_infidelity(Ũ⃗::AbstractVector, Ũ⃗_goal::AbstractVector)
+    ℱ = isovec_unitary_fidelity(Ũ⃗, Ũ⃗_goal)
+    return abs(1 - ℱ)
+end
+
+@views function unitary_infidelity_gradient(Ũ⃗::AbstractVector, Ũ⃗_goal::AbstractVector)
+    n = Int(sqrt(length(Ũ⃗) ÷ 2))
+    U⃗ᵣ = Ũ⃗[1:end ÷ 2]
+    U⃗ᵢ = Ũ⃗[end ÷ 2 + 1:end]
+    Ū⃗ᵣ = Ũ⃗_goal[1:end ÷ 2]
+    Ū⃗ᵢ = Ũ⃗_goal[end ÷ 2 + 1:end]
+    Tᵣ = Ū⃗ᵣ' * U⃗ᵣ + Ū⃗ᵢ' * U⃗ᵢ
+    Tᵢ = Ū⃗ᵣ' * U⃗ᵢ - Ū⃗ᵢ' * U⃗ᵣ
+    ℱ = 1 / n * sqrt(Tᵣ^2 + Tᵢ^2)
+    ∇ᵣℱ = 1 / (n^2 * ℱ) * (Tᵣ * Ū⃗ᵣ - Tᵢ * Ū⃗ᵢ)
+    ∇ᵢℱ = 1 / (n^2 * ℱ) * (Tᵣ * Ū⃗ᵢ + Tᵢ * Ū⃗ᵣ)
+    ∇ℱ = [∇ᵣℱ; ∇ᵢℱ]
+    return -sign(1 - ℱ) * ∇ℱ
+end
+
+@views function unitary_infidelity_hessian(Ũ⃗::AbstractVector, Ũ⃗_goal::AbstractVector)
+    n = Int(sqrt(length(Ũ⃗) ÷ 2))
+    U⃗ᵣ = Ũ⃗[1:end ÷ 2]
+    U⃗ᵢ = Ũ⃗[end ÷ 2 + 1:end]
+    Ū⃗ᵣ = Ũ⃗_goal[1:end ÷ 2]
+    Ū⃗ᵢ = Ũ⃗_goal[end ÷ 2 + 1:end]
+    Tᵣ = Ū⃗ᵣ' * U⃗ᵣ + Ū⃗ᵢ' * U⃗ᵢ
+    Tᵢ = Ū⃗ᵣ' * U⃗ᵢ - Ū⃗ᵢ' * U⃗ᵣ
+    Wᵣᵣ = Ū⃗ᵣ * Ū⃗ᵣ'
+    Wᵣᵢ = Ū⃗ᵣ * Ū⃗ᵢ'
+    Wᵢᵢ = Ū⃗ᵢ * Ū⃗ᵢ'
+    ℱ = 1 / n * sqrt(Tᵣ^2 + Tᵢ^2)
+    ∇ᵣℱ = 1 / (n^2 * ℱ) * (Tᵣ * Ū⃗ᵣ - Tᵢ * Ū⃗ᵢ)
+    ∇ᵢℱ = 1 / (n^2 * ℱ) * (Tᵣ * Ū⃗ᵢ + Tᵢ * Ū⃗ᵣ)
+    ∇ℱ = [∇ᵣℱ; ∇ᵢℱ]
+    ∂ᵣ²ℱ = 1 / ℱ * (∇ᵣℱ * ∇ᵣℱ' + 1 / n^2 * (Wᵣᵣ + Wᵢᵢ))
+    ∂ᵢ²ℱ = 1 / ℱ * (∇ᵢℱ * ∇ᵢℱ' + 1 / n^2 * (Wᵣᵣ + Wᵢᵢ))
+    ∂ᵣ∂ᵢℱ = 1 / ℱ * (∇ᵣℱ * ∇ᵢℱ' + 1 / n^2 * (Wᵣᵢ - Wᵣᵢ'))
+    ∂²ℱ = [∂ᵣ²ℱ ∂ᵣ∂ᵢℱ; ∂ᵣ∂ᵢℱ' ∂ᵢ²ℱ]
+    return -sign(1 - ℱ) * (∇ℱ * ∇ℱ' + ∂²ℱ)
+end
+
+
+
+
 
 function unitary_trace_loss(Ũ⃗::AbstractVector, Ũ⃗_goal::AbstractVector)
     U = iso_vec_to_operator(Ũ⃗)
@@ -163,35 +213,16 @@ struct UnitaryInfidelityLoss <: AbstractLoss
         name::Symbol,
         Ũ⃗_goal::AbstractVector
     )
-        # l = Ũ⃗ -> unitary_infidelity(Ũ⃗, Ũ⃗_goal)
-        # ∇l = Ũ⃗ -> ForwardDiff.gradient(l, Ũ⃗)
-
-        # Symbolics.@variables Ũ⃗[1:length(Ũ⃗_goal)]
-        # Ũ⃗ = collect(Ũ⃗)
-
-        # ∇²l_symbolic = Symbolics.sparsehessian(l(Ũ⃗), Ũ⃗)
-        # K, J, _ = findnz(∇²l_symbolic)
-        # kjs = collect(zip(K, J))
-        # filter!(((k, j),) -> k ≤ j, kjs)
-        # ∇²l_structure = kjs
-
-        # ∇²l_expression = Symbolics.build_function(∇²l_symbolic, Ũ⃗)
-        # ∇²l = eval(∇²l_expression[1])
-
         l = Ũ⃗ -> unitary_infidelity(Ũ⃗, Ũ⃗_goal)
-        ∇l = Ũ⃗ -> ForwardDiff.gradient(l, Ũ⃗)
-        ∇²l = Ũ⃗ -> ForwardDiff.hessian(l, Ũ⃗)
+        ∇l = Ũ⃗ -> unitary_infidelity_gradient(Ũ⃗, Ũ⃗_goal)
+        ∇²l = Ũ⃗ -> unitary_infidelity_hessian(Ũ⃗, Ũ⃗_goal)
         Ũ⃗_dim = length(Ũ⃗_goal)
-
-        # ∇²l_structure = loss_hessian_structure(∇²l, Ũ⃗_dim)
-
         ∇²l_structure = []
         for (i, j) ∈ Iterators.product(1:Ũ⃗_dim, 1:Ũ⃗_dim)
             if i ≤ j
                 push!(∇²l_structure, (i, j))
             end
         end
-
         return new(l, ∇l, ∇²l, ∇²l_structure, name)
     end
 end
@@ -202,7 +233,6 @@ function (loss::UnitaryInfidelityLoss)(
     hessian=false
 )
     @assert !(gradient && hessian)
-
     if !(gradient || hessian)
         return loss.l(Ũ⃗_end)
     elseif gradient
