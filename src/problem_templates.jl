@@ -52,6 +52,7 @@ function UnitarySmoothPulseProblem(
     timesteps_all_equal::Bool=true,
     verbose::Bool=false,
     U_init::Union{AbstractMatrix{<:Number},Nothing}=nothing,
+    geodesic=true,
 )
     U_goal = Matrix{ComplexF64}(U_goal)
 
@@ -71,19 +72,25 @@ function UnitarySmoothPulseProblem(
         end
 
         if isnothing(a_guess)
-            # TODO: add warning in case U_goal is not unitary
+            geodesic_success = true
+            if geodesic
+                try
+                    Ũ⃗ = unitary_geodesic(U_goal, T)
+                catch e
+                    @warn "Could not find geodesic. Using random initial guess."
+                    geodesic_success = false
+                end
+            end
+            if !geodesic || !geodesic_success
+                Ũ⃗ = 2 * rand(length(Ũ⃗_init), T) .- 1
+            end
             a_dists =  [Uniform(-a_bounds[i], a_bounds[i]) for i = 1:n_drives]
             a = hcat([
                 zeros(n_drives),
                 vcat([rand(a_dists[i], 1, T - 2) for i = 1:n_drives]...),
                 zeros(n_drives)
             ]...)
-            try
-                Ũ⃗ = unitary_geodesic(U_goal, T)
-            catch e
-                @warn "Could not find geodesic. Rolling out unitary from random intial controls."
-                Ũ⃗ = unitary_rollout(Ũ⃗_init, a, Δt, system)
-            end
+
             da = randn(n_drives, T) * drive_derivative_σ
             dda = randn(n_drives, T) * drive_derivative_σ
         else

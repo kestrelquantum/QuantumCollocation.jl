@@ -86,18 +86,62 @@ end
     Tᵣ = Ū⃗ᵣ' * U⃗ᵣ + Ū⃗ᵢ' * U⃗ᵢ
     Tᵢ = Ū⃗ᵣ' * U⃗ᵢ - Ū⃗ᵢ' * U⃗ᵣ
     Wᵣᵣ = Ū⃗ᵣ * Ū⃗ᵣ'
-    Wᵣᵢ = Ū⃗ᵣ * Ū⃗ᵢ'
     Wᵢᵢ = Ū⃗ᵢ * Ū⃗ᵢ'
+    Wᵣᵢ = Ū⃗ᵣ * Ū⃗ᵢ'
+    Wᵢᵣ = Wᵣᵢ'
     ℱ = 1 / n * sqrt(Tᵣ^2 + Tᵢ^2)
     ∇ᵣℱ = 1 / (n^2 * ℱ) * (Tᵣ * Ū⃗ᵣ - Tᵢ * Ū⃗ᵢ)
     ∇ᵢℱ = 1 / (n^2 * ℱ) * (Tᵣ * Ū⃗ᵢ + Tᵢ * Ū⃗ᵣ)
-    ∇ℱ = [∇ᵣℱ; ∇ᵢℱ]
-    ∂ᵣ²ℱ = 1 / ℱ * (∇ᵣℱ * ∇ᵣℱ' + 1 / n^2 * (Wᵣᵣ + Wᵢᵢ))
-    ∂ᵢ²ℱ = 1 / ℱ * (∇ᵢℱ * ∇ᵢℱ' + 1 / n^2 * (Wᵣᵣ + Wᵢᵢ))
-    ∂ᵣ∂ᵢℱ = 1 / ℱ * (∇ᵣℱ * ∇ᵢℱ' + 1 / n^2 * (Wᵣᵢ - Wᵣᵢ'))
+    ∂ᵣ²ℱ = 1 / ℱ * (-∇ᵣℱ * ∇ᵣℱ' + 1 / n^2 * (Wᵣᵣ + Wᵢᵢ))
+    ∂ᵢ²ℱ = 1 / ℱ * (-∇ᵢℱ * ∇ᵢℱ' + 1 / n^2 * (Wᵣᵣ + Wᵢᵢ))
+    ∂ᵣ∂ᵢℱ = 1 / ℱ * (-∇ᵢℱ * ∇ᵣℱ' + 1 / n^2 * (Wᵢᵣ - Wᵣᵢ))
     ∂²ℱ = [∂ᵣ²ℱ ∂ᵣ∂ᵢℱ; ∂ᵣ∂ᵢℱ' ∂ᵢ²ℱ]
-    return -sign(1 - ℱ) * (∇ℱ * ∇ℱ' + ∂²ℱ)
+    return -sign(1 - ℱ) * ∂²ℱ
 end
+
+
+
+struct UnitaryInfidelityLoss <: AbstractLoss
+    l::Function
+    ∇l::Function
+    ∇²l::Function
+    ∇²l_structure::Vector{Tuple{Int,Int}}
+    name::Symbol
+
+    function UnitaryInfidelityLoss(
+        name::Symbol,
+        Ũ⃗_goal::AbstractVector
+    )
+        l = Ũ⃗ -> unitary_infidelity(Ũ⃗, Ũ⃗_goal)
+        ∇l = Ũ⃗ -> unitary_infidelity_gradient(Ũ⃗, Ũ⃗_goal)
+        ∇²l = Ũ⃗ -> unitary_infidelity_hessian(Ũ⃗, Ũ⃗_goal)
+        Ũ⃗_dim = length(Ũ⃗_goal)
+        ∇²l_structure = []
+        for (i, j) ∈ Iterators.product(1:Ũ⃗_dim, 1:Ũ⃗_dim)
+            if i ≤ j
+                push!(∇²l_structure, (i, j))
+            end
+        end
+        return new(l, ∇l, ∇²l, ∇²l_structure, name)
+    end
+end
+
+function (loss::UnitaryInfidelityLoss)(
+    Ũ⃗_end::AbstractVector{<:Real};
+    gradient=false,
+    hessian=false
+)
+    @assert !(gradient && hessian)
+    if !(gradient || hessian)
+        return loss.l(Ũ⃗_end)
+    elseif gradient
+        return loss.∇l(Ũ⃗_end)
+    elseif hessian
+        return loss.∇²l(Ũ⃗_end)
+    end
+end
+
+
 
 
 
@@ -198,50 +242,6 @@ function (loss::UnitaryTraceLoss)(
         return loss.∇²l(Ũ⃗_end)
     end
 end
-
-
-
-
-struct UnitaryInfidelityLoss <: AbstractLoss
-    l::Function
-    ∇l::Function
-    ∇²l::Function
-    ∇²l_structure::Vector{Tuple{Int,Int}}
-    name::Symbol
-
-    function UnitaryInfidelityLoss(
-        name::Symbol,
-        Ũ⃗_goal::AbstractVector
-    )
-        l = Ũ⃗ -> unitary_infidelity(Ũ⃗, Ũ⃗_goal)
-        ∇l = Ũ⃗ -> unitary_infidelity_gradient(Ũ⃗, Ũ⃗_goal)
-        ∇²l = Ũ⃗ -> unitary_infidelity_hessian(Ũ⃗, Ũ⃗_goal)
-        Ũ⃗_dim = length(Ũ⃗_goal)
-        ∇²l_structure = []
-        for (i, j) ∈ Iterators.product(1:Ũ⃗_dim, 1:Ũ⃗_dim)
-            if i ≤ j
-                push!(∇²l_structure, (i, j))
-            end
-        end
-        return new(l, ∇l, ∇²l, ∇²l_structure, name)
-    end
-end
-
-function (loss::UnitaryInfidelityLoss)(
-    Ũ⃗_end::AbstractVector{<:Real};
-    gradient=false,
-    hessian=false
-)
-    @assert !(gradient && hessian)
-    if !(gradient || hessian)
-        return loss.l(Ũ⃗_end)
-    elseif gradient
-        return loss.∇l(Ũ⃗_end)
-    elseif hessian
-        return loss.∇²l(Ũ⃗_end)
-    end
-end
-
 
 
 
