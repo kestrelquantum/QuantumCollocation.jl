@@ -149,7 +149,7 @@ end
 
 function build_anticomms(
     G_drift::Matrix{R}, 
-    G_drives::Matrix{R}, 
+    G_drives::Vector{Matrix{R}}, 
     n_drives::Int) where R <: Number
 
     drive_anticomms = fill(
@@ -349,9 +349,8 @@ struct UnitaryPadeIntegrator{R <: Number} <: QuantumPadeIntegrator
         G_drives = sys.G_drives
 
         drive_anticomms, drift_anticomms = 
-            P.order == 4 ? build_anticomms(G_drift, G_drives, n_drives) : nothing, nothing
+            order == 4 ? build_anticomms(G_drift, G_drives, n_drives) : (nothing, nothing)
         
-
         return new{R}(
             I_2N,
             G_drift,
@@ -377,8 +376,8 @@ struct QuantumStatePadeIntegrator{R <: Number} <: QuantumPadeIntegrator
     I_2N::SparseMatrixCSC{R, Int}
     G_drift::Matrix{R}
     G_drives::Vector{Matrix{R}}
-    G_drive_anticomms::Symmetric
-    G_drift_anticomms::Vector{Matrix{R}}
+    G_drive_anticomms::Union{Symmetric, Nothing}
+    G_drift_anticomms::Union{Vector{Matrix{R}}, Nothing}
     state_symb::Union{Symbol,Nothing}
     drive_symb::Union{Symbol,Tuple{Vararg{Symbol}},Nothing}
     n_drives::Int
@@ -430,7 +429,6 @@ struct QuantumStatePadeIntegrator{R <: Number} <: QuantumPadeIntegrator
         @assert order ∈ [4, 6, 8, 10] "order must be in [4, 6, 8, 10]"
         @assert !isnothing(state_symb) "state_symb must be specified"
         @assert !isnothing(drive_symb) "drive_symb must be specified"
-
         n_drives = length(sys.H_drives_real)
         N = size(sys.H_drift_real, 1)
         dim = 2N
@@ -440,7 +438,7 @@ struct QuantumStatePadeIntegrator{R <: Number} <: QuantumPadeIntegrator
         G_drives = sys.G_drives
 
         drive_anticomms, drift_anticomms = 
-            P.order == 4 ? build_anticomms(G_drift, G_drives, n_drives) : nothing, nothing
+            order == 4 ? build_anticomms(G_drift, G_drives, n_drives) : (nothing, nothing)
         
         return new{R}(
             I_2N,
@@ -551,6 +549,7 @@ function ∂aₜ(
     Ũ⃗ₜ::AbstractVector{T},
     aₜ::AbstractVector{T},
     Δtₜ::Real,
+    drive_indices=1:P.n_drives
 ) where {R <: Real, T <: Real}
     
     if P.autodiff || !isnothing(P.G)
@@ -564,10 +563,10 @@ function ∂aₜ(
     # otherwise we don't have a nonlinear G or are fine with using 
     # the fourth order derivatives
 
-    else
+    elseif P.order == 4
         n_drives = length(aₜ)
         ∂aP = zeros(T, P.dim, n_drives)
-        for j = 1:n_drives
+        for j = drive_indices
             Gʲ = P.G_drives[j]
             Gʲ_anticomm_Gₜ =
                 G(aₜ, P.G_drift_anticomms[j], P.G_drive_anticomms[:, j])
@@ -580,9 +579,12 @@ function ∂aₜ(
                     Δt^2 / 12 * Gʲ_anticomm_Gₜ * (ψ̃ⁱₜ₊₁ - ψ̃ⁱₜ)
             end
         end   
+    else
+        ## higher order pade code goes here
     end
     return ∂aP
 end
+
 
 function ∂aₜ(
     P::QuantumStatePadeIntegrator{R},
@@ -590,6 +592,7 @@ function ∂aₜ(
     ψ̃ₜ::AbstractVector{T},
     aₜ::AbstractVector{T},
     Δtₜ::Real,
+    drive_indices=1:P.n_drives
 ) where {R <: Real, T <: Real}
     if P.autodiff || !isnothing(P.G)
 
@@ -605,7 +608,7 @@ function ∂aₜ(
     elseif P.order == 4
         n_drives = length(aₜ)
         ∂aP = zeros(T, P.dim, n_drives)
-        for j = 1:n_drives
+        for j = drive_indices
             Gʲ = P.G_drives[j]
             Gʲ_anticomm_Gₜ =
                 G(aₜ, P.G_drift_anticomms[j], P.G_drive_anticomms[:, j])
@@ -686,7 +689,7 @@ end
     else
         Δtₜ = traj.timestep
     end
-
+    # fix this so that it concatenates all the controls.
     if P.drive_symb isa Tuple
         aₜs = Tuple(zₜ[traj.components[s]] for s ∈ P.drive_symb)
         ∂aₜPs = []

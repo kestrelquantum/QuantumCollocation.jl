@@ -24,6 +24,7 @@ Z = NamedTrajectory(
     (
         Ũ⃗ = unitary_geodesic(U_goal, T),
         a = randn(n_drives, T),
+        g = randn(n_drives, T),
         da = randn(n_drives, T),
         Δt = fill(dt, 1, T),
     ),
@@ -32,6 +33,11 @@ Z = NamedTrajectory(
     goal=(Ũ⃗ = Ũ⃗_goal,)
 )
 
-P = UnitaryPadeIntegrator(system, :Ũ⃗, :a)
+P = UnitaryPadeIntegrator(system, :Ũ⃗, (:a, :g))
 
-@btime P(Z.datavec[slice(2, Z.dim)], Z.datavec[slice(3, Z.dim)], Z)
+#P(Z.datavec[slice(2, Z.dim)], Z.datavec[slice(3, Z.dim)], Z)
+
+z_2 = Z.datavec[slice(2, Z.dim)]
+z_3 = Z.datavec[slice(3, Z.dim)]
+
+[z_2[Z.components[:g]]... for s ∈ P.drive_symb]
