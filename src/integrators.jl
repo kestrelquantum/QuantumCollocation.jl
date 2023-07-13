@@ -735,11 +735,8 @@ end
     ψ̃ₜ₊₁ = zₜ₊₁[traj.components[P.state_symb]]
     ψ̃ₜ = zₜ[traj.components[P.state_symb]]
 
-    if free_time
-        Δtₜ = zₜ[traj.components[traj.timestep]][1]
-    else
-        Δtₜ = traj.timestep
-    end
+    
+    Δtₜ = free_time ? zₜ[traj.components[traj.timestep]][1] : traj.timestep
 
     if P.drive_symb isa Tuple
         inds = [traj.components[s] for s in P.drive_symb]
@@ -747,37 +744,18 @@ end
     else 
         inds = traj.components[P.drive_symb]
     end
+
     for i = 1:length(inds) - 1
         @assert inds[i] + 1 == inds[i + 1] "Controls must be in order"
     end
 
-    aₜ = zₜ[traj.components[P.drive_symb]]
+    aₜ = zₜ[inds]
 
-    if P.drive_symb isa Tuple
-        aₜs = Tuple(zₜ[traj.components[s]] for s ∈ P.drive_symb)
-        ∂aₜPs = []
-        let H_drive_mark = 0
-            for aₜᵢ ∈ aₜs
-                n_aᵢ_drives = length(aₜᵢ)
-                drive_indices = (H_drive_mark + 1):(H_drive_mark + n_aᵢ_drives)
-                ∂aₜᵢP = ∂aₜ(P, ψ̃ₜ₊₁, ψ̃ₜ, aₜᵢ, Δtₜ, drive_indices)
-                push!(∂aₜPs, ∂aₜᵢP)
-                H_drive_mark += n_aᵢ_drives
-            end
-        end
-        ∂aₜP = tuple(∂aₜPs...)
-        if free_time
-            ∂ΔtₜP = ∂Δtₜ(P, ψ̃ₜ₊₁, ψ̃ₜ, vcat(aₜs...), Δtₜ)
-        end
-
-    else
-        aₜ = zₜ[traj.components[P.drive_symb]]
-        ∂aₜP = ∂aₜ(P, ψ̃ₜ₊₁, ψ̃ₜ, aₜ, Δtₜ)
-        if free_time
-            ∂ΔtₜP = ∂Δtₜ(P, ψ̃ₜ₊₁, ψ̃ₜ, aₜ, Δtₜ)
-        end
+    ∂aₜP = ∂aₜ(P, ψ̃ₜ₊₁, ψ̃ₜ, aₜ, Δtₜ)
+    if free_time
+        ∂ΔtₜP = ∂Δtₜ(P, ψ̃ₜ₊₁, ψ̃ₜ, aₜ, Δtₜ)
     end
-    
+
     Gₜ::AbstractMatrix = isnothing(P.G) ? G(aₜ, P.G_drift, P.G_drives) : P.G(aₜ, P.G_drift, P.G_drives)
     n = P.order ÷ 2
     Gₜ_powers = compute_powers(Gₜ, n)
