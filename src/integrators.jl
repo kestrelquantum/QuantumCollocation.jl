@@ -810,9 +810,8 @@ function μ∂aₜ∂Ũ⃗ₜ(
     n_drives = length(aₜ)
     μ∂aₜ∂Ũ⃗ₜP = zeros(T, P.dim, n_drives)
     for j = 1:n_drives
-        dr_ind = drive_indices[j]
-        Gʲ = P.G_drives[dr_ind]
-        Ĝʲ = G(aₜ, P.G_drift_anticoms[dr_ind], P.G_drive_anticoms[:, dr_ind])
+        Gʲ = P.G_drives[j]
+        Ĝʲ = G(aₜ, P.G_drift_anticoms[j], P.G_drive_anticoms[:, j])
         ∂aₜ∂Ũ⃗ₜ_block_i = -(Δt / 2 * Gʲ + Δt^2 / 12 * Ĝʲ)
         # sparse is necessary since blockdiag doesn't accept dense matrices
         ∂aₜ∂Ũ⃗ₜ = blockdiag(fill(sparse(∂aₜ∂Ũ⃗ₜ_block_i), P.N)...)
@@ -826,14 +825,12 @@ function μ∂Ũ⃗ₜ₊₁∂aₜ(
     aₜ::AbstractVector{T},
     Δtₜ::Real,
     μₜ::AbstractVector{T},
-    drive_indices=1:P.n_drives
 ) where T <: Real
     n_drives = length(aₜ)
     μ∂Ũ⃗ₜ₊₁∂aₜP = zeros(T, n_drives, P.dim)
     for j = 1:n_drives
-        dr_ind = drive_indices[j]
-        Gʲ = P.G_drives[dr_ind]
-        Ĝʲ = G(aₜ, P.G_drift_anticoms[dr_ind], P.G_drive_anticoms[:, dr_ind])
+        Gʲ = P.G_drives[j]
+        Ĝʲ = G(aₜ, P.G_drift_anticoms[j], P.G_drive_anticoms[:, j])
         ∂Ũ⃗ₜ₊₁∂aₜ_block_i = -(Δt / 2 * Gʲ + Δt^2 / 12 * Ĝʲ)
         # sparse is necessary since blockdiag doesn't accept dense matrices
         ∂Ũ⃗ₜ₊₁∂aₜ = blockdiag(fill(sparse(∂Ũ⃗ₜ₊₁∂aₜ_block_i), P.N)...)
