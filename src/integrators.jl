@@ -682,35 +682,23 @@ end
     Ũ⃗ₜ₊₁ = zₜ₊₁[traj.components[P.unitary_symb]]
     Ũ⃗ₜ = zₜ[traj.components[P.unitary_symb]]
 
-    if free_time
-        Δtₜ = zₜ[traj.components[traj.timestep]][1]
-    else
-        Δtₜ = traj.timestep
-    end
-    # fix this so that it concatenates all the controls.
+    Δtₜ = free_time ? zₜ[traj.components[traj.timestep]][1] : traj.timestep
+
     if P.drive_symb isa Tuple
-        aₜs = Tuple(zₜ[traj.components[s]] for s ∈ P.drive_symb)
-        ∂aₜPs = []
-        let H_drive_mark = 0
-            for aₜᵢ ∈ aₜs                
-                n_aᵢ_drives = length(aₜᵢ)
-                drive_indices = (H_drive_mark + 1):(H_drive_mark + n_aᵢ_drives)
-                ∂aₜᵢP = ∂aₜ(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, aₜᵢ, Δtₜ, drive_indices)
-                push!(∂aₜPs, ∂aₜᵢP)
-                H_drive_mark += n_aᵢ_drives
-            end
-        end
-        ∂aₜP = tuple(∂aₜPs...)
-        if free_time
-            ∂ΔtₜP = ∂Δtₜ(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, vcat(aₜs...), Δtₜ)
-        end
-        ∂ΔtₜP = ∂Δtₜ(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, vcat(aₜs...), Δtₜ)
-    else
-        aₜ = zₜ[traj.components[P.drive_symb]]
-        ∂aₜP = ∂aₜ(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, aₜ, Δtₜ)
-        if free_time
-            ∂ΔtₜP = ∂Δtₜ(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, aₜ, Δtₜ)
-        end
+        inds = [traj.components[s] for s in P.drive_symb]
+        inds = vcat(collect.(inds)...)
+    else 
+        inds = traj.components[P.drive_symb]
+    end
+
+    for i = 1:length(inds) - 1
+        @assert inds[i] + 1 == inds[i + 1] "Controls must be in order"
+    end
+
+    aₜ = zₜ[inds]
+    ∂aₜP = ∂aₜ(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, aₜ, Δtₜ)
+    if free_time
+        ∂ΔtₜP = ∂Δtₜ(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, aₜ, Δtₜ)
     end
 
     ∂Ũ⃗ₜP = spzeros(P.dim, P.dim)
@@ -742,7 +730,7 @@ end
     zₜ₊₁::AbstractVector,
     traj::NamedTrajectory
 )
-    free_time = !isnothing(P.timestep_symb)
+    free_time = traj.timestep isa Symbol
 
     ψ̃ₜ₊₁ = zₜ₊₁[traj.components[P.state_symb]]
     ψ̃ₜ = zₜ[traj.components[P.state_symb]]
@@ -752,6 +740,18 @@ end
     else
         Δtₜ = traj.timestep
     end
+
+    if P.drive_symb isa Tuple
+        inds = [traj.components[s] for s in P.drive_symb]
+        inds = vcat(collect.(inds)...)
+    else 
+        inds = traj.components[P.drive_symb]
+    end
+    for i = 1:length(inds) - 1
+        @assert inds[i] + 1 == inds[i + 1] "Controls must be in order"
+    end
+
+    aₜ = zₜ[traj.components[P.drive_symb]]
 
     if P.drive_symb isa Tuple
         aₜs = Tuple(zₜ[traj.components[s]] for s ∈ P.drive_symb)
@@ -1076,6 +1076,7 @@ end
 
     if P.drive_symb isa Tuple
         aₜ = Tuple(zₜ[traj.components[s]] for s ∈ P.drive_symb)
+        
 
         μ∂aₜᵢ∂Ũ⃗ₜPs = []
         μ∂²aₜᵢPs = []
