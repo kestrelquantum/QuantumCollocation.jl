@@ -564,7 +564,7 @@ function ∂aₜ(
 
     elseif P.order == 4
         n_drives = length(aₜ)
-        ∂aP = zeros(T, P.dim, n_drives)
+        ∂aP = Array{T}(undef, P.dim, n_drives)
         isodim = 2*P.N
         for j = 1:n_drives
             Gʲ = P.G_drives[j]
@@ -605,7 +605,7 @@ function ∂aₜ(
 
     elseif P.order == 4
         n_drives = length(aₜ)
-        ∂aP = zeros(T, P.dim, n_drives)
+        ∂aP = Array{T}(undef, P.dim, n_drives)
         for j = 1:n_drives
             Gʲ = P.G_drives[j]
             Gʲ_anticomm_Gₜ =
@@ -805,10 +805,11 @@ function μ∂aₜ∂Ũ⃗ₜ(
     aₜ::AbstractVector{T},
     Δtₜ::Real,
     μₜ::AbstractVector{T},
-    drive_indices=1:P.n_drives
 ) where T <: Real
-    n_drives = length(aₜ)
-    μ∂aₜ∂Ũ⃗ₜP = zeros(T, P.dim, n_drives)
+
+    n_drives = P.n_drives
+    μ∂aₜ∂Ũ⃗ₜP = Array{T}(undef, P.dim, n_drives)
+    
     for j = 1:n_drives
         Gʲ = P.G_drives[j]
         Ĝʲ = G(aₜ, P.G_drift_anticoms[j], P.G_drive_anticoms[:, j])
@@ -817,6 +818,7 @@ function μ∂aₜ∂Ũ⃗ₜ(
         ∂aₜ∂Ũ⃗ₜ = blockdiag(fill(sparse(∂aₜ∂Ũ⃗ₜ_block_i), P.N)...)
         μ∂aₜ∂Ũ⃗ₜP[:, j] = ∂aₜ∂Ũ⃗ₜ * μₜ
     end
+
     return μ∂aₜ∂Ũ⃗ₜP
 end
 
@@ -826,8 +828,10 @@ function μ∂Ũ⃗ₜ₊₁∂aₜ(
     Δtₜ::Real,
     μₜ::AbstractVector{T},
 ) where T <: Real
-    n_drives = length(aₜ)
+
+    n_drives = P.n_drives
     μ∂Ũ⃗ₜ₊₁∂aₜP = zeros(T, n_drives, P.dim)
+    
     for j = 1:n_drives
         Gʲ = P.G_drives[j]
         Ĝʲ = G(aₜ, P.G_drift_anticoms[j], P.G_drive_anticoms[:, j])
@@ -836,6 +840,7 @@ function μ∂Ũ⃗ₜ₊₁∂aₜ(
         ∂Ũ⃗ₜ₊₁∂aₜ = blockdiag(fill(sparse(∂Ũ⃗ₜ₊₁∂aₜ_block_i), P.N)...)
         μ∂Ũ⃗ₜ₊₁∂aₜP[j, :] = μₜ' * ∂Ũ⃗ₜ₊₁∂aₜ
     end
+
     return μ∂Ũ⃗ₜ₊₁∂aₜP
 end
 
@@ -845,14 +850,17 @@ function μ∂aₜ∂ψ̃ₜ(
     Δtₜ::Real,
     μₜ::AbstractVector{T},
 ) where T <: Real
-    n_drives = length(aₜ)
+
+    n_drives = P.n_drives
     μ∂aₜ∂ψ̃ₜP = zeros(T, P.dim, n_drives)
+
     for j = 1:n_drives
         Gʲ = P.G_drives[j]
         Ĝʲ = G(aₜ, P.G_drift_anticoms[j], P.G_drive_anticoms[:, j])
         ∂aₜ∂ψ̃ₜP = -(Δt / 2 * Gʲ + Δt^2 / 12 * Ĝʲ)
         μ∂aₜ∂ψ̃ₜP[:, j] = ∂aₜ∂ψ̃ₜP' * μₜ
-     end
+    end
+
     return μ∂aₜ∂ψ̃ₜP
 end
 
@@ -862,14 +870,17 @@ function μ∂ψ̃ₜ₊₁∂aₜ(
     Δtₜ::Real,
     μₜ::AbstractVector{T},
 ) where T <: Real
-    n_drives = length(aₜ)
+
+    n_drives = P.n_drives
     μ∂ψ̃ₜ₊₁∂aₜP = zeros(T, n_drives, P.dim)
+
     for j = 1:n_drives
         Gʲ = P.G_drives[j]
         Ĝʲ = G(aₜ, P.G_drift_anticoms[j], P.G_drive_anticoms[:, j])
         ∂ψ̃ₜ₊₁∂aₜP = -Δt / 2 * Gʲ +  Δt^2 / 12 * Ĝʲ
         μ∂ψ̃ₜ₊₁∂aₜP[j, :] = μₜ' * ∂ψ̃ₜ₊₁∂aₜP
     end
+
     #can add if else for higher order derivatives
     return μ∂ψ̃ₜ₊₁∂aₜP
 end
@@ -880,34 +891,23 @@ function μ∂²aₜ(
     Ũ⃗ₜ::AbstractVector{T},
     Δtₜ::Real,
     μₜ::AbstractVector{T},
-    drive_indices=1:P.n_drives
 ) where T <: Real
-    n_drives = length(drive_indices)
+
+    n_drives = P.n_drives
     μ∂²aₜP = zeros(T, n_drives, n_drives)
-    for j = 1:n_drives
-        for i = 1:j
-            ∂aⁱ∂aʲBR = Δtₜ^2 / 12 * (
-                P.H_drive_imag_anticomms[drive_indices[i], drive_indices[j]] -
-                P.H_drive_real_anticomms[drive_indices[i], drive_indices[j]]
-            )
-            ∂aⁱ∂aʲBI = -Δtₜ^2 / 12 * (
-                P.H_drives_real_anticomm_H_drives_imag[drive_indices[i], drive_indices[j]] +
-                P.H_drives_real_anticomm_H_drives_imag[drive_indices[j], drive_indices[i]]
-            )
-            ∂aⁱ∂aʲFR = Δtₜ^2 / 12 * (
-                P.H_drive_imag_anticomms[drive_indices[i], drive_indices[j]] -
-                P.H_drive_real_anticomms[drive_indices[i], drive_indices[j]]
-            )
-            ∂aⁱ∂aʲFI = Δtₜ^2 / 12 * (
-                P.H_drives_real_anticomm_H_drives_imag[drive_indices[i], drive_indices[j]] +
-                P.H_drives_real_anticomm_H_drives_imag[drive_indices[j], drive_indices[i]]
-            )
-            ∂aⁱ∂aʲB̂ = P.I_2N ⊗ ∂aⁱ∂aʲBR + P.Ω_2N ⊗ ∂aⁱ∂aʲBI
-            ∂aⁱ∂aʲF̂ = P.I_2N ⊗ ∂aⁱ∂aʲFR - P.Ω_2N ⊗ ∂aⁱ∂aʲFI
-            μ∂²aₜP[i, j] = μₜ' * (∂aⁱ∂aʲB̂ * Ũ⃗ₜ₊₁ - ∂aⁱ∂aʲF̂ * Ũ⃗ₜ)
+
+    if P.order==4
+        for i = 1:n_drives
+            for j = 1:i
+                ∂aʲ∂aⁱP_block = 
+                    Δtₜ^2 / 12 * P.G_drive_anticoms[i, j] 
+                ∂aʲ∂aⁱP = blockdiag(fill(sparse(∂aʲ∂aⁱP_block), P.N)...)
+                μ∂²aₜP[j, i] = dot(μₜ, ∂aʲ∂aⁱP*(Ũ⃗ₜ₊₁ - Ũ⃗ₜ))
+            end
         end
     end
-    return μ∂²aₜP
+    
+    return Symmetric(μ∂²aₜP)
 end
 
 function μ∂²aₜ(
@@ -916,34 +916,21 @@ function μ∂²aₜ(
     ψ̃ₜ::AbstractVector{T},
     Δtₜ::Real,
     μₜ::AbstractVector{T},
-    drive_indices=1:P.n_drives
 ) where T <: Real
+
     n_drives = length(drive_indices)
-    μ∂²aₜP = zeros(T, n_drives, n_drives)
-    for j = 1:n_drives
-        for i = 1:j
-            ∂aⁱ∂aʲBR = Δtₜ^2 / 12 * (
-                P.H_drive_imag_anticomms[drive_indices[i], drive_indices[j]] -
-                P.H_drive_real_anticomms[drive_indices[i], drive_indices[j]]
-            )
-            ∂aⁱ∂aʲBI = -Δtₜ^2 / 12 * (
-                P.H_drives_real_anticomm_H_drives_imag[drive_indices[i], drive_indices[j]] +
-                P.H_drives_real_anticomm_H_drives_imag[drive_indices[j], drive_indices[i]]
-            )
-            ∂aⁱ∂aʲFR = Δtₜ^2 / 12 * (
-                P.H_drive_imag_anticomms[drive_indices[i], drive_indices[j]] -
-                P.H_drive_real_anticomms[drive_indices[i], drive_indices[j]]
-            )
-            ∂aⁱ∂aʲFI = Δtₜ^2 / 12 * (
-                P.H_drives_real_anticomm_H_drives_imag[drive_indices[i], drive_indices[j]] +
-                P.H_drives_real_anticomm_H_drives_imag[drive_indices[j], drive_indices[i]]
-            )
-            ∂aⁱ∂aʲB = Id2 ⊗ ∂aⁱ∂aʲBR + Im2 ⊗ ∂aⁱ∂aʲBI
-            ∂aⁱ∂aʲF = Id2 ⊗ ∂aⁱ∂aʲFR - Im2 ⊗ ∂aⁱ∂aʲFI
-            μ∂²aₜP[i, j] = μₜ' * (∂aⁱ∂aʲB * ψ̃ₜ₊₁ - ∂aⁱ∂aʲF * ψ̃ₜ)
+    μ∂²aₜP = Array{T}(undef, n_drives, n_drives)
+
+    if P.order==4
+        for i=1:n_drives
+            for j=1:i
+                ∂aʲ∂aⁱP = Δtₜ^2 / 12 * P.G_drive_anticoms[i, j] * (ψ̃ₜ₊₁ - ψ̃ₜ)
+                μ∂²aₜP[j, i] = dot(μₜ, ∂aʲ∂aⁱP)
+            end
         end
     end
-    return μ∂²aₜP
+
+    return Symmetric(μ∂²aₜP)
 end
 
 function ∂Δtₜ∂aₜʲB_real(
@@ -1020,7 +1007,7 @@ function μ∂Δtₜ∂aₜ(
     drive_indices=1:P.n_drives
 ) where T <: Real
     n_drives = length(aₜ)
-    μ∂Δtₜ∂aₜP = zeros(T, n_drives)
+    μ∂Δtₜ∂aₜP = Array{T}(undef, n_drives)
     for j = 1:n_drives
         ∂Δtₜ∂aʲBR = ∂Δtₜ∂aₜʲB_real(P, aₜ, Δtₜ, drive_indices[j])
         ∂Δtₜ∂aʲBI = ∂Δtₜ∂aₜʲB_imag(P, aₜ, Δtₜ, drive_indices[j])
@@ -1043,7 +1030,7 @@ function μ∂Δtₜ∂aₜ(
     drive_indices=1:P.n_drives
 ) where T <: Real
     n_drives = length(aₜ)
-    μ∂Δtₜ∂aₜP = zeros(T, n_drives)
+    μ∂Δtₜ∂aₜP = Array{T}(undef, n_drives)
     for j = 1:n_drives
         ∂Δtₜ∂aʲBR = ∂Δtₜ∂aₜʲB_real(P, aₜ, Δtₜ, drive_indices[j])
         ∂Δtₜ∂aʲBI = ∂Δtₜ∂aₜʲB_imag(P, aₜ, Δtₜ, drive_indices[j])
