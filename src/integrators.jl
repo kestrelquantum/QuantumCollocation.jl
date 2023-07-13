@@ -1002,20 +1002,22 @@ function μ∂Δtₜ∂aₜ(
     Ũ⃗ₜ₊₁::AbstractVector{T},
     Ũ⃗ₜ::AbstractVector{T},
     aₜ::AbstractVector{T},
-    Δtₜ::T,
+    Δtₜ::T, 
     μₜ::AbstractVector{T},
-    drive_indices=1:P.n_drives
 ) where T <: Real
-    n_drives = length(aₜ)
+
+    n_drives = P.n_drives
     μ∂Δtₜ∂aₜP = Array{T}(undef, n_drives)
-    for j = 1:n_drives
-        ∂Δtₜ∂aʲBR = ∂Δtₜ∂aₜʲB_real(P, aₜ, Δtₜ, drive_indices[j])
-        ∂Δtₜ∂aʲBI = ∂Δtₜ∂aₜʲB_imag(P, aₜ, Δtₜ, drive_indices[j])
-        ∂Δtₜ∂aʲFR = ∂Δtₜ∂aₜʲF_real(P, aₜ, Δtₜ, drive_indices[j])
-        ∂Δtₜ∂aʲFI = ∂Δtₜ∂aₜʲF_imag(P, aₜ, Δtₜ, drive_indices[j])
-        ∂Δtₜ∂aʲB̂ = P.I_2N ⊗ ∂Δtₜ∂aʲBR + P.Ω_2N ⊗ ∂Δtₜ∂aʲBI
-        ∂Δtₜ∂aʲF̂ = P.I_2N ⊗ ∂Δtₜ∂aʲFR - P.Ω_2N ⊗ ∂Δtₜ∂aʲFI
-        μ∂Δtₜ∂aₜP[j] = μₜ' * (∂Δtₜ∂aʲB̂ * Ũ⃗ₜ₊₁ - ∂Δtₜ∂aʲF̂ * Ũ⃗ₜ)
+
+    if P.order == 4
+        for j = 1:n_drives
+            Gʲ = P.G_drives[j]
+            Ĝʲ = G(aₜ, P.G_drift_anticoms[j], P.G_drive_anticoms[:, j])
+            B = blockdiag(fill(sparse(-1/2 * Gʲ + 1/6 * Δtₜ * Ĝʲ), P.N)...)
+            F = blockdiag(fill(sparse(1/2 * Gʲ + 1/6 * Δtₜ * Ĝʲ), P.N)...)
+            ∂Δtₜ∂aₜ_j =  B*Ũ⃗ₜ₊₁ - F*Ũ⃗ₜ
+            μ∂Δtₜ∂aₜP[j] = dot(μₜ, ∂Δtₜ∂aₜ_j)
+        end
     end
     return μ∂Δtₜ∂aₜP
 end
@@ -1027,18 +1029,20 @@ function μ∂Δtₜ∂aₜ(
     aₜ::AbstractVector{T},
     Δtₜ::T,
     μₜ::AbstractVector{T},
-    drive_indices=1:P.n_drives
 ) where T <: Real
-    n_drives = length(aₜ)
+
+    n_drives = P.n_drives
     μ∂Δtₜ∂aₜP = Array{T}(undef, n_drives)
-    for j = 1:n_drives
-        ∂Δtₜ∂aʲBR = ∂Δtₜ∂aₜʲB_real(P, aₜ, Δtₜ, drive_indices[j])
-        ∂Δtₜ∂aʲBI = ∂Δtₜ∂aₜʲB_imag(P, aₜ, Δtₜ, drive_indices[j])
-        ∂Δtₜ∂aʲFR = ∂Δtₜ∂aₜʲF_real(P, aₜ, Δtₜ, drive_indices[j])
-        ∂Δtₜ∂aʲFI = ∂Δtₜ∂aₜʲF_imag(P, aₜ, Δtₜ, drive_indices[j])
-        ∂Δtₜ∂aʲB = Id2 ⊗ ∂Δtₜ∂aʲBR + Im2 ⊗ ∂Δtₜ∂aʲBI
-        ∂Δtₜ∂aʲF = Id2 ⊗ ∂Δtₜ∂aʲFR - Im2 ⊗ ∂Δtₜ∂aʲFI
-        μ∂Δtₜ∂aₜP[j] = μₜ' * (∂Δtₜ∂aʲB * ψ̃ₜ₊₁ - ∂Δtₜ∂aʲF * ψ̃ₜ)
+
+    if P.order == 4
+        for j = 1:n_drives
+            Gʲ = P.G_drives[j]
+            Ĝʲ = G(aₜ, P.G_drift_anticoms[j], P.G_drive_anticoms[:, j])
+            ∂Δt∂aʲP =
+                -1 / 2 * Gʲ * (ψ̃ₜ₊₁ + ψ̃ₜ) +
+                1 / 6 * Δtₜ * Ĝʲ * (ψ̃ₜ₊₁ - ψ̃ₜ)
+            μ∂Δtₜ∂aₜP[j] = dot(μₜ, ∂Δt∂aʲP)
+        end
     end
     return μ∂Δtₜ∂aₜP
 end
