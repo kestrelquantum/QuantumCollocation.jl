@@ -549,7 +549,6 @@ function ∂aₜ(
     Ũ⃗ₜ::AbstractVector{T},
     aₜ::AbstractVector{T},
     Δtₜ::Real,
-    drive_indices=1:P.n_drives
 ) where {R <: Real, T <: Real}
     
     if P.autodiff || !isnothing(P.G)
@@ -566,11 +565,11 @@ function ∂aₜ(
     elseif P.order == 4
         n_drives = length(aₜ)
         ∂aP = zeros(T, P.dim, n_drives)
-        for j = drive_indices
+        isodim = 2*P.N
+        for j = 1:n_drives
             Gʲ = P.G_drives[j]
             Gʲ_anticomm_Gₜ =
                 G(aₜ, P.G_drift_anticomms[j], P.G_drive_anticomms[:, j])
-            isodim = 2*P.N
             for i = 0:P.N-1
                 ψ̃ⁱₜ₊₁ = @view Ũ⃗ₜ₊₁[i * isodim .+ (1:isodim)]
                 ψ̃ⁱₜ = @view Ũ⃗ₜ[i * isodim .+ (1:isodim)]
@@ -592,7 +591,6 @@ function ∂aₜ(
     ψ̃ₜ::AbstractVector{T},
     aₜ::AbstractVector{T},
     Δtₜ::Real,
-    drive_indices=1:P.n_drives
 ) where {R <: Real, T <: Real}
     if P.autodiff || !isnothing(P.G)
 
@@ -608,7 +606,7 @@ function ∂aₜ(
     elseif P.order == 4
         n_drives = length(aₜ)
         ∂aP = zeros(T, P.dim, n_drives)
-        for j = drive_indices
+        for j = 1:n_drives
             Gʲ = P.G_drives[j]
             Gʲ_anticomm_Gₜ =
                 G(aₜ, P.G_drift_anticomms[j], P.G_drive_anticomms[:, j])
