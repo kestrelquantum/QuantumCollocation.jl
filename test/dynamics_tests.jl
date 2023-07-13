@@ -94,17 +94,17 @@
             show_diffs(J_forward_diff, J_dynamics)
 
             # test dynamics hessian of the lagrangian
-            # shape = (Z.dim * Z.T, Z.dim * Z.T)
+            shape = (Z.dim * Z.T, Z.dim * Z.T)
 
-            # μ = ones(Z.dims.states * (Z.T - 1))
+            μ = ones(Z.dims.states * (Z.T - 1))
 
-            # HoL_dynamics = dense(dynamics.μ∂²F(Z.datavec, μ), dynamics.μ∂²F_structure, shape)
+            HoL_dynamics = dense(dynamics.μ∂²F(Z.datavec, μ), dynamics.μ∂²F_structure, shape)
 
-            # hessian_atol = 1e-15
+            hessian_atol = 1e-15
 
-            # HoL_forward_diff = ForwardDiff.hessian(Z⃗ -> dot(μ, dynamics.F(Z⃗)), Z.datavec)
-            # @test all(isapprox.(HoL_forward_diff, HoL_dynamics; atol=hessian_atol))
-            # show_diffs(HoL_forward_diff, HoL_dynamics; atol=hessian_atol)
+            HoL_forward_diff = ForwardDiff.hessian(Z⃗ -> dot(μ, dynamics.F(Z⃗)), Z.datavec)
+            @test all(isapprox.(HoL_forward_diff, HoL_dynamics; atol=hessian_atol))
+            show_diffs(HoL_forward_diff, HoL_dynamics; atol=hessian_atol)
         end
 
         # @testset "UnitaryPadeIntegrator integrator w/ autodiff + DerivativeIntegrator on a & da" begin

@@ -574,8 +574,8 @@ function ∂aₜ(
                 ψ̃ⁱₜ₊₁ = @view Ũ⃗ₜ₊₁[i * isodim .+ (1:isodim)]
                 ψ̃ⁱₜ = @view Ũ⃗ₜ[i * isodim .+ (1:isodim)]
                 ∂aP[i*isodim .+ (1:isodim): j] =
-                    -Δt / 2 * Gʲ * (ψ̃ⁱₜ₊₁ + ψ̃ⁱₜ) +
-                    Δt^2 / 12 * Gʲ_anticomm_Gₜ * (ψ̃ⁱₜ₊₁ - ψ̃ⁱₜ)
+                    -Δtₜ / 2 * Gʲ * (ψ̃ⁱₜ₊₁ + ψ̃ⁱₜ) +
+                    Δtₜ^2 / 12 * Gʲ_anticomm_Gₜ * (ψ̃ⁱₜ₊₁ - ψ̃ⁱₜ)
             end
         end   
     else
@@ -611,8 +611,8 @@ function ∂aₜ(
             Gʲ_anticomm_Gₜ =
                 G(aₜ, P.G_drift_anticomms[j], P.G_drive_anticomms[:, j])
             ∂aP[:, j] =
-                -Δt / 2 * Gʲ * (ψ̃ₜ₊₁ + ψ̃ₜ) +
-                Δt^2 / 12 * Gʲ_anticomm_Gₜ * (ψ̃ₜ₊₁ - ψ̃ₜ)
+                -Δtₜ / 2 * Gʲ * (ψ̃ₜ₊₁ + ψ̃ₜ) +
+                Δtₜ^2 / 12 * Gʲ_anticomm_Gₜ * (ψ̃ₜ₊₁ - ψ̃ₜ)
         end
     else 
         ### code for arbitrary Pade goes here
@@ -640,8 +640,8 @@ function ∂Δtₜ(
     else 
         n = P.order ÷ 2
         Gₜ_powers = compute_powers(Gₜ, n)
-        B = sum([(-1)^k * k * PADE_COEFFICIENTS[P.order][k] * Δt^(k-1) * Gₜ_powers[k] for k = 1:n])
-        F = sum([k * PADE_COEFFICIENTS[P.order][k] * Δt^(k-1) * Gₜ_powers[k] for k = 1:n])
+        B = sum([(-1)^k * k * PADE_COEFFICIENTS[P.order][k] * Δtₜ^(k-1) * Gₜ_powers[k] for k = 1:n])
+        F = sum([k * PADE_COEFFICIENTS[P.order][k] * Δtₜ^(k-1) * Gₜ_powers[k] for k = 1:n])
         ∂ΔtₜP_operator = B*Ũₜ₊₁ - F*Ũₜ
         ∂ΔtₜP = iso_operator_to_iso_vec(∂ΔtₜP_operator)
     end
@@ -663,8 +663,8 @@ function ∂Δtₜ(
     else 
         n = P.order ÷ 2
         Gₜ_powers = [Gₜ^i for i in 1:n]
-        B = sum([(-1)^k * k * PADE_COEFFICIENTS[P.order][k] * Δt^(k-1) * Gₜ_powers[k] for k = 1:n])
-        F = sum([k * PADE_COEFFICIENTS[P.order][k] * Δt^(k-1) * Gₜ_powers[k] for k = 1:n])
+        B = sum([(-1)^k * k * PADE_COEFFICIENTS[P.order][k] * Δtₜ^(k-1) * Gₜ_powers[k] for k = 1:n])
+        F = sum([k * PADE_COEFFICIENTS[P.order][k] * Δtₜ^(k-1) * Gₜ_powers[k] for k = 1:n])
         ∂ΔtₜP = B*ψ̃ₜ₊₁ - F*ψ̃ₜ
     end
     return ∂ΔtₜP
@@ -708,8 +708,8 @@ end
 
     # can memoize this chunk of code, prly memoize G powers
     Gₜ_powers = compute_powers(Gₜ, n)
-    B = P.I_2N + sum([(-1)^k * PADE_COEFFICIENTS[P.order][k] * Δt^k * Gₜ_powers[k] for k = 1:n])
-    F = P.I_2N + sum([PADE_COEFFICIENTS[P.order][k] * Δt^k * Gₜ_powers[k] for k = 1:n])
+    B = P.I_2N + sum([(-1)^k * PADE_COEFFICIENTS[P.order][k] * Δtₜ^k * Gₜ_powers[k] for k = 1:n])
+    F = P.I_2N + sum([PADE_COEFFICIENTS[P.order][k] * Δtₜ^k * Gₜ_powers[k] for k = 1:n])
     N = P.N
     isodim = 2N
     for i = 0:N-1
@@ -759,8 +759,8 @@ end
     Gₜ::AbstractMatrix = isnothing(P.G) ? G(aₜ, P.G_drift, P.G_drives) : P.G(aₜ, P.G_drift, P.G_drives)
     n = P.order ÷ 2
     Gₜ_powers = compute_powers(Gₜ, n)
-    B = P.I_2N + sum([(-1)^k * PADE_COEFFICIENTS[P.order][k] * Δt^k * Gₜ_powers[k] for k = 1:n])
-    F = P.I_2N + sum([PADE_COEFFICIENTS[P.order][k] * Δt^k * Gₜ_powers[k] for k = 1:n])
+    B = P.I_2N + sum([(-1)^k * PADE_COEFFICIENTS[P.order][k] * Δtₜ^k * Gₜ_powers[k] for k = 1:n])
+    F = P.I_2N + sum([PADE_COEFFICIENTS[P.order][k] * Δtₜ^k * Gₜ_powers[k] for k = 1:n])
 
     ∂ψ̃ₜP = -F
     ∂ψ̃ₜ₊₁P = B
@@ -791,7 +791,7 @@ function μ∂aₜ∂Ũ⃗ₜ(
     for j = 1:n_drives
         Gʲ = P.G_drives[j]
         Ĝʲ = G(aₜ, P.G_drift_anticoms[j], P.G_drive_anticoms[:, j])
-        ∂aₜ∂Ũ⃗ₜ_block_i = -(Δt / 2 * Gʲ + Δt^2 / 12 * Ĝʲ)
+        ∂aₜ∂Ũ⃗ₜ_block_i = -(Δtₜ / 2 * Gʲ + Δtₜ^2 / 12 * Ĝʲ)
         # sparse is necessary since blockdiag doesn't accept dense matrices
         ∂aₜ∂Ũ⃗ₜ = blockdiag(fill(sparse(∂aₜ∂Ũ⃗ₜ_block_i), P.N)...)
         μ∂aₜ∂Ũ⃗ₜP[:, j] = ∂aₜ∂Ũ⃗ₜ * μₜ
@@ -813,7 +813,7 @@ function μ∂Ũ⃗ₜ₊₁∂aₜ(
     for j = 1:n_drives
         Gʲ = P.G_drives[j]
         Ĝʲ = G(aₜ, P.G_drift_anticoms[j], P.G_drive_anticoms[:, j])
-        ∂Ũ⃗ₜ₊₁∂aₜ_block_i = -(Δt / 2 * Gʲ + Δt^2 / 12 * Ĝʲ)
+        ∂Ũ⃗ₜ₊₁∂aₜ_block_i = -(Δtₜ / 2 * Gʲ + Δtₜ^2 / 12 * Ĝʲ)
         # sparse is necessary since blockdiag doesn't accept dense matrices
         ∂Ũ⃗ₜ₊₁∂aₜ = blockdiag(fill(sparse(∂Ũ⃗ₜ₊₁∂aₜ_block_i), P.N)...)
         μ∂Ũ⃗ₜ₊₁∂aₜP[j, :] = μₜ' * ∂Ũ⃗ₜ₊₁∂aₜ
@@ -835,7 +835,7 @@ function μ∂aₜ∂ψ̃ₜ(
     for j = 1:n_drives
         Gʲ = P.G_drives[j]
         Ĝʲ = G(aₜ, P.G_drift_anticoms[j], P.G_drive_anticoms[:, j])
-        ∂aₜ∂ψ̃ₜP = -(Δt / 2 * Gʲ + Δt^2 / 12 * Ĝʲ)
+        ∂aₜ∂ψ̃ₜP = -(Δtₜ / 2 * Gʲ + Δtₜ^2 / 12 * Ĝʲ)
         μ∂aₜ∂ψ̃ₜP[:, j] = ∂aₜ∂ψ̃ₜP' * μₜ
     end
 
@@ -855,7 +855,7 @@ function μ∂ψ̃ₜ₊₁∂aₜ(
     for j = 1:n_drives
         Gʲ = P.G_drives[j]
         Ĝʲ = G(aₜ, P.G_drift_anticoms[j], P.G_drive_anticoms[:, j])
-        ∂ψ̃ₜ₊₁∂aₜP = -Δt / 2 * Gʲ +  Δt^2 / 12 * Ĝʲ
+        ∂ψ̃ₜ₊₁∂aₜP = -Δtₜ / 2 * Gʲ +  Δtₜ^2 / 12 * Ĝʲ
         μ∂ψ̃ₜ₊₁∂aₜP[j, :] = μₜ' * ∂ψ̃ₜ₊₁∂aₜP
     end
 
