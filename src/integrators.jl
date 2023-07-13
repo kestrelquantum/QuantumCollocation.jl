@@ -573,7 +573,7 @@ function ∂aₜ(
             for i = 0:P.N-1
                 ψ̃ⁱₜ₊₁ = @view Ũ⃗ₜ₊₁[i * isodim .+ (1:isodim)]
                 ψ̃ⁱₜ = @view Ũ⃗ₜ[i * isodim .+ (1:isodim)]
-                ∂aP[i*isodim .+ (1:isodim): j] =
+                ∂aP[i*isodim .+ (1:isodim), j] =
                     -Δtₜ / 2 * Gʲ * (ψ̃ⁱₜ₊₁ + ψ̃ⁱₜ) +
                     Δtₜ^2 / 12 * Gʲ_anticomm_Gₜ * (ψ̃ⁱₜ₊₁ - ψ̃ⁱₜ)
             end
