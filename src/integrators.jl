@@ -1017,7 +1017,7 @@ function μ∂²Δtₜ(
 )
     Gₜ = G(aₜ, P.G_drift, P.G_drives)
     ∂²Δtₜ_gen_block = 1/6 * Gₜ^2 
-    ∂²Δtₜ_gen = blockdiag(fill(sparse(∂²Δtₜ_block), P.N)...)
+    ∂²Δtₜ_gen = blockdiag(fill(sparse(∂²Δtₜ_gen_block), P.N)...)
     ∂²Δtₜ = ∂²Δtₜ_gen * (Ũ⃗ₜ₊₁ -  Ũ⃗ₜ)
     return μₜ' * ∂²Δtₜ
 end
