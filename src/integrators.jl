@@ -906,7 +906,7 @@ function μ∂²aₜ(
             end
         end
     end
-    
+
     return Symmetric(μ∂²aₜP)
 end
 
@@ -922,8 +922,8 @@ function μ∂²aₜ(
     μ∂²aₜP = Array{T}(undef, n_drives, n_drives)
 
     if P.order==4
-        for i=1:n_drives
-            for j=1:i
+        for i = 1:n_drives
+            for j = 1:i
                 ∂aʲ∂aⁱP = Δtₜ^2 / 12 * P.G_drive_anticoms[i, j] * (ψ̃ₜ₊₁ - ψ̃ₜ)
                 μ∂²aₜP[j, i] = dot(μₜ, ∂aʲ∂aⁱP)
             end
