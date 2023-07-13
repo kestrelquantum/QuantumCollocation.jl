@@ -1037,35 +1037,11 @@ function μ∂²Δtₜ(
     aₜ::AbstractVector,
     μₜ::AbstractVector
 )
-    HI² = squared_operator(
-        aₜ,
-        P.H_drift_imag_squared,
-        P.H_drift_imag_anticomm_H_drives_imag,
-        P.H_drive_imag_anticomms,
-        P.n_drives
-    )
-    HR² = squared_operator(
-        aₜ,
-        P.H_drift_real_squared,
-        P.H_drift_real_anticomm_H_drives_real,
-        P.H_drive_real_anticomms,
-        P.n_drives
-    )
-    HR_anticomm_HI = operator_anticomm_operator(
-        aₜ,
-        P.H_drift_real_anticomm_H_drift_imag,
-        P.H_drift_real_anticomm_H_drives_imag,
-        P.H_drift_imag_anticomm_H_drives_real,
-        P.H_drives_real_anticomm_H_drives_imag,
-        P.n_drives
-    )
-    ∂²ΔtₜBR = 1 / 6 * (HI² - HR²)
-    ∂²ΔtₜBI = -1 / 6 * HR_anticomm_HI
-    ∂²ΔtₜFR = 1 / 6 * (HI² - HR²)
-    ∂²ΔtₜFI = 1 / 6 * HR_anticomm_HI
-    ∂²ΔtₜB̂ = P.I_2N ⊗ ∂²ΔtₜBR + P.Ω_2N ⊗ ∂²ΔtₜBI
-    ∂²ΔtₜF̂ = P.I_2N ⊗ ∂²ΔtₜFR - P.Ω_2N ⊗ ∂²ΔtₜFI
-    return μₜ' * (∂²ΔtₜB̂ * Ũ⃗ₜ₊₁ - ∂²ΔtₜF̂ * Ũ⃗ₜ)
+    Gₜ = G(aₜ, P.G_drift, P.G_drives)
+    ∂²Δtₜ_gen_block = 1/6 * Gₜ^2 
+    ∂²Δtₜ_gen = blockdiag(fill(sparse(∂²Δtₜ_block), P.N)...)
+    ∂²Δtₜ = ∂²Δtₜ_gen * (Ũ⃗ₜ₊₁ -  Ũ⃗ₜ)
+    return μₜ' * ∂²Δtₜ
 end
 
 function μ∂²Δtₜ(
@@ -1075,35 +1051,9 @@ function μ∂²Δtₜ(
     aₜ::AbstractVector,
     μₜ::AbstractVector
 )
-    HI² = squared_operator(
-        aₜ,
-        P.H_drift_imag_squared,
-        P.H_drift_imag_anticomm_H_drives_imag,
-        P.H_drive_imag_anticomms,
-        P.n_drives
-    )
-    HR² = squared_operator(
-        aₜ,
-        P.H_drift_real_squared,
-        P.H_drift_real_anticomm_H_drives_real,
-        P.H_drive_real_anticomms,
-        P.n_drives
-    )
-    HR_anticomm_HI = operator_anticomm_operator(
-        aₜ,
-        P.H_drift_real_anticomm_H_drift_imag,
-        P.H_drift_real_anticomm_H_drives_imag,
-        P.H_drift_imag_anticomm_H_drives_real,
-        P.H_drives_real_anticomm_H_drives_imag,
-        P.n_drives
-    )
-    ∂²ΔtₜBR = 1 / 6 * (HI² - HR²)
-    ∂²ΔtₜBI = -1 / 6 * HR_anticomm_HI
-    ∂²ΔtₜFR = 1 / 6 * (HI² - HR²)
-    ∂²ΔtₜFI = 1 / 6 * HR_anticomm_HI
-    ∂²ΔtₜB = Id2 ⊗ ∂²ΔtₜBR + Im2 ⊗ ∂²ΔtₜBI
-    ∂²ΔtₜF = Id2 ⊗ ∂²ΔtₜFR - Im2 ⊗ ∂²ΔtₜFI
-    return μₜ' * (∂²ΔtₜB * ψ̃ₜ₊₁ - ∂²ΔtₜF * ψ̃ₜ)
+    Gₜ = G(aₜ, P.G_drift, P.G_drives)
+    ∂²Δtₜ = 1/6 * Gₜ^2 * (ψ̃ₜ₊₁ - ψ̃ₜ)
+    return μₜ' * ∂²Δtₜ
 end
 
 @views function hessian_of_the_lagrangian(
