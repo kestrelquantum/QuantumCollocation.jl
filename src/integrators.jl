@@ -1046,68 +1046,24 @@ end
     Ũ⃗ₜ₊₁ = zₜ₊₁[traj.components[P.unitary_symb]]
     Ũ⃗ₜ = zₜ[traj.components[P.unitary_symb]]
 
-    if free_time
-        Δtₜ = zₜ[traj.components[traj.timestep]][1]
-    else
-        Δtₜ = traj.timestep
-    end
+    Δtₜ = free_time ? zₜ[traj.components[traj.timestep]][1] : traj.timestep
 
     if P.drive_symb isa Tuple
-        aₜ = Tuple(zₜ[traj.components[s]] for s ∈ P.drive_symb)
-        
-
-        μ∂aₜᵢ∂Ũ⃗ₜPs = []
-        μ∂²aₜᵢPs = []
-        if free_time
-            μ∂Δtₜ∂aₜᵢPs = []
-        end
-        μ∂Ũ⃗ₜ₊₁∂aₜᵢPs = []
-
-        H_drive_mark = 0
-
-        for aₜᵢ ∈ aₜ
-            n_aᵢ_drives = length(aₜᵢ)
-
-            drive_indices = (H_drive_mark + 1):(H_drive_mark + n_aᵢ_drives)
-
-            μ∂aₜᵢ∂Ũ⃗ₜP = μ∂aₜ∂Ũ⃗ₜ(P, aₜᵢ, Δtₜ, μₜ, drive_indices)
-            push!(μ∂aₜᵢ∂Ũ⃗ₜPs, μ∂aₜᵢ∂Ũ⃗ₜP)
-
-            μ∂²aₜᵢP = μ∂²aₜ(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, Δtₜ, μₜ, drive_indices)
-            push!(μ∂²aₜᵢPs, μ∂²aₜᵢP)
-
-            if free_time
-                μ∂Δtₜ∂aₜᵢP = μ∂Δtₜ∂aₜ(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, aₜᵢ, Δtₜ, μₜ, drive_indices)
-                push!(μ∂Δtₜ∂aₜᵢPs, μ∂Δtₜ∂aₜᵢP)
-            end
-
-            μ∂Ũ⃗ₜ₊₁∂aₜᵢP = μ∂Ũ⃗ₜ₊₁∂aₜ(P, aₜᵢ, Δtₜ, μₜ, drive_indices)
-            push!(μ∂Ũ⃗ₜ₊₁∂aₜᵢPs, μ∂Ũ⃗ₜ₊₁∂aₜᵢP)
-
-            H_drive_mark += n_aᵢ_drives
-        end
-
-        μ∂aₜ∂Ũ⃗ₜP = tuple(μ∂aₜᵢ∂Ũ⃗ₜPs...)
-        μ∂²aₜP = tuple(μ∂²aₜᵢPs...)
-        if free_time
-            μ∂Δtₜ∂aₜP = tuple(μ∂Δtₜ∂aₜᵢPs...)
-        end
-        μ∂Ũ⃗ₜ₊₁∂aₜP = tuple(μ∂Ũ⃗ₜ₊₁∂aₜᵢPs...)
-
-    else
-        aₜ = zₜ[traj.components[P.drive_symb]]
-
-        μ∂aₜ∂Ũ⃗ₜP = μ∂aₜ∂Ũ⃗ₜ(P, aₜ, Δtₜ, μₜ)
-        μ∂²aₜP = μ∂²aₜ(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, Δtₜ, μₜ)
-        if free_time
-            μ∂Δtₜ∂aₜP = μ∂Δtₜ∂aₜ(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, aₜ, Δtₜ, μₜ)
-        end
-        μ∂Ũ⃗ₜ₊₁∂aₜP = μ∂Ũ⃗ₜ₊₁∂aₜ(P, aₜ, Δtₜ, μₜ)
+        inds = [traj.components[s] for s in P.drive_symb]
+        inds = vcat(collect.(inds)...)
+    else 
+        inds = traj.components[P.drive_symb]
     end
 
-    if aₜ isa Tuple
-        aₜ = vcat(aₜ...)
+    aₜ = zₜ[inds]
+
+    μ∂aₜ∂Ũ⃗ₜP = μ∂aₜ∂Ũ⃗ₜ(P, aₜ, Δtₜ, μₜ)
+    μ∂²aₜP = μ∂²aₜ(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, Δtₜ, μₜ)
+    if free_time
+        μ∂Δtₜ∂aₜP = μ∂Δtₜ∂aₜ(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, aₜ, Δtₜ, μₜ)
     end
+
+    μ∂Ũ⃗ₜ₊₁∂aₜP = μ∂Ũ⃗ₜ₊₁∂aₜ(P, aₜ, Δtₜ, μₜ)
 
     if free_time
         μ∂Δtₜ∂Ũ⃗ₜP = μ∂Δtₜ∂Ũ⃗ₜ(P, aₜ, Δtₜ, μₜ)
@@ -1143,65 +1099,23 @@ end
     ψ̃ₜ₊₁ = zₜ₊₁[traj.components[P.state_symb]]
     ψ̃ₜ = zₜ[traj.components[P.state_symb]]
 
-    if free_time
-        Δtₜ = zₜ[traj.components[traj.timestep]][1]
-    end
+    Δtₜ = free_time ? zₜ[traj.components[traj.timestep]][1] : traj.timestep
 
     if P.drive_symb isa Tuple
-        aₜ = Tuple(zₜ[traj.components[s]] for s ∈ P.drive_symb)
-
-        μ∂aₜᵢ∂ψ̃ₜPs = []
-        μ∂²aₜᵢPs = []
-        if free_time
-            μ∂Δtₜ∂aₜᵢPs = []
-        end
-        μ∂ψ̃ₜ₊₁∂aₜᵢPs = []
-
-        H_drive_mark = 0
-
-        for aₜᵢ ∈ aₜ
-            n_aᵢ_drives = length(aₜᵢ)
-
-            drive_indices = (H_drive_mark + 1):(H_drive_mark + n_aᵢ_drives)
-
-            μ∂aₜᵢ∂ψ̃ₜP = μ∂aₜ∂ψ̃ₜ(P, aₜᵢ, Δtₜ, μₜ, drive_indices)
-            push!(μ∂aₜᵢ∂ψ̃ₜPs, μ∂aₜᵢ∂ψ̃ₜP)
-
-            μ∂²aₜᵢP = μ∂²aₜ(P, ψ̃ₜ₊₁, ψ̃ₜ, Δtₜ, μₜ, drive_indices)
-            push!(μ∂²aₜᵢPs, μ∂²aₜᵢP)
-
-            if free_time
-                μ∂Δtₜ∂aₜᵢP = μ∂Δtₜ∂aₜ(P, ψ̃ₜ₊₁, ψ̃ₜ, aₜᵢ, Δtₜ, μₜ, drive_indices)
-                push!(μ∂Δtₜ∂aₜᵢPs, μ∂Δtₜ∂aₜᵢP)
-            end
-
-            μ∂ψ̃ₜ₊₁∂aₜᵢP = μ∂ψ̃ₜ₊₁∂aₜ(P, aₜᵢ, Δtₜ, μₜ, drive_indices)
-            push!(μ∂ψ̃ₜ₊₁∂aₜᵢPs, μ∂ψ̃ₜ₊₁∂aₜᵢP)
-
-            H_drive_mark += n_aᵢ_drives
-        end
-
-        μ∂aₜ∂ψ̃ₜP = tuple(μ∂aₜᵢ∂ψ̃ₜPs...)
-        μ∂²aₜP = tuple(μ∂²aₜᵢPs...)
-        if free_time
-            μ∂Δtₜ∂aₜP = tuple(μ∂Δtₜ∂aₜᵢPs...)
-        end
-        μ∂ψ̃ₜ₊₁∂aₜP = tuple(μ∂ψ̃ₜ₊₁∂aₜᵢPs...)
-
-    else
-        aₜ = zₜ[traj.components[P.drive_symb]]
-
-        μ∂aₜ∂ψ̃ₜP = μ∂aₜ∂ψ̃ₜ(P, aₜ, Δtₜ, μₜ)
-        μ∂²aₜP = μ∂²aₜ(P, ψ̃ₜ₊₁, ψ̃ₜ, Δtₜ, μₜ)
-        if free_time
-            μ∂Δtₜ∂aₜP = μ∂Δtₜ∂aₜ(P, ψ̃ₜ₊₁, ψ̃ₜ, aₜ, Δtₜ, μₜ)
-        end
-        μ∂ψ̃ₜ₊₁∂aₜP = μ∂ψ̃ₜ₊₁∂aₜ(P, aₜ, Δtₜ, μₜ)
+        inds = [traj.components[s] for s in P.drive_symb]
+        inds = vcat(collect.(inds)...)
+    else 
+        inds = traj.components[P.drive_symb]
     end
 
-    if aₜ isa Tuple
-        aₜ = vcat(aₜ...)
+    aₜ = zₜ[inds]
+
+    μ∂aₜ∂ψ̃ₜP = μ∂aₜ∂ψ̃ₜ(P, aₜ, Δtₜ, μₜ)
+    μ∂²aₜP = μ∂²aₜ(P, ψ̃ₜ₊₁, ψ̃ₜ, Δtₜ, μₜ)
+    if free_time
+        μ∂Δtₜ∂aₜP = μ∂Δtₜ∂aₜ(P, ψ̃ₜ₊₁, ψ̃ₜ, aₜ, Δtₜ, μₜ)
     end
+    μ∂ψ̃ₜ₊₁∂aₜP = μ∂ψ̃ₜ₊₁∂aₜ(P, aₜ, Δtₜ, μₜ)
 
     if free_time
         μ∂Δtₜ∂ψ̃ₜP = μ∂Δtₜ∂ψ̃ₜ(P, aₜ, Δtₜ, μₜ)
