@@ -844,14 +844,12 @@ function μ∂aₜ∂ψ̃ₜ(
     aₜ::AbstractVector{T},
     Δtₜ::Real,
     μₜ::AbstractVector{T},
-    drive_indices=1:P.n_drives
 ) where T <: Real
     n_drives = length(aₜ)
     μ∂aₜ∂ψ̃ₜP = zeros(T, P.dim, n_drives)
     for j = 1:n_drives
-        dr_ind = drive_indices[j]
-        Gʲ = P.G_drives[dr_ind]
-        Ĝʲ = G(aₜ, P.G_drift_anticoms[dr_ind], P.G_drive_anticoms[:, dr_ind])
+        Gʲ = P.G_drives[j]
+        Ĝʲ = G(aₜ, P.G_drift_anticoms[j], P.G_drive_anticoms[:, j])
         ∂aₜ∂ψ̃ₜP = -(Δt / 2 * Gʲ + Δt^2 / 12 * Ĝʲ)
         μ∂aₜ∂ψ̃ₜP[:, j] = ∂aₜ∂ψ̃ₜP' * μₜ
      end
@@ -863,14 +861,12 @@ function μ∂ψ̃ₜ₊₁∂aₜ(
     aₜ::AbstractVector{T},
     Δtₜ::Real,
     μₜ::AbstractVector{T},
-    drive_indices=1:P.n_drives
 ) where T <: Real
     n_drives = length(aₜ)
     μ∂ψ̃ₜ₊₁∂aₜP = zeros(T, n_drives, P.dim)
     for j = 1:n_drives
-        dr_ind = drive_indices[j]
-        Gʲ = P.G_drives[dr_ind]
-        Ĝʲ = G(aₜ, P.G_drift_anticoms[dr_ind], P.G_drive_anticoms[:, dr_ind])
+        Gʲ = P.G_drives[j]
+        Ĝʲ = G(aₜ, P.G_drift_anticoms[j], P.G_drive_anticoms[:, j])
         ∂ψ̃ₜ₊₁∂aₜP = -Δt / 2 * Gʲ +  Δt^2 / 12 * Ĝʲ
         μ∂ψ̃ₜ₊₁∂aₜP[j, :] = μₜ' * ∂ψ̃ₜ₊₁∂aₜP
     end
