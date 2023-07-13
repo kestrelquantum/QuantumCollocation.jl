@@ -1053,9 +1053,10 @@ function μ∂Δtₜ∂Ũ⃗ₜ(
     Δtₜ::Real,
     μₜ::AbstractVector
 )
-    ∂ΔtF_real = ∂ΔtₜF_real(P, aₜ, Δtₜ)
-    ∂ΔtF_imag = ∂ΔtₜF_imag(P, aₜ, Δtₜ)
-    return -(P.I_2N ⊗ ∂ΔtF_real - P.Ω_2N ⊗ ∂ΔtF_imag)' * μₜ
+    Gₜ = G(aₜ, P.G_drift, P.G_drives)
+    minus_F = -(1/2 * Gₜ + 1/6 * Δtₜ * Gₜ^2)
+    big_minus_F = blockdiag(fill(sparse(minus_F), P.N)...)
+    return big_minus_F' * μₜ
 end
 
 function μ∂Ũ⃗ₜ₊₁∂Δtₜ(
@@ -1064,9 +1065,10 @@ function μ∂Ũ⃗ₜ₊₁∂Δtₜ(
     Δtₜ::Real,
     μₜ::AbstractVector
 )
-    ∂ΔtB_real = ∂ΔtₜB_real(P, aₜ, Δtₜ)
-    ∂ΔtB_imag = ∂ΔtₜB_imag(P, aₜ, Δtₜ)
-    return μₜ' * (P.I_2N ⊗ ∂ΔtB_real + P.Ω_2N ⊗ ∂ΔtB_imag)
+    Gₜ = G(aₜ, P.G_drift, P.G_drives)
+    B = -1/2 * Gₜ + 1/6 * Δtₜ * Gₜ^2
+    big_B = blockdiag(fill(sparse(B), P.N)...)
+    return μₜ' * big_B
 end
 
 function μ∂Δtₜ∂ψ̃ₜ(
@@ -1075,9 +1077,10 @@ function μ∂Δtₜ∂ψ̃ₜ(
     Δtₜ::Real,
     μₜ::AbstractVector
 )
-    ∂ΔtF_real = ∂ΔtₜF_real(P, aₜ, Δtₜ)
-    ∂ΔtF_imag = ∂ΔtₜF_imag(P, aₜ, Δtₜ)
-    return -(Id2 ⊗ ∂ΔtF_real - Im2 ⊗ ∂ΔtF_imag)' * μₜ
+    # memoize the calc here
+    Gₜ = G(aₜ, P.G_drift, P.G_drives)
+    minus_F = -(1/2 * Gₜ + 1/6 * Δtₜ * Gₜ^2) 
+    return minus_F' * μₜ
 end
 
 function μ∂ψ̃ₜ₊₁∂Δtₜ(
@@ -1086,9 +1089,9 @@ function μ∂ψ̃ₜ₊₁∂Δtₜ(
     Δtₜ::Real,
     μₜ::AbstractVector
 )
-    ∂ΔtB_real = ∂ΔtₜB_real(P, aₜ, Δtₜ)
-    ∂ΔtB_imag = ∂ΔtₜB_imag(P, aₜ, Δtₜ)
-    return μₜ' * (Id2 ⊗ ∂ΔtB_real + Im2 ⊗ ∂ΔtB_imag)
+    Gₜ = G(aₜ, P.G_drift, P.G_drives)
+    B = -1/2 * Gₜ + 1/6 * Δtₜ * Gₜ^2
+    return μₜ' * B
 end
 
 function μ∂²Δtₜ(
