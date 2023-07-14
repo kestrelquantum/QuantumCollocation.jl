@@ -33,11 +33,20 @@ Z = NamedTrajectory(
     goal=(Ũ⃗ = Ũ⃗_goal,)
 )
 
-P = UnitaryPadeIntegrator(system, :Ũ⃗, (:a, :g))
+P = UnitaryPadeIntegrator(system, :Ũ⃗, :a)
+D = DerivativeIntegrator(:a, :da, Z)
 
-#P(Z.datavec[slice(2, Z.dim)], Z.datavec[slice(3, Z.dim)], Z)
+f = [P, D]
 
-z_2 = Z.datavec[slice(2, Z.dim)]
-z_3 = Z.datavec[slice(3, Z.dim)]
+dynamics = QuantumDynamics(f, Z)
 
-[z_2[Z.components[:g]]... for s ∈ P.drive_symb]
+# test dynamics jacobian
+shape = (Z.dims.states * (Z.T - 1), Z.dim * Z.T)
+
+@btime J_dynamics, J_struc = dynamics.∂F(Z.datavec), dynamics.∂F_structure
+shape = (Z.dim * Z.T, Z.dim * Z.T)
+
+μ = ones(Z.dims.states * (Z.T - 1))
+
+@btime HoL_dynamics, HoLstruc = dynamics.μ∂²F(Z.datavec, μ), dynamics.μ∂²F_structure
+
