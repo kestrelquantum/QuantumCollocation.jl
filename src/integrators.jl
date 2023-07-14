@@ -673,10 +673,10 @@ end
 
 @views function jacobian(
     P::UnitaryPadeIntegrator,
-    zₜ::AbstractVector,
-    zₜ₊₁::AbstractVector,
+    zₜ::AbstractVector{T},
+    zₜ₊₁::AbstractVector{T},
     traj::NamedTrajectory
-)
+) where T <: Number
     free_time = traj.timestep isa Symbol
 
     Ũ⃗ₜ₊₁ = zₜ₊₁[traj.components[P.unitary_symb]]
@@ -701,8 +701,8 @@ end
         ∂ΔtₜP = ∂Δtₜ(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, aₜ, Δtₜ)
     end
 
-    ∂Ũ⃗ₜP = spzeros(P.dim, P.dim)
-    ∂Ũ⃗ₜ₊₁P = spzeros(P.dim, P.dim)
+    ∂Ũ⃗ₜP = spzeros(T, P.dim, P.dim)
+    ∂Ũ⃗ₜ₊₁P = spzeros(T, P.dim, P.dim)
     Gₜ::AbstractMatrix = isnothing(P.G) ? G(aₜ, P.G_drift, P.G_drives) : P.G(aₜ, P.G_drift, P.G_drives)
     n = P.order ÷ 2
 
@@ -711,7 +711,7 @@ end
     B = P.I_2N + sum([(-1)^k * PADE_COEFFICIENTS[P.order][k] * Δtₜ^k * Gₜ_powers[k] for k = 1:n])
     F = P.I_2N + sum([PADE_COEFFICIENTS[P.order][k] * Δtₜ^k * Gₜ_powers[k] for k = 1:n])
     N = P.N
-    isodim = 2N
+    isodim = 2*N
     for i = 0:N-1
         inds = i*isodim .+ (1:isodim)
         ∂Ũ⃗ₜP[inds, inds] .= -F
@@ -790,7 +790,7 @@ function μ∂aₜ∂Ũ⃗ₜ(
     
     for j = 1:n_drives
         Gʲ = P.G_drives[j]
-        Ĝʲ = G(aₜ, P.G_drift_anticoms[j], P.G_drive_anticoms[:, j])
+        Ĝʲ = G(aₜ, P.G_drift_anticomms[j], P.G_drive_anticomms[:, j])
         ∂aₜ∂Ũ⃗ₜ_block_i = -(Δtₜ / 2 * Gʲ + Δtₜ^2 / 12 * Ĝʲ)
         # sparse is necessary since blockdiag doesn't accept dense matrices
         ∂aₜ∂Ũ⃗ₜ = blockdiag(fill(sparse(∂aₜ∂Ũ⃗ₜ_block_i), P.N)...)

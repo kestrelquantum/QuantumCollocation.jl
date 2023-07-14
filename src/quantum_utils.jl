@@ -182,6 +182,7 @@ end
 
 function iso_vec_to_iso_operator(Ũ⃗::AbstractVector{R}) where R <: Real
     N = Int(sqrt(length(Ũ⃗) ÷ 2))
+    isodim = 2N
     Ũ = Matrix{R}(undef, isodim, isodim)
     U_real = Matrix{R}(undef, N, N)
     U_imag = Matrix{R}(undef, N, N)
@@ -211,7 +212,7 @@ function iso_operator_to_iso_vec(Ũ::AbstractMatrix{R}) where R <: Real
     N = size(Ũ, 1) ÷ 2
     Ũ⃗ = Vector{R}(undef, N^2 * 2)
     for i=0:N-1
-        Ũ⃗[i*2N .+ (1:N)] .= @view Ũ[:, i+1]
+        Ũ⃗[i*2N .+ (1:2N)] .= @view Ũ[:, i+1]
     end
     return Ũ⃗
 end
