@@ -794,7 +794,7 @@ function μ∂aₜ∂Ũ⃗ₜ(
         ∂aₜ∂Ũ⃗ₜ_block_i = -(Δtₜ / 2 * Gʲ + Δtₜ^2 / 12 * Ĝʲ)
         # sparse is necessary since blockdiag doesn't accept dense matrices
         ∂aₜ∂Ũ⃗ₜ = blockdiag(fill(sparse(∂aₜ∂Ũ⃗ₜ_block_i), P.N)...)
-        μ∂aₜ∂Ũ⃗ₜP[:, j] = ∂aₜ∂Ũ⃗ₜ * μₜ
+        μ∂aₜ∂Ũ⃗ₜP[:, j] = ∂aₜ∂Ũ⃗ₜ' * μₜ
     end
 
     return μ∂aₜ∂Ũ⃗ₜP
@@ -812,8 +812,8 @@ function μ∂Ũ⃗ₜ₊₁∂aₜ(
     
     for j = 1:n_drives
         Gʲ = P.G_drives[j]
-        Ĝʲ = G(aₜ, P.G_drift_anticoms[j], P.G_drive_anticoms[:, j])
-        ∂Ũ⃗ₜ₊₁∂aₜ_block_i = -(Δtₜ / 2 * Gʲ + Δtₜ^2 / 12 * Ĝʲ)
+        Ĝʲ = G(aₜ, P.G_drift_anticomms[j], P.G_drive_anticomms[:, j])
+        ∂Ũ⃗ₜ₊₁∂aₜ_block_i = -Δtₜ / 2 * Gʲ + Δtₜ^2 / 12 * Ĝʲ
         # sparse is necessary since blockdiag doesn't accept dense matrices
         ∂Ũ⃗ₜ₊₁∂aₜ = blockdiag(fill(sparse(∂Ũ⃗ₜ₊₁∂aₜ_block_i), P.N)...)
         μ∂Ũ⃗ₜ₊₁∂aₜP[j, :] = μₜ' * ∂Ũ⃗ₜ₊₁∂aₜ
@@ -834,7 +834,7 @@ function μ∂aₜ∂ψ̃ₜ(
 
     for j = 1:n_drives
         Gʲ = P.G_drives[j]
-        Ĝʲ = G(aₜ, P.G_drift_anticoms[j], P.G_drive_anticoms[:, j])
+        Ĝʲ = G(aₜ, P.G_drift_anticomms[j], P.G_drive_anticomms[:, j])
         ∂aₜ∂ψ̃ₜP = -(Δtₜ / 2 * Gʲ + Δtₜ^2 / 12 * Ĝʲ)
         μ∂aₜ∂ψ̃ₜP[:, j] = ∂aₜ∂ψ̃ₜP' * μₜ
     end
@@ -854,8 +854,8 @@ function μ∂ψ̃ₜ₊₁∂aₜ(
 
     for j = 1:n_drives
         Gʲ = P.G_drives[j]
-        Ĝʲ = G(aₜ, P.G_drift_anticoms[j], P.G_drive_anticoms[:, j])
-        ∂ψ̃ₜ₊₁∂aₜP = -Δtₜ / 2 * Gʲ +  Δtₜ^2 / 12 * Ĝʲ
+        Ĝʲ = G(aₜ, P.G_drift_anticomms[j], P.G_drive_anticomms[:, j])
+        ∂ψ̃ₜ₊₁∂aₜP = -Δtₜ / 2 * Gʲ + Δtₜ^2 / 12 * Ĝʲ
         μ∂ψ̃ₜ₊₁∂aₜP[j, :] = μₜ' * ∂ψ̃ₜ₊₁∂aₜP
     end
 
