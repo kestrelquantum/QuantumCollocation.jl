@@ -42,7 +42,7 @@ dynamics = QuantumDynamics(f, Z)
 
 # test dynamics jacobian
 shape = (Z.dims.states * (Z.T - 1), Z.dim * Z.T)
-
+@btime dyn_res = dynamics.F(Z.datavec)
 @btime J_dynamics, J_struc = dynamics.∂F(Z.datavec), dynamics.∂F_structure
 
 shape = (Z.dim * Z.T, Z.dim * Z.T)

@@ -703,20 +703,17 @@ end
 
     ∂Ũ⃗ₜP = spzeros(T, P.dim, P.dim)
     ∂Ũ⃗ₜ₊₁P = spzeros(T, P.dim, P.dim)
-    Gₜ::AbstractMatrix = isnothing(P.G) ? G(aₜ, P.G_drift, P.G_drives) : P.G(aₜ, P.G_drift, P.G_drives)
+    Gₜ = isnothing(P.G) ? G(aₜ, P.G_drift, P.G_drives) : P.G(aₜ, P.G_drift, P.G_drives)
     n = P.order ÷ 2
 
     # can memoize this chunk of code, prly memoize G powers
     Gₜ_powers = compute_powers(Gₜ, n)
     B = P.I_2N + sum([(-1)^k * PADE_COEFFICIENTS[P.order][k] * Δtₜ^k * Gₜ_powers[k] for k = 1:n])
     F = P.I_2N + sum([PADE_COEFFICIENTS[P.order][k] * Δtₜ^k * Gₜ_powers[k] for k = 1:n])
-    N = P.N
-    isodim = 2*N
-    for i = 0:N-1
-        inds = i*isodim .+ (1:isodim)
-        ∂Ũ⃗ₜP[inds, inds] .= -F
-        ∂Ũ⃗ₜ₊₁P[inds, inds] .= B
-    end
+
+    ∂Ũ⃗ₜ₊₁P = blockdiag(fill(sparse(B), P.N)...)
+    ∂Ũ⃗ₜP = blockdiag(fill(sparse(-F), P.N)...)
+
     if free_time
         return ∂Ũ⃗ₜP, ∂Ũ⃗ₜ₊₁P, ∂aₜP, ∂ΔtₜP
     else
@@ -756,7 +753,7 @@ end
         ∂ΔtₜP = ∂Δtₜ(P, ψ̃ₜ₊₁, ψ̃ₜ, aₜ, Δtₜ)
     end
 
-    Gₜ::AbstractMatrix = isnothing(P.G) ? G(aₜ, P.G_drift, P.G_drives) : P.G(aₜ, P.G_drift, P.G_drives)
+    Gₜ = isnothing(P.G) ? G(aₜ, P.G_drift, P.G_drives) : P.G(aₜ, P.G_drift, P.G_drives)
     n = P.order ÷ 2
     Gₜ_powers = compute_powers(Gₜ, n)
     B = P.I_2N + sum([(-1)^k * PADE_COEFFICIENTS[P.order][k] * Δtₜ^k * Gₜ_powers[k] for k = 1:n])
