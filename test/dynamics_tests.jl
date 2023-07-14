@@ -103,6 +103,8 @@
             hessian_atol = 1e-15
 
             HoL_forward_diff = ForwardDiff.hessian(Z⃗ -> dot(μ, dynamics.F(Z⃗)), Z.datavec)
+            display(HoL_dynamics)
+            display(HoL_forward_diff)
             @test all(isapprox.(HoL_forward_diff, HoL_dynamics; atol=hessian_atol))
             show_diffs(HoL_forward_diff, HoL_dynamics; atol=hessian_atol)
         end
