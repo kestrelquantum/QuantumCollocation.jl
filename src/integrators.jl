@@ -878,7 +878,7 @@ function μ∂²aₜ(
         for i = 1:n_drives
             for j = 1:i
                 ∂aʲ∂aⁱP_block = 
-                    Δtₜ^2 / 12 * P.G_drive_anticoms[i, j] 
+                    Δtₜ^2 / 12 * P.G_drive_anticomms[i, j] 
                 ∂aʲ∂aⁱP = blockdiag(fill(sparse(∂aʲ∂aⁱP_block), P.N)...)
                 μ∂²aₜP[j, i] = dot(μₜ, ∂aʲ∂aⁱP*(Ũ⃗ₜ₊₁ - Ũ⃗ₜ))
             end
@@ -902,7 +902,7 @@ function μ∂²aₜ(
     if P.order==4
         for i = 1:n_drives
             for j = 1:i
-                ∂aʲ∂aⁱP = Δtₜ^2 / 12 * P.G_drive_anticoms[i, j] * (ψ̃ₜ₊₁ - ψ̃ₜ)
+                ∂aʲ∂aⁱP = Δtₜ^2 / 12 * P.G_drive_anticomms[i, j] * (ψ̃ₜ₊₁ - ψ̃ₜ)
                 μ∂²aₜP[j, i] = dot(μₜ, ∂aʲ∂aⁱP)
             end
         end
@@ -926,7 +926,7 @@ function μ∂Δtₜ∂aₜ(
     if P.order == 4
         for j = 1:n_drives
             Gʲ = P.G_drives[j]
-            Ĝʲ = G(aₜ, P.G_drift_anticoms[j], P.G_drive_anticoms[:, j])
+            Ĝʲ = G(aₜ, P.G_drift_anticomms[j], P.G_drive_anticomms[:, j])
             B = blockdiag(fill(sparse(-1/2 * Gʲ + 1/6 * Δtₜ * Ĝʲ), P.N)...)
             F = blockdiag(fill(sparse(1/2 * Gʲ + 1/6 * Δtₜ * Ĝʲ), P.N)...)
             ∂Δtₜ∂aₜ_j =  B*Ũ⃗ₜ₊₁ - F*Ũ⃗ₜ
@@ -951,7 +951,7 @@ function μ∂Δtₜ∂aₜ(
     if P.order == 4
         for j = 1:n_drives
             Gʲ = P.G_drives[j]
-            Ĝʲ = G(aₜ, P.G_drift_anticoms[j], P.G_drive_anticoms[:, j])
+            Ĝʲ = G(aₜ, P.G_drift_anticomms[j], P.G_drive_anticomms[:, j])
             ∂Δt∂aʲP =
                 -1 / 2 * Gʲ * (ψ̃ₜ₊₁ + ψ̃ₜ) +
                 1 / 6 * Δtₜ * Ĝʲ * (ψ̃ₜ₊₁ - ψ̃ₜ)
