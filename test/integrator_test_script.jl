@@ -5,7 +5,7 @@ using TrajectoryIndexingUtils
 using BenchmarkTools
 using LinearAlgebra
 
-T = 5
+T = 100
 H_drift = kron(GATES[:Z], GATES[:X], GATES[:X], GATES[:X])
 H_drives = [kron(GATES[:X], I(2), I(2), I(2)), kron(GATES[:Y], GATES[:Y], I(2), GATES[:Y])]
 n_drives = length(H_drives)
@@ -42,7 +42,7 @@ dynamics = QuantumDynamics(f, Z)
 
 # test dynamics jacobian
 shape = (Z.dims.states * (Z.T - 1), Z.dim * Z.T)
-
+@btime dyn_res = dynamics.F(Z.datavec)
 @btime J_dynamics, J_struc = dynamics.∂F(Z.datavec), dynamics.∂F_structure
 shape = (Z.dim * Z.T, Z.dim * Z.T)
 
