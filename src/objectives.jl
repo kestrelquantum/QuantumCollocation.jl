@@ -195,9 +195,8 @@ function UnitaryInfidelityObjective(;
 
     params = Dict(
         :type => :UnitaryInfidelityObjective,
-        :names => name,
-        :goals => goal,
-        :loss => loss,
+        :name => name,
+        :goal => goal,
         :Q => Q,
         :eval_hessian => eval_hessian,
     )
