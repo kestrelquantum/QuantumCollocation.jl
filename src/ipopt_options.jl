@@ -18,7 +18,7 @@ using Base: @kwdef
     max_iter::Int = 1_000
     max_cpu_time = 1_000_000.0
     dual_inf_tol::T = 1.0
-    constr_viol_tol::T = 1.0e-12
+    constr_viol_tol::T = 1.0e-6
     compl_inf_tol::T = 1.0e-3
     acceptable_tol::T = 1.0e-6
     acceptable_iter::Int = 15
