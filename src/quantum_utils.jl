@@ -28,7 +28,7 @@ using LinearAlgebra
 
 
 """
-    kronicker product utility
+    kronecker product utility
 """
 
 ⊗(A::AbstractVecOrMat, B::AbstractVecOrMat) = kron(A, B)
