@@ -239,7 +239,7 @@ function UnitaryMinimumTimeProblem(
         trajectory
     )
 
-    push!(constraints, fidelity_constraint)
+    constraints = AbstractConstraint[constraints..., fidelity_constraint]
 
     return QuantumControlProblem(
         system,
@@ -252,6 +252,31 @@ function UnitaryMinimumTimeProblem(
         kwargs...
     )
 end
+
+function UnitaryMinimumTimeProblem(
+    prob::QuantumControlProblem;
+    kwargs...
+)
+    params = deepcopy(prob.params)
+    traj = copy(prob.trajectory)
+    system = prob.system
+    objective = Objective(params[:objective_terms])
+    integrators = prob.integrators
+    constraints = [
+        params[:linear_constraints]...,
+        NonlinearConstraint.(params[:nonlinear_constraints])...
+    ]
+    return UnitaryMinimumTimeProblem(
+        traj,
+        system,
+        objective,
+        integrators,
+        constraints;
+        build_trajectory_constraints=false,
+        kwargs...
+    )
+end
+
 
 function UnitaryMinimumTimeProblem(
     data_path::String;
@@ -508,6 +533,7 @@ function QuantumStateSmoothPulseProblem(
     system = QuantumSystem(H_drift, H_drives)
     return QuantumStateSmoothPulseProblem(system, args...; kwargs...)
 end
+
 
 function QuantumStateMinimumTimeProblem(
     trajectory::NamedTrajectory,

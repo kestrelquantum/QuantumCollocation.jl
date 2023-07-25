@@ -91,13 +91,13 @@ end
 
 function lift(
     U::AbstractMatrix{<:Number},
-    q::Int,
-    n::Int;
-    l::Int=2
-)
-    Is = Matrix{Number}[I(l) for _ = 1:n]
-    Is[q] = U
-    return foldr(kron, Is)
+    qubit_index::Int,
+    n_qubits::Int;
+    levels::Int=size(U, 1)
+)::Matrix{ComplexF64}
+    Is = Matrix{Complex}[I(levels) for _ = 1:n_qubits]
+    Is[qubit_index] = U
+    return foldr(⊗, Is)
 end
 
 
