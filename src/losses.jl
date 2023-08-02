@@ -39,13 +39,26 @@ using Symbolics
 
 abstract type AbstractLoss end
 
+"""
+    infidelity(ψ̃::AbstractVector, ψ̃goal::AbstractVector)
 
+Returns the infidelity between two quantum statevectors specified 
+in the ``\\mathbb{C}^n \\to \\mathbb{R}^{2n}`` isomorphism space.
+
+"""
 function infidelity(ψ̃::AbstractVector, ψ̃goal::AbstractVector)
     ψ = iso_to_ket(ψ̃)
     ψgoal = iso_to_ket(ψ̃goal)
     return abs(1 - abs2(ψgoal'ψ))
 end
 
+"""
+    isovec_unitary_fidelity(Ũ::AbstractVector, Ũgoal::AbstractVector)
+
+Returns the fidelity between two unitary operators, specified as an 
+isomorphic vector. 
+
+"""
 @inline @views function isovec_unitary_fidelity(Ũ⃗::AbstractVector, Ũ⃗_goal::AbstractVector)
     n = Int(sqrt(length(Ũ⃗) ÷ 2))
     U⃗ᵣ = Ũ⃗[1:end ÷ 2]
