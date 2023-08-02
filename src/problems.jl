@@ -26,6 +26,15 @@ const MOI = MathOptInterface
 
 abstract type AbstractProblem end
 
+"""
+    mutable struct QuantumControlProblem <: AbstractProblem
+
+Stores all the information needed to set up and solve a QuantumControlProblem as well as the solution
+after the solver terminates.
+
+# Fields
+- `optimizer::Ipopt.Optimizer`: Ipopt optimizer object
+"""
 mutable struct QuantumControlProblem <: AbstractProblem
     optimizer::Ipopt.Optimizer
     variables::Matrix{MOI.VariableIndex}
