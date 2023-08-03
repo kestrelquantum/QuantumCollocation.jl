@@ -173,19 +173,11 @@ function UnitarySmoothPulseProblem(
     J += QuadraticRegularizer(:da, traj, R_da)
     J += QuadraticRegularizer(:dda, traj, R_dda)
 
-    if free_time
-        integrators = [
-            UnitaryPadeIntegrator(system, :Ũ⃗, :a),
-            DerivativeIntegrator(:a, :da, traj),
-            DerivativeIntegrator(:da, :dda, traj),
-        ]
-    else
-        integrators = [
-            UnitaryPadeIntegrator(system, :Ũ⃗, :a),
-            DerivativeIntegrator(:a, :da, traj),
-            DerivativeIntegrator(:da, :dda, traj),
-        ]
-    end
+    integrators = [
+        UnitaryPadeIntegrator(system, :Ũ⃗, :a),
+        DerivativeIntegrator(:a, :da, traj),
+        DerivativeIntegrator(:da, :dda, traj),
+    ]
 
     if free_time
         if timesteps_all_equal
