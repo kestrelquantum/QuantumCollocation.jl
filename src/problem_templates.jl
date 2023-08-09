@@ -52,7 +52,9 @@ function UnitarySmoothPulseProblem(
     timesteps_all_equal::Bool=true,
     verbose::Bool=false,
     U_init::Union{AbstractMatrix{<:Number},Nothing}=nothing,
+    integrator=Integrators.fourth_order_pade,
     geodesic=true,
+    pade_order=4,
 )
     U_goal = Matrix{ComplexF64}(U_goal)
 
@@ -94,7 +96,7 @@ function UnitarySmoothPulseProblem(
             da = randn(n_drives, T) * drive_derivative_σ
             dda = randn(n_drives, T) * drive_derivative_σ
         else
-            Ũ⃗ = unitary_rollout(Ũ⃗_init, a_guess, Δt, system)
+            Ũ⃗ = unitary_rollout(Ũ⃗_init, a_guess, Δt, system; integrator=integrator)
             a = a_guess
             da = derivative(a, Δt)
             dda = derivative(da, Δt)
@@ -173,19 +175,11 @@ function UnitarySmoothPulseProblem(
     J += QuadraticRegularizer(:da, traj, R_da)
     J += QuadraticRegularizer(:dda, traj, R_dda)
 
-    if free_time
-        integrators = [
-            UnitaryPadeIntegrator(system, :Ũ⃗, :a),
-            DerivativeIntegrator(:a, :da, traj),
-            DerivativeIntegrator(:da, :dda, traj),
-        ]
-    else
-        integrators = [
-            UnitaryPadeIntegrator(system, :Ũ⃗, :a),
-            DerivativeIntegrator(:a, :da, traj),
-            DerivativeIntegrator(:da, :dda, traj),
-        ]
-    end
+    integrators = [
+        UnitaryPadeIntegrator(system, :Ũ⃗, :a; order=pade_order),
+        DerivativeIntegrator(:a, :da, traj),
+        DerivativeIntegrator(:da, :dda, traj),
+    ]
 
     if free_time
         if timesteps_all_equal
