@@ -330,7 +330,7 @@ struct UnitaryPadeIntegrator{R <: Number} <: QuantumPadeIntegrator
     function UnitaryPadeIntegrator(
         sys::QuantumSystem{R},
         unitary_symb::Union{Symbol,Nothing}=nothing,
-        drive_symb::Union{Symbol,Tuple{Vararg{Symbol}},Nothing}=nothing,
+        drive_symb::Union{Symbol,Tuple{Vararg{Symbol}},Nothing}=nothing;
         order::Int=4,
         autodiff::Bool=false,
         G::Union{Function, Nothing}=nothing,

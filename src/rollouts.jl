@@ -117,10 +117,15 @@ function unitary_rollout(
     system::QuantumSystem;
     unitary_name::Symbol=:Ũ⃗,
     drive_name::Symbol=:a,
-    integrator=exp
+    integrator=exp,
+    only_drift=false
 )
     Ũ⃗₁ = traj.initial[unitary_name]
-    controls = traj[drive_name]
+    if only_drift
+        controls = zeros(size(traj[drive_name]))
+    else
+        controls = traj[drive_name]
+    end
     Δt = timesteps(traj)
     return unitary_rollout(
         Ũ⃗₁,
