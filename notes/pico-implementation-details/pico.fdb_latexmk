@@ -1,7 +1,13 @@
 # Fdb version 3
+<<<<<<< HEAD
+["pdflatex"] 1688260156 "/home/aditya/oc_projects/QuantumCollocation.jl/notes/pico-implementation-details/pico.tex" "pico.pdf" "pico" 1688260156
+  "/etc/texmf/web2c/texmf.cnf" 1661381987 475 c0e671620eb5563b2130f56340a5fde8 ""
+  "/home/aditya/oc_projects/QuantumCollocation.jl/notes/pico-implementation-details/pico.tex" 1688260155 41515 fb5dc28a2b4c07cbe909fc022334310d ""
+=======
 ["pdflatex"] 1690232300 "/home/aaron/projects/JuliaPackages/QuantumCollocation.jl/notes/pico-implementation-details/pico.tex" "pico.pdf" "pico" 1690232300
   "/etc/texmf/web2c/texmf.cnf" 1661381987 475 c0e671620eb5563b2130f56340a5fde8 ""
   "/home/aaron/projects/JuliaPackages/QuantumCollocation.jl/notes/pico-implementation-details/pico.tex" 1690232299 43273 10a462e90cf0bf7f7f6d77cbd66301b0 ""
+>>>>>>> origin
   "/usr/share/texlive/texmf-dist/fonts/map/fontname/texfonts.map" 1577235249 3524 cb3e574dea2d1052e39280babc910dc8 ""
   "/usr/share/texlive/texmf-dist/fonts/tfm/public/amsfonts/cmextra/cmbsy5.tfm" 1246382020 1120 1e8878807317373affa7f7bba4cf2f6a ""
   "/usr/share/texlive/texmf-dist/fonts/tfm/public/amsfonts/cmextra/cmbsy7.tfm" 1246382020 1120 7f9f170e8aa57527ad6c49feafd45d54 ""
@@ -191,10 +197,17 @@
   "/usr/share/texmf/web2c/texmf.cnf" 1644012257 39432 7155514e09a3d69036fac785183a21c2 ""
   "/var/lib/texmf/fonts/map/pdftex/updmap/pdftex.map" 1661382061 166835 3237b25953d3dec94d74e36efc3a402b ""
   "/var/lib/texmf/web2c/pdftex/pdflatex.fmt" 1661382066 1435853 7dc55129da6aefe46d2d311fdea676e1 ""
+<<<<<<< HEAD
+  "pico.aux" 1688260156 2890 fe292c2c830c3fd789711dd39da86405 "pdflatex"
+  "pico.out" 1688260156 2682 60b213b9fa15f63d21d0b695d75a95e9 "pdflatex"
+  "pico.tex" 1688260155 41515 fb5dc28a2b4c07cbe909fc022334310d ""
+  "pico.toc" 1688260156 1465 c72d4d95f20c90171a1e429076586a72 "pdflatex"
+=======
   "pico.aux" 1690232300 2891 afb9be39c57d583b0c0713e927692822 "pdflatex"
   "pico.out" 1690232300 2682 60b213b9fa15f63d21d0b695d75a95e9 "pdflatex"
   "pico.tex" 1690232299 43273 10a462e90cf0bf7f7f6d77cbd66301b0 ""
   "pico.toc" 1690232300 1466 15b83aaba24388fe450dc474735884eb "pdflatex"
+>>>>>>> origin
   (generated)
   "pico.aux"
   "pico.log"
