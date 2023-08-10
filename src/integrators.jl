@@ -542,7 +542,7 @@ end
     return nth_order_pade(P, ψ̃ₜ₊₁, ψ̃ₜ, aₜ, Δtₜ) 
 end
 
-# aₜ should be a vector with all the controls. concatenate alll teh named traj controls
+# aₜ should be a vector with all the controls. concatenate all the named traj controls
 function ∂aₜ(
     P::UnitaryPadeIntegrator{R},
     Ũ⃗ₜ₊₁::AbstractVector{T},
@@ -783,17 +783,23 @@ function μ∂aₜ∂Ũ⃗ₜ(
 ) where T <: Real
 
     n_drives = P.n_drives
-    μ∂aₜ∂Ũ⃗ₜP = Array{T}(undef, P.dim, n_drives)
-    
-    for j = 1:n_drives
-        Gʲ = P.G_drives[j]
-        Ĝʲ = G(aₜ, P.G_drift_anticomms[j], P.G_drive_anticomms[:, j])
-        ∂aₜ∂Ũ⃗ₜ_block_i = -(Δtₜ / 2 * Gʲ + Δtₜ^2 / 12 * Ĝʲ)
-        # sparse is necessary since blockdiag doesn't accept dense matrices
-        ∂aₜ∂Ũ⃗ₜ = blockdiag(fill(sparse(∂aₜ∂Ũ⃗ₜ_block_i), P.N)...)
-        μ∂aₜ∂Ũ⃗ₜP[:, j] = ∂aₜ∂Ũ⃗ₜ' * μₜ
-    end
 
+    if P.autodiff || !isnothing(P.G)
+        
+    elseif P.order == 4
+        μ∂aₜ∂Ũ⃗ₜP = Array{T}(undef, P.dim, n_drives)
+        
+        for j = 1:n_drives
+            Gʲ = P.G_drives[j]
+            Ĝʲ = G(aₜ, P.G_drift_anticomms[j], P.G_drive_anticomms[:, j])
+            ∂aₜ∂Ũ⃗ₜ_block_i = -(Δtₜ / 2 * Gʲ + Δtₜ^2 / 12 * Ĝʲ)
+            # sparse is necessary since blockdiag doesn't accept dense matrices
+            ∂aₜ∂Ũ⃗ₜ = blockdiag(fill(sparse(∂aₜ∂Ũ⃗ₜ_block_i), P.N)...)
+            μ∂aₜ∂Ũ⃗ₜP[:, j] = ∂aₜ∂Ũ⃗ₜ' * μₜ
+        end
+    else
+        ## higher order pade goes here
+    end
     return μ∂aₜ∂Ũ⃗ₜP
 end
 
