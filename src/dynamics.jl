@@ -3,6 +3,11 @@ module Dynamics
 export AbstractDynamics
 export QuantumDynamics
 
+export dynamics
+export dynamics_jacobian
+export dynamics_hessian_of_lagrangian
+export dynamics_components
+
 using ..QuantumSystems
 using ..QuantumUtils
 using ..StructureUtils
@@ -31,49 +36,22 @@ struct QuantumDynamics <: AbstractDynamics
     dim::Int
 end
 
-function QuantumDynamics(
-    integrators::Vector{<:AbstractIntegrator},
-    traj::NamedTrajectory;
-    verbose=false
-)
-    if verbose
-        println("        constructing knot point dynamics functions...")
-    end
-
-    free_time = traj.timestep isa Symbol
-
-    # if free_time
-    #     @assert all([
-    #         !isnothing(state(integrator)) &&
-    #         !isnothing(controls(integrator)) &&
-    #         !isnothing(timestep(integrator))
-    #             for integrator ∈ integrators
-    #     ])
-    # else
-    #     @assert all([
-    #         !isnothing(state(integrator)) &&
-    #         !isnothing(controls(integrator))
-    #             for integrator ∈ integrators
-    #     ])
-    # end
-
-    for integrator ∈ integrators
-        if integrator isa QuantumIntegrator && controls(integrator) isa Tuple
-            drive_comps = [traj.components[s] for s ∈ integrator.drive_symb]
-            number_of_drives = sum(length.(drive_comps))
-            @assert number_of_drives == integrator.n_drives "number of drives ($(number_of_drives)) does not match number of drive terms in Hamiltonian ($(integrator.n_drives))"
-        end
-    end
-
+function dynamics_components(integrators::Vector{<:AbstractIntegrator})
     dynamics_comps = []
-    let comp_mark = 0
-        for integrator ∈ integrators
-            integrator_comps = (comp_mark + 1):(comp_mark + dim(integrator))
-            push!(dynamics_comps, integrator_comps)
-            comp_mark += dim(integrator)
-        end
+    comp_mark = 0
+    for integrator ∈ integrators
+        integrator_comps = (comp_mark + 1):(comp_mark + dim(integrator))
+        push!(dynamics_comps, integrator_comps)
+        comp_mark += dim(integrator)
     end
+    return dynamics_comps
+end
 
+function dynamics(
+    integrators::Vector{<:AbstractIntegrator},
+    traj::NamedTrajectory
+)
+    dynamics_comps = dynamics_components(integrators)
     dynamics_dim = dim(integrators)
     function f(zₜ, zₜ₊₁)
         δ = Vector{eltype(zₜ)}(undef, dynamics_dim)
@@ -82,22 +60,27 @@ function QuantumDynamics(
         end
         return δ
     end
+    return f
+end
 
+
+
+function dynamics_jacobian(
+    integrators::Vector{<:AbstractIntegrator},
+    traj::NamedTrajectory
+)
+    dynamics_comps = dynamics_components(integrators)
+    dynamics_dim = dim(integrators)
+    free_time = traj.timestep isa Symbol
     function ∂f(zₜ, zₜ₊₁)
-
         ∂ = zeros(eltype(zₜ), dynamics_dim, 2traj.dim)
-
         for (integrator, integrator_comps) ∈ zip(integrators, dynamics_comps)
-
             if integrator isa QuantumIntegrator
-
                 if integrator.autodiff
-
                     ∂P(z1, z2) = ForwardDiff.jacobian(
                         zz -> integrator(zz[1:traj.dim], zz[traj.dim+1:end], traj),
                         [z1; z2]
                     )
-
                     ∂[integrator_comps, 1:2traj.dim] = ∂P(zₜ, zₜ₊₁)
                 else
                     if free_time
@@ -110,10 +93,8 @@ function QuantumDynamics(
                         ∂xₜf, ∂xₜ₊₁f, ∂uₜf =
                             Integrators.jacobian(integrator, zₜ, zₜ₊₁, traj)
                     end
-
                     ∂[integrator_comps, x_comps] = ∂xₜf
                     ∂[integrator_comps, x_comps .+ traj.dim] = ∂xₜ₊₁f
-
                     if u_comps isa Tuple
                         for (uᵢ_comps, ∂uₜᵢf) ∈ zip(u_comps, ∂uₜf)
                             ∂[integrator_comps, uᵢ_comps] = ∂uₜᵢf
@@ -121,11 +102,8 @@ function QuantumDynamics(
                     else
                         ∂[integrator_comps, u_comps] = ∂uₜf
                     end
-
                 end
-
             elseif integrator isa DerivativeIntegrator
-
                 if free_time
                     x_comps, dx_comps, Δt_comps = comps(integrator, traj)
                     ∂xₜf, ∂xₜ₊₁f, ∂dxₜf, ∂Δtₜf =
@@ -135,7 +113,6 @@ function QuantumDynamics(
                     ∂xₜf, ∂xₜ₊₁f, ∂dxₜf =
                         Integrators.jacobian(integrator, zₜ, zₜ₊₁, traj)
                 end
-
                 ∂[integrator_comps, x_comps] = ∂xₜf
                 ∂[integrator_comps, x_comps .+ traj.dim] = ∂xₜ₊₁f
                 ∂[integrator_comps, dx_comps] = ∂dxₜf
@@ -146,29 +123,28 @@ function QuantumDynamics(
                 error("integrator type not supported: $(typeof(integrator))")
             end
         end
-
         return sparse(∂)
     end
+    return ∂f
+end
 
+function dynamics_hessian_of_lagrangian(
+    integrators::Vector{<:AbstractIntegrator},
+    traj::NamedTrajectory
+)
+    dynamics_comps = dynamics_components(integrators)
+    free_time = traj.timestep isa Symbol
     function μ∂²f(zₜ, zₜ₊₁, μₜ)
-
         μ∂² = zeros(eltype(zₜ), 2traj.dim, 2traj.dim)
-
         for (integrator, integrator_comps) ∈ zip(integrators, dynamics_comps)
-
             if integrator isa QuantumIntegrator
-
                 if integrator.autodiff
-
                     μ∂²P(z1, z2, μ) = ForwardDiff.hessian(
                         zz -> μ' * integrator(zz[1:traj.dim], zz[traj.dim+1:end], traj),
                         [z1; z2]
                     )
-
                     μ∂²[1:2traj.dim, 1:2traj.dim] = sparse(μ∂²P(zₜ, zₜ₊₁, μₜ[integrator_comps]))
-
                 else
-
                     if free_time
                         x_comps, u_comps, Δt_comps = comps(integrator, traj)
                         μ∂uₜ∂xₜf, μ∂²uₜf, μ∂Δtₜ∂xₜf, μ∂Δtₜ∂uₜf, μ∂²Δtₜf, μ∂xₜ₊₁∂uₜf, μ∂xₜ₊₁∂Δtₜf =
@@ -178,7 +154,6 @@ function QuantumDynamics(
                         μ∂uₜ∂xₜf, μ∂²uₜf, μ∂xₜ₊₁∂uₜf =
                             hessian_of_the_lagrangian(integrator, zₜ, zₜ₊₁, μₜ[integrator_comps], traj)
                     end
-
                     if u_comps isa Tuple
                         for (uᵢ_comps, μ∂uₜᵢ∂xₜf) ∈ zip(u_comps, μ∂uₜ∂xₜf)
                             μ∂²[x_comps, uᵢ_comps] += μ∂uₜᵢ∂xₜf
@@ -208,24 +183,62 @@ function QuantumDynamics(
                         μ∂²[Δt_comps, Δt_comps] .+= μ∂²Δtₜf
                     end
                 end
-
             elseif integrator isa DerivativeIntegrator
                 if free_time
                     x_comps, dx_comps, Δt_comps = comps(integrator, traj)
-
                     μ∂dxₜ∂Δtₜf = -μₜ[integrator_comps]
-
                     μ∂²[dx_comps, Δt_comps] += μ∂dxₜ∂Δtₜf
                 end
             end
         end
-
         return sparse(μ∂²)
     end
+    return μ∂²f
+end
+
+
+function QuantumDynamics(
+    integrators::Vector{<:AbstractIntegrator},
+    traj::NamedTrajectory;
+    verbose=false
+)
+    if verbose
+        println("        constructing knot point dynamics functions...")
+    end
+
+    free_time = traj.timestep isa Symbol
+
+    if free_time
+        @assert all([
+            !isnothing(state(integrator)) &&
+            !isnothing(controls(integrator))
+                for integrator ∈ integrators
+        ])
+    else
+        @assert all([
+            !isnothing(state(integrator)) &&
+            !isnothing(controls(integrator))
+                for integrator ∈ integrators
+        ])
+    end
+
+    for integrator ∈ integrators
+        if integrator isa QuantumIntegrator && controls(integrator) isa Tuple
+            drive_comps = [traj.components[s] for s ∈ integrator.drive_symb]
+            number_of_drives = sum(length.(drive_comps))
+            @assert number_of_drives == integrator.n_drives "number of drives ($(number_of_drives)) does not match number of drive terms in Hamiltonian ($(integrator.n_drives))"
+        end
+    end
+
+    f = dynamics(integrators, traj)
+    ∂f = dynamics_jacobian(integrators, traj)
+    μ∂²f = dynamics_hessian_of_lagrangian(integrators, traj)
 
     if verbose
         println("        determining dynamics derivative structure...")
     end
+
+    dynamics_dim = dim(integrators)
 
     ∂f_structure, ∂F_structure, μ∂²f_structure, μ∂²F_structure =
         dynamics_structure(∂f, μ∂²f, traj, dynamics_dim)
@@ -274,7 +287,15 @@ function QuantumDynamics(
         return μ∂²s
     end
 
-    return QuantumDynamics(integrators, F, ∂F, ∂F_structure, μ∂²F, μ∂²F_structure, dynamics_dim)
+    return QuantumDynamics(
+        integrators,
+        F,
+        ∂F,
+        ∂F_structure,
+        μ∂²F,
+        μ∂²F_structure,
+        dynamics_dim
+    )
 end
 
 QuantumDynamics(P::AbstractIntegrator, traj::NamedTrajectory; kwargs...) =

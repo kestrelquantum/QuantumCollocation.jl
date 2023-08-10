@@ -5,6 +5,7 @@ export Objective
 export QuantumObjective
 export QuantumStateObjective
 export QuantumUnitaryObjective
+export UnitaryInfidelityObjective
 
 export MinimumTimeObjective
 
@@ -82,8 +83,6 @@ function sparse_to_moi(A::SparseMatrixCSC)
     vals = [A[i,j] for (i,j) ∈ inds]
     return (inds, vals)
 end
-
-
 """
     QuantumObjective
 
@@ -176,6 +175,76 @@ function QuantumObjective(;
 	return Objective(L, ∇L, ∂²L, ∂²L_structure, Dict[params])
 end
 
+
+
+"""
+    UnitaryInfidelityObjective
+
+
+"""
+function UnitaryInfidelityObjective(;
+    name::Union{Nothing,Symbol}=nothing,
+    goal::Union{Nothing,AbstractVector{<:Real}}=nothing,
+	Q::Float64=100.0,
+	eval_hessian::Bool=true
+)
+    @assert !isnothing(goal) "unitary goal name must be specified"
+
+    loss = :UnitaryInfidelityLoss
+    l = eval(loss)(name, goal)
+
+    params = Dict(
+        :type => :UnitaryInfidelityObjective,
+        :name => name,
+        :goal => goal,
+        :Q => Q,
+        :eval_hessian => eval_hessian,
+    )
+
+	@views function L(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory)
+        return Q * l(Z⃗[slice(Z.T, Z.components[name], Z.dim)])
+    end
+
+    @views function ∇L(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory)
+        ∇ = zeros(Z.dim * Z.T)
+        Ũ⃗_slice = slice(Z.T, Z.components[name], Z.dim)
+        Ũ⃗ = Z⃗[Ũ⃗_slice]
+        ∇l = l(Ũ⃗; gradient=true)
+        ∇[Ũ⃗_slice] .= Q * ∇l
+        return ∇
+    end
+
+    function ∂²L_structure(Z::NamedTrajectory)
+        final_time_offset = index(Z.T, 0, Z.dim)
+        comp_start_offset = Z.components[name][1] - 1
+        structure = [
+            ij .+ (final_time_offset + comp_start_offset)
+                for ij ∈ l.∇²l_structure
+        ]
+        return structure
+    end
+
+
+    @views function ∂²L(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory; return_moi_vals=true)
+        H = spzeros(Z.dim * Z.T, Z.dim * Z.T)
+        Ũ⃗_slice = slice(Z.T, Z.components[name], Z.dim)
+        H[Ũ⃗_slice, Ũ⃗_slice] = Q * l(Z⃗[Ũ⃗_slice]; hessian=true)
+        if return_moi_vals
+            Hs = [H[i,j] for (i, j) ∈ ∂²L_structure(Z)]
+            return Hs
+        else
+            return H
+        end
+    end
+
+
+    # ∂²L_structure(Z::NamedTrajectory) = []
+
+    # ∂²L(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory) = []
+
+	return Objective(L, ∇L, ∂²L, ∂²L_structure, Dict[params])
+end
+
 function QuantumObjective(
     name::Symbol,
     traj::NamedTrajectory,
@@ -184,6 +253,14 @@ function QuantumObjective(
 )
     goal = traj.goal[name]
     return QuantumObjective(name=name, goals=goal, loss=loss, Q=Q)
+end
+
+function UnitaryInfidelityObjective(
+    name::Symbol,
+    traj::NamedTrajectory,
+    Q::Float64
+)
+    return UnitaryInfidelityObjective(name=name, goal=traj.goal[name], Q=Q)
 end
 
 function QuantumObjective(

@@ -52,6 +52,7 @@ function UnitarySmoothPulseProblem(
     timesteps_all_equal::Bool=true,
     verbose::Bool=false,
     U_init::Union{AbstractMatrix{<:Number},Nothing}=nothing,
+    geodesic=true,
 )
     U_goal = Matrix{ComplexF64}(U_goal)
 
@@ -71,19 +72,25 @@ function UnitarySmoothPulseProblem(
         end
 
         if isnothing(a_guess)
-            # TODO: add warning in case U_goal is not unitary
+            geodesic_success = true
+            if geodesic
+                try
+                    Ũ⃗ = unitary_geodesic(U_goal, T)
+                catch e
+                    @warn "Could not find geodesic. Using random initial guess."
+                    geodesic_success = false
+                end
+            end
+            if !geodesic || !geodesic_success
+                Ũ⃗ = 2 * rand(length(Ũ⃗_init), T) .- 1
+            end
             a_dists =  [Uniform(-a_bounds[i], a_bounds[i]) for i = 1:n_drives]
             a = hcat([
                 zeros(n_drives),
                 vcat([rand(a_dists[i], 1, T - 2) for i = 1:n_drives]...),
                 zeros(n_drives)
             ]...)
-            try
-                Ũ⃗ = unitary_geodesic(U_goal, T)
-            catch e
-                @warn "Could not find geodesic. Rolling out unitary from random intial controls."
-                Ũ⃗ = unitary_rollout(Ũ⃗_init, a, Δt, system)
-            end
+
             da = randn(n_drives, T) * drive_derivative_σ
             dda = randn(n_drives, T) * drive_derivative_σ
         else
@@ -161,16 +168,16 @@ function UnitarySmoothPulseProblem(
         end
     end
 
-    J = QuantumUnitaryObjective(:Ũ⃗, traj, Q)
+    J = UnitaryInfidelityObjective(:Ũ⃗, traj, Q)
     J += QuadraticRegularizer(:a, traj, R_a)
     J += QuadraticRegularizer(:da, traj, R_da)
     J += QuadraticRegularizer(:dda, traj, R_dda)
 
     if free_time
         integrators = [
-            UnitaryPadeIntegrator(system, :Ũ⃗, :a, :Δt),
-            DerivativeIntegrator(:a, :da, :Δt, traj),
-            DerivativeIntegrator(:da, :dda, :Δt, traj),
+            UnitaryPadeIntegrator(system, :Ũ⃗, :a),
+            DerivativeIntegrator(:a, :da, traj),
+            DerivativeIntegrator(:da, :dda, traj),
         ]
     else
         integrators = [
@@ -232,7 +239,7 @@ function UnitaryMinimumTimeProblem(
         trajectory
     )
 
-    push!(constraints, fidelity_constraint)
+    constraints = AbstractConstraint[constraints..., fidelity_constraint]
 
     return QuantumControlProblem(
         system,
@@ -245,6 +252,31 @@ function UnitaryMinimumTimeProblem(
         kwargs...
     )
 end
+
+function UnitaryMinimumTimeProblem(
+    prob::QuantumControlProblem;
+    kwargs...
+)
+    params = deepcopy(prob.params)
+    traj = copy(prob.trajectory)
+    system = prob.system
+    objective = Objective(params[:objective_terms])
+    integrators = prob.integrators
+    constraints = [
+        params[:linear_constraints]...,
+        NonlinearConstraint.(params[:nonlinear_constraints])...
+    ]
+    return UnitaryMinimumTimeProblem(
+        traj,
+        system,
+        objective,
+        integrators,
+        constraints;
+        build_trajectory_constraints=false,
+        kwargs...
+    )
+end
+
 
 function UnitaryMinimumTimeProblem(
     data_path::String;
@@ -451,14 +483,14 @@ function QuantumStateSmoothPulseProblem(
     if free_time
 
         ψ̃_integrators = [
-            QuantumStatePadeIntegrator(system, Symbol("ψ̃$i"), :a, :Δt)
+            QuantumStatePadeIntegrator(system, Symbol("ψ̃$i"), :a)
                 for i = 1:length(ψ_inits)
         ]
 
         integrators = [
             ψ̃_integrators...,
-            DerivativeIntegrator(:a, :da, :Δt, traj),
-            DerivativeIntegrator(:da, :dda, :Δt, traj)
+            DerivativeIntegrator(:a, :da, traj),
+            DerivativeIntegrator(:da, :dda, traj)
         ]
     else
         ψ̃_integrators = [
@@ -501,6 +533,7 @@ function QuantumStateSmoothPulseProblem(
     system = QuantumSystem(H_drift, H_drives)
     return QuantumStateSmoothPulseProblem(system, args...; kwargs...)
 end
+
 
 function QuantumStateMinimumTimeProblem(
     trajectory::NamedTrajectory,

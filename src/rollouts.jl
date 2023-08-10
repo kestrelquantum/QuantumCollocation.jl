@@ -13,9 +13,10 @@ using ..Integrators
 
 using Manifolds
 using LinearAlgebra
+using NamedTrajectories
 
 function rollout(
-    ψ̃₁::AbstractVector{<:Number},
+    ψ̃₁::AbstractVector{Float64},
     controls::AbstractMatrix{Float64},
     Δt::Union{AbstractVector{Float64}, AbstractMatrix{Float64}, Float64},
     system::QuantumSystem;
@@ -46,6 +47,9 @@ function rollout(
 
     return Ψ̃
 end
+
+rollout(ψ::Vector{<:Complex}, args...; kwargs...) =
+    rollout(ket_to_iso(ψ), args...; kwargs...)
 
 function rollout(
     ψ̃₁s::AbstractVector{<:AbstractVector}, args...; kwargs...
@@ -91,6 +95,8 @@ function unitary_rollout(
     return Ũ⃗
 end
 
+
+
 function unitary_rollout(
     controls::AbstractMatrix{Float64},
     Δt::Union{AbstractVector{Float64}, AbstractMatrix{Float64}, Float64},
@@ -103,6 +109,38 @@ function unitary_rollout(
         Δt,
         system;
         integrator=integrator
+    )
+end
+
+function unitary_rollout(
+    traj::NamedTrajectory,
+    system::QuantumSystem;
+    unitary_name::Symbol=:Ũ⃗,
+    drive_name::Symbol=:a,
+    integrator=exp
+)
+    Ũ⃗₁ = traj.initial[unitary_name]
+    controls = traj[drive_name]
+    Δt = timesteps(traj)
+    return unitary_rollout(
+        Ũ⃗₁,
+        controls,
+        Δt,
+        system;
+        integrator=integrator
+    )
+end
+
+function QuantumUtils.unitary_fidelity(
+    traj::NamedTrajectory,
+    system::QuantumSystem;
+    unitary_name::Symbol=:Ũ⃗,
+    kwargs...
+)
+    Ũ⃗_final = unitary_rollout(traj, system; unitary_name=unitary_name, kwargs...)[:, end]
+    return unitary_fidelity(
+        Ũ⃗_final,
+        traj.goal[unitary_name]
     )
 end
 
