@@ -42,7 +42,7 @@ abstract type AbstractLoss end
 """
     infidelity(ψ̃::AbstractVector, ψ̃goal::AbstractVector)
 
-Returns the infidelity between two quantum statevectors specified 
+Returns the infidelity between two quantum statevectors specified
 in the ``\\mathbb{C}^n \\to \\mathbb{R}^{2n}`` isomorphism space.
 
 """
@@ -55,8 +55,8 @@ end
 """
     isovec_unitary_fidelity(Ũ::AbstractVector, Ũgoal::AbstractVector)
 
-Returns the fidelity between two unitary operators, specified as an 
-isomorphic vector. 
+Returns the fidelity between two unitary operators, specified as an
+isomorphic vector.
 
 """
 @inline @views function isovec_unitary_fidelity(Ũ⃗::AbstractVector, Ũ⃗_goal::AbstractVector)
