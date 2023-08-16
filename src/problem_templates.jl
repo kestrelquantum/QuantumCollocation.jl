@@ -55,8 +55,17 @@ function UnitarySmoothPulseProblem(
     integrator=Integrators.fourth_order_pade,
     geodesic=true,
     pade_order=4,
+    autodiff=false,
+    subspace=nothing,
+    jacobian_structure=true,
+    hessian_approximation=false,
+    jacobian_chunk_size=10,
 )
     U_goal = Matrix{ComplexF64}(U_goal)
+
+    if hessian_approximation
+        ipopt_options.hessian_approximation = "limited-memory"
+    end
 
     if isnothing(U_init)
         Ũ⃗_init = operator_to_iso_vec(1.0I(size(U_goal, 1)))
@@ -170,13 +179,13 @@ function UnitarySmoothPulseProblem(
         end
     end
 
-    J = UnitaryInfidelityObjective(:Ũ⃗, traj, Q)
+    J = UnitaryInfidelityObjective(:Ũ⃗, traj, Q; subspace=subspace)
     J += QuadraticRegularizer(:a, traj, R_a)
     J += QuadraticRegularizer(:da, traj, R_da)
     J += QuadraticRegularizer(:dda, traj, R_dda)
 
     integrators = [
-        UnitaryPadeIntegrator(system, :Ũ⃗, :a; order=pade_order),
+        UnitaryPadeIntegrator(system, :Ũ⃗, :a; order=pade_order, autodiff=autodiff),
         DerivativeIntegrator(:a, :da, traj),
         DerivativeIntegrator(:da, :dda, traj),
     ]
@@ -197,6 +206,9 @@ function UnitarySmoothPulseProblem(
         linear_solver=linear_solver,
         verbose=verbose,
         ipopt_options=ipopt_options,
+        jacobian_structure=jacobian_structure,
+        hessian_approximation=hessian_approximation,
+        jacobian_chunk_size=jacobian_chunk_size,
     )
 end
 

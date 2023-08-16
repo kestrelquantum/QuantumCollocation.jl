@@ -124,12 +124,20 @@ function QuantumControlProblem(
     params::Dict{Symbol,Any}=Dict{Symbol, Any}(),
     ipopt_options::Options=Options(),
     verbose=false,
+    jacobian_structure=true,
+    hessian_approximation=false,
+    jacobian_chunk_size=10,
     kwargs...
 )
     if verbose
         println("    building dynamics from integrators...")
     end
-    dynamics = QuantumDynamics(integrators, traj; verbose=verbose)
+    dynamics = QuantumDynamics(integrators, traj;
+        jacobian_structure=jacobian_structure,
+        hessian_approximation=hessian_approximation,
+        jacobian_chunk_size=jacobian_chunk_size,
+        verbose=verbose
+    )
     return QuantumControlProblem(
         system,
         traj,
@@ -151,12 +159,20 @@ function QuantumControlProblem(
     params::Dict{Symbol,Any}=Dict{Symbol, Any}(),
     ipopt_options::Options=Options(),
     verbose=false,
+    jacobian_structure=true,
+    hessian_approximation=false,
+    jacobian_chunk_size=10,
     kwargs...
 )
     if verbose
         println("    building dynamics from integrator...")
     end
-    dynamics = QuantumDynamics(integrator, traj; verbose=verbose)
+    dynamics = QuantumDynamics(integrator, traj;
+        jacobian_structure=jacobian_structure,
+        hessian_approximation=hessian_approximation,
+        jacobian_chunk_size=jacobian_chunk_size,
+        verbose=verbose
+    )
     return QuantumControlProblem(
         system,
         traj,
@@ -177,12 +193,20 @@ function QuantumControlProblem(
     params::Dict{Symbol,Any}=Dict{Symbol, Any}(),
     ipopt_options::Options=Options(),
     verbose=false,
+    jacobian_structure=true,
+    hessian_approximation=false,
+    jacobian_chunk_size=10,
     kwargs...
 )
     if verbose
         println("    building dynamics from function...")
     end
-    dynamics = QuantumDynamics(f, traj; verbose=verbose)
+    dynamics = QuantumDynamics(f, traj;
+        jacobian_structure=jacobian_structure,
+        hessian_approximation=hessian_approximation,
+        jacobian_chunk_size=jacobian_chunk_size,
+        verbose=verbose
+    )
     return QuantumControlProblem(
         system,
         traj,

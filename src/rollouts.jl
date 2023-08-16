@@ -140,12 +140,30 @@ function QuantumUtils.unitary_fidelity(
     traj::NamedTrajectory,
     system::QuantumSystem;
     unitary_name::Symbol=:Ũ⃗,
+    subspace=nothing,
     kwargs...
 )
     Ũ⃗_final = unitary_rollout(traj, system; unitary_name=unitary_name, kwargs...)[:, end]
     return unitary_fidelity(
         Ũ⃗_final,
-        traj.goal[unitary_name]
+        traj.goal[unitary_name];
+        subspace=subspace
+    )
+end
+
+function QuantumUtils.unitary_fidelity(
+    U_goal::AbstractMatrix{ComplexF64},
+    controls::AbstractMatrix{Float64},
+    Δt::Union{AbstractVector{Float64}, AbstractMatrix{Float64}, Float64},
+    system::QuantumSystem;
+    subspace=nothing,
+    integrator=exp
+)
+    Ũ⃗_final = unitary_rollout(controls, Δt, system; integrator=integrator)[:, end]
+    return unitary_fidelity(
+        Ũ⃗_final,
+        operator_to_iso_vec(U_goal);
+        subspace=subspace
     )
 end
 

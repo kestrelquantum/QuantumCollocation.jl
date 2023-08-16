@@ -174,8 +174,9 @@ function iso_vec_to_operator(Ũ⃗::AbstractVector{R}) where R <: Real
     N = Int(sqrt(Ũ⃗_dim))
     U = Matrix{Complex{R}}(undef, N, N)
     for i=0:N-1
-        U[:, i+1] .= @view(Ũ⃗[i*2N .+ (1:N)]) + 
-                    one(R) * im * @view(Ũ⃗[i*isodim .+ (N+1:2N)])
+        U[:, i+1] .=
+            @view(Ũ⃗[i*2N .+ (1:N)]) +
+            one(R) * im * @view(Ũ⃗[i*2N .+ (N+1:2N)])
     end
     return U
 end
@@ -232,15 +233,22 @@ function iso_fidelity(ψ̃, ψ̃_goal)
     return fidelity(ψ, ψ_goal)
 end
 
-function unitary_fidelity(U::Matrix, U_goal::Matrix)
-    N = size(U, 1)
-    return 1 / N * abs(tr(U_goal'U))
+function unitary_fidelity(U::Matrix, U_goal::Matrix; subspace=nothing)
+    if isnothing(subspace)
+        N = size(U, 1)
+        return 1 / N * abs(tr(U_goal'U))
+    else
+        U_goal = U_goal[subspace, subspace]
+        U = U[subspace, subspace]
+        N = size(U, 1)
+        return 1 / N * abs(tr(U_goal'U))
+    end
 end
 
-function unitary_fidelity(Ũ⃗::Vector, Ũ⃗_goal::Vector)
+function unitary_fidelity(Ũ⃗::AbstractVector{<:Real}, Ũ⃗_goal::AbstractVector{<:Real}; subspace=nothing)
     U = iso_vec_to_operator(Ũ⃗)
     U_goal = iso_vec_to_operator(Ũ⃗_goal)
-    return unitary_fidelity(U, U_goal)
+    return unitary_fidelity(U, U_goal; subspace=subspace)
 end
 
 """
@@ -253,10 +261,15 @@ function population(ψ̃, i)
     return abs2(ψ[i + 1])
 end
 
-function populations(ψ̃)
+function populations(ψ̃::AbstractVector{<:Real})
     ψ = iso_to_ket(ψ̃)
     return abs2.(ψ)
 end
+
+function populations(ψ::AbstractVector{<:Complex})
+    return abs2.(ψ)
+end
+
 
 
 

@@ -59,7 +59,7 @@
             (ψ̃ = randn(4, T), u = randn(2, T)),
             controls=:u,
             timestep=0.1,
-            goal=(ψ̃ = [1, 0, 0, 0],)
+            goal=(ψ̃ = [1.0, 0.0, 0.0, 0.0],)
         )
 
 
@@ -89,7 +89,7 @@
             (ψ̃ = randn(4, T), u = randn(2, T)),
             controls=:u,
             timestep=0.1,
-            goal=(ψ̃ = [1, 0, 0, 0],)
+            goal=(ψ̃ = [1.0, 0.0, 0.0, 0.0],)
         )
 
 
@@ -144,6 +144,8 @@
 
         # test objective function hessian
         shape = (Z.dim * Z.T, Z.dim * Z.T)
-        @test all(ForwardDiff.hessian(L, Z.datavec) .≈ dense(∂²L(Z.datavec), ∂²L_structure, shape))
+        H = dense(∂²L(Z.datavec), ∂²L_structure, shape)
+        H_forwarddiff = ForwardDiff.hessian(L, Z.datavec)
+        @test all(H .≈ H_forwarddiff)
     end
 end

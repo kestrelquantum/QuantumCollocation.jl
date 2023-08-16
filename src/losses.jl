@@ -59,43 +59,64 @@ Returns the fidelity between two unitary operators, specified as an
 isomorphic vector.
 
 """
-@inline @views function isovec_unitary_fidelity(Ũ⃗::AbstractVector, Ũ⃗_goal::AbstractVector)
-    n = Int(sqrt(length(Ũ⃗) ÷ 2))
-    U⃗ᵣ = Ũ⃗[1:end ÷ 2]
-    U⃗ᵢ = Ũ⃗[end ÷ 2 + 1:end]
-    Ū⃗ᵣ = Ũ⃗_goal[1:end ÷ 2]
-    Ū⃗ᵢ = Ũ⃗_goal[end ÷ 2 + 1:end]
+@inline @views function isovec_unitary_fidelity(
+    Ũ⃗::AbstractVector,
+    Ũ⃗_goal::AbstractVector,
+    subspace::Tuple{AbstractVector{Int},AbstractVector{Int}}=axes(iso_vec_to_operator(Ũ⃗_goal))
+)
+    subspace_rows, subspace_cols = subspace
+    U = iso_vec_to_operator(Ũ⃗)[subspace_rows, subspace_cols]
+    n = size(U, 1)
+    U_goal = iso_vec_to_operator(Ũ⃗_goal)[subspace_rows, subspace_cols]
+    U⃗ᵣ, U⃗ᵢ = vec(real(U)), vec(imag(U))
+    Ū⃗ᵣ, Ū⃗ᵢ = vec(real(U_goal)), vec(imag(U_goal))
     Tᵣ = Ū⃗ᵣ' * U⃗ᵣ + Ū⃗ᵢ' * U⃗ᵢ
     Tᵢ = Ū⃗ᵣ' * U⃗ᵢ - Ū⃗ᵢ' * U⃗ᵣ
     return 1 / n * sqrt(Tᵣ^2 + Tᵢ^2)
 end
 
-@views function unitary_infidelity(Ũ⃗::AbstractVector, Ũ⃗_goal::AbstractVector)
-    ℱ = isovec_unitary_fidelity(Ũ⃗, Ũ⃗_goal)
+@views function unitary_infidelity(
+    Ũ⃗::AbstractVector,
+    Ũ⃗_goal::AbstractVector,
+    subspace::Tuple{AbstractVector{Int},AbstractVector{Int}}=axes(iso_vec_to_operator(Ũ⃗_goal))
+)
+    ℱ = isovec_unitary_fidelity(Ũ⃗, Ũ⃗_goal, subspace)
     return abs(1 - ℱ)
 end
 
-@views function unitary_infidelity_gradient(Ũ⃗::AbstractVector, Ũ⃗_goal::AbstractVector)
-    n = Int(sqrt(length(Ũ⃗) ÷ 2))
-    U⃗ᵣ = Ũ⃗[1:end ÷ 2]
-    U⃗ᵢ = Ũ⃗[end ÷ 2 + 1:end]
-    Ū⃗ᵣ = Ũ⃗_goal[1:end ÷ 2]
-    Ū⃗ᵢ = Ũ⃗_goal[end ÷ 2 + 1:end]
+@views function unitary_infidelity_gradient(
+    Ũ⃗::AbstractVector,
+    Ũ⃗_goal::AbstractVector,
+    subspace::Tuple{AbstractVector{Int},AbstractVector{Int}}=axes(iso_vec_to_operator(Ũ⃗_goal))
+)
+    subspace_rows, subspace_cols = subspace
+    U = iso_vec_to_operator(Ũ⃗)[subspace_rows, subspace_cols]
+    n = size(U, 1)
+    U_goal = iso_vec_to_operator(Ũ⃗_goal)[subspace_rows, subspace_cols]
+    U⃗ᵣ, U⃗ᵢ = vec(real(U)), vec(imag(U))
+    Ū⃗ᵣ, Ū⃗ᵢ = vec(real(U_goal)), vec(imag(U_goal))
     Tᵣ = Ū⃗ᵣ' * U⃗ᵣ + Ū⃗ᵢ' * U⃗ᵢ
     Tᵢ = Ū⃗ᵣ' * U⃗ᵢ - Ū⃗ᵢ' * U⃗ᵣ
     ℱ = 1 / n * sqrt(Tᵣ^2 + Tᵢ^2)
     ∇ᵣℱ = 1 / (n^2 * ℱ) * (Tᵣ * Ū⃗ᵣ - Tᵢ * Ū⃗ᵢ)
     ∇ᵢℱ = 1 / (n^2 * ℱ) * (Tᵣ * Ū⃗ᵢ + Tᵢ * Ū⃗ᵣ)
     ∇ℱ = [∇ᵣℱ; ∇ᵢℱ]
+    permutation = vcat(vcat([[slice(j, n), slice(j, n) .+ n^2] for j = 1:n]...)...)
+    ∇ℱ = ∇ℱ[permutation]
     return -sign(1 - ℱ) * ∇ℱ
 end
 
-@views function unitary_infidelity_hessian(Ũ⃗::AbstractVector, Ũ⃗_goal::AbstractVector)
-    n = Int(sqrt(length(Ũ⃗) ÷ 2))
-    U⃗ᵣ = Ũ⃗[1:end ÷ 2]
-    U⃗ᵢ = Ũ⃗[end ÷ 2 + 1:end]
-    Ū⃗ᵣ = Ũ⃗_goal[1:end ÷ 2]
-    Ū⃗ᵢ = Ũ⃗_goal[end ÷ 2 + 1:end]
+@views function unitary_infidelity_hessian(
+    Ũ⃗::AbstractVector,
+    Ũ⃗_goal::AbstractVector,
+    subspace::Tuple{AbstractVector{Int},AbstractVector{Int}}=axes(iso_vec_to_operator(Ũ⃗_goal))
+)
+    subspace_rows, subspace_cols = subspace
+    U = iso_vec_to_operator(Ũ⃗)[subspace_rows, subspace_cols]
+    n = size(U, 1)
+    U_goal = iso_vec_to_operator(Ũ⃗_goal)[subspace_rows, subspace_cols]
+    U⃗ᵣ, U⃗ᵢ = vec(real(U)), vec(imag(U))
+    Ū⃗ᵣ, Ū⃗ᵢ = vec(real(U_goal)), vec(imag(U_goal))
     Tᵣ = Ū⃗ᵣ' * U⃗ᵣ + Ū⃗ᵢ' * U⃗ᵢ
     Tᵢ = Ū⃗ᵣ' * U⃗ᵢ - Ū⃗ᵢ' * U⃗ᵣ
     Wᵣᵣ = Ū⃗ᵣ * Ū⃗ᵣ'
@@ -109,6 +130,8 @@ end
     ∂ᵢ²ℱ = 1 / ℱ * (-∇ᵢℱ * ∇ᵢℱ' + 1 / n^2 * (Wᵣᵣ + Wᵢᵢ))
     ∂ᵣ∂ᵢℱ = 1 / ℱ * (-∇ᵢℱ * ∇ᵣℱ' + 1 / n^2 * (Wᵢᵣ - Wᵣᵢ))
     ∂²ℱ = [∂ᵣ²ℱ ∂ᵣ∂ᵢℱ; ∂ᵣ∂ᵢℱ' ∂ᵢ²ℱ]
+    permutation = vcat(vcat([[slice(j, n), slice(j, n) .+ n^2] for j = 1:n]...)...)
+    ∂²ℱ = ∂²ℱ[permutation, permutation]
     return -sign(1 - ℱ) * ∂²ℱ
 end
 
@@ -123,11 +146,77 @@ struct UnitaryInfidelityLoss <: AbstractLoss
 
     function UnitaryInfidelityLoss(
         name::Symbol,
-        Ũ⃗_goal::AbstractVector
+        Ũ⃗_goal::AbstractVector;
+        subspace::Union{Nothing, AbstractVector{Int}, Tuple{AbstractVector{Int},AbstractVector{Int}}}=nothing,
     )
-        l = Ũ⃗ -> unitary_infidelity(Ũ⃗, Ũ⃗_goal)
-        ∇l = Ũ⃗ -> unitary_infidelity_gradient(Ũ⃗, Ũ⃗_goal)
-        ∇²l = Ũ⃗ -> unitary_infidelity_hessian(Ũ⃗, Ũ⃗_goal)
+        if isnothing(subspace)
+            subspace = axes(iso_vec_to_operator(Ũ⃗_goal))
+        elseif subspace isa AbstractVector{Int}
+            subspace = (subspace, subspace)
+        end
+
+        l = Ũ⃗ -> unitary_infidelity(Ũ⃗, Ũ⃗_goal, subspace)
+
+        @views ∇l = Ũ⃗ -> begin
+            subspace_rows, subspace_cols = subspace
+            n_subspace = length(subspace_rows)
+            n_full = Int(sqrt(length(Ũ⃗) ÷ 2))
+            ∇l_subspace = unitary_infidelity_gradient(Ũ⃗, Ũ⃗_goal, subspace)
+            ∇l_full = zeros(2 * n_full^2)
+            for j ∈ eachindex(subspace_cols)
+                ∇l_full[slice(2subspace_cols[j] - 1, subspace_rows, n_full)] =
+                    ∇l_subspace[slice(2j - 1, n_subspace)]
+                ∇l_full[slice(2subspace_cols[j], subspace_rows, n_full)] =
+                    ∇l_subspace[slice(2j, n_subspace)]
+            end
+            return ∇l_full
+        end
+
+        @views ∇²l = Ũ⃗ -> begin
+            subspace_rows, subspace_cols = subspace
+            n_subspace = length(subspace_rows)
+            n_full = Int(sqrt(length(Ũ⃗) ÷ 2))
+            ∇²l_subspace = unitary_infidelity_hessian(Ũ⃗, Ũ⃗_goal, subspace)
+            ∇²l_full = zeros(2 * n_full^2, 2 * n_full^2)
+            # TODO: make sure this is correct for case where subspace_rows ≠ subspace_cols
+            for k ∈ eachindex(subspace_cols)
+                for j ∈ eachindex(subspace_cols)
+                    ∇²l_full[
+                        slice(2subspace_cols[k] - 1, subspace_rows, n_full),
+                        slice(2subspace_cols[j] - 1, subspace_rows, n_full)
+                    ] = ∇²l_subspace[
+                        slice(2k - 1, n_subspace),
+                        slice(2j - 1, n_subspace)
+                    ]
+
+                    ∇²l_full[
+                        slice(2subspace_cols[k] - 1, subspace_rows, n_full),
+                        slice(2subspace_cols[j], subspace_rows, n_full)
+                    ] = ∇²l_subspace[
+                        slice(2k - 1, n_subspace),
+                        slice(2j, n_subspace)
+                    ]
+
+                    ∇²l_full[
+                        slice(2subspace_cols[k], subspace_rows, n_full),
+                        slice(2subspace_cols[j] - 1, subspace_rows, n_full)
+                    ] = ∇²l_subspace[
+                        slice(2k, n_subspace),
+                        slice(2j - 1, n_subspace)
+                    ]
+
+                    ∇²l_full[
+                        slice(2subspace_cols[k], subspace_rows, n_full),
+                        slice(2subspace_cols[j], subspace_rows, n_full)
+                    ] = ∇²l_subspace[
+                        slice(2k, n_subspace),
+                        slice(2j, n_subspace)
+                    ]
+                end
+            end
+            return ∇²l_full
+        end
+
         Ũ⃗_dim = length(Ũ⃗_goal)
         ∇²l_structure = []
         for (i, j) ∈ Iterators.product(1:Ũ⃗_dim, 1:Ũ⃗_dim)

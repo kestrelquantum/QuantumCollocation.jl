@@ -80,78 +80,162 @@ end
 dynamics_hessian_of_lagrangian_structure(∂²f::Function, zdim::Int, μdim::Int) =
     hessian_of_lagrangian_structure(∂²f, 2zdim, μdim)
 
-function dynamics_structure(∂f̂::Function, traj::NamedTrajectory, dynamics_dim::Int)
-    ∂²f̂(zz) = reshape(
-        ForwardDiff.jacobian(x -> vec(∂f̂(x)), zz),
-        traj.dims.states,
-        2traj.dim,
-        2traj.dim
-    )
+# function dynamics_structure(∂f̂::Function, traj::NamedTrajectory, dynamics_dim::Int)
+#     ∂²f̂(zz) = reshape(
+#         ForwardDiff.jacobian(x -> vec(∂f̂(x)), zz),
+#         traj.dims.states,
+#         2traj.dim,
+#         2traj.dim
+#     )
 
-    ∂f_structure = dynamics_jacobian_structure(∂f̂, traj.dim)
+#     ∂f_structure = dynamics_jacobian_structure(∂f̂, traj.dim)
 
+#     ∂F_structure = Tuple{Int,Int}[]
+
+#     for t = 1:traj.T-1
+#         ∂fₜ_structure = [
+#             (
+#                 i + index(t, 0, dynamics_dim),
+#                 j + index(t, 0, traj.dim)
+#             ) for (i, j) ∈ ∂f_structure
+#         ]
+#         append!(∂F_structure, ∂fₜ_structure)
+#     end
+
+#     μ∂²f_structure =
+#         dynamics_hessian_of_lagrangian_structure(∂²f̂, traj.dim, dynamics_dim)
+
+#     μ∂²F_structure = Tuple{Int,Int}[]
+
+#     for t = 1:traj.T-1
+#         μ∂²fₜ_structure = [ij .+ index(t, 0, traj.dim) for ij ∈ μ∂²f_structure]
+#         append!(μ∂²F_structure, μ∂²fₜ_structure)
+#     end
+
+#     return ∂f_structure, ∂F_structure, μ∂²f_structure, μ∂²F_structure
+# end
+
+function dynamics_structure(
+    ∂f::Function,
+    μ∂²f::Function,
+    traj::NamedTrajectory,
+    dynamics_dim::Int;
+    verbose=false,
+    jacobian=true,
+    hessian=true
+)
+    @assert hessian ? jacobian : true "if hessian is true, jacobian must be true"
+
+    # getting inter knot point structure
+    if jacobian
+        if verbose
+            println("            computing jacobian sparsity...")
+        end
+        # getting symbolic variables
+        z1 = collect(Symbolics.@variables(z[1:traj.dim])...)
+        z2 = collect(Symbolics.@variables(z[1:traj.dim])...)
+        ∂f_structure = structure(sparse(∂f(z1, z2)))
+    else
+        if verbose
+            println("            computing full jacobian block...")
+        end
+        ∂f_structure = [(i, j) for i = 1:dynamics_dim, j = 1:2traj.dim]
+    end
+
+    if hessian
+        if verbose
+            println("            computing hessian sparsity...")
+        end
+        μ = collect(Symbolics.@variables(μ[1:dynamics_dim])...)
+        μ∂²f_structure = structure(sparse(μ∂²f(z1, z2, μ)); upper_half=true)
+    else
+        if verbose
+            println("            computing full hessian block...")
+        end
+        μ∂²f_structure = [(i, j) for i = 1:2traj.dim, j = 1:2traj.dim if j ≥ i]
+    end
+
+    if verbose
+        println("            creating full trajectory jacobian structure...")
+    end
     ∂F_structure = Tuple{Int,Int}[]
+    ∂F_structure = Vector{Tuple{Int,Int}}(undef, length(∂f_structure) * (traj.T - 1))
 
-    for t = 1:traj.T-1
+    @views Threads.@threads for t = 1:traj.T-1
         ∂fₜ_structure = [
             (
                 i + index(t, 0, dynamics_dim),
                 j + index(t, 0, traj.dim)
             ) for (i, j) ∈ ∂f_structure
         ]
-        append!(∂F_structure, ∂fₜ_structure)
+        ∂F_structure[slice(t, length(∂f_structure))] .= ∂fₜ_structure
     end
-
-    μ∂²f_structure =
-        dynamics_hessian_of_lagrangian_structure(∂²f̂, traj.dim, dynamics_dim)
 
     μ∂²F_structure = Tuple{Int,Int}[]
 
-    for t = 1:traj.T-1
+    if verbose
+        println("            creating full trajectory hessian structure...")
+    end
+
+    μ∂²F_structure = Vector{Tuple{Int,Int}}(undef, length(μ∂²f_structure) * (traj.T - 1))
+
+    @views Threads.@threads for t = 1:traj.T-1
         μ∂²fₜ_structure = [ij .+ index(t, 0, traj.dim) for ij ∈ μ∂²f_structure]
-        append!(μ∂²F_structure, μ∂²fₜ_structure)
+        μ∂²F_structure[slice(t, length(μ∂²f_structure))] .= μ∂²fₜ_structure
     end
 
     return ∂f_structure, ∂F_structure, μ∂²f_structure, μ∂²F_structure
 end
 
-function dynamics_structure(∂f::Function, μ∂²f::Function, traj::NamedTrajectory, dynamics_dim::Int)
 
-    # getting symbolic variables
-    z1 = collect(Symbolics.@variables(z[1:traj.dim])...)
-    z2 = collect(Symbolics.@variables(z[1:traj.dim])...)
-    μ = collect(Symbolics.@variables(μ[1:dynamics_dim])...)
-
+function dynamics_structure(
+    ∂f::Function,
+    traj::NamedTrajectory,
+    dynamics_dim::Int;
+    verbose=false,
+    jacobian=true,
+)
     # getting inter knot point structure
-    ∂f_structure = structure(sparse(∂f(z1, z2)))
-    μ∂²f_structure = structure(sparse(μ∂²f(z1, z2, μ)); upper_half=true)
+    if jacobian
+        if verbose
+            println("            computing jacobian sparsity...")
+        end
+        # getting symbolic variables
+        z1 = collect(Symbolics.@variables(z[1:traj.dim])...)
+        z2 = collect(Symbolics.@variables(z[1:traj.dim])...)
+        ∂f_structure = structure(sparse(∂f(z1, z2)))
+    else
+        if verbose
+            println("            computing full jacobian block...")
+        end
+        ∂f_structure = [(i, j) for i = 1:dynamics_dim, j = 1:2traj.dim]
+    end
 
-    ∂F_structure = Tuple{Int,Int}[]
+    if verbose
+        println("            creating full trajectory jacobian structure...")
+    end
 
-    for t = 1:traj.T-1
+    display(length(∂f_structure) * (traj.T - 1))
+
+    ∂F_structure = Vector{Tuple{Int,Int}}(undef, length(∂f_structure) * (traj.T - 1))
+
+    @views Threads.@threads for t = 1:traj.T-1
         ∂fₜ_structure = [
             (
                 i + index(t, 0, dynamics_dim),
                 j + index(t, 0, traj.dim)
             ) for (i, j) ∈ ∂f_structure
         ]
-        append!(∂F_structure, ∂fₜ_structure)
+        ∂F_structure[slice(t, length(∂f_structure))] .= ∂fₜ_structure
     end
 
-    μ∂²F_structure = Tuple{Int,Int}[]
-
-    for t = 1:traj.T-1
-        μ∂²fₜ_structure = [ij .+ index(t, 0, traj.dim) for ij ∈ μ∂²f_structure]
-        append!(μ∂²F_structure, μ∂²fₜ_structure)
-    end
-
-    return ∂f_structure, ∂F_structure, μ∂²f_structure, μ∂²F_structure
+    return ∂f_structure, ∂F_structure
 end
 
 function loss_hessian_structure(∂²l::Function, xdim::Int)
     x = collect(Symbolics.@variables(x[1:xdim])...)
     ∂²l_x = ∂²l(x)
-    return structure(sparse(∂²l); upper_half=true)
+    return structure(sparse(∂²l_x); upper_half=true)
 end
 
 end

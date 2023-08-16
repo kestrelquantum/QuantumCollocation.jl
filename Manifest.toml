@@ -1429,9 +1429,7 @@ version = "0.2.50"
 
 [[deps.NamedTrajectories]]
 deps = ["CairoMakie", "DataStructures", "Documenter", "JLD2", "LaTeXStrings", "Latexify", "OhMyREPL", "Reexport", "Revise", "Unidecode"]
-git-tree-sha1 = "4c26fdb2d850f074e1c651fbf16fc19247d5369a"
-repo-rev = "main"
-repo-url = "https://github.com/aarontrowbridge/NamedTrajectories.jl.git"
+path = "../NamedTrajectories.jl"
 uuid = "538bc3a1-5ab9-4fc3-b776-35ca1e893e08"
 version = "0.1.2"
 
