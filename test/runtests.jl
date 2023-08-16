@@ -6,6 +6,7 @@ using Test
 using LinearAlgebra
 using ForwardDiff
 #using FiniteDiff
+using SparseArrays
 using Random
 
 Random.seed!(1234)

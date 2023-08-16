@@ -24,6 +24,12 @@ export fourth_order_pade
 export sixth_order_pade
 export eighth_order_pade
 export tenth_order_pade
+export twelth_order_pade
+export fourteenth_order_pade
+export sixteenth_order_pade
+export eighteenth_order_pade
+export twentieth_order_pade
+
 
 using TrajectoryIndexingUtils
 using ..QuantumSystems
@@ -36,7 +42,7 @@ using SparseArrays
 
 
 function nth_order_pade(Gₜ::Matrix, n::Int)
-    @assert n ∈ keys(PADE_COEFFICIENTS)
+    @assert n ∈ keys(PADE_COEFFICIENTS) "$n is not in $(keys(PADE_COEFFICIENTS))"
     coeffs = PADE_COEFFICIENTS[n]
     Id = 1.0I(size(Gₜ, 1))
     p = n ÷ 2
@@ -52,6 +58,11 @@ fourth_order_pade(Gₜ::Matrix) = nth_order_pade(Gₜ, 4)
 sixth_order_pade(Gₜ::Matrix) = nth_order_pade(Gₜ, 6)
 eighth_order_pade(Gₜ::Matrix) = nth_order_pade(Gₜ, 8)
 tenth_order_pade(Gₜ::Matrix) = nth_order_pade(Gₜ, 10)
+twelth_order_pade(Gₜ::Matrix) = nth_order_pade(Gₜ, 12)
+fourteenth_order_pade(Gₜ::Matrix) = nth_order_pade(Gₜ, 14)
+sixteenth_order_pade(Gₜ::Matrix) = nth_order_pade(Gₜ, 16)
+eighteenth_order_pade(Gₜ::Matrix) = nth_order_pade(Gₜ, 18)
+twentieth_order_pade(Gₜ::Matrix) = nth_order_pade(Gₜ, 20)
 
 function compute_powers(G::AbstractMatrix{T}, order::Int) where T <: Number
     powers = Array{typeof(G)}(undef, order)
@@ -271,7 +282,12 @@ const PADE_COEFFICIENTS = Dict{Int,Vector{Float64}}(
     4 => [1/2, 1/12],
     6 => [1/2, 1/10, 1/120],
     8 => [1/2, 3/28, 1/84, 1/1680],
-    10 => [1/2, 1/9, 1/72, 1/1008, 1/30240]
+    10 => [1/2, 1/9, 1/72, 1/1008, 1/30240],
+    12 => [1/2, 5/44, 1/66, 1/792, 1/15840, 1/665280],
+    14 => [1/2, 3/26, 5/312, 5/3432, 1/11440, 1/308880, 1/17297280],
+    16 => [1/2, 7/60, 1/60, 1/624, 1/9360, 1/205920, 1/7207200, 1/518918400],
+    18 => [1/2, 2/17, 7/408, 7/4080, 1/8160, 1/159120, 1/4455360, 1/196035840, 1/17643225600],
+    20 => [1/2, 9/76, 1/57, 7/3876, 7/51680, 7/930240, 1/3255840, 1/112869120, 1/6094932480, 1/670442572800]
 )
 
 """
@@ -335,7 +351,7 @@ struct UnitaryPadeIntegrator{R <: Number} <: QuantumPadeIntegrator
         autodiff::Bool=false,
         G::Union{Function, Nothing}=nothing,
     ) where R <: Real
-        @assert order ∈ [4, 6, 8, 10] "order must be in [4, 6, 8, 10]"
+        @assert order ∈ keys(PADE_COEFFICIENTS) "order $order is not in $(keys(PADE_COEFFICIENTS))"
         @assert !isnothing(unitary_symb) "must specify unitary symbol"
         @assert !isnothing(drive_symb) "must specify drive symbol"
 
