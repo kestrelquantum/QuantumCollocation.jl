@@ -66,7 +66,7 @@
                 da = randn(n_drives, T),
                 Δt = fill(dt, 1, T),
             ),
-            controls=(:da,),
+            controls=(:da, :Δt),
             timestep=:Δt,
             goal=(Ũ⃗ = Ũ⃗_goal,)
         )
@@ -87,6 +87,7 @@
             # display(Z.data)
             # println(Z.dim)
             #display(Z.datavec)
+            size(dynamics.F(Z.datavec)) |> display
             J_forward_diff = ForwardDiff.jacobian(dynamics.F, Z.datavec)
             display(J_dynamics)
             display(J_forward_diff)
@@ -102,9 +103,11 @@
 
             # hessian_atol = 1e-15
 
-            # HoL_forward_diff = ForwardDiff.hessian(Z⃗ -> dot(μ, dynamics.F(Z⃗)), Z.datavec)
-            # @test all(isapprox.(HoL_forward_diff, HoL_dynamics; atol=hessian_atol))
-            # show_diffs(HoL_forward_diff, HoL_dynamics; atol=hessian_atol)
+            HoL_forward_diff = ForwardDiff.hessian(Z⃗ -> dot(μ, dynamics.F(Z⃗)), Z.datavec)
+            # display(HoL_dynamics)
+            # display(HoL_forward_diff)
+            @test all(isapprox.(HoL_forward_diff, HoL_dynamics; atol=hessian_atol))
+            show_diffs(HoL_forward_diff, HoL_dynamics; atol=hessian_atol)
         end
 
         # @testset "UnitaryPadeIntegrator integrator w/ autodiff + DerivativeIntegrator on a & da" begin
