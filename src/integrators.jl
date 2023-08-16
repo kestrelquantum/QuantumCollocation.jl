@@ -351,7 +351,7 @@ struct UnitaryPadeIntegrator{R <: Number} <: QuantumPadeIntegrator
         autodiff::Bool=false,
         G::Union{Function, Nothing}=nothing,
     ) where R <: Real
-        @assert order ∈ [4, 6, 8, 10] "order must be in [4, 6, 8, 10]"
+        @assert order ∈ keys(PADE_COEFFICIENTS) "order $order is not in $(keys(PADE_COEFFICIENTS))"
         @assert !isnothing(unitary_symb) "must specify unitary symbol"
         @assert !isnothing(drive_symb) "must specify drive symbol"
 
