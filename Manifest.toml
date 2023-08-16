@@ -1433,7 +1433,7 @@ uuid = "356022a1-0364-5f58-8944-0da4b18d706f"
 version = "0.2.50"
 
 [[deps.NamedTrajectories]]
-deps = ["CairoMakie", "DataStructures", "Documenter", "JLD2", "LaTeXStrings", "Latexify", "OhMyREPL", "OrderedCollections", "Reexport", "Revise", "Unidecode"]
+deps = ["CairoMakie", "DataStructures", "Documenter", "JLD2", "LaTeXStrings", "Latexify", "OhMyREPL", "Reexport", "Revise", "Unidecode"]
 path = "../NamedTrajectories.jl"
 uuid = "538bc3a1-5ab9-4fc3-b776-35ca1e893e08"
 version = "0.1.2"
