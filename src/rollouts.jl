@@ -10,6 +10,7 @@ export linear_interpolation
 using ..QuantumUtils
 using ..QuantumSystems
 using ..Integrators
+using ..Problems
 
 using Manifolds
 using LinearAlgebra
@@ -149,6 +150,13 @@ function QuantumUtils.unitary_fidelity(
         traj.goal[unitary_name];
         subspace=subspace
     )
+end
+
+function QuantumUtils.unitary_fidelity(
+    prob::QuantumControlProblem;
+    kwargs...
+)
+    return unitary_fidelity(prob.trajectory, prob.system; kwargs...)
 end
 
 function QuantumUtils.unitary_fidelity(

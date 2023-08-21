@@ -18,7 +18,7 @@ using NamedTrajectories
 using LinearAlgebra
 using SparseArrays
 using ForwardDiff
-using Zygote
+using PolyesterForwardDiff
 
 
 abstract type AbstractDynamics end
@@ -68,22 +68,28 @@ end
 function dynamics_jacobian(
     integrators::Vector{<:AbstractIntegrator},
     traj::NamedTrajectory;
-    chunk_size=1
+    chunk_size=8
 )
     dynamics_comps = dynamics_components(integrators)
     dynamics_dim = dim(integrators)
     free_time = traj.timestep isa Symbol
-    function ∂f(zₜ, zₜ₊₁)
+    @views function ∂f(zₜ, zₜ₊₁)
         ∂ = zeros(eltype(zₜ), dynamics_dim, 2traj.dim)
         for (integrator, integrator_comps) ∈ zip(integrators, dynamics_comps)
             if integrator isa QuantumIntegrator
                 if integrator.autodiff
                     Pᵢ = zz -> integrator(zz[1:traj.dim], zz[traj.dim+1:end], traj)
-                    Pᵢ_config = ForwardDiff.JacobianConfig(
-                        Pᵢ, [zₜ; zₜ₊₁], ForwardDiff.Chunk{chunk_size}()
+                    # Pᵢ_config = ForwardDiff.JacobianConfig(
+                    #     Pᵢ, [zₜ; zₜ₊₁], ForwardDiff.Chunk{chunk_size}()
+                    # )
+                    # ∂Pᵢ = (z1, z2) -> ForwardDiff.jacobian(Pᵢ, [z1; z2], Pᵢ_config)
+                    ∂Pᵢ! = (∂′, z1, z2) -> PolyesterForwardDiff.threaded_jacobian!(
+                        Pᵢ,
+                        ∂′,
+                        [z1; z2],
+                        ForwardDiff.Chunk(chunk_size)
                     )
-                    ∂Pᵢ = (z1, z2) -> ForwardDiff.jacobian(Pᵢ, [z1; z2], Pᵢ_config)
-                    ∂[integrator_comps, 1:2traj.dim] = ∂Pᵢ(zₜ, zₜ₊₁)
+                    ∂Pᵢ!(∂[integrator_comps, 1:2traj.dim], zₜ, zₜ₊₁)
                 else
                     if free_time
                         x_comps, u_comps, Δt_comps = comps(integrator, traj)
