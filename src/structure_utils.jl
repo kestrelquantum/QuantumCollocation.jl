@@ -215,8 +215,6 @@ function dynamics_structure(
         println("            creating full trajectory jacobian structure...")
     end
 
-    display(length(∂f_structure) * (traj.T - 1))
-
     ∂F_structure = Vector{Tuple{Int,Int}}(undef, length(∂f_structure) * (traj.T - 1))
 
     @views Threads.@threads for t = 1:traj.T-1

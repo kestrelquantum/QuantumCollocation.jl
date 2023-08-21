@@ -664,7 +664,7 @@ function ∂aₜ(
                 (Id2 ⊗ ∂aʲBR + Im2 ⊗ ∂aʲBI) * ψ̃ₜ₊₁ -
                 (Id2 ⊗ ∂aʲFR - Im2 ⊗ ∂aʲFI) * ψ̃ₜ
         end
-    else
+    # else
         ### code for arbitrary Pade goes here
     end
     return ∂aP
@@ -702,10 +702,8 @@ function ∂Δtₜ(
         F = sum([k * PADE_COEFFICIENTS[P.order][k] * Δtₜ^(k-1) * Gₜ_powers[k] for k = 1:n])
         ∂ΔtₜP_operator = B*Ũₜ₊₁ - F*Ũₜ
         ∂ΔtₜP = iso_operator_to_iso_vec(∂ΔtₜP_operator)
+        end
     end
-
-    #     end
-    # end
     return ∂ΔtₜP
 end
 
@@ -750,6 +748,7 @@ end
     else
         inds = traj.components[P.drive_symb]
     end
+
     if P.order==4 && isnothing(P.G)
         F̂ = P.I_2N ⊗ FR - P.Ω_2N ⊗ FI
         B̂ = P.I_2N ⊗ BR + P.Ω_2N ⊗ BI
@@ -760,6 +759,7 @@ end
     else
         ∂Ũ⃗ₜP = spzeros(P.dim, P.dim)
         ∂Ũ⃗ₜ₊₁P = spzeros(P.dim, P.dim)
+    end
 
 
     if free_time

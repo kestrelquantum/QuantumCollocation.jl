@@ -60,8 +60,13 @@ function UnitarySmoothPulseProblem(
     jacobian_structure=true,
     hessian_approximation=false,
     jacobian_chunk_size=10,
+    blas_multithreading=true,
 )
     U_goal = Matrix{ComplexF64}(U_goal)
+
+    if !blas_multithreading
+        BLAS.set_num_threads(1)
+    end
 
     if hessian_approximation
         ipopt_options.hessian_approximation = "limited-memory"
@@ -209,6 +214,7 @@ function UnitarySmoothPulseProblem(
         jacobian_structure=jacobian_structure,
         hessian_approximation=hessian_approximation,
         jacobian_chunk_size=jacobian_chunk_size,
+        eval_hessian=!hessian_approximation
     )
 end
 
