@@ -680,15 +680,6 @@ function ∂Δtₜ(
     aₜ::AbstractVector,
     Δtₜ::Real
 ) where R <: Real
-    if isnothing(P.G) && P.order == 4
-        ∂ΔtₜBR = ∂ΔtₜB_real(P, aₜ, Δtₜ)
-        ∂ΔtₜBI = ∂ΔtₜB_imag(P, aₜ, Δtₜ)
-        ∂ΔtₜFR = ∂ΔtₜF_real(P, aₜ, Δtₜ)
-        ∂ΔtₜFI = ∂ΔtₜF_imag(P, aₜ, Δtₜ)
-        ∂ΔtₜP =
-            (P.I_2N ⊗ ∂ΔtₜBR + P.Ω_2N ⊗ ∂ΔtₜBI) * Ũ⃗ₜ₊₁ -
-            (P.I_2N ⊗ ∂ΔtₜFR - P.Ω_2N ⊗ ∂ΔtₜFI) * Ũ⃗ₜ
-
     Gₜ = isnothing(P.G) ? G(aₜ, P.G_drift, P.G_drives) : P.G(aₜ)
     Ũₜ₊₁ = iso_vec_to_iso_operator(Ũ⃗ₜ₊₁)
     Ũₜ = iso_vec_to_iso_operator(Ũ⃗ₜ)
@@ -702,7 +693,6 @@ function ∂Δtₜ(
         F = sum([k * PADE_COEFFICIENTS[P.order][k] * Δtₜ^(k-1) * Gₜ_powers[k] for k = 1:n])
         ∂ΔtₜP_operator = B*Ũₜ₊₁ - F*Ũₜ
         ∂ΔtₜP = iso_operator_to_iso_vec(∂ΔtₜP_operator)
-        end
     end
     return ∂ΔtₜP
 end
@@ -749,18 +739,28 @@ end
         inds = traj.components[P.drive_symb]
     end
 
-    if P.order==4 && isnothing(P.G)
-        F̂ = P.I_2N ⊗ FR - P.Ω_2N ⊗ FI
-        B̂ = P.I_2N ⊗ BR + P.Ω_2N ⊗ BI
-
-        ∂Ũ⃗ₜP = -F̂
-        ∂Ũ⃗ₜ₊₁P = B̂
-        display(∂Ũ⃗ₜP)
-    else
-        ∂Ũ⃗ₜP = spzeros(P.dim, P.dim)
-        ∂Ũ⃗ₜ₊₁P = spzeros(P.dim, P.dim)
+    for i = 1:length(inds) - 1
+        @assert inds[i] + 1 == inds[i + 1] "Controls must be in order"
     end
 
+    aₜ = zₜ[inds]
+    ∂aₜP = ∂aₜ(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, aₜ, Δtₜ)
+    if free_time
+        ∂ΔtₜP = ∂Δtₜ(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, aₜ, Δtₜ)
+    end
+
+    ∂Ũ⃗ₜP = spzeros(T, P.dim, P.dim)
+    ∂Ũ⃗ₜ₊₁P = spzeros(T, P.dim, P.dim)
+    Gₜ = isnothing(P.G) ? G(aₜ, P.G_drift, P.G_drives) : P.G(aₜ, P.G_drift, P.G_drives)
+    n = P.order ÷ 2
+
+    # can memoize this chunk of code, prly memoize G powers
+    Gₜ_powers = compute_powers(Gₜ, n)
+    B = P.I_2N + sum([(-1)^k * PADE_COEFFICIENTS[P.order][k] * Δtₜ^k * Gₜ_powers[k] for k = 1:n])
+    F = P.I_2N + sum([PADE_COEFFICIENTS[P.order][k] * Δtₜ^k * Gₜ_powers[k] for k = 1:n])
+
+    ∂Ũ⃗ₜ₊₁P = blockdiag(fill(sparse(B), P.N)...)
+    ∂Ũ⃗ₜP = blockdiag(fill(sparse(-F), P.N)...)
 
     if free_time
         return ∂Ũ⃗ₜP, ∂Ũ⃗ₜ₊₁P, ∂aₜP, ∂ΔtₜP
@@ -768,6 +768,7 @@ end
         return ∂Ũ⃗ₜP, ∂Ũ⃗ₜ₊₁P, ∂aₜP
     end
 end
+
 
 @views function jacobian(
     P::QuantumStatePadeIntegrator,
