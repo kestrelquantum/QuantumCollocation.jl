@@ -18,9 +18,6 @@ using NamedTrajectories
 using LinearAlgebra
 using SparseArrays
 using ForwardDiff
-using PolyesterForwardDiff
-using Polyester: disable_polyester_threads
-
 
 abstract type AbstractDynamics end
 
@@ -80,18 +77,11 @@ function dynamics_jacobian(
             if integrator isa QuantumIntegrator
                 if integrator.autodiff
                     Pᵢ = zz -> integrator(zz[1:traj.dim], zz[traj.dim+1:end], traj)
-                    # Pᵢ_config = ForwardDiff.JacobianConfig(
-                    #     Pᵢ, [zₜ; zₜ₊₁], ForwardDiff.Chunk{chunk_size}()
-                    # )
-                    # ∂Pᵢ = (z1, z2) -> ForwardDiff.jacobian(Pᵢ, [z1; z2], Pᵢ_config)
-                    # ∂[integrator_comps, 1:2traj.dim] = ∂Pᵢ(zₜ, zₜ₊₁)
-                    ∂Pᵢ! = (∂′, z1, z2) -> PolyesterForwardDiff.threaded_jacobian!(
-                        Pᵢ,
-                        ∂′,
-                        [z1; z2],
-                        ForwardDiff.Chunk(chunk_size)
+                    Pᵢ_config = ForwardDiff.JacobianConfig(
+                        Pᵢ, [zₜ; zₜ₊₁], ForwardDiff.Chunk{chunk_size}()
                     )
-                    ∂Pᵢ!(∂[integrator_comps, 1:2traj.dim], zₜ, zₜ₊₁)
+                    ∂Pᵢ = (z1, z2) -> ForwardDiff.jacobian(Pᵢ, [z1; z2], Pᵢ_config)
+                    ∂[integrator_comps, 1:2traj.dim] = ∂Pᵢ(zₜ, zₜ₊₁)
                 else
                     if free_time
                         x_comps, u_comps, Δt_comps = comps(integrator, traj)
@@ -293,14 +283,12 @@ function QuantumDynamics(
 
     @views function ∂F(Z⃗::AbstractVector{R}) where R <: Real
         ∂s = zeros(R, length(∂F_structure))
-        disable_polyester_threads() do
-            Threads.@threads for t = 1:traj.T-1
-                zₜ = Z⃗[slice(t, traj.dim)]
-                zₜ₊₁ = Z⃗[slice(t + 1, traj.dim)]
-                ∂fₜ = ∂f(zₜ, zₜ₊₁)
-                for (k, (i, j)) ∈ enumerate(∂f_structure)
-                    ∂s[index(t, k, ∂f_nnz)] = ∂fₜ[i, j]
-                end
+        Threads.@threads for t = 1:traj.T-1
+            zₜ = Z⃗[slice(t, traj.dim)]
+            zₜ₊₁ = Z⃗[slice(t + 1, traj.dim)]
+            ∂fₜ = ∂f(zₜ, zₜ₊₁)
+            for (k, (i, j)) ∈ enumerate(∂f_structure)
+                ∂s[index(t, k, ∂f_nnz)] = ∂fₜ[i, j]
             end
         end
         return ∂s

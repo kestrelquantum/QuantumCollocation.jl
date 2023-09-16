@@ -55,7 +55,7 @@ function UnitarySmoothPulseProblem(
     integrator=Integrators.fourth_order_pade,
     geodesic=true,
     pade_order=4,
-    autodiff=false,
+    autodiff=pade_order != 4,
     subspace=nothing,
     jacobian_structure=true,
     hessian_approximation=false,

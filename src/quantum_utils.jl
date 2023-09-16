@@ -23,6 +23,9 @@ export iso_fidelity
 export unitary_fidelity
 export population
 export populations
+export subspace_unitary
+export quantum_state
+export subspace_indices
 
 using LinearAlgebra
 
@@ -98,6 +101,18 @@ function lift(
     Is = Matrix{Complex}[I(levels) for _ = 1:n_qubits]
     Is[qubit_index] = U
     return foldr(⊗, Is)
+end
+
+function lift(
+    op::AbstractMatrix{<:Number},
+    i::Int,
+    levels::Vector{Int}
+)::Matrix{ComplexF64}
+    @assert size(op, 1) == size(op, 2) == levels[i] "Operator must be square and match dimension of qubit i"
+
+    Is = [collect(1.0I(l)) for l ∈ levels]
+    Is[i] = op
+    return kron(1.0, Is...)
 end
 
 
@@ -269,6 +284,131 @@ end
 function populations(ψ::AbstractVector{<:Complex})
     return abs2.(ψ)
 end
+
+"""
+    unitary subspace utilities
+"""
+
+function subspace_unitary(
+    levels::Vector{Int},
+    gate_name::Symbol,
+    qubit::Union{Int, Vector{Int}}
+)
+    if qubit isa Int
+        @assert length(string(gate_name)) == 1
+        @assert gate_name ∈ keys(GATES)
+        gate = zeros(ComplexF64, levels[qubit], levels[qubit])
+        gate[1:2, 1:2] = GATES[gate_name]
+    else
+        @assert length(qubit) == 2 "only 2-qubit gates are supported, for now"
+        @assert all(qubit .== qubit[1]:qubit[end]) "Qubits must be consecutive"
+        @assert length(string(gate_name)) == length(qubit)
+        @assert first(string(gate_name)) == 'C' "Only controlled gates are supported, for now"
+        @assert Symbol(last(string(gate_name))) ∈ keys(GATES)
+        @assert gate_name == :CX "Only CX gates are supported, for now"
+        g1 = cavity_state(0, levels[qubit[1]])
+        e1 = cavity_state(1, levels[qubit[1]])
+        g2 = cavity_state(0, levels[qubit[2]])
+        e2 = cavity_state(1, levels[qubit[2]])
+        gg = g1 ⊗ g2
+        ge = g1 ⊗ e2
+        eg = e1 ⊗ g2
+        ee = e1 ⊗ e2
+        gate = gg * gg' + ge * ge' + ee * eg' + eg * ee'
+    end
+
+    # fill with ones to handle kron of possibly only one element
+    U_init = [[1.0 + 0.0im;;]]
+    U_goal = [[1.0 + 0.0im;;]]
+    added_gate = false
+    for (i, level) ∈ enumerate(levels)
+        gᵢ = cavity_state(0, level)
+        eᵢ = cavity_state(1, level)
+        Idᵢ =  gᵢ * gᵢ' + eᵢ * eᵢ'
+        push!(U_init, Idᵢ)
+        if i ∈ qubit
+            if added_gate
+                continue
+            else
+                push!(U_goal, gate)
+                added_gate = true
+            end
+        else
+            push!(U_goal, Idᵢ)
+        end
+    end
+    U_init = kron(U_init...)
+    U_goal = kron(U_goal...)
+    return U_init, U_goal
+end
+
+function quantum_state(
+    ket::String,
+    levels::Vector{Int};
+    level_dict=Dict(:g => 0, :e => 1, :f => 2, :h => 2),
+    return_states=false
+)
+    kets = []
+
+    for x ∈ split(ket, ['(', ')'])
+        if x == ""
+            continue
+        elseif all(Symbol(xᵢ) ∈ keys(level_dict) for xᵢ ∈ x)
+            append!(kets, x)
+        elseif occursin("+", x)
+            superposition = split(x, '+')
+            @assert all(all(Symbol(xᵢ) ∈ keys(level_dict) for xᵢ ∈ x) for x ∈ superposition) "Invalid ket: $x"
+            @assert length(superposition) == 2 "Only two states can be superposed for now"
+            push!(kets, x)
+        else
+            error("Invalid ket: $x")
+        end
+    end
+
+    states = []
+
+    for (ψᵢ, l) ∈ zip(kets, levels)
+        if ψᵢ isa AbstractString && occursin("+", ψᵢ)
+            superposition = split(ψᵢ, '+')
+            superposition_states = [level_dict[Symbol(x)] for x ∈ superposition]
+            @assert all(state ≤ l - 1 for state ∈ superposition_states) "Level $ψᵢ is not allowed for $l levels"
+            superposition_state = sum([cavity_state(state, l) for state ∈ superposition_states])
+            normalize!(superposition_state)
+            push!(states, superposition_state)
+        else
+            state = level_dict[Symbol(ψᵢ)]
+            @assert state ≤ l - 1 "Level $ψᵢ is not allowed for $l levels"
+            push!(states, cavity_state(state, l))
+        end
+    end
+
+    if return_states
+        return states
+    else
+        return kron(states...)
+    end
+end
+
+function subspace_indices(
+    subspace_levels::AbstractVector{Int},
+    levels::AbstractVector{Int}
+)
+    basis = kron([""], [string.(1:level) for level ∈ levels]...)
+    return findall(
+        b -> all(
+            l ≤ subspace_levels[i]
+                for (i, l) ∈ enumerate([parse(Int, bᵢ) for bᵢ ∈ b])
+        ),
+        basis
+    )
+end
+
+subspace_indices(levels::AbstractVector{Int}; subspace_max=2) =
+    subspace_indices(fill(subspace_max, length(levels)), levels)
+
+
+
+
 
 
 
