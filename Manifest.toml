@@ -2,7 +2,7 @@
 
 julia_version = "1.9.2"
 manifest_format = "2.0"
-project_hash = "afe9d342522098e708097b13449db9c59304d834"
+project_hash = "f85ab11e4749271cd4247d68bc1450135ce84ae2"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "f5c25e8a5b29b5e941b7408bc8cc79fea4d9ef9a"
@@ -1676,14 +1676,6 @@ deps = ["ArrayInterface", "BitTwiddlingConvenienceFunctions", "CPUSummary", "IfE
 git-tree-sha1 = "3d811babe092a6e7b130beee84998fe7663348b6"
 uuid = "f517fe37-dbe3-4b94-8317-1923a5111588"
 version = "0.7.5"
-
-[[deps.PolyesterForwardDiff]]
-deps = ["ForwardDiff", "Polyester"]
-git-tree-sha1 = "02c0a379a0854c66f0656d34f324b0d331a38cea"
-repo-rev = "main"
-repo-url = "https://github.com/aarontrowbridge/PolyesterForwardDiff.jl"
-uuid = "98d1487c-24ca-40b6-b7ab-df2af84e126b"
-version = "0.1.0"
 
 [[deps.PolyesterWeave]]
 deps = ["BitTwiddlingConvenienceFunctions", "CPUSummary", "IfElse", "Static", "ThreadingUtilities"]
