@@ -187,6 +187,7 @@ end
 function iso_vec_to_operator(Ũ⃗::AbstractVector{R}) where R <: Real
     Ũ⃗_dim = div(length(Ũ⃗), 2)
     N = Int(sqrt(Ũ⃗_dim))
+    isodim = 2N
     U = Matrix{Complex{R}}(undef, N, N)
     for i=0:N-1
         U[:, i+1] .=
