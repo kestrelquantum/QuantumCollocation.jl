@@ -88,8 +88,8 @@
             # println(Z.dim)
             #display(Z.datavec)
             J_forward_diff = ForwardDiff.jacobian(dynamics.F, Z.datavec)
-            display(J_dynamics)
-            display(J_forward_diff)
+            # display(J_dynamics)
+            # display(J_forward_diff)
             @test all(J_forward_diff .≈ J_dynamics)
             show_diffs(J_forward_diff, J_dynamics)
 
