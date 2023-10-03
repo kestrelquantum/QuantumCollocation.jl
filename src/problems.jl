@@ -102,7 +102,9 @@ function QuantumControlProblem(
     params[:eval_hessian] = eval_hessian
     params[:options] = options
     params[:linear_constraints] = linear_constraints
-    params[:nonlinear_constraints] = [nl_constraint.params for nl_constraint ∈ nonlinear_constraints]
+    params[:nonlinear_constraints] = [
+        nl_constraint.params for nl_constraint ∈ nonlinear_constraints
+    ]
     params[:objective_terms] = obj.terms
 
     return QuantumControlProblem(
@@ -124,12 +126,18 @@ function QuantumControlProblem(
     params::Dict{Symbol,Any}=Dict{Symbol, Any}(),
     ipopt_options::Options=Options(),
     verbose=false,
+    jacobian_structure=true,
+    hessian_approximation=false,
     kwargs...
 )
     if verbose
         println("    building dynamics from integrators...")
     end
-    dynamics = QuantumDynamics(integrators, traj; verbose=verbose)
+    dynamics = QuantumDynamics(integrators, traj;
+        jacobian_structure=jacobian_structure,
+        hessian_approximation=hessian_approximation,
+        verbose=verbose
+    )
     return QuantumControlProblem(
         system,
         traj,
@@ -151,12 +159,18 @@ function QuantumControlProblem(
     params::Dict{Symbol,Any}=Dict{Symbol, Any}(),
     ipopt_options::Options=Options(),
     verbose=false,
+    jacobian_structure=true,
+    hessian_approximation=false,
     kwargs...
 )
     if verbose
         println("    building dynamics from integrator...")
     end
-    dynamics = QuantumDynamics(integrator, traj; verbose=verbose)
+    dynamics = QuantumDynamics(integrator, traj;
+        jacobian_structure=jacobian_structure,
+        hessian_approximation=hessian_approximation,
+        verbose=verbose
+    )
     return QuantumControlProblem(
         system,
         traj,
@@ -177,12 +191,18 @@ function QuantumControlProblem(
     params::Dict{Symbol,Any}=Dict{Symbol, Any}(),
     ipopt_options::Options=Options(),
     verbose=false,
+    jacobian_structure=true,
+    hessian_approximation=false,
     kwargs...
 )
     if verbose
         println("    building dynamics from function...")
     end
-    dynamics = QuantumDynamics(f, traj; verbose=verbose)
+    dynamics = QuantumDynamics(f, traj;
+        jacobian_structure=jacobian_structure,
+        hessian_approximation=hessian_approximation,
+        verbose=verbose
+    )
     return QuantumControlProblem(
         system,
         traj,

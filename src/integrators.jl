@@ -148,8 +148,8 @@ end
 end
 
 function build_anticomms(
-    G_drift::Matrix{R}, 
-    G_drives::Vector{Matrix{R}}, 
+    G_drift::Matrix{R},
+    G_drives::Vector{Matrix{R}},
     n_drives::Int) where R <: Number
 
     drive_anticomms = fill(
@@ -209,7 +209,7 @@ dim(integrators::AbstractVector{<:AbstractIntegrator}) = sum(dim, integrators)
 
 
 ###
-### Derivative Integrator 
+### Derivative Integrator
 ###
 
 struct DerivativeIntegrator <: AbstractIntegrator
@@ -348,9 +348,9 @@ struct UnitaryPadeIntegrator{R <: Number} <: QuantumPadeIntegrator
         G_drift = sys.G_drift
         G_drives = sys.G_drives
 
-        drive_anticomms, drift_anticomms = 
+        drive_anticomms, drift_anticomms =
             order == 4 ? build_anticomms(G_drift, G_drives, n_drives) : (nothing, nothing)
-        
+
         return new{R}(
             I_2N,
             G_drift,
@@ -363,7 +363,7 @@ struct UnitaryPadeIntegrator{R <: Number} <: QuantumPadeIntegrator
             N,
             dim,
             order,
-            autodiff, 
+            autodiff,
             G,
         )
     end
@@ -437,9 +437,9 @@ struct QuantumStatePadeIntegrator{R <: Number} <: QuantumPadeIntegrator
         G_drift = sys.G_drift
         G_drives = sys.G_drives
 
-        drive_anticomms, drift_anticomms = 
+        drive_anticomms, drift_anticomms =
             order == 4 ? build_anticomms(G_drift, G_drives, n_drives) : (nothing, nothing)
-        
+
         return new{R}(
             I_2N,
             G_drift,
@@ -500,7 +500,7 @@ end
     else
         aₜ = zₜ[traj.components[P.drive_symb]]
     end
-    return nth_order_pade(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, aₜ, Δtₜ) 
+    return nth_order_pade(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, aₜ, Δtₜ)
 end
 
 
@@ -539,7 +539,7 @@ end
     else
         Δtₜ = traj.timestep
     end
-    return nth_order_pade(P, ψ̃ₜ₊₁, ψ̃ₜ, aₜ, Δtₜ) 
+    return nth_order_pade(P, ψ̃ₜ₊₁, ψ̃ₜ, aₜ, Δtₜ)
 end
 
 # aₜ should be a vector with all the controls. concatenate all the named traj controls
@@ -550,16 +550,16 @@ function ∂aₜ(
     aₜ::AbstractVector{T},
     Δtₜ::Real,
 ) where {R <: Real, T <: Real}
-    
+
     if P.autodiff || !isnothing(P.G)
 
-        # then we need to use the nth_order_pade function 
+        # then we need to use the nth_order_pade function
         # which handles nonlinear G and higher order Pade integrators
 
         f(a) = nth_order_pade(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, a, Δtₜ)
         ∂aP = ForwardDiff.jacobian(f, aₜ)
 
-    # otherwise we don't have a nonlinear G or are fine with using 
+    # otherwise we don't have a nonlinear G or are fine with using
     # the fourth order derivatives
 
     elseif P.order == 4
@@ -577,7 +577,7 @@ function ∂aₜ(
                     -Δtₜ / 2 * Gʲ * (ψ̃ⁱₜ₊₁ + ψ̃ⁱₜ) +
                     Δtₜ^2 / 12 * Gʲ_anticomm_Gₜ * (ψ̃ⁱₜ₊₁ - ψ̃ⁱₜ)
             end
-        end   
+        end
     else
         ## higher order pade code goes here
     end
@@ -594,13 +594,13 @@ function ∂aₜ(
 ) where {R <: Real, T <: Real}
     if P.autodiff || !isnothing(P.G)
 
-        # then we need to use the nth_order_pade function 
+        # then we need to use the nth_order_pade function
         # which handles nonlinear G and higher order Pade integrators
 
         f(a) = nth_order_pade(P, ψ̃ₜ₊₁, ψ̃ₜ, a, Δtₜ)
         ∂aP = ForwardDiff.jacobian(f, aₜ)
 
-    # otherwise we don't have a nonlinear G or are fine with using 
+    # otherwise we don't have a nonlinear G or are fine with using
     # the fourth order derivatives
 
     elseif P.order == 4
@@ -614,7 +614,7 @@ function ∂aₜ(
                 -Δtₜ / 2 * Gʲ * (ψ̃ₜ₊₁ + ψ̃ₜ) +
                 Δtₜ^2 / 12 * Gʲ_anticomm_Gₜ * (ψ̃ₜ₊₁ - ψ̃ₜ)
         end
-    else 
+    else
         ### code for arbitrary Pade goes here
     end
     return ∂aP
@@ -637,7 +637,7 @@ function ∂Δtₜ(
     if P.order == 4
         ∂ΔtₜP_operator = -1/2 * Gₜ * (Ũₜ₊₁ + Ũₜ) + 1/6 * Δtₜ * Gₜ^2 * (Ũₜ₊₁ - Ũₜ)
         ∂ΔtₜP = iso_operator_to_iso_vec(∂ΔtₜP_operator)
-    else 
+    else
         n = P.order ÷ 2
         Gₜ_powers = compute_powers(Gₜ, n)
         B = sum([(-1)^k * k * PADE_COEFFICIENTS[P.order][k] * Δtₜ^(k-1) * Gₜ_powers[k] for k = 1:n])
@@ -660,7 +660,7 @@ function ∂Δtₜ(
     Gₜ = isnothing(P.G) ? G(aₜ, P.G_drift, P.G_drives) : P.G(aₜ)
     if P.order==4
         ∂ΔtₜP = -1/2 * Gₜ * (ψ̃ₜ₊₁ + ψ̃ₜ) + 1/6 * Δtₜ * Gₜ^2 * (ψ̃ₜ₊₁ - ψ̃ₜ)
-    else 
+    else
         n = P.order ÷ 2
         Gₜ_powers = [Gₜ^i for i in 1:n]
         B = sum([(-1)^k * k * PADE_COEFFICIENTS[P.order][k] * Δtₜ^(k-1) * Gₜ_powers[k] for k = 1:n])
@@ -687,7 +687,7 @@ end
     if P.drive_symb isa Tuple
         inds = [traj.components[s] for s in P.drive_symb]
         inds = vcat(collect.(inds)...)
-    else 
+    else
         inds = traj.components[P.drive_symb]
     end
 
@@ -732,13 +732,13 @@ end
     ψ̃ₜ₊₁ = zₜ₊₁[traj.components[P.state_symb]]
     ψ̃ₜ = zₜ[traj.components[P.state_symb]]
 
-    
+
     Δtₜ = free_time ? zₜ[traj.components[traj.timestep]][1] : traj.timestep
 
     if P.drive_symb isa Tuple
         inds = [traj.components[s] for s in P.drive_symb]
         inds = vcat(collect.(inds)...)
-    else 
+    else
         inds = traj.components[P.drive_symb]
     end
 
@@ -785,10 +785,10 @@ function μ∂aₜ∂Ũ⃗ₜ(
     n_drives = P.n_drives
 
     if P.autodiff || !isnothing(P.G)
-        
+
     elseif P.order == 4
         μ∂aₜ∂Ũ⃗ₜP = Array{T}(undef, P.dim, n_drives)
-        
+
         for j = 1:n_drives
             Gʲ = P.G_drives[j]
             Ĝʲ = G(aₜ, P.G_drift_anticomms[j], P.G_drive_anticomms[:, j])
@@ -812,7 +812,7 @@ function μ∂Ũ⃗ₜ₊₁∂aₜ(
 
     n_drives = P.n_drives
     μ∂Ũ⃗ₜ₊₁∂aₜP = zeros(T, n_drives, P.dim)
-    
+
     for j = 1:n_drives
         Gʲ = P.G_drives[j]
         Ĝʲ = G(aₜ, P.G_drift_anticomms[j], P.G_drive_anticomms[:, j])
@@ -880,8 +880,8 @@ function μ∂²aₜ(
     if P.order==4
         for i = 1:n_drives
             for j = 1:i
-                ∂aʲ∂aⁱP_block = 
-                    Δtₜ^2 / 12 * P.G_drive_anticomms[i, j] 
+                ∂aʲ∂aⁱP_block =
+                    Δtₜ^2 / 12 * P.G_drive_anticomms[i, j]
                 ∂aʲ∂aⁱP = blockdiag(fill(sparse(∂aʲ∂aⁱP_block), P.N)...)
                 μ∂²aₜP[j, i] = dot(μₜ, ∂aʲ∂aⁱP*(Ũ⃗ₜ₊₁ - Ũ⃗ₜ))
             end
@@ -919,7 +919,7 @@ function μ∂Δtₜ∂aₜ(
     Ũ⃗ₜ₊₁::AbstractVector{T},
     Ũ⃗ₜ::AbstractVector{T},
     aₜ::AbstractVector{T},
-    Δtₜ::T, 
+    Δtₜ::T,
     μₜ::AbstractVector{T},
 ) where T <: Real
 
@@ -996,7 +996,7 @@ function μ∂Δtₜ∂ψ̃ₜ(
 )
     # memoize the calc here
     Gₜ = G(aₜ, P.G_drift, P.G_drives)
-    minus_F = -(1/2 * Gₜ + 1/6 * Δtₜ * Gₜ^2) 
+    minus_F = -(1/2 * Gₜ + 1/6 * Δtₜ * Gₜ^2)
     return minus_F' * μₜ
 end
 
@@ -1019,7 +1019,7 @@ function μ∂²Δtₜ(
     μₜ::AbstractVector
 )
     Gₜ = G(aₜ, P.G_drift, P.G_drives)
-    ∂²Δtₜ_gen_block = 1/6 * Gₜ^2 
+    ∂²Δtₜ_gen_block = 1/6 * Gₜ^2
     ∂²Δtₜ_gen = blockdiag(fill(sparse(∂²Δtₜ_gen_block), P.N)...)
     ∂²Δtₜ = ∂²Δtₜ_gen * (Ũ⃗ₜ₊₁ -  Ũ⃗ₜ)
     return μₜ' * ∂²Δtₜ
@@ -1054,7 +1054,7 @@ end
     if P.drive_symb isa Tuple
         inds = [traj.components[s] for s in P.drive_symb]
         inds = vcat(collect.(inds)...)
-    else 
+    else
         inds = traj.components[P.drive_symb]
     end
 
@@ -1107,7 +1107,7 @@ end
     if P.drive_symb isa Tuple
         inds = [traj.components[s] for s in P.drive_symb]
         inds = vcat(collect.(inds)...)
-    else 
+    else
         inds = traj.components[P.drive_symb]
     end
 

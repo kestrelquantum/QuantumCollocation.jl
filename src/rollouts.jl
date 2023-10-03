@@ -10,6 +10,7 @@ export linear_interpolation
 using ..QuantumUtils
 using ..QuantumSystems
 using ..Integrators
+using ..Problems
 
 using Manifolds
 using LinearAlgebra
@@ -63,7 +64,7 @@ function unitary_rollout(
     controls::AbstractMatrix{Float64},
     Δt::Union{AbstractVector{Float64}, AbstractMatrix{Float64}, Float64},
     system::QuantumSystem;
-    integrator=Integrators.fourth_order_pade
+    integrator=exp
 )
     if Δt isa AbstractMatrix
         @assert size(Δt, 1) == 1
@@ -101,7 +102,7 @@ function unitary_rollout(
     controls::AbstractMatrix{Float64},
     Δt::Union{AbstractVector{Float64}, AbstractMatrix{Float64}, Float64},
     system::QuantumSystem;
-    integrator=Integrators.fourth_order_pade
+    integrator=exp
 )
     return unitary_rollout(
         operator_to_iso_vec(Matrix{ComplexF64}(I(size(system.H_drift_real, 1)))),
@@ -140,12 +141,37 @@ function QuantumUtils.unitary_fidelity(
     traj::NamedTrajectory,
     system::QuantumSystem;
     unitary_name::Symbol=:Ũ⃗,
+    subspace=nothing,
     kwargs...
 )
     Ũ⃗_final = unitary_rollout(traj, system; unitary_name=unitary_name, kwargs...)[:, end]
     return unitary_fidelity(
         Ũ⃗_final,
-        traj.goal[unitary_name]
+        traj.goal[unitary_name];
+        subspace=subspace
+    )
+end
+
+function QuantumUtils.unitary_fidelity(
+    prob::QuantumControlProblem;
+    kwargs...
+)
+    return unitary_fidelity(prob.trajectory, prob.system; kwargs...)
+end
+
+function QuantumUtils.unitary_fidelity(
+    U_goal::AbstractMatrix{ComplexF64},
+    controls::AbstractMatrix{Float64},
+    Δt::Union{AbstractVector{Float64}, AbstractMatrix{Float64}, Float64},
+    system::QuantumSystem;
+    subspace=nothing,
+    integrator=exp
+)
+    Ũ⃗_final = unitary_rollout(controls, Δt, system; integrator=integrator)[:, end]
+    return unitary_fidelity(
+        Ũ⃗_final,
+        operator_to_iso_vec(U_goal);
+        subspace=subspace
     )
 end
 

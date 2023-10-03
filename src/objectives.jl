@@ -186,12 +186,13 @@ function UnitaryInfidelityObjective(;
     name::Union{Nothing,Symbol}=nothing,
     goal::Union{Nothing,AbstractVector{<:Real}}=nothing,
 	Q::Float64=100.0,
-	eval_hessian::Bool=true
+	eval_hessian::Bool=true,
+    subspace=nothing
 )
     @assert !isnothing(goal) "unitary goal name must be specified"
 
     loss = :UnitaryInfidelityLoss
-    l = eval(loss)(name, goal)
+    l = eval(loss)(name, goal; subspace=subspace)
 
     params = Dict(
         :type => :UnitaryInfidelityObjective,
@@ -199,6 +200,7 @@ function UnitaryInfidelityObjective(;
         :goal => goal,
         :Q => Q,
         :eval_hessian => eval_hessian,
+        :subspace => subspace
     )
 
 	@views function L(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory)
@@ -258,9 +260,10 @@ end
 function UnitaryInfidelityObjective(
     name::Symbol,
     traj::NamedTrajectory,
-    Q::Float64
+    Q::Float64;
+    subspace=nothing
 )
-    return UnitaryInfidelityObjective(name=name, goal=traj.goal[name], Q=Q)
+    return UnitaryInfidelityObjective(name=name, goal=traj.goal[name], Q=Q, subspace=subspace)
 end
 
 function QuantumObjective(
