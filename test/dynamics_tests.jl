@@ -83,18 +83,18 @@
             # test dynamics jacobian
             shape = (Z.dims.states * (Z.T - 1), Z.dim * Z.T)
 
-            display(dynamics.∂F(Z.datavec))
+            # display(dynamics.∂F(Z.datavec))
 
             J_dynamics = dense(dynamics.∂F(Z.datavec), dynamics.∂F_structure, shape)
-            display(sparse(J_dynamics))
+            # display(sparse(J_dynamics))
             # display(Z.data)
             # println(Z.dim)
             #display(Z.datavec)
             J_forward_diff = ForwardDiff.jacobian(dynamics.F, Z.datavec)
             # display(J_dynamics)
-            display(sparse(J_forward_diff))
+            # display(sparse(J_forward_diff))
             @test all(J_forward_diff .≈ J_dynamics)
-            show_diffs(J_forward_diff, J_dynamics)
+            # show_diffs(J_forward_diff, J_dynamics)
 
             # test dynamics hessian of the lagrangian
             # shape = (Z.dim * Z.T, Z.dim * Z.T)
