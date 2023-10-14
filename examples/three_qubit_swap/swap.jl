@@ -5,8 +5,7 @@ using LinearAlgebra
 
 # problem parameters
 
-max_iter = 10000
-linear_solver = "mumps"
+max_iter = 200
 watchdog_trigger = 0
 watchdog_iter = 10
 R = 1e-3
@@ -22,7 +21,7 @@ T = 500
 Δt_min = 0.5 * Δt
 Δt_max = 1.0 * Δt
 
-load_trajectory = true
+load_trajectory = false
 load_path = "examples/three_qubit_swap/newplots/T_500_Q_200.0_Δt_0.4_a_bound_0.25132741228718347_dda_bound_0.05dt_min_0.2_dt_max_0.4_max_iter_100000_00002.png"
 
 if load_trajectory
@@ -106,7 +105,6 @@ prob = UnitarySmoothPulseProblem(
     Δt_min = Δt_min,
     Δt_max = Δt_max,
     max_iter = max_iter,
-    linear_solver = linear_solver,
     verbose = true,
     ipopt_options = Options(
         watchdog_shortened_iter_trigger = watchdog_trigger,
@@ -132,28 +130,15 @@ println("solving problem...")
 solve!(prob)
 println()
 
-fid = unitary_fidelity(prob.trajectory[end].Ũ⃗, prob.trajectory.goal.Ũ⃗)
+println("plotting final result...")
+plot(plot_path, prob.trajectory, [:Ũ⃗, :a]; ignored_labels=[:Ũ⃗])
+
+fid = unitary_fidelity(prob)
 
 println("Final fidelity: ", fid)
 
-# |0⟩ rollout test
-ψ = qubit_system_state("100")
-ψ̃ = ket_to_iso(ψ)
-ψ̃_goal = ket_to_iso(U_goal * ψ)
-Ψ̃ = rollout(ψ̃, prob.trajectory.a, prob.trajectory.Δt, prob.system)
-Ψ̃_exp = rollout(ψ̃, prob.trajectory.a, prob.trajectory.Δt, prob.system; integrator=exp)
-pade_rollout_fidelity = fidelity(Ψ̃[:, end], ψ̃_goal)
-exp_rollout_fidelity = fidelity(Ψ̃_exp[:, end], ψ̃_goal)
-println("|100⟩ pade rollout fidelity:  ", pade_rollout_fidelity)
-println("|100⟩ exp rollout fidelity:   ", exp_rollout_fidelity)
-
-println("plotting solution...")
-plot(plot_path, prob.trajectory, [:Ũ⃗, :a]; ignored_labels=[:Ũ⃗])
-
 info = Dict(
-    "solver fidelity" => fid,
-    "pade rollout fidelity" => pade_rollout_fidelity,
-    "exp rollout fidelity" => exp_rollout_fidelity,
+    "fidelity" => fid,
     "pulse duration" => times(prob.trajectory)[end],
 )
 

@@ -296,7 +296,7 @@ function UnitaryMinimumTimeProblem(
     system = data["system"]
     trajectory = data["trajectory"]
     objective = Objective(data["params"][:objective_terms])
-    integrators = data["params"][:dynamics]
+    integrators = data["integrators"]
     constraints = AbstractConstraint[
         data["params"][:linear_constraints]...,
         NonlinearConstraint.(data["params"][:nonlinear_constraints])...
