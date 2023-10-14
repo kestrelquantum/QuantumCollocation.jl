@@ -42,7 +42,7 @@ end
 
 const RESERVED_KEYS = ["system", "trajectory", "options", "params", "integrators"]
 
-function load_problem(path::String; verbose=true, return_data=false)
+function load_problem(path::String; verbose=true, return_data=false, kwargs...)
     data = load(path)
 
     if verbose
@@ -88,7 +88,7 @@ function load_problem(path::String; verbose=true, return_data=false)
 
         constraints = AbstractConstraint[linear_constraints; nonlinear_constraints]
 
-        prob = @timed QuantumControlProblem(
+        prob = QuantumControlProblem(
             system,
             trajectory,
             objective,
@@ -96,7 +96,9 @@ function load_problem(path::String; verbose=true, return_data=false)
             constraints=constraints,
             options=options,
             verbose=verbose,
-            params...
+            build_trajectory_constraints=false,
+            params...,
+            kwargs...
         )
 
         println("Problem loaded! Elapsed time: $(prob.time / 60) minutes")
@@ -107,9 +109,9 @@ end
 
 function save_h5(prob::QuantumControlProblem, save_path::String; verbose=true)
     traj = prob.trajectory
-    
+
     result = Dict(
-        
+
     )
 end
 
