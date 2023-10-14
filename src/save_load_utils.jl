@@ -101,7 +101,7 @@ function load_problem(path::String; verbose=true, return_data=false, kwargs...)
             kwargs...
         )
 
-        return prob.value
+        return prob
     end
 end
 
