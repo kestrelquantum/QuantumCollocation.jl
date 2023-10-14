@@ -101,8 +101,6 @@ function load_problem(path::String; verbose=true, return_data=false, kwargs...)
             kwargs...
         )
 
-        println("Problem loaded! Elapsed time: $(prob.time / 60) minutes")
-
         return prob.value
     end
 end
