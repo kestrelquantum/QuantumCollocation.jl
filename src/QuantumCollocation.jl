@@ -11,11 +11,11 @@ include("quantum_utils.jl")
 include("quantum_systems.jl")
 @reexport using .QuantumSystems
 
-include("constraints.jl")
-@reexport using .Constraints
-
 include("losses.jl")
 @reexport using .Losses
+
+include("constraints.jl")
+@reexport using .Constraints
 
 include("objectives.jl")
 @reexport using .Objectives
