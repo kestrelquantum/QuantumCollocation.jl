@@ -45,6 +45,10 @@ function UnitarySmoothPulseProblem(
     R_a::Union{Float64, Vector{Float64}}=R,
     R_da::Union{Float64, Vector{Float64}}=R,
     R_dda::Union{Float64, Vector{Float64}}=R,
+    leakage_suppression=false,
+    leakage_indices=nothing,
+    system_levels=nothing,
+    R_leakage=1e-1,
     max_iter::Int=1000,
     linear_solver::String="mumps",
     ipopt_options::Options=Options(),
@@ -187,6 +191,16 @@ function UnitarySmoothPulseProblem(
     J += QuadraticRegularizer(:a, traj, R_a)
     J += QuadraticRegularizer(:da, traj, R_da)
     J += QuadraticRegularizer(:dda, traj, R_dda)
+
+    if leakage_suppression
+        if isnothing(leakage_indices)
+            @assert !isnothing(system_levels) "if leakage_indices is not nothing, system_levels must be provided"
+            leakage_indices = unitary_isomorphism_leakage_indices(system_levels)
+        end
+        J_leakage, slack_con = L1Regularizer(:Ũ⃗, traj; R_value=R_leakage, indices=leakage_indices)
+        push!(constraints, slack_con)
+        J += J_leakage
+    end
 
     integrators = [
         UnitaryPadeIntegrator(system, :Ũ⃗, :a; order=pade_order, autodiff=autodiff),
