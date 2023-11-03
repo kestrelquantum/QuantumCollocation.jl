@@ -26,7 +26,10 @@ export populations
 export subspace_unitary
 export quantum_state
 export subspace_indices
+export subspace_leakage_indices
+export unitary_isomorphism_leakage_indices
 
+using TrajectoryIndexingUtils
 using LinearAlgebra
 
 
@@ -199,8 +202,7 @@ end
 
 function iso_vec_to_iso_operator(Ũ⃗::AbstractVector{R}) where R <: Real
     N = Int(sqrt(length(Ũ⃗) ÷ 2))
-    isodim = 2N
-    Ũ = Matrix{R}(undef, isodim, isodim)
+    Ũ = Matrix{R}(undef, 2N, 2N)
     U_real = Matrix{R}(undef, N, N)
     U_imag = Matrix{R}(undef, N, N)
     for i=0:N-1
@@ -395,17 +397,51 @@ function subspace_indices(
     levels::AbstractVector{Int}
 )
     basis = kron([""], [string.(1:level) for level ∈ levels]...)
-    return findall(
+    subspace_indices = findall(
         b -> all(
             l ≤ subspace_levels[i]
                 for (i, l) ∈ enumerate([parse(Int, bᵢ) for bᵢ ∈ b])
         ),
         basis
     )
+    return subspace_indices
 end
 
-subspace_indices(levels::AbstractVector{Int}; subspace_max=2) =
-    subspace_indices(fill(subspace_max, length(levels)), levels)
+subspace_indices(levels::AbstractVector{Int}; subspace_max=2, kwargs...) =
+    subspace_indices(fill(subspace_max, length(levels)), levels; kwargs...)
+
+function subspace_leakage_indices(
+    subspace_levels::AbstractVector{Int},
+    levels::AbstractVector{Int};
+)
+    basis = kron([""], [string.(1:level) for level ∈ levels]...)
+    subspace_indices = findall(
+        b -> all(
+            l ≤ subspace_levels[i]
+                for (i, l) ∈ enumerate([parse(Int, bᵢ) for bᵢ ∈ b])
+        ),
+        basis
+    )
+    return setdiff(1:length(basis), subspace_indices)
+end
+
+subspace_leakage_indices(levels::AbstractVector{Int}; subspace_max=2, kwargs...) =
+    subspace_leakage_indices(fill(subspace_max, length(levels)), levels; kwargs...)
+
+function unitary_isomorphism_leakage_indices(levels::AbstractVector{Int}; kwargs...)
+    N = prod(levels)
+    subspace_inds = subspace_indices(levels; kwargs...)
+    leakage_inds = subspace_leakage_indices(levels; kwargs...)
+    iso_leakage_inds = Int[]
+    for sⱼ ∈ subspace_inds
+        for lᵢ ∈ leakage_inds
+            push!(iso_leakage_inds, index(sⱼ, lᵢ, 2N))
+            push!(iso_leakage_inds, index(sⱼ, lᵢ + N, 2N))
+        end
+    end
+    return iso_leakage_inds
+end
+
 
 
 
