@@ -32,10 +32,10 @@ function UnitarySmoothPulseProblem(
     Δt::Float64;
     free_time=true,
     init_trajectory::Union{NamedTrajectory, Nothing}=nothing,
-    a_bound::Float64=Inf,
+    a_bound::Float64=1.0,
     a_bounds::Vector{Float64}=fill(a_bound, length(system.G_drives)),
     a_guess::Union{Matrix{Float64}, Nothing}=nothing,
-    dda_bound::Float64=Inf,
+    dda_bound::Float64=1.0,
     dda_bounds::Vector{Float64}=fill(dda_bound, length(system.G_drives)),
     Δt_min::Float64=0.5 * Δt,
     Δt_max::Float64=1.5 * Δt,

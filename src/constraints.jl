@@ -50,15 +50,15 @@ end
 """
     struct NonlinearEqualityConstraint
 
-Represents a nonlinear equality constraint. 
+Represents a nonlinear equality constraint.
 
 # Fields
 - `g::Function`: the constraint function
 - `∂g::Function`: the Jacobian of the constraint function
-- `∂g_structure::Vector{Tuple{Int, Int}}`: the structure of the Jacobian 
+- `∂g_structure::Vector{Tuple{Int, Int}}`: the structure of the Jacobian
    i.e. all non-zero entries
 - `μ∂²g::Function`: the Hessian of the constraint function
-- `μ∂²g_structure::Vector{Tuple{Int, Int}}`: the structure of the Hessian 
+- `μ∂²g_structure::Vector{Tuple{Int, Int}}`: the structure of the Hessian
 - `dim::Int`: the dimension of the constraint function
 - `params::Dict{Symbol, Any}`: a dictionary of parameters
 
@@ -81,12 +81,12 @@ Represents a nonlinear inequality constraint.
 # Fields
 - `g::Function`: the constraint function
 - `∂g::Function`: the Jacobian of the constraint function
-- `∂g_structure::Vector{Tuple{Int, Int}}`: the structure of the Jacobian 
+- `∂g_structure::Vector{Tuple{Int, Int}}`: the structure of the Jacobian
    i.e. all non-zero entries
 - `μ∂²g::Function`: the Hessian of the constraint function
-- `μ∂²g_structure::Vector{Tuple{Int, Int}}`: the structure of the Hessian 
+- `μ∂²g_structure::Vector{Tuple{Int, Int}}`: the structure of the Hessian
 - `dim::Int`: the dimension of the constraint function
-- `params::Dict{Symbol, Any}`: a dictionary of parameters containing additional 
+- `params::Dict{Symbol, Any}`: a dictionary of parameters containing additional
    information about the constraint
 
 """
@@ -104,14 +104,14 @@ end
     FinalFidelityConstraint(<keyword arguments>)
 
 
-Returns a NonlinearInequalityConstraint representing a constraint on the 
+Returns a NonlinearInequalityConstraint representing a constraint on the
 minimum allowed fidelity.
 
 # Arguments
 - `fidelity_function::Union{Function,Nothing}=nothing`: the fidelity function
-- `value::Union{Float64,Nothing}=nothing`: the minimum fidelity value allowed 
+- `value::Union{Float64,Nothing}=nothing`: the minimum fidelity value allowed
    by the constraint
-- `comps::Union{AbstractVector{Int},Nothing}=nothing`: the components of the 
+- `comps::Union{AbstractVector{Int},Nothing}=nothing`: the components of the
    state to which the fidelity function is applied
 - `goal::Union{AbstractVector{Float64},Nothing}=nothing`: the goal state
 - `statedim::Union{Int,Nothing}=nothing`: the dimension of the state
@@ -205,14 +205,22 @@ function FinalFidelityConstraint(;
         end
     end
 
-    return NonlinearInequalityConstraint(g, ∂g, ∂g_structure, μ∂²g, μ∂²g_structure, 1, params)
+    return NonlinearInequalityConstraint(
+        g,
+        ∂g,
+        ∂g_structure,
+        μ∂²g,
+        μ∂²g_structure,
+        1,
+        params
+    )
 end
 
 """
     FinalUnitaryFidelityConstraint(statesymb::Symbol, val::Float64, traj::NamedTrajectory)
 
-Returns a FinalFidelityConstraint for the unitary fidelity function where statesymb 
-is the NamedTrajectory symbol representing the unitary. 
+Returns a FinalFidelityConstraint for the unitary fidelity function where statesymb
+is the NamedTrajectory symbol representing the unitary.
 
 """
 function FinalUnitaryFidelityConstraint(
@@ -235,8 +243,8 @@ end
 """
     FinalQuantumStateFidelityConstraint(statesymb::Symbol, val::Float64, traj::NamedTrajectory)
 
-Returns a FinalFidelityConstraint for the unitary fidelity function where statesymb 
-is the NamedTrajectory symbol representing the unitary. 
+Returns a FinalFidelityConstraint for the unitary fidelity function where statesymb
+is the NamedTrajectory symbol representing the unitary.
 
 """
 function FinalQuantumStateFidelityConstraint(
@@ -279,7 +287,7 @@ Returns a NonlinearInequalityConstraint on the complex modulus of a complex cont
 
 # Arguments
 - `R::Union{Float64,Nothing}=nothing`: the maximum allowed complex modulus
-- `comps::Union{AbstractVector{Int},Nothing}=nothing`: the components of the complex control, 
+- `comps::Union{AbstractVector{Int},Nothing}=nothing`: the components of the complex control,
    both the real and imaginary parts
 - `times::Union{AbstractVector{Int},Nothing}=nothing`: the times at which the constraint is applied
 - `zdim::Union{Int,Nothing}=nothing`: the dimension of a single time step of the trajectory
@@ -439,7 +447,7 @@ end
     trajectory_constraints(traj::NamedTrajectory)
 
 Implements the initial and final value constraints and bounds constraints on the controls
-and states as specified by traj. 
+and states as specified by traj.
 
 """
 

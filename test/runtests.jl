@@ -1,20 +1,20 @@
-using Revise
-using QuantumCollocation
-using NamedTrajectories
-
 using Test
 using LinearAlgebra
 using ForwardDiff
-#using FiniteDiff
 using SparseArrays
-using Random
+using Random; Random.seed!(1234)
 
-Random.seed!(1234)
+using QuantumCollocation
+using NamedTrajectories
+
+
+
 
 include("test_utils.jl")
 
 @testset "QuantumCollocation.jl" begin
-    include("quantum_systems_tests.jl")
-    include("objectives_tests.jl")
-    include("dynamics_tests.jl")
+    include("quantum_systems_test.jl")
+    include("objectives_test.jl")
+    include("dynamics_test.jl")
+    include("problem_templates_test.jl")
 end
