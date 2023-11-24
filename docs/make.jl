@@ -1,9 +1,23 @@
 using QuantumCollocation
 using Documenter
+using Literate
 
 push!(LOAD_PATH, joinpath(@__DIR__, "..", "src"))
 
-DocMeta.setdocmeta!(QuantumCollocation, :DocTestSetup, :(using QuantumCollocation); recursive=true)
+# DocMeta.setdocmeta!(QuantumCollocation, :DocTestSetup, :(using QuantumCollocation); recursive=true)
+
+src = joinpath(@__DIR__, "src")
+lit = joinpath(@__DIR__, "literate")
+
+lit_output = joinpath(src, "generated")
+
+for (root, _, files) ∈ walkdir(lit), file ∈ files
+    splitext(file)[2] == ".jl" || continue
+    ipath = joinpath(root, file)
+    opath = splitdir(replace(ipath, lit=>lit_output))[1]
+    Literate.markdown(ipath, opath)
+end
+
 
 makedocs(;
     modules=[QuantumCollocation],
@@ -30,23 +44,21 @@ makedocs(;
         )),
     ),
     pages=[
-        "Introduction" => "index.md",
-        "Getting Started" => "getting_started.md",
+        "Home" => "index.md",
+        "Quickstart Guide" => "generated/quickstart.md",
         "Manual" => [
-            "Quantum Systems"   => "quantum_systems.md",
-            "Quantum Utilities" => "quantum_utils.md",
-            # "Quantum Losses"     => "quantum_losss.md",
-            # "Objectives"        => "objectives.md",
-            # "Losses"             => "losss.md",
-            # "Constraints"       => "constraints.md",
-            # "Integrators"       => "integrators.md",
-            # "Problems"          => "problems.md",
+            "Quantum Systems"   => "generated/man/quantum_systems.md",
+            "Quantum Utilities" => "generated/man/quantum_utils.md",
+            "Problem Templates" => "generated/man/problem_templates.md",
         ],
-        # "Examples" => "examples.md",
+        "Examples" => [
+            "Single Qubit" => "generated/examples/single_qubit.md",
+        ],
+        "Library" => "lib.md",
     ],
 )
 
 deploydocs(;
     repo="github.com/aarontrowbridge/QuantumCollocation.jl.git",
-    devbranch="dev-aaron",
+    devbranch="main",
 )
