@@ -453,7 +453,7 @@ function UnitaryRobustnessProblem(
 end
 
 function UnitaryRobustnessProblem(
-    Hₑ::AstractMatrix{<:Number},
+    Hₑ::AbstractMatrix{<:Number},
     prob::QuantumControlProblem;
     kwargs...
 )
