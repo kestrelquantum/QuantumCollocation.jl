@@ -117,6 +117,7 @@ minimum allowed fidelity.
 - `statedim::Union{Int,Nothing}=nothing`: the dimension of the state
 - `zdim::Union{Int,Nothing}=nothing`: the dimension of a single time step of the trajectory
 - `T::Union{Int,Nothing}=nothing`: the number of time steps
+- `subspace::Union{AbstractVector{<:Integer}, Nothing}=nothing`: the subspace indices of the fidelity
 
 """
 
@@ -128,6 +129,7 @@ function FinalFidelityConstraint(;
     statedim::Union{Int,Nothing}=nothing,
     zdim::Union{Int,Nothing}=nothing,
     T::Union{Int,Nothing}=nothing,
+    subspace::Union{AbstractVector{<:Integer}, Nothing}=nothing
 )
     @assert !isnothing(fidelity_function) "must provide a fidelity function"
     @assert !isnothing(value) "must provide a fidelity value"
@@ -139,7 +141,11 @@ function FinalFidelityConstraint(;
 
     fidelity_function_symbol = Symbol(fidelity_function)
 
-    fid = x -> fidelity_function(x, goal)
+    if isnothing(subspace)
+        fid = x -> fidelity_function(x, goal)
+    else
+        fid = x -> fidelity_function(x, goal; subspace=subspace)
+    end
 
     @assert fid(randn(statedim)) isa Float64 "fidelity function must return a scalar"
 
@@ -157,6 +163,7 @@ function FinalFidelityConstraint(;
         params[:statedim] = statedim
         params[:zdim] = zdim
         params[:T] = T
+        params[:subspace] = subspace
     end
 
     state_slice = slice(T, comps, zdim)
@@ -226,7 +233,8 @@ is the NamedTrajectory symbol representing the unitary.
 function FinalUnitaryFidelityConstraint(
     statesymb::Symbol,
     val::Float64,
-    traj::NamedTrajectory
+    traj::NamedTrajectory,
+    subspace::Union{AbstractVector{<:Integer}, Nothing}=nothing
 )
     @assert statesymb ∈ traj.names
     return FinalFidelityConstraint(;
@@ -236,7 +244,8 @@ function FinalUnitaryFidelityConstraint(
         goal=traj.goal[statesymb],
         statedim=traj.dims[statesymb],
         zdim=traj.dim,
-        T=traj.T
+        T=traj.T,
+        subspace=subspace
     )
 end
 
