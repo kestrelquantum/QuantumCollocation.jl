@@ -2,6 +2,7 @@ module ProblemTemplates
 
 export UnitarySmoothPulseProblem
 export UnitaryMinimumTimeProblem
+export UnitaryRobustnessProblem
 
 export QuantumStateSmoothPulseProblem
 export QuantumStateMinimumTimeProblem
@@ -359,7 +360,7 @@ function UnitaryMinimumTimeProblem(
     kwargs...
 )
     params = deepcopy(prob.params)
-    traj = copy(prob.trajectory)
+    trajectory = copy(prob.trajectory)
     system = prob.system
     objective = Objective(params[:objective_terms])
     integrators = prob.integrators
@@ -368,7 +369,7 @@ function UnitaryMinimumTimeProblem(
         NonlinearConstraint.(params[:nonlinear_constraints])...
     ]
     return UnitaryMinimumTimeProblem(
-        traj,
+        trajectory,
         system,
         objective,
         integrators,
@@ -377,7 +378,6 @@ function UnitaryMinimumTimeProblem(
         kwargs...
     )
 end
-
 
 function UnitaryMinimumTimeProblem(
     data_path::String;
@@ -451,6 +451,34 @@ function UnitaryRobustnessProblem(
         kwargs...
     )
 end
+
+function UnitaryRobustnessProblem(
+    Hₑ::AstractMatrix{<:Number},
+    prob::QuantumControlProblem;
+    kwargs...
+)
+    params = deepcopy(prob.params)
+    trajectory = copy(prob.trajectory)
+    system = prob.system
+    objective = Objective(params[:objective_terms])
+    integrators = prob.integrators
+    constraints = [
+        params[:linear_constraints]...,
+        NonlinearConstraint.(params[:nonlinear_constraints])...
+    ]
+
+    return UnitaryRobustnessProblem(
+        Hₑ,
+        trajectory,
+        system,
+        objective,
+        integrators,
+        constraints;
+        build_trajectory_constraints=false,
+        kwargs...
+    )
+end
+
 
 # ------------------------------------------
 # Quantum State Problem Templates
