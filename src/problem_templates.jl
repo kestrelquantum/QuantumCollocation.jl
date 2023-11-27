@@ -25,6 +25,83 @@ using JLD2
 # Unitary Problem Templates
 # -------------------------------------------
 
+@doc raw"""
+    UnitarySmoothPulseProblem(H_drift, H_drives, U_goal, T, Δt; kwargs...)
+    UnitarySmoothPulseProblem(system::QuantumSystem, U_goal, T, Δt; kwargs...)
+
+Construct a `QuantumControlProblem` for a free-time unitary gate problem with smooth control pulses enforced by constraining the second derivative of the pulse trajectory, i.e.,
+
+```math
+\begin{aligned}
+\underset{\vec{\tilde{U}}, a, \dot{a}, \ddot{a}, \Delta t}{\text{minimize}} & \quad
+Q \cdot \ell\qty(\vec{\tilde{U}}_T, \vec{\tilde{U}}_{\text{goal}}) + \frac{1}{2} \sum_t \qty(R_a a_t^2 + R_{\dot{a}} \dot{a}_t^2 + R_{\ddot{a}} \ddot{a}_t^2) \\
+\text{ subject to } & \quad \vb{P}^{(n)}\qty(\vec{\tilde{U}}_{t+1}, \vec{\tilde{U}}_t, a_t, \Delta t_t) = 0 \\
+& a_{t+1} - a_t - \dot{a}_t \Delta t_t = 0 \\
+& \quad \dot{a}_{t+1} - \dot{a}_t - \ddot{a}_t \Delta t_t = 0 \\
+& \quad |a_t| \leq a_{\text{bound}} \\
+& \quad |\ddot{a}_t| \leq \ddot{a}_{\text{bound}} \\
+& \quad \Delta t_{\text{min}} \leq \Delta t_t \leq \Delta t_{\text{max}} \\
+\end{aligned}
+```
+
+where, for $U \in SU(N)$,
+
+```math
+\ell\qty(\vec{\tilde{U}}_T, \vec{\tilde{U}}_{\text{goal}}) =
+\abs{1 - \frac{1}{N} \abs{ \tr \qty(U_{\text{goal}}, U_T)} }
+```
+
+is the *infidelity* objective function, $Q$ is a weight, $R_a$, $R_{\dot{a}}$, and $R_{\ddot{a}}$ are weights on the regularization terms, and $\vb{P}^{(n)}$ is the $n$th-order Pade integrator.
+
+# Arguments
+
+- `H_drift::AbstractMatrix{<:Number}`: the drift hamiltonian
+- `H_drives::Vector{<:AbstractMatrix{<:Number}}`: the control hamiltonians
+or
+- `system::QuantumSystem`: the system to be controlled
+with
+- `U_goal::AbstractMatrix{<:Number}`: the target unitary
+- `T::Int`: the number of timesteps
+- `Δt::Float64`: the (initial) time step size
+
+# Keyword Arguments
+- `free_time::Bool=true`: whether or not to allow the time steps to vary
+- `init_trajectory::Union{NamedTrajectory, Nothing}=nothing`: an initial trajectory to use
+- `a_bound::Float64=1.0`: the bound on the control pulse
+- `a_bounds::Vector{Float64}=fill(a_bound, length(system.G_drives))`: the bounds on the control pulses, one for each drive
+- `a_guess::Union{Matrix{Float64}, Nothing}=nothing`: an initial guess for the control pulses
+- `dda_bound::Float64=1.0`: the bound on the control pulse derivative
+- `dda_bounds::Vector{Float64}=fill(dda_bound, length(system.G_drives))`: the bounds on the control pulse derivatives, one for each drive
+- `Δt_min::Float64=0.5 * Δt`: the minimum time step size
+- `Δt_max::Float64=1.5 * Δt`: the maximum time step size
+- `drive_derivative_σ::Float64=0.01`: the standard deviation of the initial guess for the control pulse derivatives
+- `Q::Float64=100.0`: the weight on the infidelity objective
+- `R=1e-2`: the weight on the regularization terms
+- `R_a::Union{Float64, Vector{Float64}}=R`: the weight on the regularization term for the control pulses
+- `R_da::Union{Float64, Vector{Float64}}=R`: the weight on the regularization term for the control pulse derivatives
+- `R_dda::Union{Float64, Vector{Float64}}=R`: the weight on the regularization term for the control pulse second derivatives
+- `leakage_suppression::Bool=false`: whether or not to suppress leakage to higher energy states
+- `leakage_indices::Union{Nothing, Vector{Int}}=nothing`: the indices of $\vec{\tilde{U}}$ corresponding leakage operators that should be suppressed
+- `system_levels::Union{Nothing, Vector{Int}}=nothing`: the number of levels in each subsystem
+- `R_leakage=1e-1`: the weight on the leakage suppression term
+- `max_iter::Int=1000`: the maximum number of iterations for the solver
+- `linear_solver::String="mumps"`: the linear solver to use
+- `ipopt_options::Options=Options()`: the options for the Ipopt solver
+- `constraints::Vector{<:AbstractConstraint}=AbstractConstraint[]`: additional constraints to add to the problem
+- `timesteps_all_equal::Bool=true`: whether or not to enforce that all time steps are equal
+- `verbose::Bool=false`: whether or not to print constructor output
+- `U_init::Union{AbstractMatrix{<:Number},Nothing}=nothing`: an initial guess for the unitary
+- `integrator=Integrators.fourth_order_pade`: the integrator to use for the unitary
+- `geodesic=true`: whether or not to use the geodesic as the initial guess for the unitary
+- `pade_order=4`: the order of the Pade approximation to use for the unitary integrator
+- `autodiff=pade_order != 4`: whether or not to use automatic differentiation for the unitary integrator
+- `subspace=nothing`: the subspace to use for the unitary integrator
+- `jacobian_structure=true`: whether or not to use the jacobian structure
+- `hessian_approximation=false`: whether or not to use L-BFGS hessian approximation in Ipopt
+- `blas_multithreading=true`: whether or not to use multithreading in BLAS
+"""
+function UnitarySmoothPulseProblem end
+
 function UnitarySmoothPulseProblem(
     system::QuantumSystem,
     U_goal::AbstractMatrix{<:Number},

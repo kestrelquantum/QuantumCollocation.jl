@@ -1,4 +1,4 @@
-# QuantumCollocation.jl
+ QuantumCollocation.jl
 
 <div align="center"> <a href="https://github.com/aarontrowbridge/Piccolo.jl">
     <img src="assets/logo.svg" alt="logo" width="35%"/>
@@ -52,3 +52,20 @@ See the example script [examples/scripts/single_qubit_gate.jl](examples/scripts/
 Uses GitHub Next's [repo-visualization](https://githubnext.com/projects/repo-visualization/) tool to see repo structure.
 
 ![Repo Structure](images/diagram.svg)
+
+## TODO:
+
+Documentation:
+
+- [ ] cross-referencing to library
+- [ ] notation explanation
+- [ ] examples
+  - [ ] two-qubit
+  - [ ] cat qubit 
+  - [ ] three-qubit 
+  - [ ] qubit-cavity
+  - [ ] qubit-cavity-qubit
+
+Functionality:
+
+- [ ] better quantum system constructors (e.g. storing composite system info) 
