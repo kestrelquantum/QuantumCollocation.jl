@@ -54,7 +54,6 @@ end
 makedocs(;
     modules=[QuantumCollocation],
     authors="Aaron Trowbridge <aaron.j.trowbridge@gmail.com> and contributors",
-    repo="https://github.com/aarontrowbridge/QuantumCollocation.jl/blob/{commit}{path}#{line}",
     sitename="QuantumCollocation.jl",
     format=format,
     pages=pages,
