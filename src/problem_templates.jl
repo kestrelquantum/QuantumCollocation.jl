@@ -412,6 +412,7 @@ function UnitaryRobustnessProblem(
     constraints::Vector{<:AbstractConstraint};
     unitary_symbol::Symbol=:Ũ⃗,
     final_fidelity::Float64=unitary_fidelity(trajectory[end][unitary_symbol], trajectory.goal[unitary_symbol]),
+    subspace::Union{AbstractVector{<:Integer}, Nothing}=nothing,
     eval_hessian::Bool=false,
     verbose::Bool=false,
     ipopt_options::Options=Options(),
@@ -433,7 +434,7 @@ function UnitaryRobustnessProblem(
     fidelity_constraint = FinalUnitaryFidelityConstraint(
         unitary_symbol,
         final_fidelity,
-        trajectory,
+        trajectory;
         subspace=subspace
     )
 

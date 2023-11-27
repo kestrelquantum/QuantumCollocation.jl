@@ -233,7 +233,7 @@ is the NamedTrajectory symbol representing the unitary.
 function FinalUnitaryFidelityConstraint(
     statesymb::Symbol,
     val::Float64,
-    traj::NamedTrajectory,
+    traj::NamedTrajectory;
     subspace::Union{AbstractVector{<:Integer}, Nothing}=nothing
 )
     @assert statesymb ∈ traj.names

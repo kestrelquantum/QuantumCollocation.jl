@@ -1,7 +1,6 @@
 module QuantumUtils
 
 export GATES
-export gate
 export ⊗
 export apply
 export qubit_system_state
@@ -35,30 +34,16 @@ using LinearAlgebra
 
 
 """
-    ⊗(A::AbstractVecOrMat, B::AbstractVecOrMat)
-
-Kronecker product of two vectors or matrices.
+    kronecker product utility
 """
+
 ⊗(A::AbstractVecOrMat, B::AbstractVecOrMat) = kron(A, B)
 
 
-@doc raw"""
-    GATES::Dict{Symbol, Matrix{ComplexF64}}
-
-Dictionary of common quantum gates.
-
-# Elements
-- `:I` - identity, $I$
-- `:X` - Pauli X, $\sigma_x$
-- `:Y` - Pauli Y, $\sigma_y$
-- `:Z` - Pauli Z, $\sigma_z$
-- `:H` - Hadamard, $H$
-- `:CX` - controlled-X, $C_X$
-- `:XI` - $-i X \otimes I$
-- `:sqrtiSWAP` - $\sqrt{i \text{SWAP}}$
-
-
 """
+    quantum gates
+"""
+
 const GATES = Dict(
     :I => [1 0;
            0 1],
@@ -91,18 +76,8 @@ const GATES = Dict(
                    0 0 0 1]
 )
 
-"""
-    gate(U::Symbol)
-
-Get a gate from the `GATES` dictionary.
-"""
 gate(U::Symbol) = GATES[U]
 
-"""
-    apply(gate::Symbol, ψ::Vector{<:Number})
-
-Apply a gate from the GATES dictionary to a quantum state.
-"""
 function apply(gate::Symbol, ψ::Vector{<:Number})
     @assert norm(ψ) ≈ 1.0
     @assert gate in keys(GATES) "gate not found"
@@ -111,11 +86,6 @@ function apply(gate::Symbol, ψ::Vector{<:Number})
     return ComplexF64.(normalize(Û * ψ))
 end
 
-@doc raw"""
-    qubit_system_state(ket::String)
-
-Get a quantum state from a string of qubit states, e.g. `"01"` -> $\ket{01}$.
-"""
 function qubit_system_state(ket::String)
     cs = [c for c ∈ ket]
     @assert all(c ∈ "01" for c ∈ cs)
@@ -125,43 +95,17 @@ function qubit_system_state(ket::String)
     return ψ
 end
 
-
-@doc raw"""
-    lift(
-        U::AbstractMatrix{<:Number},
-        i::Int,
-        n::Int;
-        levels::Int=size(U, 1)
-    )
-
-Lift a matrix to a larger Hilbert space by placing it on the `i`-th qubit of a `n`-qubit system. I.e.,
-```math
-U \mapsto I_1 \otimes \cdots \otimes I_{i-1} \otimes U \otimes I_{i+1} \otimes \cdots \otimes I_n
-```
-"""
 function lift(
     U::AbstractMatrix{<:Number},
-    i::Int,
-    n::Int;
+    qubit_index::Int,
+    n_qubits::Int;
     levels::Int=size(U, 1)
 )::Matrix{ComplexF64}
-    Is = Matrix{Complex}[I(levels) for _ = 1:n]
-    Is[i] = U
+    Is = Matrix{Complex}[I(levels) for _ = 1:n_qubits]
+    Is[qubit_index] = U
     return foldr(⊗, Is)
 end
 
-@doc raw"""
-    lift(
-        op::AbstractMatrix{<:Number},
-        i::Int,
-        levels::Vector{Int}
-    )
-
-Lift a matrix to a larger Hilbert space by placing it on the `i`-th qubit of a `n`-qubit system. I.e.,
-```math
-U \mapsto I_1 \otimes \cdots \otimes I_{i-1} \otimes U \otimes I_{i+1} \otimes \cdots \otimes I_n
-```
-"""
 function lift(
     op::AbstractMatrix{<:Number},
     i::Int,

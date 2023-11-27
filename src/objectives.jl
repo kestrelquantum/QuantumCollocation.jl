@@ -15,6 +15,7 @@ export QuadraticSmoothnessRegularizer
 export L1Regularizer
 
 using TrajectoryIndexingUtils
+using ..QuantumUtils
 using ..QuantumSystems
 using ..Losses
 using ..Constraints
@@ -665,11 +666,11 @@ end
 
 @doc raw"""
 InfidelityRobustnessObjective(
-        Hₑ::AbstractMatrix{<:Number},
-        Z::NamedTrajectory;
-        eval_hessian::Bool=false,
-        subspace::Union{AbstractVector{<:Integer}, Nothing}=nothing
-    )
+    Hₑ::AbstractMatrix{<:Number},
+    Z::NamedTrajectory;
+    eval_hessian::Bool=false,
+    subspace::Union{AbstractVector{<:Integer}, Nothing}=nothing
+)
 
 Create a control objective which penalizes the sensitivity of the infidelity
 to the provided operator defined in the subspace of the control dynamics, 
@@ -707,7 +708,6 @@ function InfidelityRobustnessObjective(
         return [j for (s, j) ∈ zip(operator_to_iso_vec(A), Z.components[:Ũ⃗]) if convert(Bool, s)]
     end
     ivs = iso_vec_subspace(isnothing(subspace) ? collect(1:size(Hₑ, 1)) : subspace, Z)
-    T = sum(NT.timesteps(Z))
 
     @views function timesteps(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory)
         return map(1:Z.T) do t
@@ -722,6 +722,7 @@ function InfidelityRobustnessObjective(
     # Control frame
     @views function toggle(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory)
         Δts = timesteps(Z⃗, Z)
+        T = sum(Δts)
         R = sum(
             map(1:Z.T) do t
                 Uₜ = iso_vec_to_operator(Z⃗[slice(t, ivs, Z.dim)])
@@ -740,6 +741,7 @@ function InfidelityRobustnessObjective(
         ∇ = zeros(Z.dim * Z.T)
         R = toggle(Z⃗, Z)
         Δts = timesteps(Z⃗, Z)
+        T = sum(Δts)
         Threads.@threads for t ∈ 1:Z.T
             # State gradients
             Uₜ_slice = slice(t, ivs, Z.dim)
