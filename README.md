@@ -1,4 +1,4 @@
- QuantumCollocation.jl
+# QuantumCollocation.jl
 
 <div align="center"> <a href="https://github.com/aarontrowbridge/Piccolo.jl">
     <img src="assets/logo.svg" alt="logo" width="35%"/>
