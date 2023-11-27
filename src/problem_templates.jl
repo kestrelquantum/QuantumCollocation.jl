@@ -403,6 +403,55 @@ function UnitaryMinimumTimeProblem(
     )
 end
 
+function UnitaryRobustnessProblem(
+    Hₑ::AbstractMatrix{<:Number},
+    trajectory::NamedTrajectory,
+    system::QuantumSystem,
+    objective::Objective,
+    integrators::Vector{<:AbstractIntegrator},
+    constraints::Vector{<:AbstractConstraint};
+    unitary_symbol::Symbol=:Ũ⃗,
+    final_fidelity::Float64=unitary_fidelity(trajectory[end][unitary_symbol], trajectory.goal[unitary_symbol]),
+    eval_hessian::Bool=false,
+    verbose::Bool=false,
+    ipopt_options::Options=Options(),
+    kwargs...
+)
+    @assert unitary_symbol ∈ trajectory.names
+
+    if !eval_hessian
+        ipopt_options.hessian_approximation = "limited-memory"
+    end
+
+    objective += InfidelityRobustnessObjective(
+        Hₑ,
+        trajectory,
+        eval_hessian=eval_hessian,
+        subspace=subspace
+    )
+
+    fidelity_constraint = FinalUnitaryFidelityConstraint(
+        unitary_symbol,
+        final_fidelity,
+        trajectory,
+        subspace=subspace
+    )
+
+    constraints = AbstractConstraint[constraints..., fidelity_constraint]
+
+    return QuantumControlProblem(
+        system,
+        trajectory,
+        objective,
+        integrators;
+        constraints=constraints,
+        verbose=verbose,
+        ipopt_options=ipopt_options,
+        eval_hessian=eval_hessian,
+        kwargs...
+    )
+end
+
 # ------------------------------------------
 # Quantum State Problem Templates
 # ------------------------------------------

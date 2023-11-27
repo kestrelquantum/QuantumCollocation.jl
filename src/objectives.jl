@@ -8,6 +8,7 @@ export QuantumUnitaryObjective
 export UnitaryInfidelityObjective
 
 export MinimumTimeObjective
+export InfidelityRobustnessObjective
 
 export QuadraticRegularizer
 export QuadraticSmoothnessRegularizer
@@ -663,14 +664,14 @@ function MinimumTimeObjective(traj::NamedTrajectory; D=1.0)
 end
 
 @doc raw"""
-QuantumRobustnessObjective(
+InfidelityRobustnessObjective(
         Hₑ::AbstractMatrix{<:Number},
         Z::NamedTrajectory;
         eval_hessian::Bool=false,
         subspace::Union{AbstractVector{<:Integer}, Nothing}=nothing
     )
 
-Create a control objective which penalizes the sensitivity of the fidelity
+Create a control objective which penalizes the sensitivity of the infidelity
 to the provided operator defined in the subspace of the control dynamics, 
 thereby realizing robust control.
 
@@ -691,7 +692,7 @@ R_{Robust}(a) = \frac{1}{N} \norm{R}^2_F
 ```
 where N is the dimension of the Hilbert space.
 """
-function QuantumRobustnessObjective(
+function InfidelityRobustnessObjective(
     Hₑ::AbstractMatrix{<:Number},
     Z::NamedTrajectory;
     eval_hessian::Bool=false,
@@ -756,9 +757,15 @@ function QuantumRobustnessObjective(
         return ∇ / size(R, 1)
     end
 
-    # Hessian is approximately dense, R contains all unitaries
-    ∂²L = nothing
-    ∂²L_structure = nothing
+    # Hessian is dense (Control frame R contains sum over all unitaries).
+    if eval_hessian
+        # TODO
+		∂²L = (Z⃗, Z) -> []
+		∂²L_structure = Z -> []
+	else
+		∂²L = nothing
+		∂²L_structure = nothing
+	end
 
     params = Dict(
         :type => :QuantumRobustnessObjective,
