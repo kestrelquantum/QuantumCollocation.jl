@@ -1,8 +1,6 @@
 ```@meta
-EditURL = "../../../literate/man/quantum_systems.jl"
+EditURL = "../../../literate/man/utils.jl"
 ```
-
-# Quantum Systems
 
 ---
 
