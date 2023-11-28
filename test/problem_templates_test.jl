@@ -95,11 +95,11 @@ end
     )
     solve!(probs["robust"]; max_iter=100)
     
-    EvalLoss(problem, Loss) = Loss(vec(problem.trajectory.data), problem.trajectory)
-    Loss = InfidelityRobustnessObjective(H_error, probs["transmon"].trajectory).L
+    eval_loss(problem, Loss) = Loss(vec(problem.trajectory.data), problem.trajectory)
+    loss = InfidelityRobustnessObjective(H_error, probs["transmon"].trajectory).L
 
     # Robustness improvement over default
-    @test EvalLoss(probs["robust"], Loss) < EvalLoss(probs["transmon"], Loss)
+    @test eval_loss(probs["robust"], loss) < eval_loss(probs["transmon"], loss)
     
     # Fidelity constraint approximately satisfied
     @test isapprox(unitary_fidelity(probs["robust"]; subspace=subspace), 0.99, atol=0.025)
@@ -121,7 +121,7 @@ end
     solve!(probs["unconstrained"]; max_iter=100)
     
     # Additonal robustness improvement after relaxed objective
-    @test EvalLoss(probs["unconstrained"], Loss) < EvalLoss(probs["transmon"], Loss)
+    @test eval_loss(probs["unconstrained"], Loss) < eval_loss(probs["transmon"], Loss)
     
     # Fidelity constraint approximately satisfied
     @test isapprox(unitary_fidelity(probs["unconstrained"]; subspace=subspace), 0.99, atol=0.025)
