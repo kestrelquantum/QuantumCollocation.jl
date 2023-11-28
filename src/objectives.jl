@@ -317,7 +317,12 @@ function QuadraticRegularizer(;
 	@views function L(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory)
 		J = 0.0
 		for t ∈ times
-            Δt = Z⃗[slice(t, Z.components[timestep_symbol], Z.dim)]
+            if Z.timestep isa Symbol
+                Δt = Z⃗[slice(t, Z.components[timestep_symbol], Z.dim)]
+            else
+                Δt = Z.timestep
+            end
+            
             vₜ = Z⃗[slice(t, Z.components[name], Z.dim)]
             rₜ = Δt .* vₜ
             J += 0.5 * rₜ' * (R .* rₜ)
@@ -326,17 +331,20 @@ function QuadraticRegularizer(;
 	end
 
 	@views function ∇L(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory)
-		∇ = zeros(Z.dim * Z.T)
+		∇ = zeros(Z.dim * Z.T)        
 		Threads.@threads for t ∈ times
-            Δt_slice = slice(t, Z.components[timestep_symbol], Z.dim)
             vₜ_slice = slice(t, Z.components[name], Z.dim)
-            Δt = Z⃗[Δt_slice]
             vₜ = Z⃗[vₜ_slice]
-			∇[vₜ_slice] .= R .* (Δt.^2 .* vₜ)
 
             if Z.timestep isa Symbol
+                Δt_slice = slice(t, Z.components[timestep_symbol], Z.dim)
+                Δt = Z⃗[Δt_slice]
                 ∇[Δt_slice] .= vₜ' * (R .* (Δt .* vₜ))
+            else
+                Δt = Z.timestep
             end
+
+			∇[vₜ_slice] .= R .* (Δt.^2 .* vₜ)
 		end
 		return ∇
 	end
@@ -369,21 +377,23 @@ function QuadraticRegularizer(;
             end
             return structure
         end
-        
+
 		∂²L = (Z⃗, Z) -> begin
             values = []
             # Match Hessian structure indices
             for t ∈ times
-                Δt = Z⃗[slice(t, Z.components[timestep_symbol], Z.dim)]
-                append!(values, R .* Δt.^2)
-
                 if Z.timestep isa Symbol
-                    vₜ = Z⃗[slice(t, Z.components[name], Z.dim)]
+                    Δt = Z⃗[slice(t, Z.components[timestep_symbol], Z.dim)]
+                    append!(values, R .* Δt.^2)
                     # ∂²_vₜ_Δt, ∂²_Δt_vₜ
+                    vₜ = Z⃗[slice(t, Z.components[name], Z.dim)]
                     append!(values, 2 * (R .* (Δt .* vₜ)))
                     append!(values, 2 * (R .* (Δt .* vₜ)))
                     # ∂²_Δt_Δt
                     append!(values, vₜ' * (R .* vₜ))
+                else
+                    Δt = Z.timestep
+                    append!(values, R .* Δt.^2)
                 end
             end
             return values
