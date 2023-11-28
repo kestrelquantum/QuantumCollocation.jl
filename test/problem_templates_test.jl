@@ -54,6 +54,7 @@ end
     subspace = subspace_indices([3])
     T = 50
     Δt = .2
+    probs = Dict()
 
     # --------------------------------------------
     #   1. test UnitarySmoothPulseProblem with subspace
@@ -104,7 +105,7 @@ end
     solve!(probs["unconstrained"]; max_iter=100)
     
     # Additonal robustness improvement after relaxed objective
-    @test eval_loss(probs["unconstrained"], Loss) < eval_loss(probs["transmon"], Loss)
+    @test eval_loss(probs["unconstrained"], loss) < eval_loss(probs["transmon"], loss)
     
     # Fidelity constraint approximately satisfied
     @test isapprox(unitary_fidelity(probs["unconstrained"]; subspace=subspace), 0.99, atol=0.025)
