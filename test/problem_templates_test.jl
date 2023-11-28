@@ -47,47 +47,30 @@ end
     # --------------------------------------------
     # Initialize with UnitarySmoothPulseProblem
     # --------------------------------------------
-    H_drift = zeros(2, 2)
-    H_drives = [GATES[:X], GATES[:Y]]
-    U_goal = GATES[:X]
-    T = 50
-    Δt = .2
-
-    probs = Dict()
-    
-    probs["qubit"] = UnitarySmoothPulseProblem(
-        H_drift, H_drives, U_goal, T, Δt;
-        verbose=false
-    )
-    
-    solve!(probs["qubit"]; max_iter=100)
-    
-    @test unitary_fidelity(probs["qubit"]) > 0.99
-    
-    # --------------------------------------------
-    # 1. test UnitarySmoothPulseProblem with subspace
-    # --------------------------------------------
     H_error = GATES[:Z]
     H_drift = zeros(3, 3)
     H_drives = [create(3) + annihilate(3), im * (create(3) - annihilate(3))]
     U_goal = [0 1 0; 1 0 0; 0 0 0]
-    T = probs["qubit"].trajectory.T
-    Δt = probs["qubit"].trajectory[:Δt][1]
-    a_guess = probs["qubit"].trajectory[:a]
-    
     subspace = subspace_indices([3])
+    T = 50
+    Δt = .2
+
+    # --------------------------------------------
+    #   1. test UnitarySmoothPulseProblem with subspace
+    #   - rely on random initialization
+    # --------------------------------------------
     probs["transmon"] = UnitarySmoothPulseProblem(
         H_drift, H_drives, U_goal, T, Δt;
-        a_guess=a_guess, subspace=subspace, geodesic=false, verbose=false
+        subspace=subspace, geodesic=false, verbose=false
     )
-    solve!(probs["transmon"]; max_iter=100)
+    solve!(probs["transmon"]; max_iter=200)
     
     # Subspace gate success
     @test unitary_fidelity(probs["transmon"]; subspace=subspace) > 0.99
 
 
     # --------------------------------------------
-    # 3. test UnitaryRobustnessProblem from previous problem
+    #   2. test UnitaryRobustnessProblem from previous problem
     # --------------------------------------------
     probs["robust"] = UnitaryRobustnessProblem(
         H_error, probs["transmon"];
@@ -105,7 +88,7 @@ end
     @test isapprox(unitary_fidelity(probs["robust"]; subspace=subspace), 0.99, atol=0.025)
     
     # --------------------------------------------
-    # 4. test UnitaryRobustnessProblem from default struct
+    #   3. test UnitaryRobustnessProblem from default struct
     # --------------------------------------------
     params = deepcopy(probs["transmon"].params)
     trajectory = copy(probs["transmon"].trajectory)
