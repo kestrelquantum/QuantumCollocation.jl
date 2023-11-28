@@ -637,11 +637,11 @@ function MinimumTimeObjective(;
     )
 
     # TODO: amend this for case of no TimeStepsAllEqualConstraint
-	L(Z⃗::AbstractVector, Z::NamedTrajectory) = D * Z⃗[Δt_indices][end]
+	L(Z⃗::AbstractVector, Z::NamedTrajectory) = D * sum(Z⃗[Δt_indices])
 
 	∇L = (Z⃗::AbstractVector, Z::NamedTrajectory) -> begin
 		∇ = zeros(typeof(Z⃗[1]), length(Z⃗))
-		∇[Δt_indices[end]] = D
+		∇[Δt_indices] .= D
 		return ∇
 	end
 
