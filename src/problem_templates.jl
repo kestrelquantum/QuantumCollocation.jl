@@ -2,6 +2,7 @@ module ProblemTemplates
 
 export UnitarySmoothPulseProblem
 export UnitaryMinimumTimeProblem
+export UnitaryRobustnessProblem
 
 export QuantumStateSmoothPulseProblem
 export QuantumStateMinimumTimeProblem
@@ -359,7 +360,7 @@ function UnitaryMinimumTimeProblem(
     kwargs...
 )
     params = deepcopy(prob.params)
-    traj = copy(prob.trajectory)
+    trajectory = copy(prob.trajectory)
     system = prob.system
     objective = Objective(params[:objective_terms])
     integrators = prob.integrators
@@ -368,7 +369,7 @@ function UnitaryMinimumTimeProblem(
         NonlinearConstraint.(params[:nonlinear_constraints])...
     ]
     return UnitaryMinimumTimeProblem(
-        traj,
+        trajectory,
         system,
         objective,
         integrators,
@@ -377,7 +378,6 @@ function UnitaryMinimumTimeProblem(
         kwargs...
     )
 end
-
 
 function UnitaryMinimumTimeProblem(
     data_path::String;
@@ -402,6 +402,84 @@ function UnitaryMinimumTimeProblem(
         kwargs...
     )
 end
+
+function UnitaryRobustnessProblem(
+    Hₑ::AbstractMatrix{<:Number},
+    trajectory::NamedTrajectory,
+    system::QuantumSystem,
+    objective::Objective,
+    integrators::Vector{<:AbstractIntegrator},
+    constraints::Vector{<:AbstractConstraint};
+    unitary_symbol::Symbol=:Ũ⃗,
+    final_fidelity::Float64=unitary_fidelity(trajectory[end][unitary_symbol], trajectory.goal[unitary_symbol]),
+    subspace::Union{AbstractVector{<:Integer}, Nothing}=nothing,
+    eval_hessian::Bool=false,
+    verbose::Bool=false,
+    ipopt_options::Options=Options(),
+    kwargs...
+)
+    @assert unitary_symbol ∈ trajectory.names
+
+    if !eval_hessian
+        ipopt_options.hessian_approximation = "limited-memory"
+    end
+
+    objective += InfidelityRobustnessObjective(
+        Hₑ,
+        trajectory,
+        eval_hessian=eval_hessian,
+        subspace=subspace
+    )
+
+    fidelity_constraint = FinalUnitaryFidelityConstraint(
+        unitary_symbol,
+        final_fidelity,
+        trajectory;
+        subspace=subspace
+    )
+
+    constraints = AbstractConstraint[constraints..., fidelity_constraint]
+
+    return QuantumControlProblem(
+        system,
+        trajectory,
+        objective,
+        integrators;
+        constraints=constraints,
+        verbose=verbose,
+        ipopt_options=ipopt_options,
+        eval_hessian=eval_hessian,
+        kwargs...
+    )
+end
+
+function UnitaryRobustnessProblem(
+    Hₑ::AbstractMatrix{<:Number},
+    prob::QuantumControlProblem;
+    kwargs...
+)
+    params = deepcopy(prob.params)
+    trajectory = copy(prob.trajectory)
+    system = prob.system
+    objective = Objective(params[:objective_terms])
+    integrators = prob.integrators
+    constraints = [
+        params[:linear_constraints]...,
+        NonlinearConstraint.(params[:nonlinear_constraints])...
+    ]
+
+    return UnitaryRobustnessProblem(
+        Hₑ,
+        trajectory,
+        system,
+        objective,
+        integrators,
+        constraints;
+        build_trajectory_constraints=false,
+        kwargs...
+    )
+end
+
 
 # ------------------------------------------
 # Quantum State Problem Templates

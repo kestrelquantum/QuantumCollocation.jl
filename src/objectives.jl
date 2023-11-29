@@ -8,12 +8,14 @@ export QuantumUnitaryObjective
 export UnitaryInfidelityObjective
 
 export MinimumTimeObjective
+export InfidelityRobustnessObjective
 
 export QuadraticRegularizer
 export QuadraticSmoothnessRegularizer
 export L1Regularizer
 
 using TrajectoryIndexingUtils
+using ..QuantumUtils
 using ..QuantumSystems
 using ..Losses
 using ..Constraints
@@ -661,5 +663,120 @@ function MinimumTimeObjective(traj::NamedTrajectory; D=1.0)
     Δt_indices = [index(t, traj.components[traj.timestep][1], traj.dim) for t = 1:traj.T]
     return MinimumTimeObjective(; D=D, Δt_indices=Δt_indices)
 end
+
+@doc raw"""
+InfidelityRobustnessObjective(
+    Hₑ::AbstractMatrix{<:Number},
+    Z::NamedTrajectory;
+    eval_hessian::Bool=false,
+    subspace::Union{AbstractVector{<:Integer}, Nothing}=nothing
+)
+
+Create a control objective which penalizes the sensitivity of the infidelity
+to the provided operator defined in the subspace of the control dynamics, 
+thereby realizing robust control.
+
+The control dynamics are
+```math
+U_C(a)= \prod_t \exp{-i H_C(a_t)}
+```
+
+In the control frame, the Hₑ operator is (proportional to)
+```math
+R_{Robust}(a) = \frac{1}{T \norm{H_e}_2} \sum_t U_C(a_t)^\dag H_e U_C(a_t) \Delta t
+```
+where we have adjusted to a unitless expression of the operator.
+
+The robustness objective is 
+```math
+R_{Robust}(a) = \frac{1}{N} \norm{R}^2_F
+```
+where N is the dimension of the Hilbert space.
+"""
+function InfidelityRobustnessObjective(
+    Hₑ::AbstractMatrix{<:Number},
+    Z::NamedTrajectory;
+    eval_hessian::Bool=false,
+    subspace::Union{AbstractVector{<:Integer}, Nothing}=nothing
+)
+    # Indices of all non-zero subspace components for iso_vec_operators 
+    function iso_vec_subspace(subspace::AbstractVector{<:Integer}, Z::NamedTrajectory)
+        d = isqrt(Z.dims[:Ũ⃗] ÷ 2)
+        A = zeros(Complex, d, d)
+        A[subspace, subspace] .= 1 + im
+        # Return any index where there is a 1.
+        return [j for (s, j) ∈ zip(operator_to_iso_vec(A), Z.components[:Ũ⃗]) if convert(Bool, s)]
+    end
+    ivs = iso_vec_subspace(isnothing(subspace) ? collect(1:size(Hₑ, 1)) : subspace, Z)
+
+    @views function timesteps(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory)
+        return map(1:Z.T) do t
+            if Z.timestep isa Symbol
+                Z⃗[slice(t, Z.components[Z.timestep], Z.dim)][1]
+            else
+                Z.timestep
+            end
+        end
+    end
+
+    # Control frame
+    @views function toggle(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory)
+        Δts = timesteps(Z⃗, Z)
+        T = sum(Δts)
+        R = sum(
+            map(1:Z.T) do t
+                Uₜ = iso_vec_to_operator(Z⃗[slice(t, ivs, Z.dim)])
+                Uₜ'Hₑ*Uₜ .* Δts[t]
+            end
+        ) / norm(Hₑ) / T
+        return R
+    end
+
+    function L(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory)
+        R = toggle(Z⃗, Z)
+        return real(tr(R'R)) / size(R, 1)
+    end
+
+    @views function ∇L(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory)
+        ∇ = zeros(Z.dim * Z.T)
+        R = toggle(Z⃗, Z)
+        Δts = timesteps(Z⃗, Z)
+        T = sum(Δts)
+        Threads.@threads for t ∈ 1:Z.T
+            # State gradients
+            Uₜ_slice = slice(t, ivs, Z.dim)
+            Uₜ = iso_vec_to_operator(Z⃗[Uₜ_slice])
+            ∇[Uₜ_slice] .= 2 .* operator_to_iso_vec(
+                Hₑ * Uₜ * R .* Δts[t]
+            ) / norm(Hₑ) / T
+            # Time gradients
+            if Z.timestep isa Symbol 
+                t_slice = slice(t, Z.components[Z.timestep], Z.dim)
+                ∂R = Uₜ'Hₑ*Uₜ
+                ∇[t_slice] .= tr(∂R*R + R*∂R) / norm(Hₑ) / T
+            end
+        end
+        return ∇ / size(R, 1)
+    end
+
+    # Hessian is dense (Control frame R contains sum over all unitaries).
+    if eval_hessian
+        # TODO
+		∂²L = (Z⃗, Z) -> []
+		∂²L_structure = Z -> []
+	else
+		∂²L = nothing
+		∂²L_structure = nothing
+	end
+
+    params = Dict(
+        :type => :QuantumRobustnessObjective,
+        :error => Hₑ,
+        :eval_hessian => eval_hessian
+    )
+
+    return Objective(L, ∇L, ∂²L, ∂²L_structure, Dict[params])
+end
+
 
 end
