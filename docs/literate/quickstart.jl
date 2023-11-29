@@ -13,7 +13,7 @@
 
 # ## Basic Usage
 
-# For example, to create a problem for a single qubit $X$ gate (with a bound on the drive of $|a| < a_{\text{bound}}$), i.e., with system hamiltonian
+# For example, to create a problem for a single qubit $X$ gate (with a bound on the drive of $|a^i| < a_{\text{bound}}$), i.e., with system hamiltonian
 # ```math
 # H(t) = \frac{\omega}{2} \sigma_z + a^1(t) \sigma_x + a^2(t) \sigma_y
 # ```
