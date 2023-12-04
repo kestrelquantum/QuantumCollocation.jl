@@ -217,6 +217,17 @@ function FinalFidelityConstraint(;
         μ∂²g = nothing
     end
 
+    return NonlinearInequalityConstraint(
+        g,
+        ∂g,
+        ∂g_structure,
+        μ∂²g,
+        μ∂²g_structure,
+        1,
+        params
+    )
+end
+
 """
     FinalUnitaryFidelityConstraint(statesymb::Symbol, val::Float64, traj::NamedTrajectory)
 
