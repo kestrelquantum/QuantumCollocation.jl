@@ -832,7 +832,7 @@ function InfidelityRobustnessObjective(
             if Z.timestep isa Symbol 
                 t_slice = slice(t, Z.components[Z.timestep], Z.dim)
                 ∂R = Uₜ'Hₑ*Uₜ
-                ∇[t_slice] .= tr(∂R*R + R*∂R) / norm(Hₑ) / T
+                ∇[t_slice] .= real(tr(∂R*R + R*∂R)) / norm(Hₑ) / T
             end
         end
         return ∇ / size(R, 1)

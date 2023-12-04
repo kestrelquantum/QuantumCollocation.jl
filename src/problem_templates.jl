@@ -326,6 +326,8 @@ function UnitaryMinimumTimeProblem(
     constraints::Vector{<:AbstractConstraint};
     unitary_symbol::Symbol=:Ũ⃗,
     final_fidelity::Float64=unitary_fidelity(trajectory[end][unitary_symbol], trajectory.goal[unitary_symbol]),
+    subspace::Union{AbstractVector{<:Integer}, Nothing}=nothing,
+    hessian_approximation::Bool=true,
     D=1.0,
     verbose::Bool=false,
     ipopt_options::Options=Options(),
@@ -333,12 +335,18 @@ function UnitaryMinimumTimeProblem(
 )
     @assert unitary_symbol ∈ trajectory.names
 
+    if hessian_approximation
+        ipopt_options.hessian_approximation = "limited-memory"
+    end
+
     objective += MinimumTimeObjective(trajectory; D=D)
 
     fidelity_constraint = FinalUnitaryFidelityConstraint(
         unitary_symbol,
         final_fidelity,
-        trajectory
+        trajectory,
+        subspace=subspace,
+        hessian=!hessian_approximation
     )
 
     constraints = AbstractConstraint[constraints..., fidelity_constraint]
@@ -351,6 +359,7 @@ function UnitaryMinimumTimeProblem(
         constraints=constraints,
         verbose=verbose,
         ipopt_options=ipopt_options,
+        hessian_approximation=hessian_approximation,
         kwargs...
     )
 end
@@ -359,6 +368,7 @@ function UnitaryMinimumTimeProblem(
     prob::QuantumControlProblem;
     constraints::Union{Vector{<:AbstractConstraint}, Nothing}=nothing,
     objective::Union{Objective, Nothing}=nothing,
+    build_trajectory_constraints::Bool=true,
     kwargs...
 )
     params = deepcopy(prob.params)
@@ -375,9 +385,9 @@ function UnitaryMinimumTimeProblem(
             params[:linear_constraints]...,
             NonlinearConstraint.(params[:nonlinear_constraints])...
         ]
-        build_constraints=false
+        build_trajectory_constraints=false
     else
-        build_constraints=true
+        build_trajectory_constraints=build_trajectory_constraints
     end
 
     return UnitaryMinimumTimeProblem(
@@ -386,7 +396,7 @@ function UnitaryMinimumTimeProblem(
         objective,
         integrators,
         constraints;
-        build_trajectory_constraints=build_constraints,
+        build_trajectory_constraints=build_trajectory_constraints,
         kwargs...
     )
 end
@@ -425,21 +435,21 @@ function UnitaryRobustnessProblem(
     unitary_symbol::Symbol=:Ũ⃗,
     final_fidelity::Float64=unitary_fidelity(trajectory[end][unitary_symbol], trajectory.goal[unitary_symbol]),
     subspace::Union{AbstractVector{<:Integer}, Nothing}=nothing,
-    eval_hessian::Bool=false,
+    hessian_approximation::Bool=true,
     verbose::Bool=false,
     ipopt_options::Options=Options(),
     kwargs...
 )
     @assert unitary_symbol ∈ trajectory.names
 
-    if !eval_hessian
+    if hessian_approximation
         ipopt_options.hessian_approximation = "limited-memory"
     end
 
     objective += InfidelityRobustnessObjective(
         Hₑ,
         trajectory,
-        eval_hessian=eval_hessian,
+        eval_hessian=!hessian_approximation,
         subspace=subspace
     )
 
@@ -447,7 +457,8 @@ function UnitaryRobustnessProblem(
         unitary_symbol,
         final_fidelity,
         trajectory;
-        subspace=subspace
+        subspace=subspace,
+        hessian=!hessian_approximation
     )
 
     constraints = AbstractConstraint[constraints..., fidelity_constraint]
@@ -460,7 +471,7 @@ function UnitaryRobustnessProblem(
         constraints=constraints,
         verbose=verbose,
         ipopt_options=ipopt_options,
-        eval_hessian=eval_hessian,
+        hessian_approximation=hessian_approximation,
         kwargs...
     )
 end
@@ -470,6 +481,7 @@ function UnitaryRobustnessProblem(
     prob::QuantumControlProblem;
     constraints::Union{Vector{<:AbstractConstraint}, Nothing}=nothing,
     objective::Union{Objective, Nothing}=nothing,
+    build_trajectory_constraints::Bool=true,
     kwargs...
 )
     params = deepcopy(prob.params)
@@ -486,9 +498,9 @@ function UnitaryRobustnessProblem(
             params[:linear_constraints]...,
             NonlinearConstraint.(params[:nonlinear_constraints])...
         ]
-        build_constraints=false
+        build_trajectory_constraints=false
     else
-        build_constraints=true
+        build_trajectory_constraints=build_trajectory_constraints
     end
 
     return UnitaryRobustnessProblem(
@@ -498,7 +510,7 @@ function UnitaryRobustnessProblem(
         objective,
         integrators,
         constraints;
-        build_trajectory_constraints=build_constraints,
+        build_trajectory_constraints=build_trajectory_constraints,
         kwargs...
     )
 end
