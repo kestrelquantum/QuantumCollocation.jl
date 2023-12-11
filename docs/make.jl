@@ -14,7 +14,7 @@ pages = [
         "Utilities" => "generated/man/utils.md",
     ],
     "Examples" => [
-        "Single Qubit" => "generated/examples/single_qubit.md",
+        "Multilevel Transmon" => "generated/examples/multilevel_transmon.md",
     ],
     "Library" => "lib.md",
 ]
