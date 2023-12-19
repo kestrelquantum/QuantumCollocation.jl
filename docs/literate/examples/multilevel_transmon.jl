@@ -94,7 +94,6 @@ transformations = OrderedDict(
     :Ũ⃗ => [
         x -> populations(iso_vec_to_operator(x)[:, 1]),
         x -> populations(iso_vec_to_operator(x)[:, 2]),
-        x -> populations(iso_vec_to_operator(x)[:, 3]),
     ]
 )
 
@@ -102,7 +101,6 @@ transforamtion_labels = OrderedDict(
     :Ũ⃗ => [
         "\\psi^g",
         "\\psi^e",
-        "\\psi^f",
     ]
 )
 
@@ -110,7 +108,6 @@ transformation_titles = OrderedDict(
     :Ũ⃗ => [
         "Populations of evolution from |0⟩",
         "Populations of evolution from |1⟩",
-        "Populations of evolution from |2⟩",
     ]
 )
 
@@ -125,3 +122,28 @@ plot(prob.trajectory, [:a];
 # ## Leakage suppression
 
 # As can bee seen in the plot above, although the fidelity is high, the $f$ level of the transmon is highly populated throughout the evolution. This is suboptimal, but we can account for this by penalizing the leakage elements of the unitary, namely those elements of the form $U_{f, i}$ where $i \neq f$.  We utilize an $L_1$ penalty on these elements, which is implemented in the [`UnitarySmoothPulseProblem`](@ref) type as the `leakage_penalty` keyword argument.
+
+## get the indices of the leakage subspace of the isomorphic vector representation
+## of the unitary
+leakage_indices = subspace_leakage_indices(levels)
+
+## set the leakage penalty
+R_leakage = 1.0e0
+
+new_prob = UnitarySmoothPulseProblem(
+    H_drift,
+    H_drives,
+    U_goal,
+    T,
+    timesteps(prob.trajectory)[end];
+    U_init=U_init,
+    subspace=subspace,
+    a_guess=prob.trajectory.a,
+    a_bound=a_bound,
+    leakage_suppression=true,
+    leakage_indices=leakage_indices,
+    system_levels=[levels],
+    R_leakage=R_leakage,
+)
+
+solve!(new_prob; max_iter=100)

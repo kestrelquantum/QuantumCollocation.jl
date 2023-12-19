@@ -1,6 +1,7 @@
 module QuantumUtils
 
 export GATES
+export gate
 export ⊗
 export apply
 export qubit_system_state
@@ -435,6 +436,9 @@ function subspace_leakage_indices(
     )
     return setdiff(1:length(basis), subspace_indices)
 end
+
+subspace_leakage_indices(levels::Int; kwargs...) =
+    subspace_leakage_indices([levels]; kwargs...)
 
 subspace_leakage_indices(levels::AbstractVector{Int}; subspace_max=2, kwargs...) =
     subspace_leakage_indices(fill(subspace_max, length(levels)), levels; kwargs...)
