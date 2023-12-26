@@ -25,11 +25,11 @@ body:
       label: Importance
       description: How important is this feature to you?
       options:
-        - label: "1 (lowest)"
-        - label: "2"
-        - label: "3"
-        - label: "4"
-        - label: "5 (highest)"
+        - 1 (lowest)
+        - 2
+        - 3
+        - 4
+        - 5 (highest)
       default: 0
     validations:
       required: true
