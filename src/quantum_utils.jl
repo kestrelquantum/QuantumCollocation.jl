@@ -106,7 +106,7 @@ operators_from_dict(key_string::String, operator_dictionary; I_key="I")
 
     Replace the string (each character is one key) with operators from a dictionary.
 """
-operators_from_dict(key_string::String, operator_dictionary; I_key="I") = 
+operators_from_dict(key_string::String, operator_dictionary; I_key="I") =
     operators_from_dict([string(c) for c ∈ key_string], operator_dictionary, I_key=I_key)
 
 """
