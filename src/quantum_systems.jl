@@ -5,6 +5,9 @@ export QuantumSystem
 export CompositeQuantumSystem
 export QuantumSystemCoupling
 
+export embed
+
+
 export iso
 
 using ..QuantumUtils
@@ -84,7 +87,6 @@ function operator_algebra(
             end
         end
     end
-
     if return_layers
         return basis, all_layers
     else
@@ -134,7 +136,7 @@ end
 
 """
 ```julia
-AbstractQuantumSystem
+AbstractSystem
 ```
 
 Abstract type for defining systems.
@@ -238,6 +240,21 @@ function Base.copy(sys::QuantumSystem)
     )
 end
 
+function embed(
+    op::Matrix{ComplexF64},
+    sys::QuantumSystem;
+    subspace=1:size(op, 1)
+)::Matrix{ComplexF64}
+    @assert size(op, 1) == size(op, 2) "Operator must be square."
+    embed_op = zeros(ComplexF64, sys.levels, sys.levels)
+    embed_op[subspace, subspace] = op
+    return embed_op
+end
+
+embed(op::AbstractMatrix{<:Number}, sys; kwargs...) =
+    embed(Matrix{ComplexF64}(op), sys; kwargs...)
+
+
 
 
 
@@ -250,10 +267,10 @@ end
 
 """
 struct QuantumSystemCoupling
-    term::SparseMatrixCSC{ComplexF64, Int}
+    op::SparseMatrixCSC{ComplexF64, Int}
     g_ij::Float64
     pair::Tuple{Int, Int}
-    subsystem_levels::Vector{Int}
+    sub_levels::Vector{Int}
     constructor::Union{Function, Nothing}
     params::Dict{Symbol, <:Any}
 
@@ -268,7 +285,7 @@ end
 function (coupling::QuantumSystemCoupling)(;
     g_ij::Float64=coupling.g_ij,
     pair::Tuple{Int, Int}=coupling.pair,
-    subsystem_levels::Vector{Int}=coupling.subsystem_levels,
+    sub_levels::Vector{Int}=coupling.sub_levels,
     params...
 )
     @assert !isnothing(coupling.constructor) "No constructor provided."
@@ -278,7 +295,7 @@ function (coupling::QuantumSystemCoupling)(;
     return coupling.constructor(
         g_ij,
         pair,
-        subsystem_levels;
+        sub_levels;
         merge(coupling.params, Dict(params...))...
     )
 end
@@ -288,7 +305,7 @@ function Base.copy(coupling::QuantumSystemCoupling)
         copy(coupling.op),
         coupling.g_ij,
         coupling.pair,
-        coupling.subsystem_levels,
+        coupling.sub_levels,
         coupling.constructor,
         copy(coupling.params)
     )
@@ -301,7 +318,7 @@ struct CompositeQuantumSystem <: AbstractQuantumSystem
     G_drift::SparseMatrixCSC{Float64, Int}
     G_drives::Vector{SparseMatrixCSC{Float64, Int}}
     levels::Int
-    subsystem_levels::Vector{Int}
+    sub_levels::Vector{Int}
     params::Dict{Symbol, Any}
     subsystems::Vector{QuantumSystem}
     couplings::Vector{QuantumSystemCoupling}
@@ -328,26 +345,26 @@ function CompositeQuantumSystem(
     # add lifted subsystem drift Hamiltonians
     H_drift = sparse(zeros(levels, levels))
     for (i, sys) ∈ enumerate(subsystems)
-        H_drift += lift(sys.H_drift, i, subsystem_levels)
+        H_drift += lift(sys.H_drift, i, sub_levels)
     end
 
     # add lifated couplings to the drift Hamiltonian
     for coupling ∈ couplings
-        H_drift += coupling.term
+        H_drift += coupling.op
     end
 
     # add lifted subsystem drive Hamiltonians
     H_drives = SparseMatrixCSC{ComplexF64, Int}[]
     for (i, sys) ∈ enumerate(subsystems)
         for H_drive ∈ sys.H_drives
-            push!(H_drives, lift(H_drive, i, subsystem_levels))
+            push!(H_drives, lift(H_drive, i, sub_levels))
         end
     end
 
     G_drift = G(H_drift)
     G_drives = G.(H_drives)
     levels = size(H_drift, 1)
-    subsystem_levels = [sys.levels for sys ∈ subsystems]
+    sub_levels = [sys.levels for sys ∈ subsystems]
     params = Dict{Symbol, Any}()
 
     return CompositeQuantumSystem(
@@ -356,7 +373,7 @@ function CompositeQuantumSystem(
         G_drift,
         G_drives,
         levels,
-        subsystem_levels,
+        sub_levels,
         params,
         subsystems,
         couplings
@@ -396,23 +413,23 @@ function (csys::CompositeQuantumSystem)(;
         end
     end
 
-    # if subsystem_levels is provided then set all subsystems and couplings to subsystem_levels
-    if !isnothing(subsystem_levels)
+    # if sub_levels is provided then set all subsystems and couplings to sub_levels
+    if !isnothing(sub_levels)
 
-        if subsystem_levels isa Int
-            subsystem_levels = fill(subsystem_levels, length(csys.subsystems))
+        if sub_levels isa Int
+            sub_levels = fill(sub_levels, length(csys.subsystems))
         else
             @assert(
-                length(subsystem_levels) == length(csys.subsystems),
+                length(sub_levels) == length(csys.subsystems),
                 """\n
-                    number of subsystem_levels ($(length(subsystem_levels))) must match number of subsystems ($(length(csys.subsystems))).
+                    number of sub_levels ($(length(sub_levels))) must match number of subsystems ($(length(csys.subsystems))).
                 """
             )
         end
 
         for i = 1:length(csys.subsystems)
             if i ∈ keys(subsystem_params)
-                subsystem_params[i][:levels] = subsystem_levels[i]
+                subsystem_params[i][:levels] = sub_levels[i]
             else
                 subsystem_params[i] = Dict{Symbol, Any}(
                     :levels => subsystem_levels[i]
@@ -422,7 +439,7 @@ function (csys::CompositeQuantumSystem)(;
 
         for i = 1:length(csys.couplings)
             if i ∈ keys(coupling_params)
-                coupling_params[i][:subsystem_levels] = subsystem_levels
+                coupling_params[i][:sub_levels] = sub_levels
             else
                 coupling_params[i] = Dict{Symbol, Any}(
                     :subsystem_levels => subsystem_levels
@@ -439,7 +456,7 @@ function (csys::CompositeQuantumSystem)(;
     end
 
     # sometimes redundant, but here to catch any changes in indvidual subsystem levels
-    subsystem_levels = [sys.levels for sys ∈ subsystems]
+    sub_levels = [sys.levels for sys ∈ subsystems]
 
     # construct couplings with new parameters
     if !isempty(csys.couplings)
@@ -462,7 +479,46 @@ QuantumUtils.quantum_state(ket::String, csys::CompositeQuantumSystem; kwargs...)
 
 # TODO: add methods to combine composite quantum systems
 
+function embed(
+    op::Matrix{ComplexF64},
+    csys::CompositeQuantumSystem,
+    op_subsystem_indices::AbstractVector{Int},
+    op_subspaces::Vector{<:AbstractVector{Int}}=fill(1:2, length(csys.subsystems))
+)
+    @assert size(op, 1) == size(op, 2) "Operator must be square."
+    @assert all(diff(op_subsystem_indices) .== 1) "op_subsystem_indices must be consecutive (for now)."
 
+    if size(op, 1) == prod(length.(op_subspaces[op_subsystem_indices]))
+        Is = Matrix{ComplexF64}.(I.(length.(op_subspaces)))
+        Is[op_subsystem_indices[1]] = op
+        deleteat!(Is, op_subsystem_indices[2:end])
+        op = kron(Is...)
+    else
+        @assert(
+            size(op, 1) == prod(length.(op_subspaces)),
+            """\n
+                Operator size ($(size(op, 1))) must match product of subsystem subspaces ($(prod(length.(subspaces)))). Or
+            """
+        )
+    end
 
+    subspace_indices = get_subspace_indices(op_subspaces, csys.sub_levels)
+
+    embed_op = zeros(ComplexF64, csys.levels, csys.levels)
+    embed_op[subspace_indices, subspace_indices] = op
+    return embed_op
+end
+
+function embed(
+    op::Matrix{ComplexF64},
+    csys::CompositeQuantumSystem,
+    op_subsystem_index::Int,
+    args...
+)
+    return embed(op, csys, [op_subsystem_index], args...)
+end
+
+embed(op::AbstractMatrix{<:Number}, args...) =
+    embed(Matrix{ComplexF64}(op), args...)
 
 end
