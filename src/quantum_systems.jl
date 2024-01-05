@@ -6,8 +6,6 @@ export CompositeQuantumSystem
 export QuantumSystemCoupling
 
 export embed
-export is_linearly_dependent
-export operator_algebra
 
 
 export iso
@@ -16,104 +14,6 @@ using ..QuantumUtils
 
 using LinearAlgebra
 using SparseArrays
-
-function is_linearly_dependent(
-    basis::Vector{<:AbstractMatrix};
-    eps=eps(Float32)
-)
-    # Note: basis is assumed to be linearly independent
-    M = hcat(vec.(basis)...)
-    return is_linearly_dependent(M, eps=eps)
-end
-
-function is_linearly_dependent(
-    basis::Vector{<:AbstractMatrix},
-    op::AbstractMatrix;
-    eps=eps(Float32)
-)
-    # Note: basis is assumed to be linearly independent
-    M = hcat(vec.(basis)..., vec(op))
-    return is_linearly_dependent(M, eps=eps)
-end
-
-function is_linearly_dependent(M::AbstractMatrix; eps=eps(Float32))
-    if size(M, 2) > size(M, 1)
-        println("Linearly dependent because columns > rows.")
-        return true
-    end
-    # QR decomposition has a zero R on diagonal if linearly dependent
-    val = minimum(abs.(diag(qr(M).R)))
-    return isapprox(val, 0.0, atol=eps)
-end
-
-commutator(A::AbstractMatrix, B::AbstractMatrix) = A * B - B * A
-
-is_hermitian(A::AbstractMatrix) = isapprox(A, A', atol=1e-8)
-
-function operator_algebra(
-    gens::Vector{<:AbstractMatrix}; return_layers=false, normalize=false
-)
-    """
-    operator_algebra(generators; return_layers=false, normalize=false)
-
-        Compute the Lie algebra basis for the given generators.
-        If return_layers is true, the Lie tree layers are also returned.
-    """
-    basis = normalize ? [g / norm(g) for g ∈ gens] : copy(gens)
-    current_layer = copy(basis)
-    if return_layers
-        all_layers = Vector{Matrix{ComplexF64}}[copy(gens)]
-    end
-
-    ℓ = 1
-    println("ℓ = $ℓ")
-    if is_linearly_dependent(basis)
-        println("Linearly dependent generators.")
-    else
-        # Note: Use left normalized commutators
-        # Note: Jacobi identity is not checked
-        while length(basis) < size(first(gens), 1)^2 - 1
-            layer = Matrix{ComplexF64}[]
-            # Repeat commutators until no new operators are found.
-            for op ∈ current_layer
-                for gen ∈ gens
-                    test = commutator(gen, op)
-                    if all(test .≈ 0)
-                        continue
-                    # Current basis is assumed to be linearly independent
-                    elseif is_linearly_dependent([basis..., test])
-                        continue
-                    else
-                        test .= is_hermitian(test) ? test : im * test
-                        test .= normalize ? test / norm(test) : test
-                        push!(layer, test)
-                        push!(basis, test)
-                    end
-                end
-            end
-
-            if isempty(layer)
-                println("Subspace termination.")
-                break
-            else
-                current_layer = layer
-                ℓ += 1
-                println("ℓ = $ℓ")
-            end
-
-            if return_layers
-                append!(all_layers, [current_layer])
-            end
-        end
-    end
-    if return_layers
-        return basis, all_layers
-    else
-        return basis
-    end
-end
-
-
 
 const Im2 = [
     0 -1;
