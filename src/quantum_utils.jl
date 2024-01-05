@@ -18,7 +18,6 @@ export quad
 export cavity_state
 export multimode_state
 export number
-export normalize
 export fidelity
 export iso_fidelity
 export unitary_fidelity
@@ -26,9 +25,9 @@ export population
 export populations
 export subspace_unitary
 export quantum_state
-export subspace_indices
-export subspace_leakage_indices
-export unitary_isomorphism_leakage_indices
+export get_subspace_indices
+export get_subspace_leakage_indices
+export get_unitary_isomorphism_leakage_indices
 
 using TrajectoryIndexingUtils
 using LinearAlgebra
@@ -110,11 +109,11 @@ end
 function lift(
     op::AbstractMatrix{<:Number},
     i::Int,
-    levels::Vector{Int}
+    sub_levels::Vector{Int}
 )::Matrix{ComplexF64}
-    @assert size(op, 1) == size(op, 2) == levels[i] "Operator must be square and match dimension of qubit i"
+    @assert size(op, 1) == size(op, 2) == sub_levels[i] "Operator must be square and match dimension of subsystem i"
 
-    Is = [collect(1.0I(l)) for l ∈ levels]
+    Is = [collect(1.0 * typeof(op)(I, l, l)) for l ∈ sub_levels]
     Is[i] = op
     return kron(1.0, Is...)
 end
@@ -126,21 +125,42 @@ end
     quantum harmonic oscillator operators
 """
 
-function annihilate(levels::Int)
+"""
+    annihilate(levels::Int)
+
+Get the annihilation operator for a system with `levels` levels.
+"""
+function annihilate(levels::Int)::Matrix{ComplexF64}
     return diagm(1 => map(sqrt, 1:levels - 1))
 end
 
+"""
+    create(levels::Int)
+
+Get the creation operator for a system with `levels` levels.
+"""
 function create(levels::Int)
-    return (annihilate(levels))' |> collect
+    return collect(annihilate(levels)')
 end
 
+"""
+    number(levels::Int)
+
+Get the number operator `n = a'a` for a system with `levels` levels.
+"""
 function number(levels::Int)
     return create(levels) * annihilate(levels)
 end
 
+"""
+    quad(levels::Int)
+
+Get the operator `n(n - I)` for a system with `levels` levels.
+"""
 function quad(levels::Int)
     return number(levels) * (number(levels) - I(levels))
 end
+
 
 function cavity_state(level::Int, cavity_levels::Int)
     state = zeros(ComplexF64, cavity_levels)
@@ -183,10 +203,6 @@ end
 ket_to_iso(ψ) = [real(ψ); imag(ψ)]
 
 iso_to_ket(ψ̃) = ψ̃[1:div(length(ψ̃), 2)] + im * ψ̃[(div(length(ψ̃), 2) + 1):end]
-
-function normalize(state::Vector{C} where C <: Number)
-    return state / norm(state)
-end
 
 function iso_vec_to_operator(Ũ⃗::AbstractVector{R}) where R <: Real
     Ũ⃗_dim = div(length(Ũ⃗), 2)
@@ -404,25 +420,29 @@ function quantum_state(
     end
 end
 
-function subspace_indices(
-    subspace_levels::AbstractVector{Int},
-    levels::AbstractVector{Int}
+function get_subspace_indices(
+    subspaces::Vector{<:AbstractVector{Int}},
+    subsystem_levels::AbstractVector{Int}
 )
-    basis = kron([""], [string.(1:level) for level ∈ levels]...)
+    @assert length(subspaces) == length(subsystem_levels)
+
+    basis = kron([""], [string.(1:level) for level ∈ subsystem_levels]...)
+
     subspace_indices = findall(
         b -> all(
-            l ≤ subspace_levels[i]
+            l ∈ subspaces[i]
                 for (i, l) ∈ enumerate([parse(Int, bᵢ) for bᵢ ∈ b])
         ),
         basis
     )
+
     return subspace_indices
 end
 
-subspace_indices(levels::AbstractVector{Int}; subspace_max=2, kwargs...) =
-    subspace_indices(fill(subspace_max, length(levels)), levels; kwargs...)
+get_subspace_indices(levels::AbstractVector{Int}; subspace=1:2, kwargs...) =
+    get_subspace_indices(fill(subspace, length(levels)), levels; kwargs...)
 
-function subspace_leakage_indices(
+function get_subspace_leakage_indices(
     subspace_levels::AbstractVector{Int},
     levels::AbstractVector{Int};
 )
@@ -437,16 +457,16 @@ function subspace_leakage_indices(
     return setdiff(1:length(basis), subspace_indices)
 end
 
-subspace_leakage_indices(levels::Int; kwargs...) =
-    subspace_leakage_indices([levels]; kwargs...)
+get_subspace_leakage_indices(levels::Int; kwargs...) =
+    get_subspace_leakage_indices([levels]; kwargs...)
 
-subspace_leakage_indices(levels::AbstractVector{Int}; subspace_max=2, kwargs...) =
-    subspace_leakage_indices(fill(subspace_max, length(levels)), levels; kwargs...)
+get_subspace_leakage_indices(levels::AbstractVector{Int}; subspace_max=2, kwargs...) =
+    get_subspace_leakage_indices(fill(subspace_max, length(levels)), levels; kwargs...)
 
-function unitary_isomorphism_leakage_indices(levels::AbstractVector{Int}; kwargs...)
+function get_unitary_isomorphism_leakage_indices(levels::AbstractVector{Int}; kwargs...)
     N = prod(levels)
-    subspace_inds = subspace_indices(levels; kwargs...)
-    leakage_inds = subspace_leakage_indices(levels; kwargs...)
+    subspace_inds = get_subspace_indices(levels; kwargs...)
+    leakage_inds = get_subspace_leakage_indices(levels; kwargs...)
     iso_leakage_inds = Int[]
     for sⱼ ∈ subspace_inds
         for lᵢ ∈ leakage_inds
