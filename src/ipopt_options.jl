@@ -42,6 +42,8 @@ using Base: @kwdef
     skip_finalize_solution_call = "no"
     hsllib = nothing
     hessian_approximation = "exact"
+    recalc_y = "no"
+    recalc_y_feas_tol = 1.0e-6
     linear_solver = "mumps"
     watchdog_shortened_iter_trigger = 10
     watchdog_trial_iter_max = 3
