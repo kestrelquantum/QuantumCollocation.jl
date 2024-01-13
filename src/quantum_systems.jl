@@ -12,6 +12,86 @@ using ..QuantumUtils
 using LinearAlgebra
 using SparseArrays
 
+function is_linearly_dependent(
+    basis::Vector{<:AbstractMatrix},
+    op::AbstractMatrix;
+    eps=eps(Float32)
+)
+    # Note: basis is assumed to be linearly independent
+    M = hcat(vec.(basis)..., vec(op))
+    return is_linearly_dependent(M, eps=eps)
+end
+
+function is_linearly_dependent(M::AbstractMatrix; eps=eps(Float32))
+    if size(M, 2) > size(M, 1)
+        println("Linearly dependent because columns > rows.")
+        return true
+    end
+    # QR decomposition has a zero R on diagonal if linearly dependent
+    val = minimum(abs.(diag(qr(M).R)))
+    return isapprox(val, 0.0, atol=eps)
+end
+
+function operator_algebra(
+    generators::Vector{<:AbstractMatrix}; return_layers=false
+)
+    """
+    operator_algebra(generators; return_layers=false)
+
+        Compute the Lie algebra basis for the given generators.
+        If return_layers is true, the Lie tree layers are also returned.
+    """
+    basis = copy(generators)
+    current_layer = copy(generators)
+    if return_layers
+        all_layers = Vector{Matrix{ComplexF64}}[copy(generators)]
+    end
+
+    if is_linearly_dependent(stack(vec.(basis)))
+        println("Linearly dependent generators.")
+    else
+        # Note: Use left normalized commutators
+        # Note: Jacobi identity is not checked
+        ℓ = 1
+        while length(basis) < size(first(generators), 1)^2 - 1
+            println("ℓ = $ℓ")
+            layer = Matrix{ComplexF64}[]
+            # Repeat commutators until no new operators are found.
+            for op ∈ current_layer
+                for gen ∈ generators
+                    test = commutator(gen, op)
+                    if all(test .≈ 0) || is_linearly_dependent(basis, test)
+                        continue
+                    else
+                        push!(layer, test)
+                        push!(basis, test)
+                    end
+                end
+            end
+
+            if isempty(layer)
+                println("Subspace termination.")
+                break
+            else
+                current_layer = layer
+                ℓ += 1
+            end
+
+            if return_layers
+                append!(all_layers, [current_layer])
+            end
+        end
+    end
+
+    if return_layers
+        return basis, all_layers
+    else
+        return basis
+    end
+end
+
+
+
 const Im2 = [
     0 -1;
     1  0
@@ -379,5 +459,8 @@ QuantumUtils.quantum_state(ket::String, csys::CompositeQuantumSystem; kwargs...)
     quantum_state(ket, csys.subsystem_levels; kwargs...)
 
 # TODO: add methods to combine composite quantum systems
+
+
+
 
 end
