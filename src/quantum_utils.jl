@@ -3,6 +3,8 @@ module QuantumUtils
 export GATES
 export gate
 export ⊗
+export operators_from_dict
+export kron_from_dict
 export apply
 export qubit_system_state
 export lift
@@ -84,6 +86,42 @@ function apply(gate::Symbol, ψ::Vector{<:Number})
     Û = gate(gate)
     @assert size(Û, 2) == size(ψ, 1) "gate size does not match ket dim"
     return ComplexF64.(normalize(Û * ψ))
+end
+
+"""
+operators_from_dict(keys::AbstractVector{<:Any}, operator_dictionary; I_key=:I)
+
+    Replace the vector of keys using the operators from a dictionary.
+"""
+function operators_from_dict(keys::AbstractVector{<:Any}, operator_dictionary; I_key=:I)
+    first_operator = first(values(operator_dictionary))
+    I_default = Matrix{eltype(first_operator)}(I, size(first_operator))
+    # Identity key is replaced by operator_dictionary, else default I.
+    return replace(replace(keys, operator_dictionary...), I_key => I_default)
+end
+
+"""
+operators_from_dict(key_string::String, operator_dictionary; I_key="I")
+
+    Replace the string (each character is one key) with operators from a dictionary.
+"""
+operators_from_dict(key_string::String, operator_dictionary; I_key="I") = 
+    operators_from_dict([string(c) for c ∈ key_string], operator_dictionary, I_key=I_key)
+
+"""
+kron_from_dict(keys, dict; kwargs...)
+
+    Reduce the keys to a single operator by using the provided dictionary and the kronecker product.
+"""
+function kron_from_dict(keys, dict; kwargs...)
+    if occursin("+", keys)
+        return sum(
+            [kron_from_dict(string(s), dict; kwargs...)
+            for s ∈ split(keys, "+")]
+        )
+    else
+        return reduce(kron, operators_from_dict(keys, dict; kwargs...))
+    end
 end
 
 function qubit_system_state(ket::String)
