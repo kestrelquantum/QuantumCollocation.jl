@@ -63,6 +63,8 @@ function operator_algebra(
                     if all(test .≈ 0) || is_linearly_dependent(basis, test)
                         continue
                     else
+                        # Store as Hermitian operator
+                        test = is_hermitian(test) ? test : im * test
                         push!(layer, test)
                         push!(basis, test)
                     end

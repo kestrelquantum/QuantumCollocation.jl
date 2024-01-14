@@ -213,8 +213,8 @@ end
 
 function unitary_geodesic(U_goal, samples; kwargs...)
     N = size(U_goal, 1)
-    U_init = Matrix{ComplexF64}(I(N))
-    return unitary_geodesic(U_init, U_goal, 1:samples; kwargs...)
+    U₀ = Matrix{ComplexF64}(I(N))
+    return unitary_geodesic(U₀, U_goal, samples; kwargs...)
 end
 
 unitary_geodesic(
@@ -222,7 +222,7 @@ unitary_geodesic(
     U₁::AbstractMatrix{<:Number},
     samples::Number;
     kwargs...
-) = unitary_geodesic(U₀, U₁, 1:samples; kwargs...)
+) = unitary_geodesic(U₀, U₁, range(0, 1, samples); kwargs...)
 
 function unitary_geodesic(
     U₀::AbstractMatrix{<:Number},
