@@ -3,6 +3,7 @@ module QuantumUtils
 export GATES
 export gate
 export ⊗
+export vec⁻¹
 export operators_from_dict
 export kron_from_dict
 export apply
@@ -237,6 +238,10 @@ end
 """
     isomporphism utilities
 """
+function vec⁻¹(x::AbstractVector)
+    n = isqrt(length(x))
+    return reshape(x, n, n)
+end
 
 ket_to_iso(ψ) = [real(ψ); imag(ψ)]
 
