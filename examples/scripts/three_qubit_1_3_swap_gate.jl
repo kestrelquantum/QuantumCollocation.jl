@@ -3,7 +3,6 @@ using QuantumCollocation
 using NamedTrajectories
 using LinearAlgebra
 using Distributions
-using Manifolds
 
 max_iter = 5000
 linear_solver = "mumps"
