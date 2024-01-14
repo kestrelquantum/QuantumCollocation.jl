@@ -50,6 +50,7 @@
     rollout = [exp(-im * H * t) * U₀ for t ∈ range(0, 1, 10)]
     Us_test = stack(operator_to_iso_vec.(rollout), dims=2)
     @test isapprox(Us, Us_test)
+<<<<<<< HEAD
 
 
     ## Group 2: √X to X (π/2 rotation)
@@ -69,3 +70,7 @@
     @test Us_wrap[:, end] ≈ operator_to_iso_vec(U_ω)
 
 end
+=======
+
+end
+>>>>>>> ccc0fbe (Bug fix: geodesic arg sample uses range [0,1])
