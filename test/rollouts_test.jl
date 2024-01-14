@@ -12,9 +12,6 @@
         U_α, U_ω, range(0, 1, 4), return_generator=true
     )
 
-    Us = unitary_geodesic(
-        U_α, U_ω, range(0, 1, 4)
-    )
     @test size(Us, 2) == 4
     @test Us[:, 1] ≈ operator_to_iso_vec(U_α)
     @test Us[:, end] ≈ operator_to_iso_vec(U_ω)
@@ -33,6 +30,7 @@
     @test norm(H10) ≈ π/10
 
     # Test wrapped call
+<<<<<<< HEAD
     Us_wrap, H_wrap = unitary_geodesic(U_ω, 10, return_generator=true)
     @test Us_wrap[:, 1] ≈ operator_to_iso_vec(GATES[:I])
     @test Us_wrap[:, end] ≈ operator_to_iso_vec(U_ω)
@@ -53,10 +51,8 @@
     rollout = [exp(-im * H * t) * U₀ for t ∈ range(0, 1, 10)]
     Us_test = stack(operator_to_iso_vec.(rollout), dims=2)
     @test isapprox(Us, Us_test)
-<<<<<<< HEAD
+    Us_wrap = unitary_geodesic(U_ω, 4)
+    @test Us_wrap[:, 1] ≈ operator_to_iso_vec(GATES[:I])
+    @test Us_wrap[:, end] ≈ operator_to_iso_vec(U_ω)
 
 end
-=======
-
-end
->>>>>>> ccc0fbe (Bug fix: geodesic arg sample uses range [0,1])
