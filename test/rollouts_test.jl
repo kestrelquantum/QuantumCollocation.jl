@@ -15,7 +15,7 @@
     Us = unitary_geodesic(
         U_α, U_ω, range(0, 1, 4)
     )
-    
+
     @test size(Us, 2) == 4
     @test Us[:, 1] ≈ operator_to_iso_vec(U_α)
     @test Us[:, end] ≈ operator_to_iso_vec(U_ω)
@@ -54,5 +54,5 @@
     rollout = [exp(-im * H * t) * U₀ for t ∈ range(0, 1, 10)]
     Us_test = stack(operator_to_iso_vec.(rollout), dims=2)
     @test isapprox(Us, Us_test)
-    
+
 end
