@@ -3,7 +3,6 @@ using NamedTrajectories
 using LinearAlgebra
 using SparseArrays
 using Distributions
-using Manifolds
 
 max_iter = 500
 linear_solver = "pardiso"
@@ -95,7 +94,8 @@ else
     Δt_max = 1.0 * dt
 
 
-    Ũ⃗, G⃗ = unitary_geodesic(U_goal, T; return_generator=true)
+    Ũ⃗, H_eff = unitary_geodesic(U_goal, T; return_generator=true)
+    G⃗ = stack([skew_symmetric_vec(iso(-im * H_eff)) for t = 1:n_moments], dims=2)
 
     # G⃗ = G⃗_geodesic + rand(Normal(0, 0.01), size(G⃗_geodesic))
 

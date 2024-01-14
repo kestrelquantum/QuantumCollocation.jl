@@ -37,7 +37,7 @@
 
     @test unitary_fidelity(mintime_prob) > final_fidelity
 
-    @test times(mintime_prob.trajectory)[end] < times(prob.trajectory)[end]
+    @test sum(mintime_prob.trajectory[:Δt]) < sum(prob.trajectory[:Δt])
 
 end
 
