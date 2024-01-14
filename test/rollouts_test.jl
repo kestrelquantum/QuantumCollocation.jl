@@ -30,9 +30,26 @@
     @test norm(H10) ≈ π/10
 
     # Test wrapped call
-    Us_wrap = unitary_geodesic(U_ω, 4)
+    Us_wrap, H_wrap = unitary_geodesic(U_ω, 10, return_generator=true)
     @test Us_wrap[:, 1] ≈ operator_to_iso_vec(GATES[:I])
     @test Us_wrap[:, end] ≈ operator_to_iso_vec(U_ω)
+    rollout = [exp(-im * H_wrap * t) for t ∈ range(0, 1, 10)]
+    Us_test = stack(operator_to_iso_vec.(rollout), dims=2)
+    @test isapprox(Us_wrap, Us_test)
+
+
+    ## Group 2: √X to X (π/2 rotation)
+
+    # Test geodesic not at identity
+    U₀ = sqrt(GATES[:X])
+    U₁ = GATES[:X]
+    Us, H = unitary_geodesic(U₀, U₁, 10, return_generator=true)
+    @test Us[:, 1] ≈ operator_to_iso_vec(U₀)
+    @test Us[:, end] ≈ operator_to_iso_vec(U_ω)
+
+    rollout = [exp(-im * H * t) * U₀ for t ∈ range(0, 1, 10)]
+    Us_test = stack(operator_to_iso_vec.(rollout), dims=2)
+    @test isapprox(Us, Us_test)
 
 
     ## Group 2: √X to X (π/2 rotation)
