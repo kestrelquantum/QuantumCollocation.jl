@@ -10,8 +10,6 @@ export InfidelityLoss
 export UnitaryInfidelityLoss
 export UnitaryTraceLoss
 
-export structure
-
 export infidelity
 export unitary_infidelity
 
@@ -52,11 +50,19 @@ function infidelity(ψ̃::AbstractVector, ψ̃goal::AbstractVector)
     return abs(1 - abs2(ψgoal'ψ))
 end
 
-"""
+@doc raw"""
     isovec_unitary_fidelity(Ũ::AbstractVector, Ũgoal::AbstractVector)
 
-Returns the fidelity between two unitary operators, specified as an
-isomorphic vector.
+Returns the fidelity between the isomorphic unitary $\vec{\widetilde{U}} \sim U \in SU(n)$ and the isomorphic goal unitary $\vec{\widetilde{U}}_{\text{goal}}$.
+
+```math
+\begin{aligned}
+\mathcal{F}(\vec{\widetilde{U}}, \vec{\widetilde{U}}_{\text{goal}}) &= \frac{1}{n} \abs{\tr \qty(U_{\text{goal}}^\dagger U)} \\
+&= \frac{1}{n} \sqrt{T_R^{2} + T_I^{2}}
+\end{aligned}
+```
+
+where $T_R = \langle \vec{\widetilde{U}}_{\text{goal}, R}, \vec{\widetilde{U}}_R \rangle + \langle \vec{\widetilde{U}}_{\text{goal}, I}, \vec{\widetilde{U}}_I \rangle$ and $T_I = \langle \vec{\widetilde{U}}_{\text{goal}, R}, \vec{\widetilde{U}}_I \rangle - \langle \vec{\widetilde{U}}_{\text{goal}, I}, \vec{\widetilde{U}}_R \rangle$.
 
 """
 @inline @views function isovec_unitary_fidelity(
@@ -78,7 +84,8 @@ end
 @views function unitary_infidelity(
     Ũ⃗::AbstractVector,
     Ũ⃗_goal::AbstractVector,
-    subspace::Tuple{AbstractVector{Int},AbstractVector{Int}}=axes(iso_vec_to_operator(Ũ⃗_goal))
+    subspace::Tuple{AbstractVector{Int},AbstractVector{Int}}=
+        axes(iso_vec_to_operator(Ũ⃗_goal))
 )
     ℱ = isovec_unitary_fidelity(Ũ⃗, Ũ⃗_goal, subspace)
     return abs(1 - ℱ)
@@ -87,7 +94,8 @@ end
 @views function unitary_infidelity_gradient(
     Ũ⃗::AbstractVector,
     Ũ⃗_goal::AbstractVector,
-    subspace::Tuple{AbstractVector{Int},AbstractVector{Int}}=axes(iso_vec_to_operator(Ũ⃗_goal))
+    subspace::Tuple{AbstractVector{Int},AbstractVector{Int}}=
+        axes(iso_vec_to_operator(Ũ⃗_goal))
 )
     subspace_rows, subspace_cols = subspace
     U = iso_vec_to_operator(Ũ⃗)[subspace_rows, subspace_cols]
@@ -407,7 +415,7 @@ struct QuantumLoss
     isodim::Int
 
     function QuantumLoss(
-        sys::AbstractSystem,
+        sys::AbstractQuantumSystem,
         loss::Symbol = :infidelity_loss
     )
         if loss == :energy_loss
@@ -527,7 +535,7 @@ struct QuantumLossHessian
     end
 end
 
-function structure(
+function StructureUtils.structure(
     H::QuantumLossHessian,
     T::Int,
     vardim::Int

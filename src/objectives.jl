@@ -17,6 +17,7 @@ export L1Regularizer
 using TrajectoryIndexingUtils
 using ..QuantumUtils
 using ..QuantumSystems
+using ..EmbeddedOperators
 using ..Losses
 using ..Constraints
 
@@ -324,7 +325,7 @@ function QuadraticRegularizer(;
             else
                 Δt = Z.timestep
             end
-            
+
             vₜ = Z⃗[slice(t, Z.components[name], Z.dim)]
             rₜ = Δt .* vₜ
             J += 0.5 * rₜ' * (R .* rₜ)
@@ -333,7 +334,7 @@ function QuadraticRegularizer(;
 	end
 
 	@views function ∇L(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory)
-		∇ = zeros(Z.dim * Z.T)        
+		∇ = zeros(Z.dim * Z.T)
 		Threads.@threads for t ∈ times
             vₜ_slice = slice(t, Z.components[name], Z.dim)
             vₜ = Z⃗[vₜ_slice]
@@ -722,7 +723,7 @@ InfidelityRobustnessObjective(
 )
 
 Create a control objective which penalizes the sensitivity of the infidelity
-to the provided operator defined in the subspace of the control dynamics, 
+to the provided operator defined in the subspace of the control dynamics,
 thereby realizing robust control.
 
 The control dynamics are
@@ -736,7 +737,7 @@ R_{Robust}(a) = \frac{1}{T \norm{H_e}_2} \sum_t U_C(a_t)^\dag H_e U_C(a_t) \Delt
 ```
 where we have adjusted to a unitless expression of the operator.
 
-The robustness objective is 
+The robustness objective is
 ```math
 R_{Robust}(a) = \frac{1}{N} \norm{R}^2_F
 ```
@@ -748,7 +749,7 @@ function InfidelityRobustnessObjective(
     eval_hessian::Bool=false,
     subspace::Union{AbstractVector{<:Integer}, Nothing}=nothing
 )
-    # Indices of all non-zero subspace components for iso_vec_operators 
+    # Indices of all non-zero subspace components for iso_vec_operators
     function iso_vec_subspace(subspace::AbstractVector{<:Integer}, Z::NamedTrajectory)
         d = isqrt(Z.dims[:Ũ⃗] ÷ 2)
         A = zeros(Complex, d, d)
@@ -799,7 +800,7 @@ function InfidelityRobustnessObjective(
                 Hₑ * Uₜ * R .* Δts[t]
             ) / norm(Hₑ) / T
             # Time gradients
-            if Z.timestep isa Symbol 
+            if Z.timestep isa Symbol
                 t_slice = slice(t, Z.components[Z.timestep], Z.dim)
                 ∂R = Uₜ'Hₑ*Uₜ
                 ∇[t_slice] .= tr(∂R*R + R*∂R) / norm(Hₑ) / T

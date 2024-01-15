@@ -11,6 +11,12 @@ include("quantum_utils.jl")
 include("quantum_systems.jl")
 @reexport using .QuantumSystems
 
+include("quantum_system_templates.jl")
+@reexport using .QuantumSystemTemplates
+
+include("embedded_operators.jl")
+@reexport using .EmbeddedOperators
+
 include("losses.jl")
 @reexport using .Losses
 

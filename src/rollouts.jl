@@ -9,6 +9,7 @@ export linear_interpolation
 
 using ..QuantumUtils
 using ..QuantumSystems
+using ..EmbeddedOperators
 using ..Integrators
 using ..Problems
 
@@ -20,7 +21,7 @@ function rollout(
     ψ̃₁::AbstractVector{Float64},
     controls::AbstractMatrix{Float64},
     Δt::Union{AbstractVector{Float64}, AbstractMatrix{Float64}, Float64},
-    system::QuantumSystem;
+    system::AbstractQuantumSystem;
     integrator=Integrators.fourth_order_pade
 )
     if Δt isa AbstractMatrix
@@ -63,7 +64,7 @@ function unitary_rollout(
     Ũ⃗₁::AbstractVector{<:Real},
     controls::AbstractMatrix{Float64},
     Δt::Union{AbstractVector{Float64}, AbstractMatrix{Float64}, Float64},
-    system::QuantumSystem;
+    system::AbstractQuantumSystem;
     integrator=exp
 )
     if Δt isa AbstractMatrix
@@ -79,12 +80,15 @@ function unitary_rollout(
 
     Ũ⃗[:, 1] .= Ũ⃗₁
 
+    G_drift = Matrix{Float64}(system.G_drift)
+    G_drives = Matrix{Float64}.(system.G_drives)
+
     for t = 2:T
         aₜ₋₁ = controls[:, t - 1]
         Gₜ = Integrators.G(
             aₜ₋₁,
-            system.G_drift,
-            system.G_drives
+            G_drift,
+            G_drives
         )
         Ũ⃗ₜ₋₁ = Ũ⃗[:, t - 1]
         Ũₜ₋₁ = iso_vec_to_iso_operator(Ũ⃗ₜ₋₁)
@@ -101,7 +105,7 @@ end
 function unitary_rollout(
     controls::AbstractMatrix{Float64},
     Δt::Union{AbstractVector{Float64}, AbstractMatrix{Float64}, Float64},
-    system::QuantumSystem;
+    system::AbstractQuantumSystem;
     integrator=exp
 )
     return unitary_rollout(
@@ -115,7 +119,7 @@ end
 
 function unitary_rollout(
     traj::NamedTrajectory,
-    system::QuantumSystem;
+    system::AbstractQuantumSystem;
     unitary_name::Symbol=:Ũ⃗,
     drive_name::Symbol=:a,
     integrator=exp,
@@ -139,12 +143,17 @@ end
 
 function QuantumUtils.unitary_fidelity(
     traj::NamedTrajectory,
-    system::QuantumSystem;
+    system::AbstractQuantumSystem;
     unitary_name::Symbol=:Ũ⃗,
     subspace=nothing,
     kwargs...
 )
-    Ũ⃗_final = unitary_rollout(traj, system; unitary_name=unitary_name, kwargs...)[:, end]
+    Ũ⃗_final = unitary_rollout(
+        traj,
+        system;
+        unitary_name=unitary_name,
+        kwargs...
+    )[:, end]
     return unitary_fidelity(
         Ũ⃗_final,
         traj.goal[unitary_name];
@@ -163,7 +172,7 @@ function QuantumUtils.unitary_fidelity(
     U_goal::AbstractMatrix{ComplexF64},
     controls::AbstractMatrix{Float64},
     Δt::Union{AbstractVector{Float64}, AbstractMatrix{Float64}, Float64},
-    system::QuantumSystem;
+    system::AbstractQuantumSystem;
     subspace=nothing,
     integrator=exp
 )
@@ -203,8 +212,6 @@ function skew_symmetric_vec(M::AbstractMatrix)
     return v
 end
 
-
-
 function unitary_geodesic(
     U_init::AbstractMatrix{<:Number},
     U_goal::AbstractMatrix{<:Number},
@@ -227,6 +234,19 @@ function unitary_geodesic(
     else
         return Ũ⃗
     end
+end
+
+function unitary_geodesic(
+    operator::EmbeddedOperator,
+    samples::Int
+)
+    U_goal = unembed(operator)
+    U_init = Matrix{ComplexF64}(I(size(U_goal, 1)))
+    Ũ⃗ = unitary_geodesic(U_init, U_goal, samples)
+    return hcat([
+        operator_to_iso_vec(EmbeddedOperators.embed(iso_vec_to_operator(Ũ⃗ₜ), operator))
+            for Ũ⃗ₜ ∈ eachcol(Ũ⃗)
+    ]...)
 end
 
 function unitary_geodesic(U_goal, samples; kwargs...)

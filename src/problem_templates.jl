@@ -9,6 +9,7 @@ export QuantumStateMinimumTimeProblem
 
 using ..QuantumSystems
 using ..QuantumUtils
+using ..EmbeddedOperators
 using ..Rollouts
 using ..Objectives
 using ..Constraints
@@ -21,6 +22,17 @@ using LinearAlgebra
 using Distributions
 using JLD2
 
+function unitary_linear_interpolation(
+    U_init::AbstractMatrix{<:Number},
+    U_goal::AbstractMatrix{<:Number},
+    samples::Int;
+)
+    Ũ⃗_init = operator_to_iso_vec(U_init)
+    Ũ⃗_goal = operator_to_iso_vec(U_goal)
+    Ũ⃗s = [Ũ⃗_init + (Ũ⃗_goal - Ũ⃗_init) * t for t ∈ range(0, 1, length=samples)]
+    Ũ⃗ = hcat(Ũ⃗s...)
+    return Ũ⃗
+end
 
 # -------------------------------------------
 # Unitary Problem Templates
@@ -82,8 +94,6 @@ with
 - `R_da::Union{Float64, Vector{Float64}}=R`: the weight on the regularization term for the control pulse derivatives
 - `R_dda::Union{Float64, Vector{Float64}}=R`: the weight on the regularization term for the control pulse second derivatives
 - `leakage_suppression::Bool=false`: whether or not to suppress leakage to higher energy states
-- `leakage_indices::Union{Nothing, Vector{Int}}=nothing`: the indices of $\vec{\tilde{U}}$ corresponding leakage operators that should be suppressed
-- `system_levels::Union{Nothing, Vector{Int}}=nothing`: the number of levels in each subsystem
 - `R_leakage=1e-1`: the weight on the leakage suppression term
 - `max_iter::Int=1000`: the maximum number of iterations for the solver
 - `linear_solver::String="mumps"`: the linear solver to use
@@ -91,7 +101,6 @@ with
 - `constraints::Vector{<:AbstractConstraint}=AbstractConstraint[]`: additional constraints to add to the problem
 - `timesteps_all_equal::Bool=true`: whether or not to enforce that all time steps are equal
 - `verbose::Bool=false`: whether or not to print constructor output
-- `U_init::Union{AbstractMatrix{<:Number},Nothing}=nothing`: an initial guess for the unitary
 - `integrator=Integrators.fourth_order_pade`: the integrator to use for the unitary
 - `geodesic=true`: whether or not to use the geodesic as the initial guess for the unitary
 - `pade_order=4`: the order of the Pade approximation to use for the unitary integrator
@@ -104,8 +113,8 @@ with
 function UnitarySmoothPulseProblem end
 
 function UnitarySmoothPulseProblem(
-    system::QuantumSystem,
-    U_goal::AbstractMatrix{<:Number},
+    system::AbstractQuantumSystem,
+    operator::Union{EmbeddedOperator, AbstractMatrix{<:Number}},
     T::Int,
     Δt::Float64;
     free_time=true,
@@ -124,8 +133,6 @@ function UnitarySmoothPulseProblem(
     R_da::Union{Float64, Vector{Float64}}=R,
     R_dda::Union{Float64, Vector{Float64}}=R,
     leakage_suppression=false,
-    leakage_indices=nothing,
-    system_levels=nothing,
     R_leakage=1e-1,
     max_iter::Int=1000,
     linear_solver::String="mumps",
@@ -133,17 +140,21 @@ function UnitarySmoothPulseProblem(
     constraints::Vector{<:AbstractConstraint}=AbstractConstraint[],
     timesteps_all_equal::Bool=true,
     verbose::Bool=false,
-    U_init::Union{AbstractMatrix{<:Number},Nothing}=nothing,
     integrator=Integrators.fourth_order_pade,
     geodesic=true,
     pade_order=4,
     autodiff=pade_order != 4,
-    subspace=nothing,
     jacobian_structure=true,
     hessian_approximation=false,
     blas_multithreading=true,
 )
-    U_goal = Matrix{ComplexF64}(U_goal)
+    if operator isa EmbeddedOperator
+        U_goal = operator.operator
+        U_init = subspace_identity(operator)
+    else
+        U_goal = Matrix{ComplexF64}(operator)
+        U_init = Matrix{ComplexF64}(I(size(U_goal, 1)))
+    end
 
     if !blas_multithreading
         BLAS.set_num_threads(1)
@@ -153,11 +164,6 @@ function UnitarySmoothPulseProblem(
         ipopt_options.hessian_approximation = "limited-memory"
     end
 
-    if isnothing(U_init)
-        Ũ⃗_init = operator_to_iso_vec(1.0I(size(U_goal, 1)))
-    else
-        Ũ⃗_init = operator_to_iso_vec(U_init)
-    end
 
     n_drives = length(system.G_drives)
 
@@ -169,19 +175,30 @@ function UnitarySmoothPulseProblem(
         end
 
         if isnothing(a_guess)
-            geodesic_success = true
             if geodesic
-                try
-                    Ũ⃗ = unitary_geodesic(U_goal, T)
-                catch e
-                    @warn "Could not find geodesic. Using random initial guess."
-                    geodesic_success = false
+                if operator isa EmbeddedOperator
+
+                    Ũ⃗ = unitary_geodesic(operator, T)
+                    try
+                        Ũ⃗ = unitary_geodesic(operator, T)
+                    catch e
+                        throw(e)
+                        println("WARNING: Could not find geodesic for subspace operator. Using linear interpolation.")
+                        Ũ⃗ = unitary_linear_interpolation(U_init, U_goal, T)
+                    end
+                else
+                    try
+                        Ũ⃗ = unitary_geodesic(U_goal, T)
+                    catch e
+                        println("WARNING: Could not find geodesic. Using linear interpolation.")
+                        # TODO: use embedded operator for subspace geodesic
+                        Ũ⃗ = unitary_linear_interpolation(U_init, U_goal, T)
+                    end
                 end
             end
-            if !geodesic || !geodesic_success
-                Ũ⃗ = 2 * rand(length(Ũ⃗_init), T) .- 1
-            end
+
             a_dists =  [Uniform(-a_bounds[i], a_bounds[i]) for i = 1:n_drives]
+
             a = hcat([
                 zeros(n_drives),
                 vcat([rand(a_dists[i], 1, T - 2) for i = 1:n_drives]...),
@@ -197,14 +214,8 @@ function UnitarySmoothPulseProblem(
             dda = derivative(da, Δt)
         end
 
-        if isnothing(U_init)
-            Ũ⃗_init = operator_to_iso_vec(1.0I(size(U_goal, 1)))
-        else
-            Ũ⃗_init = operator_to_iso_vec(U_init)
-        end
-
         initial = (
-            Ũ⃗ = Ũ⃗_init,
+            Ũ⃗ = operator_to_iso_vec(U_init),
             a = zeros(n_drives),
         )
 
@@ -265,19 +276,27 @@ function UnitarySmoothPulseProblem(
         end
     end
 
-    J = UnitaryInfidelityObjective(:Ũ⃗, traj, Q; subspace=subspace)
+    J = UnitaryInfidelityObjective(:Ũ⃗, traj, Q;
+        subspace=operator isa EmbeddedOperator ? operator.subspace_indices : nothing,
+    )
     J += QuadraticRegularizer(:a, traj, R_a)
     J += QuadraticRegularizer(:da, traj, R_da)
     J += QuadraticRegularizer(:dda, traj, R_dda)
 
     if leakage_suppression
-        if isnothing(leakage_indices)
-            @assert !isnothing(system_levels) "if leakage_indices is not nothing, system_levels must be provided"
-            leakage_indices = unitary_isomorphism_leakage_indices(system_levels)
+        if operator isa EmbeddedOperator
+            leakage_indices = get_unitary_isomorphism_leakage_indices(operator)
+            J_leakage, slack_con = L1Regularizer(
+                :Ũ⃗,
+                traj;
+                R_value=R_leakage,
+                indices=leakage_indices
+            )
+            push!(constraints, slack_con)
+            J += J_leakage
+        else
+            @warn "leakage_suppression is not supported for non-embedded operators, ignoring."
         end
-        J_leakage, slack_con = L1Regularizer(:Ũ⃗, traj; R_value=R_leakage, indices=leakage_indices)
-        push!(constraints, slack_con)
-        J += J_leakage
     end
 
     integrators = [
@@ -320,7 +339,7 @@ end
 
 function UnitaryMinimumTimeProblem(
     trajectory::NamedTrajectory,
-    system::QuantumSystem,
+    system::AbstractQuantumSystem,
     objective::Objective,
     integrators::Vector{<:AbstractIntegrator},
     constraints::Vector{<:AbstractConstraint};

@@ -75,7 +75,7 @@ end
 const Id2 = 1.0 * I(2)
 const Im2 = 1.0 * [0 -1; 1 0]
 
-anticomm(A::Matrix{R}, B::Matrix{R}) where R <: Number = A * B + B * A
+anticomm(A::AbstractMatrix{R}, B::AbstractMatrix{R}) where R <: Number = A * B + B * A
 
 function anticomm(
     A::AbstractMatrix{R},
@@ -148,8 +148,8 @@ end
 end
 
 function build_anticomms(
-    G_drift::Matrix{R},
-    G_drives::Vector{Matrix{R}},
+    G_drift::AbstractMatrix{R},
+    G_drives::Vector{<:AbstractMatrix{R}},
     n_drives::Int) where R <: Number
 
     drive_anticomms = fill(
@@ -276,12 +276,12 @@ const PADE_COEFFICIENTS = Dict{Int,Vector{Float64}}(
 
 """
 """
-struct UnitaryPadeIntegrator{R <: Number} <: QuantumPadeIntegrator
-    I_2N::SparseMatrixCSC{R, Int}
-    G_drift::Matrix{R}
-    G_drives::Vector{Matrix{R}}
+struct UnitaryPadeIntegrator <: QuantumPadeIntegrator
+    I_2N::SparseMatrixCSC{Float64, Int}
+    G_drift::Matrix{Float64}
+    G_drives::Vector{Matrix{Float64}}
     G_drive_anticomms::Union{Nothing, Symmetric}
-    G_drift_anticomms::Union{Nothing, Vector{Matrix{R}}}
+    G_drift_anticomms::Union{Nothing, Vector{Matrix{Float64}}}
     unitary_symb::Union{Symbol, Nothing}
     drive_symb::Union{Symbol, Tuple{Vararg{Symbol}}, Nothing}
     n_drives::Int
@@ -293,7 +293,7 @@ struct UnitaryPadeIntegrator{R <: Number} <: QuantumPadeIntegrator
 
     """
         UnitaryPadeIntegrator(
-            sys::QuantumSystem{R},
+            sys::AbstractQuantumSystem,
             unitary_symb::Symbol,
             drive_symb::Union{Symbol,Tuple{Vararg{Symbol}}};
             order::Int=4,
@@ -320,7 +320,7 @@ struct UnitaryPadeIntegrator{R <: Number} <: QuantumPadeIntegrator
     ```
 
     # Arguments
-    - `sys::QuantumSystem{R}`: the quantum system
+    - `sys::AbstractQuantumSystem`: the quantum system
     - `unitary_symb::Union{Symbol,Nothing}=nothing`: the symbol for the unitary
     - `drive_symb::Union{Symbol,Tuple{Vararg{Symbol}},Nothing}=nothing`: the symbol(s) for the drives
     - `order::Int=4`: the order of the Pade approximation. Must be in `[4, 6, 8, 10]`. If order is not `4` and `autodiff` is `false`, then the integrator will use the hand-coded fourth order derivatives.
@@ -328,19 +328,19 @@ struct UnitaryPadeIntegrator{R <: Number} <: QuantumPadeIntegrator
 
     """
     function UnitaryPadeIntegrator(
-        sys::QuantumSystem{R},
+        sys::AbstractQuantumSystem,
         unitary_symb::Union{Symbol,Nothing}=nothing,
         drive_symb::Union{Symbol,Tuple{Vararg{Symbol}},Nothing}=nothing;
         order::Int=4,
         autodiff::Bool=false,
         G::Union{Function, Nothing}=nothing,
-    ) where R <: Real
+    )
         @assert order ∈ [4, 6, 8, 10] "order must be in [4, 6, 8, 10]"
         @assert !isnothing(unitary_symb) "must specify unitary symbol"
         @assert !isnothing(drive_symb) "must specify drive symbol"
 
-        n_drives = length(sys.H_drives_real)
-        N = size(sys.H_drift_real, 1)
+        n_drives = length(sys.H_drives)
+        N = size(sys.H_drift, 1)
         dim = 2N^2
 
         I_2N = sparse(I(2N))
@@ -351,7 +351,7 @@ struct UnitaryPadeIntegrator{R <: Number} <: QuantumPadeIntegrator
         drive_anticomms, drift_anticomms =
             order == 4 ? build_anticomms(G_drift, G_drives, n_drives) : (nothing, nothing)
 
-        return new{R}(
+        return new(
             I_2N,
             G_drift,
             G_drives,
@@ -372,12 +372,12 @@ end
 state(P::UnitaryPadeIntegrator) = P.unitary_symb
 controls(P::UnitaryPadeIntegrator) = P.drive_symb
 
-struct QuantumStatePadeIntegrator{R <: Number} <: QuantumPadeIntegrator
-    I_2N::SparseMatrixCSC{R, Int}
-    G_drift::Matrix{R}
-    G_drives::Vector{Matrix{R}}
+struct QuantumStatePadeIntegrator <: QuantumPadeIntegrator
+    I_2N::SparseMatrixCSC{Float64, Int}
+    G_drift::Matrix{Float64}
+    G_drives::Vector{Matrix{Float64}}
     G_drive_anticomms::Union{Symmetric, Nothing}
-    G_drift_anticomms::Union{Vector{Matrix{R}}, Nothing}
+    G_drift_anticomms::Union{Vector{Matrix{Float64}}, Nothing}
     state_symb::Union{Symbol,Nothing}
     drive_symb::Union{Symbol,Tuple{Vararg{Symbol}},Nothing}
     n_drives::Int
@@ -389,7 +389,7 @@ struct QuantumStatePadeIntegrator{R <: Number} <: QuantumPadeIntegrator
 
     """
         QuantumStatePadeIntegrator(
-            sys::QuantumSystem{R},
+            sys::AbstractQuantumSystem,
             state_symb::Union{Symbol,Nothing}=nothing,
             drive_symb::Union{Symbol,Tuple{Vararg{Symbol}},Nothing}=nothing,
             timestep_symb::Union{Symbol,Nothing}=nothing;
@@ -412,20 +412,20 @@ struct QuantumStatePadeIntegrator{R <: Number} <: QuantumPadeIntegrator
     ```
 
     # Arguments
-    - `sys::QuantumSystem{R}`: the quantum system
+    - `sys::AbstractQuantumSystem`: the quantum system
     - `state_symb::Symbol`: the symbol for the quantum state
     - `drive_symb::Union{Symbol,Tuple{Vararg{Symbol}}}`: the symbol(s) for the drives
     - `order::Int=4`: the order of the Pade approximation. Must be in `[4, 6, 8, 10]`. If order is not `4` and `autodiff` is `false`, then the integrator will use the hand-coded fourth order derivatives.
     - `autodiff::Bool=false`: whether to use automatic differentiation to compute the jacobian and hessian of the lagrangian
     """
     function QuantumStatePadeIntegrator(
-        sys::QuantumSystem{R},
+        sys::AbstractQuantumSystem,
         state_symb::Union{Symbol,Nothing}=nothing,
         drive_symb::Union{Symbol,Tuple{Vararg{Symbol}},Nothing}=nothing;
         order::Int=4,
         autodiff::Bool=order != 4,
         G::Union{Function, Nothing}=nothing,
-    ) where R <: Real
+    )
         @assert order ∈ [4, 6, 8, 10] "order must be in [4, 6, 8, 10]"
         @assert !isnothing(state_symb) "state_symb must be specified"
         @assert !isnothing(drive_symb) "drive_symb must be specified"
@@ -440,7 +440,7 @@ struct QuantumStatePadeIntegrator{R <: Number} <: QuantumPadeIntegrator
         drive_anticomms, drift_anticomms =
             order == 4 ? build_anticomms(G_drift, G_drives, n_drives) : (nothing, nothing)
 
-        return new{R}(
+        return new(
             I_2N,
             G_drift,
             G_drives,
@@ -464,30 +464,36 @@ controls(P::QuantumStatePadeIntegrator) = P.drive_symb
 
 
 function nth_order_pade(
-    P::UnitaryPadeIntegrator{R},
+    P::UnitaryPadeIntegrator,
     Ũ⃗ₜ₊₁::AbstractVector,
     Ũ⃗ₜ::AbstractVector,
     aₜ::AbstractVector,
     Δt::Real
-) where R <: Real
+)
     Ũₜ₊₁ = iso_vec_to_iso_operator(Ũ⃗ₜ₊₁)
     Ũₜ = iso_vec_to_iso_operator(Ũ⃗ₜ)
     Gₜ = isnothing(P.G) ? G(aₜ, P.G_drift, P.G_drives) : P.G(aₜ, P.G_drift, P.G_drives)
     n = P.order ÷ 2
     Gₜ_powers = compute_powers(Gₜ, n)
-    B = P.I_2N + sum([(-1)^k * PADE_COEFFICIENTS[P.order][k] * Δt^k * Gₜ_powers[k] for k = 1:n])
-    F = P.I_2N + sum([PADE_COEFFICIENTS[P.order][k] * Δt^k * Gₜ_powers[k] for k = 1:n])
+    B = P.I_2N + sum([
+        (-1)^k * PADE_COEFFICIENTS[P.order][k] * Δt^k * Gₜ_powers[k]
+            for k = 1:n
+    ])
+    F = P.I_2N + sum([
+        PADE_COEFFICIENTS[P.order][k] * Δt^k * Gₜ_powers[k]
+            for k = 1:n
+    ])
     δŨ = B * Ũₜ₊₁ - F * Ũₜ
     return iso_operator_to_iso_vec(δŨ)
 end
 
 
 
-@views function(P::UnitaryPadeIntegrator{R})(
+@views function(P::UnitaryPadeIntegrator)(
     zₜ::AbstractVector,
     zₜ₊₁::AbstractVector,
     traj::NamedTrajectory
-) where R <: Real
+)
     Ũ⃗ₜ₊₁ = zₜ₊₁[traj.components[P.unitary_symb]]
     Ũ⃗ₜ = zₜ[traj.components[P.unitary_symb]]
     if traj.timestep isa Symbol
@@ -506,27 +512,33 @@ end
 
 
 function nth_order_pade(
-    P::QuantumStatePadeIntegrator{R},
+    P::QuantumStatePadeIntegrator,
     ψ̃ₜ₊₁::AbstractVector,
     ψ̃ₜ::AbstractVector,
     aₜ::AbstractVector,
     Δt::Real
-) where R <: Real
+)
     Gₜ = isnothing(P.G) ? G(aₜ, P.G_drift, P.G_drives) : P.G(aₜ, P.G_drift, P.G_drives)
     n = P.order ÷ 2
     Gₜ_powers = compute_powers(Gₜ, n)
-    B = P.I_2N + sum([(-1)^k * PADE_COEFFICIENTS[P.order][k] * Δt^k * Gₜ_powers[k] for k = 1:n])
-    F = P.I_2N + sum([PADE_COEFFICIENTS[P.order][k] * Δt^k * Gₜ_powers[k] for k = 1:n])
+    B = P.I_2N + sum([
+        (-1)^k * PADE_COEFFICIENTS[P.order][k] * Δt^k * Gₜ_powers[k]
+            for k = 1:n
+    ])
+    F = P.I_2N + sum([
+        PADE_COEFFICIENTS[P.order][k] * Δt^k * Gₜ_powers[k]
+            for k = 1:n
+    ])
     δψ̃ = B * ψ̃ₜ₊₁ - F * ψ̃ₜ
     return δψ̃
 end
 
 
-@views function(P::QuantumStatePadeIntegrator{R})(
+@views function(P::QuantumStatePadeIntegrator)(
     zₜ::AbstractVector,
     zₜ₊₁::AbstractVector,
     traj::NamedTrajectory
-) where R <: Real
+)
     ψ̃ₜ₊₁ = zₜ₊₁[traj.components[P.state_symb]]
     ψ̃ₜ = zₜ[traj.components[P.state_symb]]
     if P.drive_symb isa Tuple
@@ -544,12 +556,12 @@ end
 
 # aₜ should be a vector with all the controls. concatenate all the named traj controls
 function ∂aₜ(
-    P::UnitaryPadeIntegrator{R},
+    P::UnitaryPadeIntegrator,
     Ũ⃗ₜ₊₁::AbstractVector{T},
     Ũ⃗ₜ::AbstractVector{T},
     aₜ::AbstractVector{T},
     Δtₜ::Real,
-) where {R <: Real, T <: Real}
+) where T <: Real
 
     if P.autodiff || !isnothing(P.G)
 
@@ -586,12 +598,12 @@ end
 
 
 function ∂aₜ(
-    P::QuantumStatePadeIntegrator{R},
+    P::QuantumStatePadeIntegrator,
     ψ̃ₜ₊₁::AbstractVector{T},
     ψ̃ₜ::AbstractVector{T},
     aₜ::AbstractVector{T},
     Δtₜ::Real,
-) where {R <: Real, T <: Real}
+) where T <: Real
     if P.autodiff || !isnothing(P.G)
 
         # then we need to use the nth_order_pade function
@@ -605,7 +617,7 @@ function ∂aₜ(
 
     elseif P.order == 4
         n_drives = length(aₜ)
-        ∂aP = Array{T}(undef, P.dim, n_drives)
+        ∂aP = zeros(P.dim, n_drives)
         for j = 1:n_drives
             Gʲ = P.G_drives[j]
             Gʲ_anticomm_Gₜ =
@@ -624,12 +636,12 @@ end
 
 
 function ∂Δtₜ(
-    P::UnitaryPadeIntegrator{R},
+    P::UnitaryPadeIntegrator,
     Ũ⃗ₜ₊₁::AbstractVector,
     Ũ⃗ₜ::AbstractVector,
     aₜ::AbstractVector,
     Δtₜ::Real
-) where R <: Real
+)
 
     Gₜ = isnothing(P.G) ? G(aₜ, P.G_drift, P.G_drives) : P.G(aₜ)
     Ũₜ₊₁ = iso_vec_to_iso_operator(Ũ⃗ₜ₊₁)
@@ -640,9 +652,15 @@ function ∂Δtₜ(
     else
         n = P.order ÷ 2
         Gₜ_powers = compute_powers(Gₜ, n)
-        B = sum([(-1)^k * k * PADE_COEFFICIENTS[P.order][k] * Δtₜ^(k-1) * Gₜ_powers[k] for k = 1:n])
-        F = sum([k * PADE_COEFFICIENTS[P.order][k] * Δtₜ^(k-1) * Gₜ_powers[k] for k = 1:n])
-        ∂ΔtₜP_operator = B*Ũₜ₊₁ - F*Ũₜ
+        B = sum([
+            (-1)^k * k * PADE_COEFFICIENTS[P.order][k] * Δtₜ^(k-1) * Gₜ_powers[k]
+                for k = 1:n
+        ])
+        F = sum([
+            k * PADE_COEFFICIENTS[P.order][k] * Δtₜ^(k-1) * Gₜ_powers[k]
+                for k = 1:n
+        ])
+        ∂ΔtₜP_operator = B * Ũₜ₊₁ - F * Ũₜ
         ∂ΔtₜP = iso_operator_to_iso_vec(∂ΔtₜP_operator)
     end
 
@@ -650,12 +668,12 @@ function ∂Δtₜ(
 end
 
 function ∂Δtₜ(
-    P::QuantumStatePadeIntegrator{R},
+    P::QuantumStatePadeIntegrator,
     ψ̃ₜ₊₁::AbstractVector,
     ψ̃ₜ::AbstractVector,
     aₜ::AbstractVector,
     Δtₜ::Real
-) where R <: Real
+)
 
     Gₜ = isnothing(P.G) ? G(aₜ, P.G_drift, P.G_drives) : P.G(aₜ)
     if P.order==4

@@ -47,6 +47,30 @@ See the example script [examples/scripts/single_qubit_gate.jl](examples/scripts/
 
 ![Single Qubit X-Gate](images/T_100_Q_1000_iter_1000_00004_fidelity_0.9999999999994745.png)
 
+## Development Guidelines
+
+### Documentation
+
+Documentation is built using [Documenter.jl](https://github.com/JuliaDocs/Documenter.jl) and uses [Literate.jl](https://github.com/fredrikekre/Literate.jl) to generate markdown files from scripts stored in [docs/literate](docs/literate). To build the documentation locally, start julia with the docs environment:
+
+```bash
+julia --project=docs
+```
+
+Then (for ease of development) load the following packages:
+
+```julia
+using Revise, LiveServer, QuantumCollocation
+```
+
+To live-serve the docs, run
+```julia
+servedocs(literate_dir="docs/literate", skip_dir="docs/src/generated")
+```
+
+Changes made to files in the docs directory should be automatically reflected in the live server. To reflect changes in the source code (e.g. doc strings), since we are using Revise, simply kill the live server running in the REPL (with, e.g., Ctrl-C) and restart it with the above command. 
+
+
 ## Repo Structure
 
 Uses GitHub Next's [repo-visualization](https://githubnext.com/projects/repo-visualization/) tool to see repo structure.

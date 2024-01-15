@@ -38,7 +38,7 @@ after the solver terminates.
 mutable struct QuantumControlProblem <: AbstractProblem
     optimizer::Ipopt.Optimizer
     variables::Matrix{MOI.VariableIndex}
-    system::QuantumSystem
+    system::AbstractQuantumSystem
     trajectory::NamedTrajectory
     integrators::Union{Nothing,Vector{<:AbstractIntegrator}}
     options::Options
@@ -46,7 +46,7 @@ mutable struct QuantumControlProblem <: AbstractProblem
 end
 
 function QuantumControlProblem(
-    system::QuantumSystem,
+    system::AbstractQuantumSystem,
     traj::NamedTrajectory,
     obj::Objective,
     dynamics::QuantumDynamics;
@@ -119,7 +119,7 @@ function QuantumControlProblem(
 end
 
 function QuantumControlProblem(
-    system::QuantumSystem,
+    system::AbstractQuantumSystem,
     traj::NamedTrajectory,
     obj::Objective,
     integrators::Vector{<:AbstractIntegrator};
@@ -152,7 +152,7 @@ end
 
 # constructor that accepts just an AbstractIntegrator
 function QuantumControlProblem(
-    system::QuantumSystem,
+    system::AbstractQuantumSystem,
     traj::NamedTrajectory,
     obj::Objective,
     integrator::AbstractIntegrator;
@@ -184,7 +184,7 @@ function QuantumControlProblem(
 end
 
 function QuantumControlProblem(
-    system::QuantumSystem,
+    system::AbstractQuantumSystem,
     traj::NamedTrajectory,
     obj::Objective,
     f::Function;
