@@ -33,38 +33,41 @@ function is_linearly_dependent(M::AbstractMatrix; eps=eps(Float32))
 end
 
 function operator_algebra(
-    generators::Vector{<:AbstractMatrix}; return_layers=false
+    gens::Vector{<:AbstractMatrix}; return_layers=false, normalize=false
 )
     """
-    operator_algebra(generators; return_layers=false)
+    operator_algebra(generators; return_layers=false, normalize=false)
 
         Compute the Lie algebra basis for the given generators.
         If return_layers is true, the Lie tree layers are also returned.
     """
-    basis = copy(generators)
-    current_layer = copy(generators)
+    basis = normalize ? [g / norm(g) for g ∈ gens] : copy(gens)
+    current_layer = copy(basis)
     if return_layers
-        all_layers = Vector{Matrix{ComplexF64}}[copy(generators)]
+        all_layers = Vector{Matrix{ComplexF64}}[copy(gens)]
     end
 
-    if is_linearly_dependent(stack(vec.(basis)))
+    ℓ = 1
+    println("ℓ = $ℓ")
+    if is_linearly_dependent(basis)
         println("Linearly dependent generators.")
     else
         # Note: Use left normalized commutators
         # Note: Jacobi identity is not checked
-        ℓ = 1
-        while length(basis) < size(first(generators), 1)^2 - 1
-            println("ℓ = $ℓ")
+        while length(basis) < size(first(gens), 1)^2 - 1
             layer = Matrix{ComplexF64}[]
             # Repeat commutators until no new operators are found.
             for op ∈ current_layer
-                for gen ∈ generators
+                for gen ∈ gens
                     test = commutator(gen, op)
-                    if all(test .≈ 0) || is_linearly_dependent(basis, test)
+                    if all(test .≈ 0)
+                        continue
+                    # Current basis is assumed to be linearly independent
+                    elseif is_linearly_dependent([basis..., test])
                         continue
                     else
-                        # Store as Hermitian operator
-                        test = is_hermitian(test) ? test : im * test
+                        test .= is_hermitian(test) ? test : im * test
+                        test .= normalize ? test / norm(test) : test
                         push!(layer, test)
                         push!(basis, test)
                     end
@@ -77,6 +80,7 @@ function operator_algebra(
             else
                 current_layer = layer
                 ℓ += 1
+                println("ℓ = $ℓ")
             end
 
             if return_layers
