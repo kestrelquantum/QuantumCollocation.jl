@@ -5,9 +5,6 @@ export QuantumSystem
 export CompositeQuantumSystem
 export QuantumSystemCoupling
 
-export embed
-
-
 export iso
 
 using ..QuantumUtils

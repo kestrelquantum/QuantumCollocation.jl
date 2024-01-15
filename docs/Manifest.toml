@@ -2,7 +2,7 @@
 
 julia_version = "1.10.0"
 manifest_format = "2.0"
-project_hash = "16ca5e82db63a4cabeee6962b2b2c4bd49bd5a3d"
+project_hash = "b78876d5513be610a9ebc417a8b7bdef190cad62"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "41c37aa88889c171f1300ceac1313c06e891d245"
@@ -83,6 +83,18 @@ version = "0.4.1"
 [[deps.ArgTools]]
 uuid = "0dad84c5-d112-42e6-8d28-ef12dabb789f"
 version = "1.1.1"
+
+[[deps.Arpack]]
+deps = ["Arpack_jll", "Libdl", "LinearAlgebra", "Logging"]
+git-tree-sha1 = "9b9b347613394885fd1c8c7729bfc60528faa436"
+uuid = "7d9fca2a-8960-54d3-9f78-7d1dccf2cb97"
+version = "0.5.4"
+
+[[deps.Arpack_jll]]
+deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "Libdl", "OpenBLAS_jll", "Pkg"]
+git-tree-sha1 = "5ba6c757e8feccf03a1554dfaf3e26b3cfc7fd5e"
+uuid = "68821587-b530-5797-8361-c406ea357684"
+version = "3.5.1+1"
 
 [[deps.Arpack]]
 deps = ["Arpack_jll", "Libdl", "LinearAlgebra", "Logging"]
@@ -312,6 +324,12 @@ git-tree-sha1 = "9c4708e3ed2b799e6124b5673a712dda0b596a9b"
 uuid = "f0e56b4a-5159-44fe-b623-3e5288b988bb"
 version = "2.3.1"
 
+[[deps.ConcurrentUtilities]]
+deps = ["Serialization", "Sockets"]
+git-tree-sha1 = "8cfa272e8bdedfa88b6aefbbca7c19f1befac519"
+uuid = "f0e56b4a-5159-44fe-b623-3e5288b988bb"
+version = "2.3.0"
+
 [[deps.Conda]]
 deps = ["Downloads", "JSON", "VersionParsing"]
 git-tree-sha1 = "51cab8e982c5b598eea9c8ceaced4b58d9dd37c9"
@@ -449,6 +467,12 @@ deps = ["IntervalArithmetic", "Random", "StaticArrays"]
 git-tree-sha1 = "b3f2ff58735b5f024c392fde763f29b057e4b025"
 uuid = "429591f6-91af-11e9-00e2-59fbe8cec110"
 version = "2.2.8"
+
+[[deps.ExceptionUnwrapping]]
+deps = ["Test"]
+git-tree-sha1 = "dcb08a0d93ec0b1cdc4af184b26b591e9695423a"
+uuid = "460bff9d-24e4-43bc-9d9f-a8973cb893f4"
+version = "0.1.10"
 
 [[deps.ExceptionUnwrapping]]
 deps = ["Test"]
@@ -697,9 +721,9 @@ version = "1.14.2+1"
 
 [[deps.HTTP]]
 deps = ["Base64", "CodecZlib", "ConcurrentUtilities", "Dates", "ExceptionUnwrapping", "Logging", "LoggingExtras", "MbedTLS", "NetworkOptions", "OpenSSL", "Random", "SimpleBufferStream", "Sockets", "URIs", "UUIDs"]
-git-tree-sha1 = "ac7b73d562b8f4287c3b67b4c66a5395a19c1ae8"
+git-tree-sha1 = "abbbb9ec3afd783a7cbd82ef01dcd088ea051398"
 uuid = "cd3eb016-35fb-5094-929b-558a96fad6f3"
-version = "1.10.2"
+version = "1.10.1"
 
 [[deps.HarfBuzz_jll]]
 deps = ["Artifacts", "Cairo_jll", "Fontconfig_jll", "FreeType2_jll", "Glib_jll", "Graphite2_jll", "JLLWrappers", "Libdl", "Libffi_jll", "Pkg"]
@@ -1071,6 +1095,12 @@ git-tree-sha1 = "24d05efe53436b22a42bf2ae459f47c48b0c2603"
 uuid = "16fef848-5104-11e9-1b77-fb7a48bbb589"
 version = "1.2.7"
 
+[[deps.LiveServer]]
+deps = ["HTTP", "LoggingExtras", "MIMEs", "Pkg", "Sockets", "Test"]
+git-tree-sha1 = "24d05efe53436b22a42bf2ae459f47c48b0c2603"
+uuid = "16fef848-5104-11e9-1b77-fb7a48bbb589"
+version = "1.2.7"
+
 [[deps.LogExpFunctions]]
 deps = ["DocStringExtensions", "IrrationalConstants", "LinearAlgebra"]
 git-tree-sha1 = "18144f3e9cbe9b15b070288eef858f71b291ce37"
@@ -1336,6 +1366,12 @@ git-tree-sha1 = "51901a49222b09e3743c65b8847687ae5fc78eb2"
 uuid = "4d8831e6-92b7-49fb-bdf8-b643e874388c"
 version = "1.4.1"
 
+[[deps.OpenSSL]]
+deps = ["BitFlags", "Dates", "MozillaCACerts_jll", "OpenSSL_jll", "Sockets"]
+git-tree-sha1 = "51901a49222b09e3743c65b8847687ae5fc78eb2"
+uuid = "4d8831e6-92b7-49fb-bdf8-b643e874388c"
+version = "1.4.1"
+
 [[deps.OpenSSL_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
 git-tree-sha1 = "60e3045590bd104a16fefb12836c00c0ef8c7f8c"
@@ -1534,7 +1570,7 @@ uuid = "1fd47b50-473d-5c70-9696-f719f8f3bcdc"
 version = "2.9.4"
 
 [[deps.QuantumCollocation]]
-deps = ["Arpack", "BenchmarkTools", "CairoMakie", "Colors", "Distributions", "Einsum", "ExponentialAction", "ForwardDiff", "HDF5", "IJulia", "Ipopt", "JLD2", "LaTeXStrings", "Libdl", "LinearAlgebra", "MathOptInterface", "NamedTrajectories", "OrderedCollections", "Random", "Reexport", "Revise", "SparseArrays", "Symbolics", "TrajectoryIndexingUtils"]
+deps = ["Arpack", "BenchmarkTools", "CairoMakie", "Colors", "Distributions", "Einsum", "ExponentialAction", "ForwardDiff", "HDF5", "IJulia", "Ipopt", "JLD2", "LaTeXStrings", "Libdl", "LinearAlgebra", "Manifolds", "MathOptInterface", "NamedTrajectories", "Random", "Reexport", "Revise", "SparseArrays", "Symbolics", "TrajectoryIndexingUtils"]
 path = ".."
 uuid = "0dc23a59-5ffb-49af-b6bd-932a8ae77adf"
 version = "0.1.5"
@@ -1978,6 +2014,11 @@ version = "1.4.0"
 git-tree-sha1 = "41d61b1c545b06279871ef1a4b5fcb2cac2191cd"
 uuid = "9d95972d-f1c8-5527-a6e0-b4b365fa01f6"
 version = "1.5.0"
+
+[[deps.URIs]]
+git-tree-sha1 = "67db6cc7b3821e19ebe75791a9dd19c9b1188f2b"
+uuid = "5c2747f8-b7ea-4ff2-ba2e-563bfd36b1d4"
+version = "1.5.1"
 
 [[deps.URIs]]
 git-tree-sha1 = "67db6cc7b3821e19ebe75791a9dd19c9b1188f2b"
