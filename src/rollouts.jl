@@ -211,6 +211,43 @@ function skew_symmetric_vec(M::AbstractMatrix)
     return v
 end
 
+function unitary_geodesic(
+    U_init::AbstractMatrix{<:Number},
+    U_goal::AbstractMatrix{<:Number},
+    samples::Int;
+    return_generator=false
+)
+    U_init = Matrix{ComplexF64}(U_init)
+    U_goal = Matrix{ComplexF64}(U_goal)
+    N = size(U_init, 1)
+    M = SpecialUnitary(N)
+    ts = range(0, 1, length=samples)
+    Us = shortest_geodesic(M, U_init, U_goal, ts)
+    X = Manifolds.log(M, U_init, U_goal)
+    G = iso(X)
+    Ũ⃗s = [operator_to_iso_vec(U) for U ∈ Us]
+    Ũ⃗ = hcat(Ũ⃗s...)
+    G̃⃗ = hcat([skew_symmetric_vec(G) for t = 1:samples]...)
+    if return_generator
+        return Ũ⃗, G̃⃗
+    else
+        return Ũ⃗
+    end
+end
+
+function unitary_geodesic(
+    operator::EmbeddedOperator,
+    samples::Int
+)
+    U_goal = unembed(operator)
+    U_init = Matrix{ComplexF64}(I(size(U_goal, 1)))
+    Ũ⃗ = unitary_geodesic(U_init, U_goal, samples)
+    return hcat([
+        operator_to_iso_vec(EmbeddedOperators.embed(iso_vec_to_operator(Ũ⃗ₜ), operator))
+            for Ũ⃗ₜ ∈ eachcol(Ũ⃗)
+    ]...)
+end
+
 function unitary_geodesic(U_goal, samples; kwargs...)
     N = size(U_goal, 1)
     U₀ = Matrix{ComplexF64}(I(N))
