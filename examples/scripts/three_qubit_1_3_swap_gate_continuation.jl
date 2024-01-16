@@ -2,7 +2,6 @@ using QuantumCollocation
 using NamedTrajectories
 using LinearAlgebra
 using Distributions
-using Manifolds
 
 max_iter = 200
 linear_solver = "pardiso"
