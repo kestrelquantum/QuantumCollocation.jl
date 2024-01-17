@@ -458,10 +458,8 @@ struct QuantumStatePadeIntegrator <: QuantumPadeIntegrator
     end
 end
 
-
 state(P::QuantumStatePadeIntegrator) = P.state_symb
 controls(P::QuantumStatePadeIntegrator) = P.drive_symb
-
 
 function nth_order_pade(
     P::UnitaryPadeIntegrator,
@@ -486,8 +484,6 @@ function nth_order_pade(
     δŨ = B * Ũₜ₊₁ - F * Ũₜ
     return iso_operator_to_iso_vec(δŨ)
 end
-
-
 
 @views function(P::UnitaryPadeIntegrator)(
     zₜ::AbstractVector,
