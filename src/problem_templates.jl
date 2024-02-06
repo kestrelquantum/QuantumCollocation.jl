@@ -11,6 +11,7 @@ using ..QuantumSystems
 using ..QuantumUtils
 using ..EmbeddedOperators
 using ..Rollouts
+using ..UnitaryGeodesics
 using ..Objectives
 using ..Constraints
 using ..Integrators
@@ -39,8 +40,8 @@ end
 # -------------------------------------------
 
 @doc raw"""
-    UnitarySmoothPulseProblem(H_drift, H_drives, U_goal, T, Δt; kwargs...)
-    UnitarySmoothPulseProblem(system::QuantumSystem, U_goal, T, Δt; kwargs...)
+    UnitarySmoothPulseProblem(H_drift, H_drives, operator, T, Δt; kwargs...)
+    UnitarySmoothPulseProblem(system::QuantumSystem, operator, T, Δt; kwargs...)
 
 Construct a `QuantumControlProblem` for a free-time unitary gate problem with smooth control pulses enforced by constraining the second derivative of the pulse trajectory, i.e.,
 
@@ -73,7 +74,7 @@ is the *infidelity* objective function, $Q$ is a weight, $R_a$, $R_{\dot{a}}$, a
 or
 - `system::QuantumSystem`: the system to be controlled
 with
-- `U_goal::AbstractMatrix{<:Number}`: the target unitary
+- `operator::Union{EmbeddedOperator, AbstractMatrix{<:Number}}`: the target unitary, either in the form of an `EmbeddedOperator` or a `Matrix{ComplexF64}
 - `T::Int`: the number of timesteps
 - `Δt::Float64`: the (initial) time step size
 
@@ -150,7 +151,7 @@ function UnitarySmoothPulseProblem(
 )
     if operator isa EmbeddedOperator
         U_goal = operator.operator
-        U_init = subspace_identity(operator)
+        U_init = get_subspace_identity(operator)
     else
         U_goal = Matrix{ComplexF64}(operator)
         U_init = Matrix{ComplexF64}(I(size(U_goal, 1)))
@@ -208,7 +209,13 @@ function UnitarySmoothPulseProblem(
             da = randn(n_drives, T) * drive_derivative_σ
             dda = randn(n_drives, T) * drive_derivative_σ
         else
-            Ũ⃗ = unitary_rollout(Ũ⃗_init, a_guess, Δt, system; integrator=integrator)
+            Ũ⃗ = unitary_rollout(
+                operator_to_iso_vec(U_init),
+                a_guess,
+                Δt,
+                system;
+                integrator=integrator
+            )
             a = a_guess
             da = derivative(a, Δt)
             dda = derivative(da, Δt)
@@ -344,7 +351,10 @@ function UnitaryMinimumTimeProblem(
     integrators::Vector{<:AbstractIntegrator},
     constraints::Vector{<:AbstractConstraint};
     unitary_symbol::Symbol=:Ũ⃗,
-    final_fidelity::Float64=unitary_fidelity(trajectory[end][unitary_symbol], trajectory.goal[unitary_symbol]),
+    final_fidelity::Float64=unitary_fidelity(
+        trajectory[end][unitary_symbol],
+        trajectory.goal[unitary_symbol]
+    ),
     D=1.0,
     verbose::Bool=false,
     ipopt_options::Options=Options(),

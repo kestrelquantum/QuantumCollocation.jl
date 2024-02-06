@@ -6,6 +6,8 @@ export TransmonDipoleCoupling
 using ..QuantumUtils
 using ..QuantumSystems
 
+using LinearAlgebra
+
 @doc raw"""
     TransmonSystem(;
         ω::Float64=4.4153,  # GHz
@@ -34,27 +36,45 @@ where `a` is the annihilation operator.
 """
 function TransmonSystem(;
     ω::Float64=4.0,  # GHz
-    δ::Float64=-0.2, # GHz
+    δ::Float64=0.2, # GHz
     levels::Int=3,
     lab_frame::Bool=false,
     frame_ω::Float64=lab_frame ? 0.0 : ω,
     mutiply_by_2π::Bool=true,
+    lab_frame_type::Symbol=:duffing,
 )
+
+    @assert lab_frame_type ∈ (:duffing, :quartic, :cosine) "lab_frame_type must be one of (:duffing, :quartic, :cosine)"
+
     if lab_frame
-        frame_ω = 0.0
+        if frame_ω ≉ 0.0
+            frame_ω = 0.0
+        end
     end
 
-    if !(frame_ω ≈ 0.0)
+    if frame_ω ≉ 0.0
         lab_frame = false
     end
 
     a = annihilate(levels)
 
     if lab_frame
-        # TODO: add functionality for hamiltonian with cosine
-        H_drift = ω * a' * a + δ / 12 * (a + a')^4
+        if lab_frame_type == :duffing
+            H_drift = ω * a' * a - δ / 2 * a' * a' * a * a
+        elseif lab_frame_type == :quartic
+            ω₀ = ω + δ
+            H_drift = ω₀ * a' * a - δ / 12 * (a + a')^4
+        elseif lab_frame_type == :cosine
+            ω₀ = ω + δ
+            E_C = δ
+            E_J = ω₀^2 / 8E_C
+            n̂ = im / 2 * (E_J / 2E_C)^(1/4) * (a - a')
+            φ̂ = (2E_C / E_J)^(1/4) * (a + a')
+            H_drift = 4 * E_C * n̂^2 - E_J * cos(φ̂)
+            # H_drift = 4 * E_C * n̂^2 - E_J * (I - φ̂^2 / 2 + φ̂^4 / 24)
+        end
     else
-        H_drift = (ω - frame_ω) * a' * a + δ / 2 * a' * a' * a * a
+        H_drift = (ω - frame_ω) * a' * a - δ / 2 * a' * a' * a * a
     end
 
     H_drives = [a + a', 1.0im * (a - a')]
@@ -71,6 +91,7 @@ function TransmonSystem(;
         :lab_frame => lab_frame,
         :frame_ω => frame_ω,
         :mutiply_by_2π => mutiply_by_2π,
+        :lab_frame_type => lab_frame_type,
     )
 
     return QuantumSystem(

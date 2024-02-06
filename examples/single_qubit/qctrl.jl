@@ -212,7 +212,7 @@ println("|1⟩ Exponential rollout fidelity:         ", fidelity(Ψ̃₂_exp[:, 
 
 
 println()
-println("duration: ", times(prob.trajectory)[end])
+println("duration: ", get_times(prob.trajectory)[end])
 
 # new plot name with fidelity included
 experiment *= "_fidelity_$(fid)"

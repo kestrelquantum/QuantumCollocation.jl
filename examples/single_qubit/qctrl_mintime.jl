@@ -28,7 +28,7 @@ plot(plot_path, prob.trajectory, [:Ũ⃗, :γ, :α]; ignored_labels=[:Ũ⃗])
 # calculating unitary fidelity
 fid = unitary_fidelity(prob.trajectory[end].Ũ⃗, prob.trajectory.goal.Ũ⃗)
 println("Final unitary fidelity: ", fid)
-println("Duration of trajectory: ", times(prob.trajectory)[end])
+println("Duration of trajectory: ", get_times(prob.trajectory)[end])
 println()
 
 drives = vcat(prob.trajectory.γ, prob.trajectory.α)
@@ -52,7 +52,7 @@ save_path = joinpath(@__DIR__, "results/mintime", experiment * ".jld2")
 # save the problem
 info = Dict(
     "exp fidelity" => fid_exp,
-    "duration" => times(prob.trajectory)[end],
+    "duration" => get_times(prob.trajectory)[end],
 )
 
 save_problem(save_path, prob, info)

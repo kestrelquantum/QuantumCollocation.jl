@@ -125,7 +125,7 @@ Ũ⃗_final = unitary_rollout(A, Δt, system; integrator=exp)[:, end]
 final_fidelity = unitary_fidelity(Ũ⃗_final, prob.trajectory.goal.Ũ⃗)
 println("Final fidelity: $final_fidelity")
 
-duration = times(prob.trajectory)[end]
+duration = get_times(prob.trajectory)[end]
 
 info = Dict(
     "final_fidelity" => final_fidelity,

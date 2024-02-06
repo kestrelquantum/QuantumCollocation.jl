@@ -397,18 +397,18 @@ struct QuantumStatePadeIntegrator <: QuantumPadeIntegrator
             autodiff::Bool=false
         ) where R <: Real
 
-    Construct a `QuantumstatePadeIntegrator` for the quantum system `sys`.
+    Construct a `QuantumStatePadeIntegrator` for the quantum system `sys`.
 
     # Examples
 
     ## for a single drive `a`:
     ```julia
-        P = QuantumstatePadeIntegrator(sys, :ψ̃, :a)
+        P = QuantumStatePadeIntegrator(sys, :ψ̃, :a)
     ```
 
     ## for two drives `α` and `γ`, order `8`, and autodiffed:
     ```julia
-        P = QuantumstatePadeIntegrator(sys, :ψ̃, (:α, :γ); order=8, autodiff=true)
+        P = QuantumStatePadeIntegrator(sys, :ψ̃, (:α, :γ); order=8, autodiff=true)
     ```
 
     # Arguments

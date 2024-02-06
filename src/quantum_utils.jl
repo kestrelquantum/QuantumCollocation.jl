@@ -47,7 +47,7 @@ using LinearAlgebra
     quantum gates
 """
 
-const GATES = Dict(
+const GATES = Dict{Symbol, Matrix{ComplexF64}}(
     :I => [1 0;
            0 1],
 
@@ -250,12 +250,11 @@ iso_to_ket(ψ̃) = ψ̃[1:div(length(ψ̃), 2)] + im * ψ̃[(div(length(ψ̃), 2
 function iso_vec_to_operator(Ũ⃗::AbstractVector{R}) where R <: Real
     Ũ⃗_dim = div(length(Ũ⃗), 2)
     N = Int(sqrt(Ũ⃗_dim))
-    isodim = 2N
     U = Matrix{Complex{R}}(undef, N, N)
     for i=0:N-1
         U[:, i+1] .=
-            @view(Ũ⃗[i*2N .+ (1:N)]) +
-            one(R) * im * @view(Ũ⃗[i*2N .+ (N+1:2N)])
+            @view(Ũ⃗[i * 2N .+ (1:N)]) +
+            one(R) * im * @view(Ũ⃗[i * 2N .+ (N+1:2N)])
     end
     return U
 end
@@ -337,6 +336,8 @@ function unitary_fidelity(
     return unitary_fidelity(U, U_goal; subspace=subspace)
 end
 
+# TODO: add unitary squared fidelity
+
 """
     quantum measurement functions
 """
@@ -356,75 +357,20 @@ function populations(ψ̃::AbstractVector{<:Real})
 end
 
 
-
 """
-    unitary subspace utilities
-"""
-
-"""
-    subspace_unitary(
-        levels::Vector{Int},
-        gate_name::Symbol,
-        qubit::Union{Int, Vector{Int}}
+    quantum_state(
+        ket::String,
+        levels::Vector{Int};
+        level_dict=Dict(:g => 0, :e => 1, :f => 2, :h => 2),
+        return_states=false
     )
 
-Get a unitary matrix for a gate acting on a subspace of a multilevel system.
+Construct a quantum state from a string ket representation.
 
-TODO: reimplement this as `embed_operator` with more methods.
+# Example
+
+# TODO: add example
 """
-function subspace_unitary(
-    levels::Vector{Int},
-    gate_name::Symbol,
-    qubit::Union{Int, Vector{Int}}
-)
-    if qubit isa Int
-        @assert length(string(gate_name)) == 1
-        @assert gate_name ∈ keys(GATES)
-        gate = zeros(ComplexF64, levels[qubit], levels[qubit])
-        gate[1:2, 1:2] = GATES[gate_name]
-    else
-        @assert length(qubit) == 2 "only 2-qubit gates are supported, for now"
-        @assert all(qubit .== qubit[1]:qubit[end]) "Qubits must be consecutive"
-        @assert length(string(gate_name)) == length(qubit)
-        @assert first(string(gate_name)) == 'C' "Only controlled gates are supported, for now"
-        @assert Symbol(last(string(gate_name))) ∈ keys(GATES)
-        @assert gate_name == :CX "Only CX gates are supported, for now"
-        g1 = cavity_state(0, levels[qubit[1]])
-        e1 = cavity_state(1, levels[qubit[1]])
-        g2 = cavity_state(0, levels[qubit[2]])
-        e2 = cavity_state(1, levels[qubit[2]])
-        gg = g1 ⊗ g2
-        ge = g1 ⊗ e2
-        eg = e1 ⊗ g2
-        ee = e1 ⊗ e2
-        gate = gg * gg' + ge * ge' + ee * eg' + eg * ee'
-    end
-
-    # fill with ones to handle kron of possibly only one element
-    U_init = [[1.0 + 0.0im;;]]
-    U_goal = [[1.0 + 0.0im;;]]
-    added_gate = false
-    for (i, level) ∈ enumerate(levels)
-        gᵢ = cavity_state(0, level)
-        eᵢ = cavity_state(1, level)
-        Idᵢ =  gᵢ * gᵢ' + eᵢ * eᵢ'
-        push!(U_init, Idᵢ)
-        if i ∈ qubit
-            if added_gate
-                continue
-            else
-                push!(U_goal, gate)
-                added_gate = true
-            end
-        else
-            push!(U_goal, Idᵢ)
-        end
-    end
-    U_init = kron(U_init...)
-    U_goal = kron(U_goal...)
-    return U_init, U_goal
-end
-
 function quantum_state(
     ket::String,
     levels::Vector{Int};

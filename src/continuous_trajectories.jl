@@ -67,9 +67,9 @@ end
 function plot(
     ct::ContinuousTrajectory,
     ts::AbstractVector{<:Real};
-    res=(800, 400),
+    fig_size=(800, 400),
 )
-    fig = Figure(resolution=res)
+    fig = Figure(size=fig_size)
     ax = Axis(fig[1, 1])
     A = ct(ts)
     series!(ax, ts, A)
@@ -79,9 +79,9 @@ end
 function plot(
     ct::ContinuousTrajectory,
     nsamples::Int;
-    res=(800, 400),
+    fig_size=(800, 400),
 )
-    fig = Figure(resolution=res)
+    fig = Figure(size=fig_size)
     ax = Axis(fig[1, 1])
     A, ts = ct(nsamples; return_times=true)
     series!(ax, ts, A)

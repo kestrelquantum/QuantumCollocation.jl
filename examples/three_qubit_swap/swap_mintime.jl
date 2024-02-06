@@ -24,10 +24,10 @@ plot(plot_path, prob.trajectory, [:Ũ⃗, :γ, :α]; ignored_labels=[:Ũ⃗])
 # calculating unitary fidelity
 fid = unitary_fidelity(prob)
 println("Final unitary fidelity: ", fid)
-println("Duration of trajectory: ", times(prob.trajectory)[end])
+println("Duration of trajectory: ", get_times(prob.trajectory)[end])
 println()
 
 info = Dict(
     "fidelity" => fid,
-    "duration" => times(prob.trajectory)[end],
+    "duration" => get_times(prob.trajectory)[end],
 )

@@ -44,7 +44,7 @@ info = Dict(
     "solver fidelity" => fid,
     "pade rollout fidelity" => pade_rollout_fidelity,
     "exp rollout fidelity" => exp_rollout_fidelity,
-    "pulse duration" => times(prob.trajectory)[end],
+    "pulse duration" => get_times(prob.trajectory)[end],
 )
 
 println("saving results...")

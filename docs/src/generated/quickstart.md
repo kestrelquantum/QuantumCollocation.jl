@@ -105,8 +105,8 @@ println("Final fidelity:    ", unitary_fidelity(prob_min_time))
 and that the duration of the pulse has decreased.
 
 ````@example quickstart
-initial_dur = times(prob.trajectory)[end]
-min_time_dur = times(prob_min_time.trajectory)[end]
+initial_dur = get_times(prob.trajectory)[end]
+min_time_dur = get_times(prob_min_time.trajectory)[end]
 
 println("Initial duration:  ", initial_dur)
 println("Minimum duration:  ", min_time_dur)

@@ -759,7 +759,7 @@ function InfidelityRobustnessObjective(
     end
     ivs = iso_vec_subspace(isnothing(subspace) ? collect(1:size(Hₑ, 1)) : subspace, Z)
 
-    @views function timesteps(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory)
+    @views function get_timesteps(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory)
         return map(1:Z.T) do t
             if Z.timestep isa Symbol
                 Z⃗[slice(t, Z.components[Z.timestep], Z.dim)][1]
@@ -771,7 +771,7 @@ function InfidelityRobustnessObjective(
 
     # Control frame
     @views function toggle(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory)
-        Δts = timesteps(Z⃗, Z)
+        Δts = get_timesteps(Z⃗, Z)
         T = sum(Δts)
         R = sum(
             map(1:Z.T) do t
@@ -790,7 +790,7 @@ function InfidelityRobustnessObjective(
     @views function ∇L(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory)
         ∇ = zeros(Z.dim * Z.T)
         R = toggle(Z⃗, Z)
-        Δts = timesteps(Z⃗, Z)
+        Δts = get_timesteps(Z⃗, Z)
         T = sum(Δts)
         Threads.@threads for t ∈ 1:Z.T
             # State gradients

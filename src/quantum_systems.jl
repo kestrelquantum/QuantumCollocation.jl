@@ -6,6 +6,8 @@ export CompositeQuantumSystem
 export QuantumSystemCoupling
 
 export embed
+export is_linearly_dependent
+export operator_algebra
 
 
 export iso
@@ -14,6 +16,15 @@ using ..QuantumUtils
 
 using LinearAlgebra
 using SparseArrays
+
+function is_linearly_dependent(
+    basis::Vector{<:AbstractMatrix};
+    eps=eps(Float32)
+)
+    # Note: basis is assumed to be linearly independent
+    M = hcat(vec.(basis)...)
+    return is_linearly_dependent(M, eps=eps)
+end
 
 function is_linearly_dependent(
     basis::Vector{<:AbstractMatrix},
@@ -34,6 +45,10 @@ function is_linearly_dependent(M::AbstractMatrix; eps=eps(Float32))
     val = minimum(abs.(diag(qr(M).R)))
     return isapprox(val, 0.0, atol=eps)
 end
+
+commutator(A::AbstractMatrix, B::AbstractMatrix) = A * B - B * A
+
+is_hermitian(A::AbstractMatrix) = isapprox(A, A', atol=1e-8)
 
 function operator_algebra(
     gens::Vector{<:AbstractMatrix}; return_layers=false, normalize=false
@@ -296,7 +311,6 @@ end
 function CompositeQuantumSystem(
     subsystems::Vector{QuantumSystem},
     couplings::Vector{QuantumSystemCoupling}=QuantumSystemCoupling[]
-
 )
     subsystem_levels = [sys.levels for sys ∈ subsystems]
     levels = prod(subsystem_levels)
@@ -421,51 +435,10 @@ function (csys::CompositeQuantumSystem)(;
     end
 
     return CompositeQuantumSystem(
-        subsystems;
-        couplings=couplings
+        subsystems,
+        couplings
     )
 end
 
-function embed(
-    op::Matrix{ComplexF64},
-    csys::CompositeQuantumSystem,
-    op_subsystem_indices::AbstractVector{Int},
-    op_subspaces::Vector{<:AbstractVector{Int}}=fill(1:2, length(csys.subsystems))
-)
-    @assert size(op, 1) == size(op, 2) "Operator must be square."
-    @assert all(diff(op_subsystem_indices) .== 1) "op_subsystem_indices must be consecutive (for now)."
-
-    if size(op, 1) == prod(length.(op_subspaces[op_subsystem_indices]))
-        Is = Matrix{ComplexF64}.(I.(length.(op_subspaces)))
-        Is[op_subsystem_indices[1]] = op
-        deleteat!(Is, op_subsystem_indices[2:end])
-        op = kron(Is...)
-    else
-        @assert(
-            size(op, 1) == prod(length.(op_subspaces)),
-            """\n
-                Operator size ($(size(op, 1))) must match product of subsystem subspaces ($(prod(length.(subspaces)))). Or
-            """
-        )
-    end
-
-    subspace_indices = get_subspace_indices(op_subspaces, csys.sub_levels)
-
-    embed_op = zeros(ComplexF64, csys.levels, csys.levels)
-    embed_op[subspace_indices, subspace_indices] = op
-    return embed_op
-end
-
-function embed(
-    op::Matrix{ComplexF64},
-    csys::CompositeQuantumSystem,
-    op_subsystem_index::Int,
-    args...
-)
-    return embed(op, csys, [op_subsystem_index], args...)
-end
-
-embed(op::AbstractMatrix{<:Number}, args...) =
-    embed(Matrix{ComplexF64}(op), args...)
 
 end

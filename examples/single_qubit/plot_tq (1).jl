@@ -19,7 +19,7 @@ function plot_twoqubit(
         Dict{Symbol, Union{Function, Vector{Function}}}(),
 
     # style keyword arguments
-    res::Tuple{Int, Int}=(1200, 900),
+    size::Tuple{Int, Int}=(1200, 900),
     titlesize::Int=36,
     series_color=:Dark2_4,
     series_color_cntrls = series_color,
@@ -45,10 +45,10 @@ function plot_twoqubit(
     @assert all([key ∈ keys(traj.components) for key ∈ comps])
     @assert all([key ∈ keys(traj.components) for key ∈ keys(transformations)])
 
-    ts = [0.; times(traj, dt_name)[1:end-1]]
+    ts = [0.; get_times(traj, dt_name)[1:end-1]]
 
     # create figure
-    fig = Figure(resolution=res)
+    fig = Figure(size=fig_size)
 
     # initialize axis count
     ax_count = 0
@@ -175,8 +175,8 @@ function plot_twoqubit(
 
         # create legend
         if key ∉ ignored_labels
-            Legend(fig[ax_count + 1, 2], ax, 
-                   labelsize=labelsize, framevisible = false, 
+            Legend(fig[ax_count + 1, 2], ax,
+                   labelsize=labelsize, framevisible = false,
                    linepoints=[Point2f(-1, 0.5), Point2f(1, 0.5)],
                    markerpoints = [Point2f(0., 0.5)],
                    markerstrokewidth = 20)
@@ -202,16 +202,16 @@ transformations = Dict(
 
 #@Aaron you will need to edit transformations and ignored labels depending on what you want to do
 plot_twoqubit(
-    plot_path, 
-    prob, 
+    plot_path,
+    prob,
     [:u];
-    ignored_labels=[:Ũ⃗], 
+    ignored_labels=[:Ũ⃗],
     transformations=transformations,
     #@Aaron you should probably change the color scheme of your controls to match
-    series_color =  [    
-    
+    series_color =  [
+
     RGB(0.459,0.439,0.702),
-    
+
     RGB(0.851,0.373,0.008),
 
     RGB(0.106,0.62,0.467),
@@ -223,7 +223,7 @@ plot_twoqubit(
         RGB(0.957,0.647,0.51),
         RGB(0.02,0.443,0.69),
         RGB(0.573,0.773,0.871),
-        :cornflowerblue, ] #:Paired_6				
+        :cornflowerblue, ] #:Paired_6
     ,
     dt_name = :Δt
 )

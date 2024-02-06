@@ -21,12 +21,18 @@ T_0 &= 10 \text{ ns}\\
 \end{aligned}
 ```
 
+For convenience, we have defined the `TransmonSystem` function in the `QuantumSystemTemplates` module, which returns a `QuantumSystem` object for a transmon qubit. We will use this function to define the system.
+
 ## Setting up the problem
+
+To begin, let's load the necessary packages, define the system parameters, and create a a `QuantumSystem` object using the `TransmonSystem` function.
 
 ````@example multilevel_transmon
 using QuantumCollocation
 using NamedTrajectories
 using LinearAlgebra
+using SparseArrays
+using Random; Random.seed!(123)
 
 # define the time parameters
 
@@ -34,137 +40,90 @@ T₀ = 10     # total time in ns
 T = 50      # number of time steps
 Δt = T₀ / T # time step
 
-# define the number of levels to model
-levels = 3
-
-# create operators
-n̂ = number(levels)
-â = annihilate(levels)
-â_dag = create(levels)
-
-# define the Hamiltonian
+# define the system parameters
+levels = 5
 δ = 0.2
-H_drift = 2π * δ * n̂ * (n̂ - I(levels)) / 2
-H_drives = [
-    2π * (â + â_dag),
-    2π * im * (â - â_dag),
-]
 
-# define the goal unitary in the computational subspace
-U_init, U_goal = subspace_unitary([levels], :X, 1)
+# add a bound to the controls
+a_bound = 0.2
 
-U_goal
+# create the system
+sys = TransmonSystem(levels=levels, δ=δ)
+
+# let's look at the parameters of the system
+sys.params
 ````
 
-Let's get the subspace indices as well as we will need them later.
+Since this is a multilevel transmon and we want to implement an, let's say, $X$ gate on the qubit subspace, i.e., the first two levels we can utilize the `EmbeddedOperator` type to define the target operator.
 
 ````@example multilevel_transmon
-subspace = subspace_indices([levels])
+# define the target operator
+op = EmbeddedOperator(:X, sys)
 
-# check that these are the correct indices (trivial in the case of a single transmon, but a useful check for more complicated systems)
-U_goal[subspace, subspace]
+# show the full operator
+op.operator |> sparse
 ````
 
-WE also can look at U_init, which is not exactly the identity
+In this formulation, we also use a subspace identity as the initial state, which looks like
 
 ````@example multilevel_transmon
-U_init
+get_subspace_identity(op) |> sparse
 ````
 
-Now will set up the optimization problem using the [`UnitarySmoothPulseProblem`](@ref) type.
+We can then pass this embedded operator to the `UnitarySmoothPulseProblem` template to create
 
 ````@example multilevel_transmon
-# set the bound on the pulse amplitude
+# create the problem
+prob = UnitarySmoothPulseProblem(sys, op, T, Δt; a_bound=a_bound)
 
-a_bound = 2π * 0.2
-
-prob = UnitarySmoothPulseProblem(
-    H_drift,
-    H_drives,
-    U_goal,
-    T,
-    Δt;
-    U_init=U_init,
-    subspace=subspace,
-    a_bound=a_bound
-)
-
-# and we can solve this problem
-
-solve!(prob; max_iter=100)
+# solve the problem
+solve!(prob; max_iter=50)
 ````
 
-and we can look at the fidelity in the subspace
+Let's look at the fidelity in the subspace
 
 ````@example multilevel_transmon
-f = unitary_fidelity(prob; subspace=subspace)
-
-println("Fidelity: $f")
+println("Fidelity: ", unitary_fidelity(prob; subspace=op.subspace_indices))
 ````
 
-We can also look at the pulse shapes
+and plot the result using the `unitary_populations_plot` function.
 
 ````@example multilevel_transmon
-transformations = OrderedDict(
-    :Ũ⃗ => [
-        x -> populations(iso_vec_to_operator(x)[:, 1]),
-        x -> populations(iso_vec_to_operator(x)[:, 2]),
-    ]
-)
-
-transforamtion_labels = OrderedDict(
-    :Ũ⃗ => [
-        "\\psi^g",
-        "\\psi^e",
-    ]
-)
-
-transformation_titles = OrderedDict(
-    :Ũ⃗ => [
-        "Populations of evolution from |0⟩",
-        "Populations of evolution from |1⟩",
-    ]
-)
-
-plot(prob.trajectory, [:a];
-    res=(1200, 1200),
-    transformations=transformations,
-    transformation_labels=transforamtion_labels,
-    include_transformation_labels=true,
-    transformation_titles=transformation_titles
-)
+unitary_populations_plot(prob; fig_size=(900, 700))
 ````
 
-## Leakage suppression
-
-As can bee seen in the plot above, although the fidelity is high, the $f$ level of the transmon is highly populated throughout the evolution. This is suboptimal, but we can account for this by penalizing the leakage elements of the unitary, namely those elements of the form $U_{f, i}$ where $i \neq f$.  We utilize an $L_1$ penalty on these elements, which is implemented in the [`UnitarySmoothPulseProblem`](@ref) type as the `leakage_penalty` keyword argument.
+## Leakage suppresion
+As can be seen from the above plot, there is a substantial amount of leakage into the higher levels during the evolution. To mitigate this, we have implemented the ability to add a cost to populating the leakage levels, in particular this is an $L_1$ norm cost, which is implemented via slack variables and should ideally drive those leakage populations down to zero.
+To implement this, pass `leakage_suppresion=true` and `R_leakage={value}` to the `UnitarySmoothPulseProblem` template.
 
 ````@example multilevel_transmon
-# get the indices of the leakage subspace of the isomorphic vector representation
-# of the unitary
-leakage_indices = subspace_leakage_indices(levels)
+# create the a leakage suppression problem, initializing with the previous solution
 
-# set the leakage penalty
-R_leakage = 1.0e0
-
-new_prob = UnitarySmoothPulseProblem(
-    H_drift,
-    H_drives,
-    U_goal,
-    T,
-    timesteps(prob.trajectory)[end];
-    U_init=U_init,
-    subspace=subspace,
-    a_guess=prob.trajectory.a,
+prob_leakage = UnitarySmoothPulseProblem(sys, op, T, Δt;
     a_bound=a_bound,
     leakage_suppression=true,
-    leakage_indices=leakage_indices,
-    system_levels=[levels],
-    R_leakage=R_leakage,
+    R_leakage=1e-1,
+    a_guess=prob.trajectory.a
 )
 
-solve!(new_prob; max_iter=100)
+# solve the problem
+
+solve!(prob_leakage; max_iter=50)
 ````
+
+Let's look at the fidelity in the subspace
+
+````@example multilevel_transmon
+println("Fidelity: ", unitary_fidelity(prob_leakage; subspace=op.subspace_indices))
+````
+
+and plot the result using the `unitary_populations_plot` function.
+
+````@example multilevel_transmon
+unitary_populations_plot(prob_leakage; fig_size=(900, 700))
+````
+
+Here we can see that the leakage populations have been driven substantially down.
 
 ---
 

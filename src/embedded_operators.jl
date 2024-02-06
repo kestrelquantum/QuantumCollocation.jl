@@ -7,7 +7,8 @@ export unembed
 export get_subspace_indices
 export get_subspace_leakage_indices
 export get_unitary_isomorphism_leakage_indices
-export subspace_identity
+export get_unitary_isomorphism_subspace_indices
+export get_subspace_identity
 
 using LinearAlgebra
 
@@ -52,19 +53,35 @@ end
 get_subspace_leakage_indices(subspace_indices::AbstractVector{Int}, levels::Int) =
     setdiff(1:levels, subspace_indices)
 
-
-
-function get_unitary_isomorphism_leakage_indices(
-    subspaces::Vector{<:AbstractVector{Int}},
+function get_unitary_isomorphism_subspace_indices(
+    subspace_indices::AbstractVector{Int},
     subsystem_levels::AbstractVector{Int}
 )
     N = prod(subsystem_levels)
-    subspace_indices = get_subspace_indices(subspaces, subsystem_levels)
+    iso_subspace_indices = Int[]
+    for sⱼ ∈ subspace_indices
+        for sᵢ ∈ subspace_indices
+            push!(iso_subspace_indices, index(sⱼ, sᵢ, 2N))
+        end
+        for sᵢ ∈ subspace_indices
+            push!(iso_subspace_indices, index(sⱼ, sᵢ + N, 2N))
+        end
+    end
+    return iso_subspace_indices
+end
+
+function get_unitary_isomorphism_leakage_indices(
+    subspace_indices::AbstractVector{Int},
+    subsystem_levels::AbstractVector{Int}
+)
+    N = prod(subsystem_levels)
     leakage_indices = get_subspace_leakage_indices(subspace_indices, N)
     iso_leakage_indices = Int[]
     for sⱼ ∈ subspace_indices
         for lᵢ ∈ leakage_indices
             push!(iso_leakage_indices, index(sⱼ, lᵢ, 2N))
+        end
+        for lᵢ ∈ leakage_indices
             push!(iso_leakage_indices, index(sⱼ, lᵢ + N, 2N))
         end
     end
@@ -72,14 +89,13 @@ function get_unitary_isomorphism_leakage_indices(
 end
 
 
-
 struct EmbeddedOperator
     operator::Matrix{ComplexF64}
-    levels::Int
-    subspaces::Vector{<:AbstractVector{Int}}
     subspace_indices::Vector{Int}
     subsystem_levels::Vector{Int}
 end
+
+Base.size(op::EmbeddedOperator) = size(op.operator)
 
 function EmbeddedOperator(
     op::AbstractMatrix{<:Number},
@@ -89,8 +105,6 @@ function EmbeddedOperator(
     op_embedded = embed(op, system)
     return EmbeddedOperator(
         op_embedded,
-        system.levels,
-        [subspace],
         get_subspace_indices(subspace, system.levels),
         [system.levels]
     )
@@ -105,8 +119,20 @@ function EmbeddedOperator(
     op_embedded = embed(op, system, op_subsystem_index; subspaces=subspaces)
     return EmbeddedOperator(
         op_embedded,
-        system.levels,
-        subspaces,
+        get_subspace_indices(subspaces, system.subsystem_levels),
+        system.subsystem_levels
+    )
+end
+
+function EmbeddedOperator(
+    op::AbstractMatrix{<:Number},
+    system::CompositeQuantumSystem,
+    op_subsystem_indices::AbstractVector{Int};
+    subspaces=fill(1:2, length(system.subsystems)),
+)
+    op_embedded = embed(op, system, op_subsystem_indices; subspaces=subspaces)
+    return EmbeddedOperator(
+        op_embedded,
         get_subspace_indices(subspaces, system.subsystem_levels),
         system.subsystem_levels
     )
@@ -121,11 +147,11 @@ end
 
 
 
-function subspace_identity(op::EmbeddedOperator)
+function get_subspace_identity(op::EmbeddedOperator)
     return embed(
         Matrix{ComplexF64}(I(length(op.subspace_indices))),
         op.subspace_indices,
-        op.levels
+        size(op)[1]
     )
 end
 
@@ -138,7 +164,7 @@ end
 function embed(A::AbstractMatrix{<:Number}, op::EmbeddedOperator)
     @assert size(A, 1) == size(A, 2) "Operator must be square."
     @assert size(A, 1) == length(op.subspace_indices) "Operator size must match subspace size."
-    return embed(A, op.subspace_indices, op.levels)
+    return embed(A, op.subspace_indices, size(op)[1])
 end
 
 function unembed(op::EmbeddedOperator)::Matrix{ComplexF64}
@@ -146,12 +172,15 @@ function unembed(op::EmbeddedOperator)::Matrix{ComplexF64}
 end
 
 function get_subspace_leakage_indices(op::EmbeddedOperator)
-    return get_subspace_leakage_indices(op.subspace_indices, op.levels)
+    return get_subspace_leakage_indices(op.subspace_indices, size(op)[1])
 end
 
-function get_unitary_isomorphism_leakage_indices(op::EmbeddedOperator)
-    return get_unitary_isomorphism_leakage_indices(op.subspaces, op.subsystem_levels)
-end
+get_unitary_isomorphism_subspace_indices(op::EmbeddedOperator) =
+    get_unitary_isomorphism_subspace_indices(op.subspace_indices, op.subsystem_levels)
+
+get_unitary_isomorphism_leakage_indices(op::EmbeddedOperator) =
+    get_unitary_isomorphism_leakage_indices(op.subspace_indices, op.subsystem_levels)
+
 
 # embed(op::AbstractMatrix)
 

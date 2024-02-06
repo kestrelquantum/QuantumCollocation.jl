@@ -2,10 +2,10 @@ module Rollouts
 
 export rollout
 export unitary_rollout
-export unitary_geodesic
-export skew_symmetric
-export skew_symmetric_vec
-export linear_interpolation
+export lab_frame_unitary_rollout
+export lab_frame_unitary_rollout_trajectory
+export sample_at
+export upsample
 
 using ..QuantumUtils
 using ..QuantumSystems
@@ -108,7 +108,7 @@ function unitary_rollout(
     integrator=exp
 )
     return unitary_rollout(
-        operator_to_iso_vec(Matrix{ComplexF64}(I(size(system.H_drift_real, 1)))),
+        operator_to_iso_vec(Matrix{ComplexF64}(I(size(system.H_drift, 1)))),
         controls,
         Δt,
         system;
@@ -130,7 +130,7 @@ function unitary_rollout(
     else
         controls = traj[drive_name]
     end
-    Δt = timesteps(traj)
+    Δt = get_timesteps(traj)
     return unitary_rollout(
         Ũ⃗₁,
         controls,
@@ -183,117 +183,100 @@ function QuantumUtils.unitary_fidelity(
     )
 end
 
+function sample_at(t::Float64, controls::AbstractMatrix{Float64}, Δt::Float64)
+    @assert t >= 0 "t must be non-negative"
+    @assert Δt > 0 "Δt must be positive"
+    @assert t <= size(controls, 2) * Δt "t must be less than the duration of the controls"
 
-function skew_symmetric(v::AbstractVector, n::Int)
-    M = zeros(eltype(v), n, n)
-    k = 1
-    for j = 1:n
-        for i = 1:j-1
-            vᵢⱼ = v[k]
-            M[i, j] = vᵢⱼ
-            M[j, i] = -vᵢⱼ
-            k += 1
-        end
-    end
-    return M
+    i = floor(Int, t / Δt) + 1
+    controls[:, i]
 end
 
-function skew_symmetric_vec(M::AbstractMatrix)
-    n = size(M, 1)
-    v = zeros(eltype(M), n * (n - 1) ÷ 2)
-    k = 1
-    for j = 1:n
-        for i = 1:j-1
-            v[k] = M[i, j]
-            k += 1
-        end
-    end
-    return v
-end
-
-function unitary_geodesic(
-    U_init::AbstractMatrix{<:Number},
-    U_goal::AbstractMatrix{<:Number},
-    samples::Int;
-    return_generator=false
+function upsample(
+    controls::AbstractMatrix{Float64},
+    duration::Float64,
+    Δt::Float64,
+    Δt_new::Float64
 )
-    U_init = Matrix{ComplexF64}(U_init)
-    U_goal = Matrix{ComplexF64}(U_goal)
-    N = size(U_init, 1)
-    M = SpecialUnitary(N)
-    ts = range(0, 1, length=samples)
-    Us = shortest_geodesic(M, U_init, U_goal, ts)
-    X = Manifolds.log(M, U_init, U_goal)
-    G = iso(X)
-    Ũ⃗s = [operator_to_iso_vec(U) for U ∈ Us]
-    Ũ⃗ = hcat(Ũ⃗s...)
-    G̃⃗ = hcat([skew_symmetric_vec(G) for t = 1:samples]...)
-    if return_generator
-        return Ũ⃗, G̃⃗
-    else
-        return Ũ⃗
-    end
+    @assert Δt > 0 "Δt must be positive"
+    @assert Δt_new > 0 "Δt_new must be positive"
+    @assert Δt_new < Δt "Δt_new must be less than Δt"
+
+    times_upsampled = LinRange(0, duration, floor(Int, duration / Δt_new) + 1)
+
+    controls_upsampled = stack([sample_at(t, controls, Δt) for t in times_upsampled])
+
+    return controls_upsampled, times_upsampled
 end
 
-function unitary_geodesic(
-    operator::EmbeddedOperator,
-    samples::Int
+"""
+    lab_frame_unitary_rollout(
+        sys::AbstractQuantumSystem,
+        controls::AbstractMatrix{Float64};
+        duration=nothing,
+        timestep=nothing,
+        ω=nothing,
+        timestep_nyquist=1 / (50 * ω)
+    )
+"""
+function lab_frame_unitary_rollout(
+    sys::AbstractQuantumSystem,
+    controls::AbstractMatrix{Float64};
+    duration=nothing,
+    timestep=nothing,
+    ω=nothing,
+    timestep_nyquist=1 / (50 * ω)
 )
-    U_goal = unembed(operator)
-    U_init = Matrix{ComplexF64}(I(size(U_goal, 1)))
-    Ũ⃗ = unitary_geodesic(U_init, U_goal, samples)
-    return hcat([
-        operator_to_iso_vec(EmbeddedOperators.embed(iso_vec_to_operator(Ũ⃗ₜ), operator))
-            for Ũ⃗ₜ ∈ eachcol(Ũ⃗)
-    ]...)
+    @assert !isnothing(duration) "must specify duration"
+    @assert !isnothing(timestep) "must specify timestep"
+    @assert !isnothing(ω) "must specify ω"
+
+    controls_upsampled, times_upsampled =
+        upsample(controls, duration, timestep, timestep_nyquist)
+
+    u = controls_upsampled[1, :]
+    v = controls_upsampled[2, :]
+
+    c = cos.(2π * ω * times_upsampled)
+    s = sin.(2π * ω * times_upsampled)
+
+    pulse = stack([u .* c - v .* s, u .* s + v .* c], dims=1)
+
+    return unitary_rollout(pulse, timestep_nyquist, sys), pulse
 end
 
-function unitary_geodesic(U_goal, samples; kwargs...)
-    N = size(U_goal, 1)
-    U₀ = Matrix{ComplexF64}(I(N))
-    return unitary_geodesic(U₀, U_goal, samples; kwargs...)
-end
+function lab_frame_unitary_rollout_trajectory(
+    sys_lab_frame::AbstractQuantumSystem,
+    traj_rotating_frame::NamedTrajectory,
+    op_lab_frame::EmbeddedOperator;
+    timestep_nyquist=1/(400 * sys_lab_frame.params[:ω]),
+    control_name::Symbol=:a,
+)::NamedTrajectory
+    @assert sys_lab_frame.params[:lab_frame] "QuantumSystem must be in the lab frame"
 
-unitary_geodesic(
-    U₀::AbstractMatrix{<:Number},
-    U₁::AbstractMatrix{<:Number},
-    samples::Number;
-    kwargs...
-) = unitary_geodesic(U₀, U₁, range(0, 1, samples); kwargs...)
+    Ũ⃗_labframe, pulse = lab_frame_unitary_rollout(
+        sys_lab_frame,
+        traj_rotating_frame[control_name];
+        duration=get_times(traj_rotating_frame)[end],
+        timestep=traj_rotating_frame.Δt[end],
+        ω=sys_lab_frame.params[:ω],
+        timestep_nyquist=timestep_nyquist
+    )
 
-function unitary_geodesic(
-    U₀::AbstractMatrix{<:Number},
-    U₁::AbstractMatrix{<:Number},
-    timesteps::AbstractVector{<:Number};
-    return_generator=false
-)
-    """
-    Compute the effective generator of the geodesic connecting U₀ and U₁.
-        U₁ = exp(-im * H * T) U₀
-        log(U₁ * U₀') = -im * H * T
-
-    Allow for the possibiltiy of unequal timesteps and ranges outside [0,1].
-
-    Returns the geodesic.
-    Optionally returns the effective Hamiltonian generating the geodesic.
-    """
-    t₀ = timesteps[1]
-    T = timesteps[end] - t₀
-    H = im * log(U₁ * U₀') / T
-    # -im prefactor is not included in H
-    U_geo = [exp(-im * H * (t - t₀)) * U₀ for t ∈ timesteps]
-    Ũ⃗_geo = stack(operator_to_iso_vec.(U_geo), dims=2)
-    if return_generator
-        return Ũ⃗_geo, H
-    else
-        return Ũ⃗_geo
-    end
-end
-
-function linear_interpolation(ψ̃₁::AbstractVector, ψ̃₂::AbstractVector, samples::Int)
-    ts = range(0, 1; length=samples)
-    ψ̃s = [ψ̃₁ + t * (ψ̃₂ - ψ̃₁) for t ∈ ts]
-    return hcat(ψ̃s...)
+    return NamedTrajectory(
+        (
+            Ũ⃗=Ũ⃗_labframe,
+            a=pulse
+        );
+        timestep=timestep_nyquist,
+        controls=(control_name,),
+        initial=(
+            Ũ⃗=Ũ⃗_labframe[:, 1],
+        ),
+        goal=(
+            Ũ⃗=operator_to_iso_vec(op_lab_frame.operator),
+        )
+    )
 end
 
 end

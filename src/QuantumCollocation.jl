@@ -44,6 +44,9 @@ include("problems.jl")
 include("rollouts.jl")
 @reexport using .Rollouts
 
+include("unitary_geodesics.jl")
+@reexport using .UnitaryGeodesics
+
 include("continuous_trajectories.jl")
 @reexport using .ContinuousTrajectories
 
@@ -56,8 +59,8 @@ include("save_load_utils.jl")
 include("problem_solvers.jl")
 @reexport using .ProblemSolvers
 
-
-
+include("plotting.jl")
+@reexport using .Plotting
 
 
 end
