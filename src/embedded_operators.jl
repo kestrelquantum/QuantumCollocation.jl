@@ -138,10 +138,36 @@ function EmbeddedOperator(
     )
 end
 
+function Base.:*(
+    op1::EmbeddedOperator,
+    op2::EmbeddedOperator
+)
+    @assert size(op1) == size(op2) "Operators must be of the same size."
+    @assert op1.subspace_indices == op2.subspace_indices "Operators must have the same subspace."
+    @assert op1.subsystem_levels == op2.subsystem_levels "Operators must have the same subsystem levels."
+    return EmbeddedOperator(
+        op1.operator * op2.operator,
+        op1.subspace_indices,
+        op1.subsystem_levels
+    )
+end
+
 function EmbeddedOperator(op::Symbol, args...; kwargs...)
     @assert op ∈ keys(GATES) "Operator must be a valid gate. See QuantumCollocation.QuantumUtils.GATES dict for available gates."
     op = GATES[op]
     return EmbeddedOperator(op, args...; kwargs...)
+end
+
+function EmbeddedOperator(
+    ops::AbstractVector{Symbol},
+    sys::CompositeQuantumSystem,
+    op_indices::AbstractVector{Int}
+)
+    ops_embedded = [
+        EmbeddedOperator(op, sys, op_indices[i])
+            for (op, i) ∈ zip(ops, op_indices)
+    ]
+    return *(ops_embedded...)
 end
 
 

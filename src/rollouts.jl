@@ -36,12 +36,15 @@ function rollout(
 
     Ψ̃[:, 1] .= ψ̃₁
 
+    G_drift = Matrix{Float64}(system.G_drift)
+    G_drives = Matrix{Float64}.(system.G_drives)
+
     for t = 2:T
         aₜ₋₁ = controls[:, t - 1]
         Gₜ = Integrators.G(
             aₜ₋₁,
-            system.G_drift,
-            system.G_drives
+            G_drift,
+            G_drives
         )
         Ψ̃[:, t] .= integrator(Gₜ * Δt[t - 1]) * Ψ̃[:, t - 1]
     end
@@ -56,6 +59,27 @@ function rollout(
     ψ̃₁s::AbstractVector{<:AbstractVector}, args...; kwargs...
 )
     return vcat([rollout(ψ̃₁, args...; kwargs...) for ψ̃₁ ∈ ψ̃₁s]...)
+end
+
+function QuantumUtils.fidelity(
+    ψ̃₁::AbstractVector{Float64},
+    ψ̃_goal::AbstractVector{Float64},
+    controls::AbstractMatrix{Float64},
+    Δt::Union{AbstractVector{Float64}, AbstractMatrix{Float64}, Float64},
+    system::AbstractQuantumSystem;
+    kwargs...
+)
+    Ψ̃ = rollout(ψ̃₁, controls, Δt, system; kwargs...)
+    return iso_fidelity(Ψ̃[:, end], ψ̃_goal)
+end
+
+function QuantumUtils.fidelity(
+    ψ₁::AbstractVector{<:Complex},
+    ψ_goal::AbstractVector{<:Complex},
+    args...;
+    kwargs...
+)
+    return fidelity(ket_to_iso(ψ₁), ket_to_iso(ψ_goal), args...; kwargs...)
 end
 
 

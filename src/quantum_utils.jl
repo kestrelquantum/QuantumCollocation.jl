@@ -1,7 +1,7 @@
 module QuantumUtils
 
 export GATES
-export gate
+export get_gate
 export ⊗
 export vec⁻¹
 export operators_from_dict
@@ -28,9 +28,6 @@ export population
 export populations
 export subspace_unitary
 export quantum_state
-export get_subspace_indices
-export get_subspace_leakage_indices
-export get_unitary_isomorphism_leakage_indices
 
 using TrajectoryIndexingUtils
 using LinearAlgebra
@@ -79,12 +76,12 @@ const GATES = Dict{Symbol, Matrix{ComplexF64}}(
                    0 0 0 1]
 )
 
-gate(U::Symbol) = GATES[U]
+get_gate(U::Symbol) = GATES[U]
 
 function apply(gate::Symbol, ψ::Vector{<:Number})
     @assert norm(ψ) ≈ 1.0
     @assert gate in keys(GATES) "gate not found"
-    Û = gate(gate)
+    Û = get_gate(gate)
     @assert size(Û, 2) == size(ψ, 1) "gate size does not match ket dim"
     return ComplexF64.(normalize(Û * ψ))
 end
@@ -276,14 +273,14 @@ function iso_vec_to_iso_operator(Ũ⃗::AbstractVector{R}) where R <: Real
 end
 
 
-function operator_to_iso_vec(U::AbstractMatrix{Complex{T}}) where T <: Real
+function operator_to_iso_vec(U::AbstractMatrix{<:Complex})
     N = size(U,1)
-    Ũ⃗ = Vector{T}(undef, N^2 * 2)
+    Ũ⃗ = Vector{Float64}(undef, N^2 * 2)
     for i=0:N-1
         Ũ⃗[i*2N .+ (1:N)] .= real(@view(U[:, i+1]))
         Ũ⃗[i*2N .+ (N+1:2N)] .= imag(@view(U[:, i+1]))
     end
-    return Vector{T}(Ũ⃗)
+    return Ũ⃗
 end
 
 function iso_operator_to_iso_vec(Ũ::AbstractMatrix{R}) where R <: Real
@@ -300,14 +297,16 @@ end
     quantum metrics
 """
 
-function fidelity(ψ, ψ_goal)
+function fidelity(ψ, ψ_goal; subspace=1:length(ψ))
+    ψ = ψ[subspace]
+    ψ_goal = ψ_goal[subspace]
     return abs2(ψ_goal'ψ)
 end
 
-function iso_fidelity(ψ̃, ψ̃_goal)
+function iso_fidelity(ψ̃, ψ̃_goal; kwargs...)
     ψ = iso_to_ket(ψ̃)
     ψ_goal = iso_to_ket(ψ̃_goal)
-    return fidelity(ψ, ψ_goal)
+    return fidelity(ψ, ψ_goal; kwargs...)
 end
 
 function unitary_fidelity(
@@ -419,6 +418,8 @@ function quantum_state(
         return kron(states...)
     end
 end
+
+
 
 
 

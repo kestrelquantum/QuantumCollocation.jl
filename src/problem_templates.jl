@@ -178,24 +178,12 @@ function UnitarySmoothPulseProblem(
         if isnothing(a_guess)
             if geodesic
                 if operator isa EmbeddedOperator
-
                     Ũ⃗ = unitary_geodesic(operator, T)
-                    try
-                        Ũ⃗ = unitary_geodesic(operator, T)
-                    catch e
-                        throw(e)
-                        println("WARNING: Could not find geodesic for subspace operator. Using linear interpolation.")
-                        Ũ⃗ = unitary_linear_interpolation(U_init, U_goal, T)
-                    end
                 else
-                    try
-                        Ũ⃗ = unitary_geodesic(U_goal, T)
-                    catch e
-                        println("WARNING: Could not find geodesic. Using linear interpolation.")
-                        # TODO: use embedded operator for subspace geodesic
-                        Ũ⃗ = unitary_linear_interpolation(U_init, U_goal, T)
-                    end
+                    Ũ⃗ = unitary_geodesic(U_goal, T)
                 end
+            else
+                Ũ⃗ = unitary_linear_interpolation(U_init, U_goal, T)
             end
 
             a_dists =  [Uniform(-a_bounds[i], a_bounds[i]) for i = 1:n_drives]

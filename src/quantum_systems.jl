@@ -165,6 +165,16 @@ abstract type AbstractQuantumSystem end
 # TODO: make subtypes: SingleQubitSystem, TwoQubitSystem, TransmonSystem, MultimodeSystem, etc.
 
 """
+QuantumSystem
+   |
+    -> EmbeddedOperator
+   |                  |
+   |                   -> QuantumObjective
+   |                  |
+    -> Matrix (goal) -
+"""
+
+"""
     QuantumSystem <: AbstractQuantumSystem
 
 A struct for storing the isomorphisms of the system's drift and drive Hamiltonians,
@@ -179,6 +189,8 @@ struct QuantumSystem <: AbstractQuantumSystem
     constructor::Union{Function, Nothing}
     params::Dict{Symbol, <:Any}
 end
+
+# TODO: add frame info to type
 
 """
     QuantumSystem(
@@ -310,8 +322,19 @@ end
 
 function CompositeQuantumSystem(
     subsystems::Vector{QuantumSystem},
-    couplings::Vector{QuantumSystemCoupling}=QuantumSystemCoupling[]
+    couplings::Vector{QuantumSystemCoupling}=QuantumSystemCoupling[];
+    subsystem_frame_index::Int=1,
+    frame_ω::Float64=subsystems[subsystem_frame_index].params[:ω],
+    lab_frame::Bool=false
 )
+    # set all subsystems to the same frame_ω
+    subsystems = [sys(; frame_ω=frame_ω) for sys ∈ subsystems]
+
+    if lab_frame
+        subsystems = [sys(; lab_frame=true) for sys ∈ subsystems]
+        couplings = [coupling(; lab_frame=true) for coupling ∈ couplings]
+    end
+
     subsystem_levels = [sys.levels for sys ∈ subsystems]
     levels = prod(subsystem_levels)
 
@@ -357,10 +380,12 @@ function (csys::CompositeQuantumSystem)(;
     subsystem_params::Dict{Int, <:Dict{Symbol, <:Any}}=Dict{Int, Dict{Symbol, Any}}(),
     coupling_params::Dict{Int, <:Dict{Symbol, <:Any}}=Dict{Int, Dict{Symbol, Any}}(),
     lab_frame::Bool=false,
+    subsystem_frame_index::Int=1,
+    frame_ω::Float64=csys.subsystems[subsystem_frame_index].params[:ω],
     subsystem_levels::Union{Nothing, Int, Vector{Int}}=nothing,
 )
-    subsystems = copy.(csys.subsystems)
-    couplings = copy.(csys.couplings)
+    subsystems = deepcopy(csys.subsystems)
+    couplings = deepcopy(csys.couplings)
 
     # if lab frame then set all subsystems and couplings to lab frame
     if lab_frame
@@ -402,7 +427,9 @@ function (csys::CompositeQuantumSystem)(;
             if i ∈ keys(subsystem_params)
                 subsystem_params[i][:levels] = subsystem_levels[i]
             else
-                subsystem_params[i] = Dict{Symbol, Any}(:levels => subsystem_levels[i])
+                subsystem_params[i] = Dict{Symbol, Any}(
+                    :levels => subsystem_levels[i]
+                )
             end
         end
 
@@ -410,28 +437,31 @@ function (csys::CompositeQuantumSystem)(;
             if i ∈ keys(coupling_params)
                 coupling_params[i][:subsystem_levels] = subsystem_levels
             else
-                coupling_params[i] = Dict{Symbol, Any}(:subsystem_levels => subsystem_levels)
+                coupling_params[i] = Dict{Symbol, Any}(
+                    :subsystem_levels => subsystem_levels
+                )
             end
         end
     end
 
-
     # construct subsystems with new parameters
     for (i, sys_params) ∈ subsystem_params
-        subsystems[i] = subsystems[i](;
-            merge(subsystems[i].params, sys_params)...,
-        )
+        subsystem_i_new_params = merge(subsystems[i].params, sys_params)
+        subsystem_i_new_params[:frame_ω] = frame_ω
+        subsystems[i] = subsystems[i](; subsystem_i_new_params...)
     end
 
     # sometimes redundant, but here to catch any changes in indvidual subsystem levels
     subsystem_levels = [sys.levels for sys ∈ subsystems]
 
     # construct couplings with new parameters
-    for (i, coupling_params) ∈ coupling_params
-        couplings[i] = couplings[i](;
-            merge(couplings[i].params, coupling_params)...,
-            subsystem_levels=subsystem_levels
-        )
+    if !isempty(csys.couplings)
+        for (i, coupling_params) ∈ coupling_params
+            couplings[i] = couplings[i](;
+                merge(couplings[i].params, coupling_params)...,
+                subsystem_levels=subsystem_levels
+            )
+        end
     end
 
     return CompositeQuantumSystem(
@@ -439,6 +469,9 @@ function (csys::CompositeQuantumSystem)(;
         couplings
     )
 end
+
+QuantumUtils.quantum_state(ket::String, csys::CompositeQuantumSystem; kwargs...) =
+    quantum_state(ket, csys.subsystem_levels; kwargs...)
 
 
 end

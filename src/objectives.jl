@@ -755,7 +755,10 @@ function InfidelityRobustnessObjective(
         A = zeros(Complex, d, d)
         A[subspace, subspace] .= 1 + im
         # Return any index where there is a 1.
-        return [j for (s, j) ∈ zip(operator_to_iso_vec(A), Z.components[:Ũ⃗]) if convert(Bool, s)]
+        return [
+            j for (s, j) ∈ zip(operator_to_iso_vec(A), Z.components[:Ũ⃗])
+                if convert(Bool, s)
+        ]
     end
     ivs = iso_vec_subspace(isnothing(subspace) ? collect(1:size(Hₑ, 1)) : subspace, Z)
 

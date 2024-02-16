@@ -20,7 +20,7 @@ using LinearAlgebra
 Returns a `QuantumSystem` object for a transmon qubit, with the Hamiltonian
 
 ```math
-H = \omega a^\dagger a + \frac{\delta}{2} a^\dagger a^\dagger a a
+H = \omega a^\dagger a - \frac{\delta}{2} a^\dagger a^\dagger a a
 ```
 
 where `a` is the annihilation operator.

@@ -59,7 +59,7 @@ end
 
     # --------------------------------------------
     #   1. test UnitarySmoothPulseProblem with subspace
-    #   - rely on random initialization
+    #   - rely on linear interpolation of unitary
     # --------------------------------------------
     probs["transmon"] = UnitarySmoothPulseProblem(
         sys, U_goal, T, Δt;
