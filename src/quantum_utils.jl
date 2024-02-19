@@ -300,7 +300,7 @@ end
 function fidelity(ψ, ψ_goal; subspace=1:length(ψ))
     ψ = ψ[subspace]
     ψ_goal = ψ_goal[subspace]
-    return abs2(ψ_goal'ψ)
+    return abs2(ψ_goal' * ψ)
 end
 
 function iso_fidelity(ψ̃, ψ̃_goal; kwargs...)
@@ -320,7 +320,7 @@ function unitary_fidelity(
     else
         U_goal = U_goal[subspace, subspace]
         U = U[subspace, subspace]
-        N = size(U, 1)
+        N = length(subspace)
         return 1 / N * abs(tr(U_goal'U))
     end
 end

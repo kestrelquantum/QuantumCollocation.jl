@@ -234,6 +234,14 @@ function QuantumSystem(H_drives::Vector{<:AbstractMatrix{<:Number}}; kwargs...)
     )
 end
 
+function QuantumSystem(H_drift::AbstractMatrix{<:Number}; kwargs...)
+    return QuantumSystem(
+        H_drift,
+        Matrix{ComplexF64}[];
+        kwargs...
+    )
+end
+
 function (sys::QuantumSystem)(; params...)
     @assert !isnothing(sys.constructor) "No constructor provided."
     @assert all([
@@ -473,5 +481,6 @@ end
 QuantumUtils.quantum_state(ket::String, csys::CompositeQuantumSystem; kwargs...) =
     quantum_state(ket, csys.subsystem_levels; kwargs...)
 
+# TODO: add methods to combine composite quantum systems
 
 end

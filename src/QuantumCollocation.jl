@@ -11,7 +11,7 @@ include("quantum_utils.jl")
 include("quantum_systems.jl")
 @reexport using .QuantumSystems
 
-include("quantum_system_templates.jl")
+include("quantum_system_templates/_quantum_system_templates.jl")
 @reexport using .QuantumSystemTemplates
 
 include("embedded_operators.jl")
@@ -44,13 +44,13 @@ include("problems.jl")
 include("rollouts.jl")
 @reexport using .Rollouts
 
-include("unitary_geodesics.jl")
-@reexport using .UnitaryGeodesics
+include("trajectory_initialization.jl")
+@reexport using .TrajectoryInitialization
 
 include("continuous_trajectories.jl")
 @reexport using .ContinuousTrajectories
 
-include("problem_templates.jl")
+include("problem_templates/_problem_templates.jl")
 @reexport using .ProblemTemplates
 
 include("save_load_utils.jl")

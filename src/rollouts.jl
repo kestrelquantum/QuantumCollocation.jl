@@ -76,7 +76,9 @@ end
 function QuantumUtils.fidelity(
     ψ₁::AbstractVector{<:Complex},
     ψ_goal::AbstractVector{<:Complex},
-    args...;
+    controls::AbstractMatrix{Float64},
+    Δt::Union{AbstractVector{Float64}, AbstractMatrix{Float64}, Float64},
+    system::AbstractQuantumSystem;
     kwargs...
 )
     return fidelity(ket_to_iso(ψ₁), ket_to_iso(ψ_goal), args...; kwargs...)
