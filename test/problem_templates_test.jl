@@ -63,7 +63,8 @@ end
     # --------------------------------------------
     probs["transmon"] = UnitarySmoothPulseProblem(
         sys, U_goal, T, Δt;
-        geodesic=false, verbose=false
+        geodesic=false,
+        verbose=false,
     )
     solve!(probs["transmon"]; max_iter=200)
 
@@ -76,9 +77,12 @@ end
     # --------------------------------------------
     probs["robust"] = UnitaryRobustnessProblem(
         H_error, probs["transmon"];
-        final_fidelity=0.99, subspace=subspace, verbose=false
+        final_fidelity=0.99,
+        subspace=subspace,
+        verbose=false,
+        ipopt_options=Options(recalc_y="yes", recalc_y_feas_tol=1e-1)
     )
-    solve!(probs["robust"]; max_iter=100)
+    solve!(probs["robust"]; max_iter=200)
 
     eval_loss(problem, Loss) = Loss(vec(problem.trajectory.data), problem.trajectory)
     loss = InfidelityRobustnessObjective(H_error, probs["transmon"].trajectory).L
