@@ -73,9 +73,9 @@ solve!(prob; max_iter=50)
 
 println("Fidelity: ", unitary_fidelity(prob; subspace=op.subspace_indices))
 
-# and plot the result using the `unitary_populations_plot` function.
+# and plot the result using the `plot_unitary_populations` function.
 
-unitary_populations_plot(prob; fig_size=(900, 700))
+plot_unitary_populations(prob; fig_size=(900, 700))
 
 # ## Leakage suppresion
 # As can be seen from the above plot, there is a substantial amount of leakage into the higher levels during the evolution. To mitigate this, we have implemented the ability to add a cost to populating the leakage levels, in particular this is an $L_1$ norm cost, which is implemented via slack variables and should ideally drive those leakage populations down to zero.
@@ -98,8 +98,8 @@ solve!(prob_leakage; max_iter=50)
 
 println("Fidelity: ", unitary_fidelity(prob_leakage; subspace=op.subspace_indices))
 
-# and plot the result using the `unitary_populations_plot` function.
+# and plot the result using the `plot_unitary_populations` function.
 
-unitary_populations_plot(prob_leakage; fig_size=(900, 700))
+plot_unitary_populations(prob_leakage; fig_size=(900, 700))
 
 # Here we can see that the leakage populations have been driven substantially down.

@@ -25,4 +25,4 @@ println("F = ", F)
 
 plot_path = joinpath(@__DIR__, "plus_plus_gate.png")
 
-unitary_populations_plot(plot_path, prob; subspace=op.subspace_indices)
+plot_unitary_populations(plot_path, prob; subspace=op.subspace_indices)

@@ -86,10 +86,10 @@ Let's look at the fidelity in the subspace
 println("Fidelity: ", unitary_fidelity(prob; subspace=op.subspace_indices))
 ````
 
-and plot the result using the `unitary_populations_plot` function.
+and plot the result using the `plot_unitary_populations` function.
 
 ````@example multilevel_transmon
-unitary_populations_plot(prob; fig_size=(900, 700))
+plot_unitary_populations(prob; fig_size=(900, 700))
 ````
 
 ## Leakage suppresion
@@ -117,10 +117,10 @@ Let's look at the fidelity in the subspace
 println("Fidelity: ", unitary_fidelity(prob_leakage; subspace=op.subspace_indices))
 ````
 
-and plot the result using the `unitary_populations_plot` function.
+and plot the result using the `plot_unitary_populations` function.
 
 ````@example multilevel_transmon
-unitary_populations_plot(prob_leakage; fig_size=(900, 700))
+plot_unitary_populations(prob_leakage; fig_size=(900, 700))
 ````
 
 Here we can see that the leakage populations have been driven substantially down.
