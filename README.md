@@ -18,8 +18,8 @@
 
 ```math
 \begin{aligned}
-\underset{U_{1:T}, a_{1:T-1}}{\text{minimize}} & \quad \ell(U_T, U_{\text{goal}})\\
-\text{ subject to } & \quad U_{t+1} = \exp(-i H(a_t)) U_t 
+\underset{U, a, \Delta t}{\text{minimize}} & \quad \ell(U_T, U_{\text{goal}})\\
+\text{ subject to } & \quad U_{t+1} = \exp(-i \Delta t H(a_t)) U_t 
 \end{aligned}
 ```
 

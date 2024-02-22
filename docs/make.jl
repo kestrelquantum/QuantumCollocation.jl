@@ -10,16 +10,16 @@ println("")
 
 pages = [
     "Home" => "index.md",
-    # "Quickstart Guide" => "generated/quickstart.md",
-    # "Manual" => [
-    #     "Problem Templates" => "generated/man/problem_templates.md",
-    #     "Utilities" => "generated/man/utils.md",
-    #     "Losses" => "generated/man/losses.md"
-    # ],
-    # "Examples" => [
-    #     "Multilevel Transmon" => "generated/examples/multilevel_transmon.md",
-    # ],
-    # "Library" => "lib.md",
+    "Quickstart Guide" => "generated/quickstart.md",
+    "Manual" => [
+        "Problem Templates" => "generated/man/problem_templates.md",
+        "Utilities" => "generated/man/utils.md",
+        "Losses" => "generated/man/losses.md"
+    ],
+    "Examples" => [
+        "Multilevel Transmon" => "generated/examples/multilevel_transmon.md",
+    ],
+    "Library" => "lib.md",
 ]
 
 format = Documenter.HTML(;
@@ -60,6 +60,7 @@ makedocs(;
     sitename="QuantumCollocation.jl",
     format=format,
     pages=pages,
+    warnonly=true,
 )
 
 deploydocs(;

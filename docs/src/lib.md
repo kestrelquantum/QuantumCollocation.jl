@@ -1,6 +1,6 @@
 #  Library
 
-<!-- ## QuantumUtils
+## QuantumUtils
 ```@autodocs
 Modules = [QuantumCollocation.QuantumUtils]
 ```
@@ -13,4 +13,4 @@ Modules = [QuantumCollocation.QuantumSystems]
 ## Integrators
 ```@autodocs
 Modules = [QuantumCollocation.Integrators]
-```  -->
+``` 

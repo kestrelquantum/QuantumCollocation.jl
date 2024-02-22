@@ -5,16 +5,18 @@ EditURL = "../../../literate/man/problem_templates.jl"
 # Problem Templates
 
 We provide a number of problem templates for making it simple and easy to set up and solve certain types of quantum optimal control problems. These templates all construct a `QuantumControlProblem` object.  The problem templates are:
-- [`UnitarySmoothPulseProblem`](#Unitary-Smooth-Pulse-Problem)
-- [`UnitaryMinimumTimeProblem`](#Unitary-Minimum-Time-Problem)
 
 ## Unitary Smooth Pulse Problem
+
+## Unitary Minimum Time Problem
+
+```@docs
+UnitaryMinimumTimeProblem
+```
 
 ```@docs
 UnitarySmoothPulseProblem
 ```
-
-## Unitary Minimum Time Problem
 
 ---
 

@@ -12,8 +12,8 @@ In quantum optimal control, we are interested in finding a pulse sequence $a_{1:
 
 ```math
 \begin{aligned}
-\underset{U_{1:T}, a_{1:T-1}}{\text{minimize}} & \quad \ell(U_T, U_{\text{goal}})\\
-\text{ subject to } & \quad f(U_{t+1}, U_t, a_t) = 0 \\
+\underset{U_{1:T}, a_{1:T-1}, \Delta t_{1:T-1}}{\text{minimize}} & \quad \ell(U_T, U_{\text{goal}})\\
+\text{ subject to } & \quad f(U_{t+1}, U_t, a_t, \Delta t_t) = 0 \\
 \end{aligned}
 ```
 
@@ -23,9 +23,9 @@ The gist of the method is that the dynamics are given by the solution to the Sch
 
 ```math
 \begin{aligned}
-f(U_{t+1}, U_t, a_t) &= U_{t+1} - \exp(-i \Delta t H(a_t)) U_t \\
-&\approx U_{t+1} - B^{-1}(a_t) F(a_t) U_t \\
-&= B(a_t) U_{t+1} - F(a_t) U_t \\
+f(U_{t+1}, U_t, a_t, \Delta t_t) &= U_{t+1} - \exp(-i \Delta t_t H(a_t)) U_t \\
+&\approx U_{t+1} - B^{-1}(a_t, \Delta t_t) F(a_t, \Delta t_t) U_t \\
+&= B(a_t, \Delta t_t) U_{t+1} - F(a_t, \Delta t_t) U_t \\
 \end{aligned}
 ```
 
@@ -36,6 +36,6 @@ This implementation is possible because direct collocation allows for the dynami
 
 ## Index
 
-<!-- ```@index
-``` -->
+```@index
+```
 

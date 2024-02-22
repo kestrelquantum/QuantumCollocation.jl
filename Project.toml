@@ -1,7 +1,7 @@
 name = "QuantumCollocation"
 uuid = "0dc23a59-5ffb-49af-b6bd-932a8ae77adf"
 authors = ["Aaron Trowbridge <aaron.j.trowbridge@gmail.com> and contributors"]
-version = "0.1.5"
+version = "0.2.0"
 
 [deps]
 Arpack = "7d9fca2a-8960-54d3-9f78-7d1dccf2cb97"

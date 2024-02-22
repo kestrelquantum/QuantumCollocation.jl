@@ -1,5 +1,4 @@
 @doc raw"""
-    UnitarySmoothPulseProblem(H_drift, H_drives, operator, T, Δt; kwargs...)
     UnitarySmoothPulseProblem(system::QuantumSystem, operator, T, Δt; kwargs...)
 
 Construct a `QuantumControlProblem` for a free-time unitary gate problem with smooth control pulses enforced by constraining the second derivative of the pulse trajectory, i.e.,
@@ -70,8 +69,6 @@ with
 - `hessian_approximation=false`: whether or not to use L-BFGS hessian approximation in Ipopt
 - `blas_multithreading=true`: whether or not to use multithreading in BLAS
 """
-function UnitarySmoothPulseProblem end
-
 function UnitarySmoothPulseProblem(
     system::AbstractQuantumSystem,
     operator::Union{EmbeddedOperator, AbstractMatrix{<:Number}},
@@ -281,6 +278,20 @@ function UnitarySmoothPulseProblem(
     )
 end
 
+
+
+"""
+    UnitarySmoothPulseProblem(
+        H_drift::AbstractMatrix{<:Number},
+        H_drives::Vector{<:AbstractMatrix{<:Number}},
+        operator,
+        T,
+        Δt;
+        kwargs...
+    )
+
+Constructor for a `UnitarySmoothPulseProblem` from a drift Hamiltonian and a set of control Hamiltonians.
+"""
 function UnitarySmoothPulseProblem(
     H_drift::AbstractMatrix{<:Number},
     H_drives::Vector{<:AbstractMatrix{<:Number}},
