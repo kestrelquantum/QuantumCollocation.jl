@@ -20,6 +20,7 @@ pages = [
         "Multilevel Transmon" => "generated/examples/multilevel_transmon.md",
     ],
     "Library" => "lib.md",
+    "Release Notes" => "release_notes.md",
 ]
 
 format = Documenter.HTML(;
