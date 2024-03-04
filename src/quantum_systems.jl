@@ -230,7 +230,8 @@ function CompositeQuantumSystem(
     couplings::Vector{QuantumSystemCoupling}=QuantumSystemCoupling[];
     subsystem_frame_index::Int=1,
     frame_ω::Float64=subsystems[subsystem_frame_index].params[:ω],
-    lab_frame::Bool=false
+    lab_frame::Bool=false,
+    params::Dict{Symbol, Any}=Dict{Symbol, Any}()
 )
     # set all subsystems to the same frame_ω
     subsystems = [sys(; frame_ω=frame_ω) for sys ∈ subsystems]
@@ -249,7 +250,7 @@ function CompositeQuantumSystem(
         H_drift += lift(sys.H_drift, i, subsystem_levels)
     end
 
-    # add lifated couplings to the drift Hamiltonian
+    # add lifted couplings to the drift Hamiltonian
     for coupling ∈ couplings
         H_drift += coupling.term
     end
@@ -266,7 +267,12 @@ function CompositeQuantumSystem(
     G_drives = G.(H_drives)
     levels = size(H_drift, 1)
     subsystem_levels = [sys.levels for sys ∈ subsystems]
-    params = Dict{Symbol, Any}()
+    params = merge(
+        params,
+        Dict{Symbol, Any}(
+            :lab_frame => lab_frame,
+        )
+    )
 
     return CompositeQuantumSystem(
         H_drift,
@@ -371,12 +377,17 @@ function (csys::CompositeQuantumSystem)(;
 
     return CompositeQuantumSystem(
         subsystems,
-        couplings
+        couplings;
+        lab_frame=lab_frame
     )
 end
 
 QuantumUtils.quantum_state(ket::String, csys::CompositeQuantumSystem; kwargs...) =
     quantum_state(ket, csys.subsystem_levels; kwargs...)
+
+function get_param(csys::CompositeQuantumSystem, key::Symbol; subsystem_index=1)
+    return csys.params[key]
+end
 
 # TODO: add methods to combine composite quantum systems
 

@@ -132,24 +132,24 @@ function qubit_system_state(ket::String)
 end
 
 function lift(
-    U::AbstractMatrix{<:Number},
+    U::M,
     qubit_index::Int,
     n_qubits::Int;
     levels::Int=size(U, 1)
-)::Matrix{ComplexF64}
-    Is = Matrix{Complex}[I(levels) for _ = 1:n_qubits]
+)::M where M <: AbstractMatrix
+    Is = M[I(levels) for _ = 1:n_qubits]
     Is[qubit_index] = U
     return foldr(⊗, Is)
 end
 
 function lift(
-    op::AbstractMatrix{<:Number},
+    op::M,
     i::Int,
     subsystem_levels::Vector{Int}
-)::Matrix{ComplexF64}
+)::M where M <: AbstractMatrix
     @assert size(op, 1) == size(op, 2) == subsystem_levels[i] "Operator must be square and match dimension of subsystem i"
 
-    Is = [collect(1.0 * typeof(op)(I, l, l)) for l ∈ subsystem_levels]
+    Is = M[collect(1.0 * typeof(op)(I, l, l)) for l ∈ subsystem_levels]
     Is[i] = op
     return kron(1.0, Is...)
 end

@@ -8,6 +8,7 @@ using ..QuantumUtils
 using ..QuantumSystems
 
 using LinearAlgebra
+using SparseArrays
 
 include("transmons.jl")
 

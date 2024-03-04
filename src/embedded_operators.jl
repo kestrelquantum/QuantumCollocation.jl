@@ -237,7 +237,7 @@ function embed(
         Is = Matrix{ComplexF64}.(I.(length.(subspaces)))
         Is[op_subsystem_indices[1]] = op
         deleteat!(Is, op_subsystem_indices[2:end])
-        op = kron(Is...)
+        op = kron([1], Is...)
     else
         @assert(
             size(op, 1) == prod(length.(subspaces)),

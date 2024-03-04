@@ -158,7 +158,7 @@ function TransmonDipoleCoupling(
     )
 
     return QuantumSystemCoupling(
-        op,
+        sparse(op),
         g_ij,
         pair,
         subsystem_levels,
@@ -176,6 +176,8 @@ function TransmonDipoleCoupling(
     subsystem_levels = [sys.levels for sys ∈ sub_systems]
     return TransmonDipoleCoupling(g_ij, pair, subsystem_levels; kwargs...)
 end
+
+
 
 """
     MultiTransmonSystem(
@@ -196,11 +198,13 @@ function MultiTransmonSystem(
     ωs::AbstractVector{Float64},
     δs::AbstractVector{Float64},
     gs::AbstractMatrix{Float64};
-    levels_per_transmon::Int = 3,
+    levels_per_transmon::Int=3,
     subsystem_levels::AbstractVector{Int} = fill(levels_per_transmon, length(ωs)),
     lab_frame=false,
     subsystems::AbstractVector{Int} = 1:length(ωs),
     subsystem_drive_indices::AbstractVector{Int} = 1:length(ωs),
+    frame_index::Int=1,
+    frame_ω::Float64=ωs[frame_index],
     kwargs...
 )
     n_subsystems = length(ωs)
@@ -216,7 +220,8 @@ function MultiTransmonSystem(
                 ω=ω,
                 δ=δ,
                 lab_frame=lab_frame,
-                drives=i ∈ subsystem_drive_indices
+                drives=i ∈ subsystem_drive_indices,
+                frame_ω=frame_ω,
             )
             push!(systems, sysᵢ)
         end
@@ -226,14 +231,18 @@ function MultiTransmonSystem(
 
     for i = 1:n_subsystems-1
         for j = i+1:n_subsystems
-            if i ∈ subsystems &&  j ∈ subsystems
-                push!(
-                    couplings,
-                    TransmonDipoleCoupling(gs[i, j], (i, j), systems; lab_frame=lab_frame)
+            if i ∈ subsystems && j ∈ subsystems
+                pair = (i, j)
+                coupling = TransmonDipoleCoupling(
+                    gs[i, j],
+                    pair,
+                    systems;
+                    lab_frame=lab_frame
                 )
+                push!(couplings, coupling)
             end
         end
     end
 
-    return CompositeQuantumSystem(systems, couplings)
+    return CompositeQuantumSystem(systems, couplings; lab_frame=lab_frame)
 end

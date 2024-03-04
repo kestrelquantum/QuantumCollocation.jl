@@ -246,16 +246,20 @@ end
     )
 """
 function lab_frame_unitary_rollout(
-    sys::AbstractQuantumSystem,
+    sys::QuantumSystem,
     controls::AbstractMatrix{Float64};
     duration=nothing,
     timestep=nothing,
-    ω=nothing,
+    ω=:ω ∈ keys(sys.params) ? sys.params[:ω] : nothing,
     timestep_nyquist=1 / (50 * ω)
 )
     @assert !isnothing(duration) "must specify duration"
     @assert !isnothing(timestep) "must specify timestep"
     @assert !isnothing(ω) "must specify ω"
+
+    # TODO: generalize to more than 2 drives
+    @assert length(sys.H_drives) == 2 "must have 2 drives"
+
 
     controls_upsampled, times_upsampled =
         upsample(controls, duration, timestep, timestep_nyquist)
@@ -271,12 +275,59 @@ function lab_frame_unitary_rollout(
     return unitary_rollout(pulse, timestep_nyquist, sys), pulse
 end
 
+function lab_frame_unitary_rollout(
+    sys::CompositeQuantumSystem,
+    controls::AbstractMatrix{Float64};
+    duration=nothing,
+    timestep=nothing,
+    ω_index=1,
+    ω=:ω ∈ keys(sys.subsystems[ω_index].params) ?
+        sys.subsystems[ω_index].params[:ω] :
+        nothing,
+    timestep_nyquist=1 / (50 * ω),
+    drive_frequencies_all_equal=false,
+)
+    @assert !isnothing(duration) "must specify duration"
+    @assert !isnothing(timestep) "must specify timestep"
+    @assert !isnothing(ω) "must specify ω"
+
+    # TODO: generalize to more than 2 drives per subsystem
+    n_drives = length(sys.H_drives)
+
+    controls_upsampled, times_upsampled =
+        upsample(controls, duration, timestep, timestep_nyquist)
+
+    U = controls_upsampled[1:2:n_drives, :]
+    V = controls_upsampled[2:2:n_drives, :]
+
+    if drive_frequencies_all_equal
+        ωs = fill(ω, n_drives ÷ 2)
+    else
+        ωs = [subsys.params[:ω] for subsys ∈ sys.subsystems if !isempty(subsys.H_drives)]
+    end
+
+    C = cos.(2π * ωs * times_upsampled')
+    S = sin.(2π * ωs * times_upsampled')
+
+    pulse = vcat([
+        stack([u .* c - v .* s, u .* s + v .* c]; dims=1)
+            for (u, v, c, s) ∈ zip(eachrow.([U, V, C, S])...)
+    ]...)
+
+    return unitary_rollout(pulse, timestep_nyquist, sys), pulse
+end
+
+
+
 function lab_frame_unitary_rollout_trajectory(
     sys_lab_frame::AbstractQuantumSystem,
     traj_rotating_frame::NamedTrajectory,
     op_lab_frame::EmbeddedOperator;
-    timestep_nyquist=1/(400 * sys_lab_frame.params[:ω]),
+    timestep_nyquist=sys_lab_frame isa QuantumSystem ?
+        1/(400 * sys_lab_frame.params[:ω]) :
+        1/(400 * sys_lab_frame.subsystems[1].params[:ω]),
     control_name::Symbol=:a,
+    kwargs...
 )::NamedTrajectory
     @assert sys_lab_frame.params[:lab_frame] "QuantumSystem must be in the lab frame"
 
@@ -285,8 +336,8 @@ function lab_frame_unitary_rollout_trajectory(
         traj_rotating_frame[control_name];
         duration=get_times(traj_rotating_frame)[end],
         timestep=traj_rotating_frame.Δt[end],
-        ω=sys_lab_frame.params[:ω],
-        timestep_nyquist=timestep_nyquist
+        timestep_nyquist=timestep_nyquist,
+        kwargs...
     )
 
     return NamedTrajectory(
