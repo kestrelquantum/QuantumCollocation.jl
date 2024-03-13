@@ -303,7 +303,9 @@ function lab_frame_unitary_rollout(
     duration=nothing,
     timestep=nothing,
     ω=:ω ∈ keys(sys.params) ? sys.params[:ω] : nothing,
-    timestep_nyquist=1 / (50 * ω)
+    timestep_nyquist=1 / (50 * ω),
+    return_pulse=false,
+    return_nyquist_timestep=false
 )
     @assert !isnothing(duration) "must specify duration"
     @assert !isnothing(timestep) "must specify timestep"
@@ -324,7 +326,21 @@ function lab_frame_unitary_rollout(
 
     pulse = stack([u .* c - v .* s, u .* s + v .* c], dims=1)
 
-    return unitary_rollout(pulse, timestep_nyquist, sys), pulse
+    Ũ⃗ = unitary_rollout(pulse, timestep_nyquist, sys)
+
+    if return_pulse
+        if return_nyquist_timestep
+            return Ũ⃗, pulse, timestep_nyquist
+        else
+            return Ũ⃗, pulse
+        end
+    else
+        if return_nyquist_timestep
+            return Ũ⃗, timestep_nyquist
+        else
+            return Ũ⃗
+        end
+    end
 end
 
 function lab_frame_rollout(
@@ -401,6 +417,8 @@ function lab_frame_unitary_rollout(
         nothing,
     timestep_nyquist=1 / (50 * ω),
     drive_frequencies_all_equal=false,
+    return_pulse=false,
+    return_nyquist_timestep=false
 )
     @assert !isnothing(duration) "must specify duration"
     @assert !isnothing(timestep) "must specify timestep"
@@ -429,7 +447,21 @@ function lab_frame_unitary_rollout(
             for (u, v, c, s) ∈ zip(eachrow.([U, V, C, S])...)
     ]...)
 
-    return unitary_rollout(pulse, timestep_nyquist, sys), pulse
+    Ũ⃗ = unitary_rollout(pulse, timestep_nyquist, sys)
+
+    if return_pulse
+        if return_nyquist_timestep
+            return Ũ⃗, pulse, timestep_nyquist
+        else
+            return Ũ⃗, pulse
+        end
+    else
+        if return_nyquist_timestep
+            return Ũ⃗, timestep_nyquist
+        else
+            return Ũ⃗
+        end
+    end
 end
 
 
@@ -452,6 +484,7 @@ function lab_frame_unitary_rollout_trajectory(
         duration=get_times(traj_rotating_frame)[end],
         timestep=traj_rotating_frame.Δt[end],
         timestep_nyquist=timestep_nyquist,
+        return_pulse=true,
         kwargs...
     )
 
