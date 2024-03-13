@@ -385,6 +385,9 @@ end
 QuantumUtils.quantum_state(ket::String, csys::CompositeQuantumSystem; kwargs...) =
     quantum_state(ket, csys.subsystem_levels; kwargs...)
 
+QuantumUtils.quantum_state(ket::String, sys::QuantumSystem; kwargs...) =
+    quantum_state(ket, [sys.levels]; kwargs...)
+
 function get_param(csys::CompositeQuantumSystem, key::Symbol; subsystem_index=1)
     return csys.params[key]
 end

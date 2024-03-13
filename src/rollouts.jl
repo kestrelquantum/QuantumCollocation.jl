@@ -2,6 +2,7 @@ module Rollouts
 
 export rollout
 export unitary_rollout
+export lab_frame_rollout
 export lab_frame_unitary_rollout
 export lab_frame_unitary_rollout_trajectory
 export sample_at
@@ -60,6 +61,7 @@ function rollout(
 )
     return vcat([rollout(ψ̃₁, args...; kwargs...) for ψ̃₁ ∈ ψ̃₁s]...)
 end
+
 
 function QuantumUtils.fidelity(
     ψ̃₁::AbstractVector{Float64},
@@ -236,6 +238,56 @@ function upsample(
 end
 
 """
+    lab_frame_rollout(
+        sys::AbstractQuantumSystem,
+        controls::AbstractMatrix{Float64};
+        duration=nothing,
+        timestep=nothing,
+        ω=nothing,
+        timestep_nyquist=1 / (50 * ω)
+    )
+"""
+function lab_frame_rollout(
+    ψ̃::AbstractVector{Float64},
+    sys::QuantumSystem,
+    controls::AbstractMatrix{Float64};
+    duration=nothing,
+    timestep=nothing,
+    ω=:ω ∈ keys(sys.params) ? sys.params[:ω] : nothing,
+    timestep_nyquist=1 / (50 * ω),
+    return_pulse=false
+)
+    @assert !isnothing(duration) "must specify duration"
+    @assert !isnothing(timestep) "must specify timestep"
+    @assert !isnothing(ω) "must specify ω"
+
+    # TODO: generalize to more than 2 drives
+    @assert length(sys.H_drives) == 2 "must have 2 drives"
+
+
+    controls_upsampled, times_upsampled =
+        upsample(controls, duration, timestep, timestep_nyquist)
+
+    u = controls_upsampled[1, :]
+    v = controls_upsampled[2, :]
+
+    c = cos.(2π * ω * times_upsampled)
+    s = sin.(2π * ω * times_upsampled)
+
+    pulse = stack([u .* c - v .* s, u .* s + v .* c], dims=1)
+
+    Ψ̃ = rollout(ψ̃, pulse, timestep_nyquist, sys)
+
+    if return_pulse
+        return Ψ̃, pulse
+    else
+        return Ψ̃
+    end
+end
+
+
+
+"""
     lab_frame_unitary_rollout(
         sys::AbstractQuantumSystem,
         controls::AbstractMatrix{Float64};
@@ -274,6 +326,69 @@ function lab_frame_unitary_rollout(
 
     return unitary_rollout(pulse, timestep_nyquist, sys), pulse
 end
+
+function lab_frame_rollout(
+    ψ̃::AbstractVector{Float64},
+    sys::CompositeQuantumSystem,
+    controls::AbstractMatrix{Float64};
+    duration=nothing,
+    timestep=nothing,
+    ω_index=1,
+    ω=:ω ∈ keys(sys.subsystems[ω_index].params) ?
+        sys.subsystems[ω_index].params[:ω] :
+        nothing,
+    timestep_nyquist=1 / (50 * ω),
+    drive_frequencies_all_equal=false,
+    return_pulse=false,
+    return_nyquist_timestep=false
+)
+    @assert !isnothing(duration) "must specify duration"
+    @assert !isnothing(timestep) "must specify timestep"
+    @assert !isnothing(ω) "must specify ω"
+
+    # TODO: generalize to more than 2 drives per subsystem
+    n_drives = length(sys.H_drives)
+
+    controls_upsampled, times_upsampled =
+        upsample(controls, duration, timestep, timestep_nyquist)
+
+    U = controls_upsampled[1:2:n_drives, :]
+    V = controls_upsampled[2:2:n_drives, :]
+
+    if drive_frequencies_all_equal
+        ωs = fill(ω, n_drives ÷ 2)
+    else
+        ωs = [subsys.params[:ω] for subsys ∈ sys.subsystems if !isempty(subsys.H_drives)]
+    end
+
+    C = cos.(2π * ωs * times_upsampled')
+    S = sin.(2π * ωs * times_upsampled')
+
+    pulse = vcat([
+        stack([u .* c - v .* s, u .* s + v .* c]; dims=1)
+            for (u, v, c, s) ∈ zip(eachrow.([U, V, C, S])...)
+    ]...)
+
+    Ψ̃ = rollout(ψ̃, pulse, timestep_nyquist, sys)
+    if return_pulse
+        if return_nyquist_timestep
+            return Ψ̃, pulse, timestep_nyquist
+        else
+            return Ψ̃, pulse
+        end
+    else
+        if return_nyquist_timestep
+            return Ψ̃, timestep_nyquist
+        else
+            return Ψ̃
+        end
+    end
+end
+
+lab_frame_rollout(ψ̃_inits::Vector{<:AbstractVector{Float64}}, args...; kwargs...) =
+    [lab_frame_rollout(ψ̃, args...; kwargs...) for ψ̃ ∈ ψ̃_inits]
+
+
 
 function lab_frame_unitary_rollout(
     sys::CompositeQuantumSystem,

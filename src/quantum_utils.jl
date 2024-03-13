@@ -415,7 +415,7 @@ function quantum_state(
     if return_states
         return states
     else
-        return kron(states...)
+        return kron([1.0], states...)
     end
 end
 
