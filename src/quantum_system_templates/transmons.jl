@@ -70,7 +70,11 @@ function TransmonSystem(;
     end
 
     if drives
-        H_drives = [a + a', 1.0im * (a - a')]
+        if lab_frame
+            H_drives = [a + a']
+        else
+            H_drives = [a + a', 1.0im * (a - a')]
+        end
     else
         H_drives = Matrix{ComplexF64}[]
     end

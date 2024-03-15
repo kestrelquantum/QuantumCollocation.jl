@@ -89,11 +89,15 @@ end
 
 function unitary_rollout(
     Ũ⃗₁::AbstractVector{<:Real},
-    controls::AbstractMatrix{Float64},
+    controls::AbstractVecOrMat{Float64},
     Δt::Union{AbstractVector{Float64}, AbstractMatrix{Float64}, Float64},
     system::AbstractQuantumSystem;
     integrator=exp
 )
+    if controls isa AbstractVector
+        controls = reshape(controls, 1, :)
+    end
+
     if Δt isa AbstractMatrix
         @assert size(Δt, 1) == 1
         Δt = vec(Δt)
@@ -130,7 +134,7 @@ end
 
 
 function unitary_rollout(
-    controls::AbstractMatrix{Float64},
+    controls::AbstractVecOrMat{Float64},
     Δt::Union{AbstractVector{Float64}, AbstractMatrix{Float64}, Float64},
     system::AbstractQuantumSystem;
     integrator=exp
@@ -211,17 +215,32 @@ function QuantumUtils.unitary_fidelity(
     )
 end
 
-function sample_at(t::Float64, controls::AbstractMatrix{Float64}, Δt::Float64)
-    @assert t >= 0 "t must be non-negative"
-    @assert Δt > 0 "Δt must be positive"
-    @assert t <= size(controls, 2) * Δt "t must be less than the duration of the controls"
+function sample_at(t::Float64, signal::AbstractMatrix{Float64}, Δt::Float64)
+    @assert t >= 0 "t = $(t) must be non-negative"
+    @assert Δt > 0 "Δt = $(Δt) must be positive"
+    duration = size(signal, 2) * Δt
+    @assert t <= duration "t = $(t) must be less than the duration ($(duration) = $(size(signal, 2)) * $(Δt)) of the signal"
 
     i = floor(Int, t / Δt) + 1
-    controls[:, i]
+
+    return signal[:, i]
+end
+
+function sample_at(t::Float64, signal::AbstractMatrix{Float64}, Δt::AbstractVector{Float64})
+    @assert t >= 0 "t = $(t) must be non-negative"
+    @assert all(Δt .> 0) "all Δt must be positive"
+    duration = sum(Δt)
+    @assert t <= duration "t = $(t) must be less than the duration ($(duration) = $(sum(Δt))) of the signal"
+
+    ts = cumsum([0; Δt[1:end-1]])
+
+    i = searchsortedlast(ts, t)
+
+    return signal[:, i]
 end
 
 function upsample(
-    controls::AbstractMatrix{Float64},
+    signal::AbstractMatrix{Float64},
     duration::Float64,
     Δt::Float64,
     Δt_new::Float64
@@ -232,9 +251,27 @@ function upsample(
 
     times_upsampled = LinRange(0, duration, floor(Int, duration / Δt_new) + 1)
 
-    controls_upsampled = stack([sample_at(t, controls, Δt) for t in times_upsampled])
+    signal_upsampled = stack([sample_at(t, signal, Δt) for t ∈ times_upsampled])
 
-    return controls_upsampled, times_upsampled
+    return signal_upsampled, times_upsampled
+end
+
+
+function upsample(
+    signal::AbstractMatrix{Float64},
+    duration::Float64,
+    Δt::AbstractVector{Float64},
+    Δt_new::Float64
+)
+    @assert all(Δt .> 0) "all Δt must be positive"
+    @assert Δt_new > 0 "Δt_new must be positive"
+    @assert Δt_new < minimum(Δt) "Δt_new must be less than the minimum Δt"
+
+    times_upsampled = LinRange(0, duration, floor(Int, duration / Δt_new) + 1)
+
+    signal_upsampled = stack([sample_at(t, signal, Δt) for t ∈ times_upsampled])
+
+    return signal_upsampled, times_upsampled
 end
 
 """
@@ -303,7 +340,7 @@ function lab_frame_unitary_rollout(
     duration=nothing,
     timestep=nothing,
     ω=:ω ∈ keys(sys.params) ? sys.params[:ω] : nothing,
-    timestep_nyquist=1 / (50 * ω),
+    timestep_nyquist=1 / (20000 * ω),
     return_pulse=false,
     return_nyquist_timestep=false
 )
@@ -312,8 +349,7 @@ function lab_frame_unitary_rollout(
     @assert !isnothing(ω) "must specify ω"
 
     # TODO: generalize to more than 2 drives
-    @assert length(sys.H_drives) == 2 "must have 2 drives"
-
+    @assert length(sys.H_drives) == 1 "must have 1 drive in lab frame"
 
     controls_upsampled, times_upsampled =
         upsample(controls, duration, timestep, timestep_nyquist)
@@ -324,7 +360,8 @@ function lab_frame_unitary_rollout(
     c = cos.(2π * ω * times_upsampled)
     s = sin.(2π * ω * times_upsampled)
 
-    pulse = stack([u .* c - v .* s, u .* s + v .* c], dims=1)
+    # pulse = stack([u .* c - v .* s, u .* s + v .* c], dims=1)
+    pulse = 2(u .* c + v .* s)
 
     Ũ⃗ = unitary_rollout(pulse, timestep_nyquist, sys)
 
@@ -442,7 +479,7 @@ function lab_frame_unitary_rollout(
     C = cos.(2π * ωs * times_upsampled')
     S = sin.(2π * ωs * times_upsampled')
 
-    pulse = vcat([
+    pulse::Vector{Float64} = vcat([
         stack([u .* c - v .* s, u .* s + v .* c]; dims=1)
             for (u, v, c, s) ∈ zip(eachrow.([U, V, C, S])...)
     ]...)
@@ -471,8 +508,8 @@ function lab_frame_unitary_rollout_trajectory(
     traj_rotating_frame::NamedTrajectory,
     op_lab_frame::EmbeddedOperator;
     timestep_nyquist=sys_lab_frame isa QuantumSystem ?
-        1/(400 * sys_lab_frame.params[:ω]) :
-        1/(400 * sys_lab_frame.subsystems[1].params[:ω]),
+        1/(10000 * sys_lab_frame.params[:ω]) :
+        1/(10000 * sys_lab_frame.subsystems[1].params[:ω]),
     control_name::Symbol=:a,
     kwargs...
 )::NamedTrajectory
@@ -487,6 +524,9 @@ function lab_frame_unitary_rollout_trajectory(
         return_pulse=true,
         kwargs...
     )
+
+    # println(size(Ũ⃗_labframe))
+    # println(size(pulse))
 
     return NamedTrajectory(
         (
