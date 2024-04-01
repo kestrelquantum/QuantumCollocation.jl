@@ -6,6 +6,7 @@ version = "0.2.0"
 [deps]
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
+Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 Einsum = "b7d42ee7-0b51-5a75-98ca-779d3107e4c0"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 IJulia = "7073ff75-c697-5162-941a-fcdaad2a7d2a"

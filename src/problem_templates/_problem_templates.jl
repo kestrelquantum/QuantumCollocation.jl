@@ -18,6 +18,7 @@ using ..Integrators
 using ..Problems
 using ..IpoptOptions
 
+using Distributions
 using NamedTrajectories
 using LinearAlgebra
 using JLD2
