@@ -20,7 +20,6 @@ using ..IpoptOptions
 
 using NamedTrajectories
 using LinearAlgebra
-using Distributions
 using JLD2
 
 include("unitary_smooth_pulse_problem.jl")

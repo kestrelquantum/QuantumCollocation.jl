@@ -71,13 +71,6 @@ servedocs(literate_dir="docs/literate", skip_dir="docs/src/generated")
 
 Changes made to files in the docs directory should be automatically reflected in the live server. To reflect changes in the source code (e.g. doc strings), since we are using Revise, simply kill the live server running in the REPL (with, e.g., Ctrl-C) and restart it with the above command. 
 
-
-## Repo Structure
-
-Uses GitHub Next's [repo-visualization](https://githubnext.com/projects/repo-visualization/) tool to see repo structure.
-
-![Repo Structure](images/diagram.svg)
-
 ## TODO:
 
 Documentation:
