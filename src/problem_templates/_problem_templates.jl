@@ -18,9 +18,9 @@ using ..Integrators
 using ..Problems
 using ..IpoptOptions
 
+using Distributions
 using NamedTrajectories
 using LinearAlgebra
-using Distributions
 using JLD2
 
 include("unitary_smooth_pulse_problem.jl")
