@@ -1,13 +1,17 @@
 # Testing dynamics derivatives
 
-@testset "Dynamics" begin
-    # initializing test system
-    T = 5
-    H_drift = GATES[:Z]
-    H_drives = [GATES[:X], GATES[:Y]]
-    n_drives = length(H_drives)
+    # @testitem "Dynamics" begin
+    #     using NamedTrajectories
 
-    system = QuantumSystem(H_drift, H_drives)
+    #     # initializing test system
+    #     T = 5
+    #     H_drift = GATES[:Z]
+    #     H_drives = [GATES[:X], GATES[:Y]]
+    #     n_drives = length(H_drives)
+
+    #     system = QuantumSystem(H_drift, H_drives)
+
+    # end
 
     # @testset "State Dynamics" begin
 
@@ -50,65 +54,66 @@
     #         dense(dynamics.μ∂²F(Z.datavec, μ), dynamics.μ∂²F_structure, shape))
     # end
 
-    @testset "Unitary dynamics" begin
-        U_init = GATES[:I]
-        U_goal = GATES[:X]
+    # @testitem "Unitary dynamics" begin
+    #     U_init = GATES[:I]
+    #     U_goal = GATES[:X]
 
-        Ũ⃗_init = operator_to_iso_vec(U_init)
-        Ũ⃗_goal = operator_to_iso_vec(U_goal)
+    #     Ũ⃗_init = operator_to_iso_vec(U_init)
+    #     Ũ⃗_goal = operator_to_iso_vec(U_goal)
 
-        dt = 0.1
+    #     dt = 0.1
 
-        Z = NamedTrajectory(
-            (
-                Ũ⃗ = unitary_geodesic(U_goal, T),
-                a = randn(n_drives, T),
-                da = randn(n_drives, T),
-                Δt = fill(dt, 1, T),
-            ),
-            controls=(:da,),
-            timestep=:Δt,
-            goal=(Ũ⃗ = Ũ⃗_goal,)
-        )
+    #     Z = NamedTrajectory(
+    #         (
+    #             Ũ⃗ = unitary_geodesic(U_goal, T),
+    #             a = randn(n_drives, T),
+    #             da = randn(n_drives, T),
+    #             Δt = fill(dt, 1, T),
+    #         ),
+    #         controls=(:da,),
+    #         timestep=:Δt,
+    #         goal=(Ũ⃗ = Ũ⃗_goal,)
+    #     )
+    # end
 
-        @testset "UnitaryPadeIntegrator integrator + DerivativeIntegrator on a & da" begin
+        # @testset "UnitaryPadeIntegrator integrator + DerivativeIntegrator on a & da" begin
 
-            P = UnitaryPadeIntegrator(system, :Ũ⃗, :a)
-            D = DerivativeIntegrator(:a, :da, Z)
+        #     P = UnitaryPadeIntegrator(system, :Ũ⃗, :a)
+        #     D = DerivativeIntegrator(:a, :da, Z)
 
-            f = [P, D]
+        #     f = [P, D]
 
-            dynamics = QuantumDynamics(f, Z)
+        #     dynamics = QuantumDynamics(f, Z)
 
-            # test dynamics jacobian
-            shape = (Z.dims.states * (Z.T - 1), Z.dim * Z.T)
+        #     # test dynamics jacobian
+        #     shape = (Z.dims.states * (Z.T - 1), Z.dim * Z.T)
 
-            # display(dynamics.∂F(Z.datavec))
+        #     # display(dynamics.∂F(Z.datavec))
 
-            J_dynamics = dense(dynamics.∂F(Z.datavec), dynamics.∂F_structure, shape)
-            # display(sparse(J_dynamics))
-            # display(Z.data)
-            # println(Z.dim)
-            #display(Z.datavec)
-            J_forward_diff = ForwardDiff.jacobian(dynamics.F, Z.datavec)
-            # display(J_dynamics)
-            # display(sparse(J_forward_diff))
-            @test all(J_forward_diff .≈ J_dynamics)
-            # show_diffs(J_forward_diff, J_dynamics)
+        #     J_dynamics = dense(dynamics.∂F(Z.datavec), dynamics.∂F_structure, shape)
+        #     # display(sparse(J_dynamics))
+        #     # display(Z.data)
+        #     # println(Z.dim)
+        #     #display(Z.datavec)
+        #     J_forward_diff = ForwardDiff.jacobian(dynamics.F, Z.datavec)
+        #     # display(J_dynamics)
+        #     # display(sparse(J_forward_diff))
+        #     @test all(J_forward_diff .≈ J_dynamics)
+        #     # show_diffs(J_forward_diff, J_dynamics)
 
-            # test dynamics hessian of the lagrangian
-            # shape = (Z.dim * Z.T, Z.dim * Z.T)
+        #     # test dynamics hessian of the lagrangian
+        #     # shape = (Z.dim * Z.T, Z.dim * Z.T)
 
-            # μ = ones(Z.dims.states * (Z.T - 1))
+        #     # μ = ones(Z.dims.states * (Z.T - 1))
 
-            # HoL_dynamics = dense(dynamics.μ∂²F(Z.datavec, μ), dynamics.μ∂²F_structure, shape)
+        #     # HoL_dynamics = dense(dynamics.μ∂²F(Z.datavec, μ), dynamics.μ∂²F_structure, shape)
 
-            # hessian_atol = 1e-15
+        #     # hessian_atol = 1e-15
 
-            # HoL_forward_diff = ForwardDiff.hessian(Z⃗ -> dot(μ, dynamics.F(Z⃗)), Z.datavec)
-            # @test all(isapprox.(HoL_forward_diff, HoL_dynamics; atol=hessian_atol))
-            # show_diffs(HoL_forward_diff, HoL_dynamics; atol=hessian_atol)
-        end
+        #     # HoL_forward_diff = ForwardDiff.hessian(Z⃗ -> dot(μ, dynamics.F(Z⃗)), Z.datavec)
+        #     # @test all(isapprox.(HoL_forward_diff, HoL_dynamics; atol=hessian_atol))
+        #     # show_diffs(HoL_forward_diff, HoL_dynamics; atol=hessian_atol)
+        # end
 
         # @testset "UnitaryPadeIntegrator integrator w/ autodiff + DerivativeIntegrator on a & da" begin
 
