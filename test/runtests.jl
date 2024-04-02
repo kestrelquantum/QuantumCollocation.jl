@@ -1,4 +1,6 @@
 using Test
+using TestItemRunner
+
 using LinearAlgebra
 using ForwardDiff
 using SparseArrays
@@ -18,3 +20,5 @@ include("test_utils.jl")
     # include("dynamics_test.jl")
     include("problem_templates_test.jl")
 end
+
+@run_package_tests
