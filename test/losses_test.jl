@@ -14,12 +14,8 @@ Tests: Losses submodule
         return Losses.isovec_unitary_fidelity(Ũ⃗₁, Ũ⃗₂)
     end
 
-    function is_unitary(U::AbstractMatrix)
-        return U'U ≈ I
-    end
-
     for U in [U_X, U_Y]
-        @test is_unitary(U)
+        @test U'U ≈ I
     end
 
     # Test gate fidelity
@@ -33,7 +29,7 @@ Tests: Losses submodule
     U_2 = U_fn(1.5, .33)
 
     for U in [U_1, U_2]
-        @test is_unitary(U)
+        @test U'U ≈ I
     end
 
     @test test_isovec_unitary_fidelity(U_1, U_1) ≈ 1
@@ -46,7 +42,7 @@ Tests: Losses submodule
     U_H2 = haar_random(2)
 
     for U in [U_H1, U_H2]
-        @test is_unitary(U)
+        @test U'U ≈ I
     end
 
     @test test_isovec_unitary_fidelity(U_H1, U_H1) ≈ 1
@@ -57,21 +53,35 @@ end
 
 
 @testitem "Isovec Unitary Fidelity Subspace" begin
-        # Test random fidelity
+    using LinearAlgebra
+
+    function test_isovec_unitary_fidelity(U₁::AbstractMatrix, U₂::AbstractMatrix, args...)
+        Ũ⃗₁ = operator_to_iso_vec(U₁)
+        Ũ⃗₂ = operator_to_iso_vec(U₂)
+        return Losses.isovec_unitary_fidelity(Ũ⃗₁, Ũ⃗₂, args...)
+    end
+
+    # Test random fidelity
+    test_subspaces = [
+        get_subspace_indices([1:2, 1:1], [2, 2]),
+        get_subspace_indices([1:2, 2:2], [2, 2]),
+    ]
+
+    for ii in test_subspaces
         U_H1 = kron(haar_random(2), haar_random(2))
+        U_H1_sub = U_H1[ii, ii]
         U_H2 = kron(haar_random(2), haar_random(2))
-        subspace_indices([2, 2])
-    
+        U_H2_sub = U_H2[ii, ii]
+
+        # subspace may not be unitary
         for U in [U_H1, U_H2]
-            @test is_unitary(U)
+            @test U'U ≈ I
         end
-    
-        @test test_isovec_unitary_fidelity(U_H1, U_H1) ≈ 1
-        @test test_isovec_unitary_fidelity(U_H2, U_H2) ≈ 1
-        @test test_isovec_unitary_fidelity(U_H1, U_X) ≈ abs(tr(U_H1'U_X)) / 2
-        @test test_isovec_unitary_fidelity(U_H1, U_H2) ≈ abs(tr(U_H1'U_H2)) / 2
 
-
+        fid = test_isovec_unitary_fidelity(U_H1, U_H2, (ii, ii))
+        fid_sub = test_isovec_unitary_fidelity(U_H1_sub, U_H2_sub)
+        @test fid ≈ fid_sub
+    end
 end
 
 
