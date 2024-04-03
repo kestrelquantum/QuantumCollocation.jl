@@ -7,6 +7,8 @@ export vec⁻¹
 export operators_from_dict
 export kron_from_dict
 export apply
+export haar_random
+export haar_identity
 export qubit_system_state
 export lift
 export ket_to_iso
@@ -26,7 +28,6 @@ export iso_fidelity
 export unitary_fidelity
 export population
 export populations
-export subspace_unitary
 export quantum_state
 
 using TrajectoryIndexingUtils
@@ -84,6 +85,24 @@ function apply(gate::Symbol, ψ::Vector{<:Number})
     Û = get_gate(gate)
     @assert size(Û, 2) == size(ψ, 1) "gate size does not match ket dim"
     return ComplexF64.(normalize(Û * ψ))
+end
+
+function haar_random(n::Int)
+    # Ginibre matrix
+    Z = (randn(n, n) + im * randn(n, n)) / √2
+    F = qr(Z)
+    # QR correction (R main diagonal is real, strictly positive)
+    Λ = diagm(diag(F.R) ./ abs.(diag(F.R)))
+    return F.Q * Λ
+end
+
+function haar_identity(n::Int, radius::Number)
+    # Ginibre matrix
+    Z = (I + radius * (randn(n, n) + im * randn(n, n)) / √2) / (1 + radius)
+    F = qr(Z)
+    # QR correction (R main diagonal is real, strictly positive)
+    Λ = diagm(diag(F.R) ./ abs.(diag(F.R)))
+    return F.Q * Λ
 end
 
 """

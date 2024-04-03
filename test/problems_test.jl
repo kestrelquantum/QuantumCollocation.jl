@@ -7,7 +7,7 @@
     - test problem loading
 """
 
-@testset "Problems" begin
+@testitem "Problems" begin
     # initializing test system
     T = 5
     H_drift = GATES[:Z]

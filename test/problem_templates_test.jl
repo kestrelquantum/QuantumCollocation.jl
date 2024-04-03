@@ -8,7 +8,6 @@
 
 
 @testset "Problem Templates" begin
-
     H_drift = GATES[:Z]
     H_drives = [GATES[:X], GATES[:Y]]
     U_goal = GATES[:H]
@@ -18,8 +17,10 @@
     # --------------------------------------------
     # 1. test UnitarySmoothPulseProblem
     # --------------------------------------------
-
-    prob = UnitarySmoothPulseProblem(H_drift, H_drives, U_goal, T, Δt)
+    prob = UnitarySmoothPulseProblem(
+        H_drift, H_drives, U_goal, T, Δt, 
+        ipopt_options=Options(print_level=4)
+    )
 
     solve!(prob; max_iter=100)
 
@@ -31,7 +32,11 @@
 
     final_fidelity = 0.99
 
-    mintime_prob = UnitaryMinimumTimeProblem(prob; final_fidelity=final_fidelity)
+    mintime_prob = UnitaryMinimumTimeProblem(
+        prob, 
+        final_fidelity=final_fidelity, 
+        ipopt_options=Options(print_level=4)
+    )
 
     solve!(mintime_prob; max_iter=100)
 
@@ -44,6 +49,7 @@ end
 
 
 @testset "Robust and Subspace Templates" begin
+    # TODO: Improve these tests.
     # --------------------------------------------
     # Initialize with UnitarySmoothPulseProblem
     # --------------------------------------------
@@ -62,14 +68,15 @@ end
     #   - rely on linear interpolation of unitary
     # --------------------------------------------
     probs["transmon"] = UnitarySmoothPulseProblem(
-        sys, U_goal, T, Δt;
+        sys, U_goal, T, Δt,
         geodesic=false,
         verbose=false,
+        ipopt_options=Options(print_level=4)
     )
     solve!(probs["transmon"]; max_iter=200)
 
     # Subspace gate success
-    @test unitary_fidelity(probs["transmon"]; subspace=subspace) > 0.99
+    @test unitary_fidelity(probs["transmon"], subspace=subspace) > 0.99
 
 
     # --------------------------------------------
@@ -80,7 +87,7 @@ end
         final_fidelity=0.99,
         subspace=subspace,
         verbose=false,
-        ipopt_options=Options(recalc_y="yes", recalc_y_feas_tol=1e-1)
+        ipopt_options=Options(recalc_y="yes", recalc_y_feas_tol=1e-1, print_level=4)
     )
     solve!(probs["robust"]; max_iter=200)
 
@@ -104,8 +111,10 @@ end
     constraints = AbstractConstraint[]
 
     probs["unconstrained"] = UnitaryRobustnessProblem(
-        H_error, trajectory, system, objective, integrators, constraints;
-        final_fidelity=0.99, subspace=subspace, verbose=false
+        H_error, trajectory, system, objective, integrators, constraints,
+        final_fidelity=0.99, 
+        subspace=subspace, 
+        ipopt_options=Options(recalc_y="yes", recalc_y_feas_tol=1e-1, print_level=4)
     )
     solve!(probs["unconstrained"]; max_iter=100)
 
@@ -114,6 +123,4 @@ end
 
     # Fidelity constraint approximately satisfied
     @test isapprox(unitary_fidelity(probs["unconstrained"]; subspace=subspace), 0.99, atol=0.025)
-
-
 end

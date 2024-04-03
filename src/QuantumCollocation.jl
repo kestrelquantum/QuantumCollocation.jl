@@ -17,6 +17,9 @@ include("quantum_system_templates/_quantum_system_templates.jl")
 include("embedded_operators.jl")
 @reexport using .EmbeddedOperators
 
+include("quantum_system_utils.jl")
+@reexport using .QuantumSystemUtils
+
 include("losses.jl")
 @reexport using .Losses
 

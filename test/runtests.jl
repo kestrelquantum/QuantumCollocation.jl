@@ -1,4 +1,6 @@
 using Test
+using TestItemRunner
+
 using LinearAlgebra
 using ForwardDiff
 using SparseArrays
@@ -13,8 +15,9 @@ using NamedTrajectories
 include("test_utils.jl")
 
 @testset "QuantumCollocation.jl" begin
-    # include("quantum_systems_test.jl")
     # include("objectives_test.jl")
     # include("dynamics_test.jl")
     include("problem_templates_test.jl")
 end
+
+@run_package_tests
