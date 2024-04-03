@@ -5,6 +5,7 @@ export EmbeddedOperator
 export embed
 export unembed
 export get_subspace_indices
+export get_subspace_enr_indices
 export get_subspace_leakage_indices
 export get_unitary_isomorphism_leakage_indices
 export get_unitary_isomorphism_subspace_indices
@@ -17,23 +18,21 @@ using TrajectoryIndexingUtils
 using ..QuantumUtils
 using ..QuantumSystems
 
+
+basis_labels(subsystem_levels::AbstractVector{Int}; baseline=1) =
+    kron([""], [string.(baseline:levels - 1 + baseline) for levels ∈ subsystem_levels]...)
+
+basis_labels(subsystem_level::Int; kwargs...) = basis_labels([subsystem_level]; kwargs...)
+
 function get_subspace_indices(
     subspaces::Vector{<:AbstractVector{Int}},
     subsystem_levels::AbstractVector{Int}
 )
     @assert length(subspaces) == length(subsystem_levels)
-
-    basis = kron([""], [string.(1:level) for level ∈ subsystem_levels]...)
-
-    subspace_indices = findall(
-        b -> all(
-            l ∈ subspaces[i]
-                for (i, l) ∈ enumerate([parse(Int, bᵢ) for bᵢ ∈ b])
-        ),
-        basis
+    return findall(
+        b -> all(l ∈ subspaces[i] for (i, l) ∈ enumerate([parse(Int, bᵢ) for bᵢ ∈ b])),
+        basis_labels(subsystem_levels, baseline=1)
     )
-
-    return subspace_indices
 end
 
 get_subspace_indices(subspace::AbstractVector{Int}, levels::Int) =
@@ -41,6 +40,14 @@ get_subspace_indices(subspace::AbstractVector{Int}, levels::Int) =
 
 get_subspace_indices(levels::AbstractVector{Int}; subspace=1:2, kwargs...) =
     get_subspace_indices(fill(subspace, length(levels)), levels; kwargs...)
+
+function get_subspace_enr_indices(excitation_restriction::Int, subsystem_levels::AbstractVector{Int})
+    # excitation_number uses baseline of zero
+    return findall(
+        b -> sum([parse(Int, bᵢ) for bᵢ ∈ b]) ≤ excitation_restriction,
+        basis_labels(subsystem_levels, baseline=0)
+    )
+end
 
 function get_subspace_leakage_indices(
     subspaces::Vector{<:AbstractVector{Int}},
