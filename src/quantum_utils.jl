@@ -3,6 +3,7 @@ module QuantumUtils
 export GATES
 export get_gate
 export ⊗
+export direct_sum
 export vec⁻¹
 export operators_from_dict
 export kron_from_dict
@@ -32,6 +33,7 @@ export quantum_state
 
 using TrajectoryIndexingUtils
 using LinearAlgebra
+using SparseArrays
 
 
 """
@@ -45,7 +47,7 @@ using LinearAlgebra
 """
 
 function direct_sum(A::AbstractMatrix, B::AbstractMatrix)
-    return [A zeros((size(A, 1), size(B, 2))); zeros((size(B, 1), size(A, 2))) B]
+    return [A spzeros((size(A, 1), size(B, 2))); spzeros((size(B, 1), size(A, 2))) B]
 end
 
 function direct_sum(Ã⃗::AbstractVector, B̃⃗::AbstractVector)
