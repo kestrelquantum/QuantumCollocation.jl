@@ -12,6 +12,7 @@ export MinimumTimeObjective
 export InfidelityRobustnessObjective
 
 export QuadraticRegularizer
+export PairwiseQuadraticRegularizer
 export QuadraticSmoothnessRegularizer
 export L1Regularizer
 
@@ -448,6 +449,155 @@ function QuadraticRegularizer(
     )
 end
 
+@doc raw"""
+    PairwiseQuadraticRegularizer(
+        Q::AbstractVector{<:Real},
+        times::AbstractVector{Int},
+        name1::Symbol,
+        name2::Symbol;
+        timestep_symbol::Symbol=:Δt,
+        eval_hessian::Bool=false,
+    )
+
+Create a pairwise quadratic regularizer for the trajectory component `name` with
+regularization strength `Q`. The regularizer is defined as
+
+```math
+    J_{Ũ⃗}(u) = \sum_t \frac{1}{2} \Delta t_t^2 (Ũ⃗_{1,t} - Ũ⃗_{2,t})^T Q (Ũ⃗_{1,t} - Ũ⃗_{2,t})
+```
+
+where $Ũ⃗_{1}$ and $Ũ⃗_{2}$ are selected by `name1` and `name2`. The
+indices specify the appropriate block diagonal components of the direct sum 
+unitary vector `Ũ⃗`.
+
+TODO: Hessian not implemented
+"""
+function PairwiseQuadraticRegularizer(
+    Q::AbstractVector{<:Real},
+    times::AbstractVector{Int},
+    name1::Symbol,
+    name2::Symbol;
+    timestep_symbol::Symbol=:Δt,
+    eval_hessian::Bool=false,
+)
+    params = Dict(
+        :type => :PairwiseQuadraticRegularizer,
+        :times => times,
+        :name => (name1, name2),
+        :Q => Q,
+        :eval_hessian => eval_hessian,
+    )
+
+    @views function L(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory)
+        J = 0.0
+        for t ∈ times
+            if Z.timestep isa Symbol
+                Δt = Z⃗[slice(t, Z.components[timestep_symbol], Z.dim)]
+            else
+                Δt = Z.timestep
+            end
+            z1_t = Z⃗[slice(t, Z.components[name1], Z.dim)]
+            z2_t = Z⃗[slice(t, Z.components[name1], Z.dim)]
+            r_t = Δt * (z1_t .- z2_t)
+            J += 0.5 * r_t' * (Q .* r_t)
+        end
+        return J
+    end
+
+    @views function ∇L(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory)
+        ∇ = zeros(Z.dim * Z.T)        
+        Threads.@threads for t ∈ times
+            z1_t_slice = slice(t, Z.components[name1], Z.dim)
+            z2_t_slice = slice(t, Z.components[name2], Z.dim)
+            z1_t = Z⃗[z1_t_slice]
+            z2_t = Z⃗[z2_t_slice]
+            
+            if Z.timestep isa Symbol
+                Δt_slice = slice(t, Z.components[timestep_symbol], Z.dim)
+                Δt = Z⃗[Δt_slice]
+                ∇[Δt_slice] .= (z1_t .- z2_t)' * (Q .* (Δt .* (z1_t .- z2_t)))
+            else
+                Δt = Z.timestep
+            end
+
+            ∇[z1_t_slice] .= Q .* (Δt^2 * (z1_t .- z2_t))
+            ∇[z2_t_slice] .= Q .* (Δt^2 * (z2_t .- z1_t))
+        end
+        return ∇
+    end
+    
+    # TODO: Hessian not implemented
+    ∂²L = nothing
+    ∂²L_structure = nothing
+
+    if eval_hessian
+        throw(ErrorException("Hessian not implemented"))
+    end
+
+    return Objective(L, ∇L, ∂²L, ∂²L_structure, Dict[params])
+end
+
+@doc raw"""
+PairwiseQuadraticRegularizer(
+        Qs::AbstractVector{<:Real},
+        graph::AbstractVector{<:AbstractVector{Symbol}},
+        num_systems::Int;
+        name::Symbol=:Ũ⃗,
+        kwargs...
+    )
+
+A convenience constructor for creating a PairwiseQuadraticRegularizer
+for the trajectory component `name` with regularization strength `Qs` over the
+graph `graph`. 
+
+The regularizer is defined as
+
+```math
+J_{Ũ⃗}(u) = \sum_{(i,j) \in E} \frac{1}{2} d(Ũ⃗_{i}, Ũ⃗_{j}; Q_{ij})
+```
+
+where $d(Ũ⃗_{i}, Ũ⃗_{j}; Q_{ij})$ is the pairwise distance between the unitaries with 
+weight $Q_{ij}$.
+"""
+function PairwiseQuadraticRegularizer(
+    traj::NamedTrajectory,
+    Qs::Union{Float64, AbstractVector{<:Float64}},
+    graph::AbstractVector{<:Tuple{Symbol, Symbol}};
+    kwargs...
+)       
+    if isa(Qs, Float64)
+        Qs = Qs * ones(length(graph))
+    end
+    @assert all(length(graph) == length(Qs)) "Graph and Qs must have same length"
+
+    J = NullObjective()
+    for (Qᵢⱼ, (symb1, symb2)) ∈ zip(Qs, graph)
+        # Symbols should be the same size
+        dim = size(traj[symb1], 1)
+        J += PairwiseQuadraticRegularizer(
+            Qᵢⱼ * ones(dim), 
+            1:traj.T,
+            symb1,
+            symb2,
+            kwargs...
+        )  
+    end
+
+    return J
+end
+
+function PairwiseQuadraticRegularizer(
+    traj::NamedTrajectory,
+    Q::Float64,
+    name1::Symbol,
+    name2::Symbol;
+    kwargs...
+)
+    return PairwiseQuadraticRegularizer(
+        traj, Q, [(name1, name2)];
+        kwargs...
+    )   
+end
 
 function QuadraticSmoothnessRegularizer(;
 	name::Symbol=nothing,

@@ -41,8 +41,9 @@ function UnitaryDirectSumProblem(
     probs::AbstractVector{<:QuantumControlProblem},
     final_fidelity::Real;
     prob_labels::AbstractVector{<:String}=[string(i) for i ∈ 1:length(probs)],
-    graph::Union{Nothing, AbstractVector{<:AbstractVector{<:Int}}}=nothing,
+    graph::Union{Nothing, AbstractVector{<:Tuple{Symbol, Symbol}}}=nothing,
     Q::Union{Float64, Vector{Float64}}=100.0,
+    Q_symb::Symbol=:Ũ⃗,
     R::Float64=1e-2,
     R_a::Union{Float64, Vector{Float64}}=R,
     R_da::Union{Float64, Vector{Float64}}=R,
@@ -74,9 +75,12 @@ function UnitaryDirectSumProblem(
         BLAS.set_num_threads(1)
     end
 
-    # Default chain graph
+    # Default chain graph 
     if isnothing(graph)
-        graph = [[prob_labels[i], prob_labels[j]] for (i, j) ∈ zip(1:N-1, 2:N)]
+        graph = [
+            (apply_postfix(Q_symb, i), apply_postfix(Q_symb, j))
+            for (i, j) ∈ zip(prob_labels[1:N-1], prob_labels[2:N])
+        ]
     end
 
     # Build the direct sum system
@@ -93,7 +97,7 @@ function UnitaryDirectSumProblem(
     )
 
     # TODO: How does this get used?
-    # TODO: If parameters, need to apply postfix
+    # TODO: If parameters, need to apply postfix to merge safely
     system = reduce(direct_sum, [p.system for p ∈ probs])
 
     # Rebuild trajectory constraints
@@ -113,7 +117,7 @@ function UnitaryDirectSumProblem(
     end
 
     # Build the objective function
-    J = NullObjective() #UnitaryPairwiseQuadraticRegularizer(traj, Q, graph, length(probs))
+    J = PairwiseQuadraticRegularizer(traj, Q, graph)
 
     for (p, ℓ) ∈ zip(probs, prob_labels)
         # TODO: not generic
