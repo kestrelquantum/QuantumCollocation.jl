@@ -1,11 +1,15 @@
 module Plotting
 
 export plot_unitary_populations
+export pretty_print
 
 using NamedTrajectories
 
 using ..QuantumUtils
 using ..Problems
+
+
+pretty_print(X::AbstractMatrix) = Base.show(stdout,"text/plain", X)
 
 # """
 #     plot_unitary_populations(
