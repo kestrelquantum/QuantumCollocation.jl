@@ -2,6 +2,7 @@ module Objectives
 
 export Objective
 
+export NullObjective
 export QuantumObjective
 export QuantumStateObjective
 export QuantumUnitaryObjective
@@ -48,6 +49,17 @@ struct Objective
 	∂²L::Union{Function, Nothing}
 	∂²L_structure::Union{Function, Nothing}
     terms::Vector{Dict}
+end
+
+function NullObjective()
+    params = Dict(:type => :NullObjective)
+	L(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory) = 0.0
+    ∇L(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory) = zeros(Z.dim * Z.T)
+    ∂²L_structure(Z::NamedTrajectory) = []
+    function ∂²L(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory; return_moi_vals=true)
+        return return_moi_vals ? [] : spzeros(Z.dim * Z.T, Z.dim * Z.T)
+    end
+	return Objective(L, ∇L, ∂²L, ∂²L_structure, Dict[params])
 end
 
 function Base.:+(obj1::Objective, obj2::Objective)
