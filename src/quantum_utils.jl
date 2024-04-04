@@ -40,6 +40,17 @@ using LinearAlgebra
 
 ⊗(A::AbstractVecOrMat, B::AbstractVecOrMat) = kron(A, B)
 
+"""
+    direct sum utility
+"""
+
+function direct_sum(A::AbstractMatrix, B::AbstractMatrix)
+    return [A zeros((size(A, 1), size(B, 2))); zeros((size(B, 1), size(A, 2))) B]
+end
+
+function direct_sum(Ã⃗::AbstractVector, B̃⃗::AbstractVector)
+    return operator_to_iso_vec(direct_sum(iso_vec_to_operator(Ã⃗), iso_vec_to_operator(B̃⃗)))
+end
 
 """
     quantum gates
