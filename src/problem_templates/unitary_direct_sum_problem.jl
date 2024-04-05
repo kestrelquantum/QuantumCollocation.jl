@@ -83,7 +83,7 @@ function UnitaryDirectSumProblem(
     # Default chain graph 
     if isnothing(graph)
         graph = [
-            (apply_postfix(Q_symb, i), apply_postfix(Q_symb, j))
+            (apply_suffix(Q_symb, i), apply_suffix(Q_symb, j))
             for (i, j) ∈ zip(prob_labels[1:N-1], prob_labels[2:N])
         ]
     else
@@ -94,7 +94,7 @@ function UnitaryDirectSumProblem(
                 if !(edge[1] in prob_labels && edge[2] in prob_labels)
                     throw(ArgumentError("Edge labels must be in prob_labels"))
                 end
-                push!(graph_symb, (apply_postfix(Q_symb, edge[1]), apply_postfix(Q_symb, edge[2])))
+                push!(graph_symb, (apply_suffix(Q_symb, edge[1]), apply_suffix(Q_symb, edge[2])))
             end
             graph = graph_symb
         end
@@ -102,19 +102,19 @@ function UnitaryDirectSumProblem(
 
     # Build the direct sum system
 
-    # merge postfix trajectories
+    # merge suffix trajectories
     traj = reduce(
         merge_outer, 
-        [apply_postfix(p.trajectory, ℓ) for (p, ℓ) ∈ zip(probs, prob_labels)]
+        [apply_suffix(p.trajectory, ℓ) for (p, ℓ) ∈ zip(probs, prob_labels)]
     )
 
     # add noise to control data (avoid restoration)
     if drive_reset_ratio > 0
         σs = repeat([drive_derivative_σ], 2)
         for ℓ in prob_labels
-            a_symb = apply_postfix(:a, ℓ)
-            da_symb = apply_postfix(:da, ℓ)
-            dda_symb = apply_postfix(:dda, ℓ)
+            a_symb = apply_suffix(:a, ℓ)
+            da_symb = apply_suffix(:da, ℓ)
+            dda_symb = apply_suffix(:dda, ℓ)
             a_bounds_lower, a_bounds_upper = traj.bounds[a_symb]
             a, da, dda = randomly_fill_drives(traj.T, a_bounds_lower, a_bounds_upper, σs)
             update!(traj, a_symb, (1 - drive_reset_ratio) * traj[a_symb] + drive_reset_ratio * a)
@@ -123,15 +123,15 @@ function UnitaryDirectSumProblem(
         end
     end
 
-    # concatenate postfix integrators
+    # concatenate suffix integrators
     integrators = vcat(
-        [apply_postfix(p.integrators, ℓ) for (p, ℓ) ∈ zip(probs, prob_labels)]...
+        [apply_suffix(p.integrators, ℓ) for (p, ℓ) ∈ zip(probs, prob_labels)]...
     )
 
     # direct sum (used for problem saving, only)
     system = reduce(
         direct_sum, 
-        [apply_postfix(p.system, ℓ) for (p, ℓ) ∈ zip(probs, prob_labels)]
+        [apply_suffix(p.system, ℓ) for (p, ℓ) ∈ zip(probs, prob_labels)]
     )
 
     # Rebuild trajectory constraints
@@ -142,7 +142,7 @@ function UnitaryDirectSumProblem(
     for (p, ℓ) ∈ zip(probs, prob_labels)
         goal_symb, = keys(p.trajectory.goal)
         fidelity_constraint = FinalUnitaryFidelityConstraint(
-            apply_postfix(goal_symb, ℓ),
+            apply_suffix(goal_symb, ℓ),
             final_fidelity,
             traj;
             subspace=subspace
@@ -152,11 +152,10 @@ function UnitaryDirectSumProblem(
 
     # Build the objective function
     J = PairwiseQuadraticRegularizer(traj, Q, graph)
-
     for (p, ℓ) ∈ zip(probs, prob_labels)
-        J += QuadraticRegularizer(apply_postfix(:a, ℓ), traj, R_a)
-        J += QuadraticRegularizer(apply_postfix(:da, ℓ), traj, R_da)
-        J += QuadraticRegularizer(apply_postfix(:dda, ℓ), traj, R_dda)
+        J += QuadraticRegularizer(apply_suffix(:a, ℓ), traj, R_a)
+        J += QuadraticRegularizer(apply_suffix(:da, ℓ), traj, R_da)
+        J += QuadraticRegularizer(apply_suffix(:dda, ℓ), traj, R_dda)
     end
 
     return QuantumControlProblem(
@@ -198,13 +197,13 @@ function QuantumUtils.direct_sum(sys1::QuantumSystem, sys2::QuantumSystem)
     )
 end
 
-apply_postfix(symb::Symbol, postfix::String) = Symbol(string(symb, postfix))
-apply_postfix(symb::Tuple, postfix::String) = Tuple(apply_postfix(s, postfix) for s ∈ symb)
-apply_postfix(symb::AbstractVector, postfix::String) = [apply_postfix(s, postfix) for s ∈ symb]
-apply_postfix(d::Dict{Symbol, Any}, postfix::String) = typeof(d)(apply_postfix(k, postfix) => v for (k, v) ∈ d)
+apply_suffix(symb::Symbol, suffix::String) = Symbol(string(symb, suffix))
+apply_suffix(symb::Tuple, suffix::String) = Tuple(apply_suffix(s, suffix) for s ∈ symb)
+apply_suffix(symb::AbstractVector, suffix::String) = [apply_suffix(s, suffix) for s ∈ symb]
+apply_suffix(d::Dict{Symbol, Any}, suffix::String) = typeof(d)(apply_suffix(k, suffix) => v for (k, v) ∈ d)
 
-function apply_postfix(nt::NamedTuple, postfix::String)
-    symbs = Tuple(apply_postfix(k, postfix) for k ∈ keys(nt))
+function apply_suffix(nt::NamedTuple, suffix::String)
+    symbs = Tuple(apply_suffix(k, suffix) for k ∈ keys(nt))
     vals = [v for v ∈ values(nt)]
     return NamedTuple{symbs}(vals)
 end
@@ -215,20 +214,20 @@ function get_components(components::Union{Tuple, AbstractVector}, traj::NamedTra
     return NamedTuple{symbs}(vals)
 end
 
-function apply_postfix(components::Union{Tuple, AbstractVector}, traj::NamedTrajectory, postfix::String)
-    return apply_postfix(get_components(components, traj), postfix)
+function apply_suffix(components::Union{Tuple, AbstractVector}, traj::NamedTrajectory, suffix::String)
+    return apply_suffix(get_components(components, traj), suffix)
 end
 
-function apply_postfix(traj::NamedTrajectory, postfix::String)
+function apply_suffix(traj::NamedTrajectory, suffix::String)
     component_names = vcat(traj.state_names..., traj.control_names...)
-    components = apply_postfix(component_names, traj, postfix)
-    bounds = apply_postfix(traj.bounds, postfix)
-    initial = apply_postfix(traj.initial, postfix)
-    final = apply_postfix(traj.final, postfix)
-    goal = apply_postfix(traj.goal, postfix)
-    controls = apply_postfix(traj.control_names, postfix)
+    components = apply_suffix(component_names, traj, suffix)
+    bounds = apply_suffix(traj.bounds, suffix)
+    initial = apply_suffix(traj.initial, suffix)
+    final = apply_suffix(traj.final, suffix)
+    goal = apply_suffix(traj.goal, suffix)
+    controls = apply_suffix(traj.control_names, suffix)
     if traj.timestep isa Symbol
-        timestep = apply_postfix(traj.timestep, postfix)
+        timestep = apply_suffix(traj.timestep, suffix)
     else
         timestep = traj.timestep
     end
@@ -243,10 +242,11 @@ function apply_postfix(traj::NamedTrajectory, postfix::String)
     )
 end
 
-function apply_postfix(
+function apply_suffix(
     integrator::UnitaryPadeIntegrator, 
-    postfix::String
-)
+    suffix::String
+)   
+    # TODO: Generalize to QuantumIntegrator?
     # Just need the matrices
     sys = QuantumSystem(
         QuantumSystems.H(integrator.G_drift), 
@@ -254,30 +254,30 @@ function apply_postfix(
     )
     return UnitaryPadeIntegrator(
         sys,
-        apply_postfix(integrator.unitary_symb, postfix),
-        apply_postfix(integrator.drive_symb, postfix),
+        apply_suffix(integrator.unitary_symb, suffix),
+        apply_suffix(integrator.drive_symb, suffix),
         order=integrator.order,
         autodiff=integrator.autodiff,
         G=integrator.G
     )
 end
 
-function apply_postfix(integrator::DerivativeIntegrator, postfix::String)
+function apply_suffix(integrator::DerivativeIntegrator, suffix::String)
     return DerivativeIntegrator(
-        apply_postfix(integrator.variable, postfix),
-        apply_postfix(integrator.derivative, postfix),
+        apply_suffix(integrator.variable, suffix),
+        apply_suffix(integrator.derivative, suffix),
         integrator.dim
     )
 end
 
-apply_postfix(integrators::AbstractVector{<:AbstractIntegrator}, postfix::String) =
-    [apply_postfix(integrator, postfix) for integrator ∈ integrators]
+apply_suffix(integrators::AbstractVector{<:AbstractIntegrator}, suffix::String) =
+    [apply_suffix(integrator, suffix) for integrator ∈ integrators]
 
-function apply_postfix(sys::QuantumSystem, postfix::String)
+function apply_suffix(sys::QuantumSystem, suffix::String)
     return QuantumSystem(
         sys.H_drift,
         sys.H_drives,
-        params=apply_postfix(sys.params, postfix)
+        params=apply_suffix(sys.params, suffix)
     )
 end
 
@@ -348,20 +348,103 @@ function merge_outer(
 
 end
 
+# TODO: overload or new name?
+Base.endswith(symb::Symbol, suffix::AbstractString) = endswith(String(symb), suffix)
+Base.endswith(integrator::UnitaryPadeIntegrator, suffix::String) = endswith(integrator.unitary_symb, suffix)
+Base.endswith(integrator::DerivativeIntegrator, suffix::String) = endswith(integrator.variable, suffix)
+Base.startswith(symb::Symbol, prefix::AbstractString) = startswith(String(symb), prefix)
+Base.startswith(symb::Symbol, prefix::Symbol) = startswith(String(symb), String(prefix))
+
+
+function get_suffix(nt::NamedTuple, suffix::String)
+    names = Tuple(k for (k, v) ∈ pairs(nt) if endswith(k, suffix))
+    values = [v for (k, v) ∈ pairs(nt) if endswith(k, suffix)]
+    return NamedTuple{names}(values)
+end
+
+function get_suffix(d::Dict{<:Symbol, <:Any}, suffix::String)
+    return Dict(k => v for (k, v) ∈ d if endswith(k, suffix))
+end
+
+function get_suffix(traj::NamedTrajectory, suffix::String)
+    state_names = Tuple(s for s ∈ traj.state_names if endswith(s, suffix))
+    control_names = Tuple(s for s ∈ traj.control_names if endswith(s, suffix))
+    component_names = Tuple(vcat(state_names..., control_names...))
+    components = NamedTuple{component_names}([traj[name] for name ∈ component_names])
+    return NamedTrajectory(
+        components,
+        controls=control_names,
+        timestep=traj.timestep,
+        bounds=get_suffix(traj.bounds, suffix),
+        initial=get_suffix(traj.initial, suffix),
+        final=get_suffix(traj.final, suffix),
+        goal=get_suffix(traj.goal, suffix)
+    )
+end
+
+function get_suffix(integrators::AbstractVector{<:AbstractIntegrator}, suffix::String)
+    return [deepcopy(integrator) for integrator ∈ integrators if endswith(integrator, suffix)]
+end
+
+function get_suffix(
+    prob::QuantumControlProblem,
+    suffix::String;
+    unitary_prefix::Symbol=:Ũ⃗,
+    kwargs...
+)
+    # Extract the trajectory
+    traj = get_suffix(prob.trajectory, suffix)
+
+    # Extract the integrators
+    integrators = get_suffix(prob.integrators, suffix)
+    
+    # Get direct sum indices
+    # TODO: doesn't exclude more than one match
+    i₀ = 0
+    indices = Int[]
+    for (k, d) ∈ pairs(traj.dims)
+        if startswith(k, unitary_prefix)
+            if endswith(k, suffix)
+                # undo real/imag, undo vectorization
+                append!(indices, i₀+1:i₀+isqrt(d ÷ 2))
+            else
+                i₀ += isqrt(d ÷ 2)
+            end
+        end
+    end
+
+    # Extract the system
+    system = QuantumSystem(
+        copy(prob.system.H_drift[indices, indices]),
+        [copy(H[indices, indices]) for H in prob.system.H_drives if !iszero(H[indices, indices])],
+        params=get_suffix(prob.system.params, suffix)
+    )
+
+    # Null objective function
+    J = NullObjective()
+
+    return QuantumControlProblem(
+        system,
+        traj,
+        J,
+        integrators
+    )
+end
+
 # *************************************************************************** #
 
-@testitem "Apply postfix to trajectories" begin
+@testitem "Apply suffix to trajectories" begin
     using NamedTrajectories
     include("../../test/test_utils.jl")
 
     traj = named_trajectory_type_1(free_time=false)
-    postfix = "_new"
-    new_traj = ProblemTemplates.apply_postfix(traj, postfix)
+    suffix = "_new"
+    new_traj = ProblemTemplates.apply_suffix(traj, suffix)
     
-    @test new_traj.state_names == ProblemTemplates.apply_postfix(traj.state_names, postfix)
-    @test new_traj.control_names == ProblemTemplates.apply_postfix(traj.control_names, postfix)
+    @test new_traj.state_names == ProblemTemplates.apply_suffix(traj.state_names, suffix)
+    @test new_traj.control_names == ProblemTemplates.apply_suffix(traj.control_names, suffix)
 
-    same_traj = ProblemTemplates.apply_postfix(traj, "")
+    same_traj = ProblemTemplates.apply_suffix(traj, "")
     @test traj == same_traj
 end
 
@@ -371,9 +454,9 @@ end
 
     traj = named_trajectory_type_1(free_time=false)
     
-    # apply postfix
-    pf_traj1 = ProblemTemplates.apply_postfix(traj, "_1")
-    pf_traj2 = ProblemTemplates.apply_postfix(traj, "_2")
+    # apply suffix
+    pf_traj1 = ProblemTemplates.apply_suffix(traj, "_1")
+    pf_traj2 = ProblemTemplates.apply_suffix(traj, "_2")
 
     # merge
     new_traj = ProblemTemplates.merge_outer(pf_traj1, pf_traj2)
@@ -391,10 +474,10 @@ end
     T = 50
     sys = QuantumSystem(H_drift, H_drives, params=Dict(:T=>T))
         
-    # apply postfix and sum
+    # apply suffix and sum
     sys2 = direct_sum(
-        ProblemTemplates.apply_postfix(sys, "_1"),
-         ProblemTemplates.apply_postfix(sys, "_2")
+        ProblemTemplates.apply_suffix(sys, "_1"),
+         ProblemTemplates.apply_suffix(sys, "_2")
     )
 
     @test length(sys2.H_drives) == 4
@@ -403,7 +486,7 @@ end
 
     # add another system
     sys = QuantumSystem(H_drift, H_drives, params=Dict(:T=>T, :S=>2T))
-    sys3 = direct_sum(sys2, ProblemTemplates.apply_postfix(sys, "_3"))
+    sys3 = direct_sum(sys2, ProblemTemplates.apply_suffix(sys, "_3"))
     @test length(sys3.H_drives) == 6
     @test sys3.params[:T_3] == T
     @test sys3.params[:S_3] == 2T
@@ -423,12 +506,12 @@ end
     # Test default
     direct_sum_prob1 = UnitaryDirectSumProblem([prob1, prob2], 0.99, ipopt_options=ops)
     state_names = vcat(
-        ProblemTemplates.apply_postfix(prob1.trajectory.state_names, "1")...,
-        ProblemTemplates.apply_postfix(prob2.trajectory.state_names, "2")...
+        ProblemTemplates.apply_suffix(prob1.trajectory.state_names, "1")...,
+        ProblemTemplates.apply_suffix(prob2.trajectory.state_names, "2")...
     )
     control_names = vcat(
-        ProblemTemplates.apply_postfix(prob1.trajectory.control_names, "1")...,
-        ProblemTemplates.apply_postfix(prob2.trajectory.control_names, "2")...
+        ProblemTemplates.apply_suffix(prob1.trajectory.control_names, "1")...,
+        ProblemTemplates.apply_suffix(prob2.trajectory.control_names, "2")...
     )
     @test issetequal(direct_sum_prob1.trajectory.state_names, state_names)
     @test issetequal(direct_sum_prob1.trajectory.control_names, control_names)
@@ -441,12 +524,12 @@ end
         graph=[("a", "b")],
         ipopt_options=ops)
     state_names_ab = vcat(
-        ProblemTemplates.apply_postfix(prob1.trajectory.state_names, "a")...,
-        ProblemTemplates.apply_postfix(prob2.trajectory.state_names, "b")...
+        ProblemTemplates.apply_suffix(prob1.trajectory.state_names, "a")...,
+        ProblemTemplates.apply_suffix(prob2.trajectory.state_names, "b")...
     )
     control_names_ab = vcat(
-        ProblemTemplates.apply_postfix(prob1.trajectory.control_names, "a")...,
-        ProblemTemplates.apply_postfix(prob2.trajectory.control_names, "b")...
+        ProblemTemplates.apply_suffix(prob1.trajectory.control_names, "a")...,
+        ProblemTemplates.apply_suffix(prob2.trajectory.control_names, "b")...
     )
     @test issetequal(direct_sum_prob2.trajectory.state_names, state_names_ab)
     @test issetequal(direct_sum_prob2.trajectory.control_names, control_names_ab)
@@ -472,8 +555,8 @@ end
 
     # Test triple
     direct_sum_prob4 = UnitaryDirectSumProblem([prob1, prob2, prob1], 0.99, ipopt_options=ops)
-    state_names_triple = vcat(state_names..., ProblemTemplates.apply_postfix(prob1.trajectory.state_names, "3")...)
-    control_names_triple = vcat(control_names..., ProblemTemplates.apply_postfix(prob1.trajectory.control_names, "3")...)
+    state_names_triple = vcat(state_names..., ProblemTemplates.apply_suffix(prob1.trajectory.state_names, "3")...)
+    control_names_triple = vcat(control_names..., ProblemTemplates.apply_suffix(prob1.trajectory.control_names, "3")...)
     @test issetequal(direct_sum_prob4.trajectory.state_names, state_names_triple)
     @test issetequal(direct_sum_prob4.trajectory.control_names, control_names_triple)
 end
