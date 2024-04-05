@@ -417,7 +417,7 @@ function get_suffix(
     system = QuantumSystem(
         copy(prob.system.H_drift[indices, indices]),
         [copy(H[indices, indices]) for H in prob.system.H_drives if !iszero(H[indices, indices])],
-        params=get_suffix(prob.system.params, suffix)
+        # params=get_suffix(prob.system.params, suffix)
     )
 
     # Null objective function
@@ -496,10 +496,10 @@ end
     sys = QuantumSystem(0.01 * GATES[:Z], [GATES[:X], GATES[:Y]])
     U_goal1 = GATES[:X]
     U_ε = haar_identity(2, 0.33)
-    U_goal2 = U_ε'U_goal1*U_ε
+    U_goal2 = U_ε'GATES[:X]*U_ε
     T = 50
     Δt = 0.2
-    ops = Options(recalc_y="yes", recalc_y_feas_tol=0.01, print_level=1)
+    ops = Options(print_level=1)
     prob1 = UnitarySmoothPulseProblem(sys, U_goal1, T, Δt, free_time=false, ipopt_options=ops)
     prob2 = UnitarySmoothPulseProblem(sys, U_goal2, T, Δt, free_time=false, ipopt_options=ops)
 
@@ -559,4 +559,19 @@ end
     control_names_triple = vcat(control_names..., ProblemTemplates.apply_suffix(prob1.trajectory.control_names, "3")...)
     @test issetequal(direct_sum_prob4.trajectory.state_names, state_names_triple)
     @test issetequal(direct_sum_prob4.trajectory.control_names, control_names_triple)
+end
+
+@testitem "Get suffix" begin
+    sys = QuantumSystem(0.01 * GATES[:Z], [GATES[:X], GATES[:Y]])
+    T = 50
+    Δt = 0.2
+    ops = Options(print_level=1)
+    prob1 = UnitarySmoothPulseProblem(sys, GATES[:X], T, Δt, free_time=false, ipopt_options=ops)
+    prob2 = UnitarySmoothPulseProblem(sys, GATES[:Y], T, Δt, free_time=false, ipopt_options=ops)
+    
+    # Direct sum problem with suffix extraction
+    # Note: Turn off control reset
+    direct_sum_prob = UnitaryDirectSumProblem([prob1, prob2], 0.99, drive_reset_ratio=0.0, ipopt_options=ops)
+    prob1_got = ProblemTemplates.get_suffix(direct_sum_prob, "1")
+    @test prob1_got.trajectory == ProblemTemplates.apply_suffix(prob1.trajectory, "1")
 end
