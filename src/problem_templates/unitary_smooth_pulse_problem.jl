@@ -141,17 +141,8 @@ function UnitarySmoothPulseProblem(
             else
                 Ũ⃗ = unitary_linear_interpolation(U_init, U_goal, T)
             end
-
-            a_dists =  [Uniform(-a_bounds[i], a_bounds[i]) for i = 1:n_drives]
-
-            a = hcat([
-                zeros(n_drives),
-                vcat([rand(a_dists[i], 1, T - 2) for i = 1:n_drives]...),
-                zeros(n_drives)
-            ]...)
-
-            da = randn(n_drives, T) * drive_derivative_σ
-            dda = randn(n_drives, T) * drive_derivative_σ
+            
+            a, da, dda = randomly_fill_drives(T, a_bounds, repeat([drive_derivative_σ], 2))
         else
             Ũ⃗ = unitary_rollout(
                 operator_to_iso_vec(U_init),
@@ -300,4 +291,65 @@ function UnitarySmoothPulseProblem(
 )
     system = QuantumSystem(H_drift, H_drives)
     return UnitarySmoothPulseProblem(system, args...; kwargs...)
+end
+
+
+# *************************************************************************** #
+function randomly_fill_drives(
+    T::Int,
+    drive_bounds_lower::AbstractVector{<:Real},
+    drive_bounds_upper::AbstractVector{<:Real},
+    drive_derivatives_σ::AbstractVector{<:Real}
+)
+    data = Matrix{Float64}[]
+
+    # Drive
+    n_drives = length(drive_bounds_lower)
+    a_dists =  [Uniform(drive_bounds_lower[i], drive_bounds_upper[i]) for i = 1:n_drives]
+    push!(
+        data,
+        hcat([
+            zeros(n_drives),
+            vcat([rand(a_dists[i], 1, T - 2) for i = 1:n_drives]...),
+            zeros(n_drives)
+        ]...)
+    )
+
+    # Drive derivatives
+    for σ ∈ drive_derivatives_σ
+        push!(
+            data,
+            randn(n_drives, T) * σ
+        )
+    end
+    return data
+end
+
+function randomly_fill_drives(
+    T::Int,
+    drive_bounds::AbstractVector{<:Real},
+    drive_derivatives_σ::AbstractVector{<:Real}
+)
+    return randomly_fill_drives(
+        T,
+        -drive_bounds,
+        drive_bounds,
+        drive_derivatives_σ
+    )
+end
+
+# *************************************************************************** #
+
+@testitem "Random drive initialization" begin
+    T = 10
+    n_drives = 2
+    drive_bounds = [1.0, 2.0]
+    drive_derivatives_σ = repeat([0.01], 2)
+    
+    a, da, dda = ProblemTemplates.randomly_fill_drives(T, drive_bounds, drive_derivatives_σ)
+
+    @test size(a) == (n_drives, T)
+    @test size(da) == (n_drives, T)
+    @test size(dda) == (n_drives, T)
+    @test all([-drive_bounds[i] < minimum(a[i, :]) < drive_bounds[i] for i in 1:n_drives])
 end

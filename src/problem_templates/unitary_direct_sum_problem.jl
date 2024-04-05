@@ -25,6 +25,8 @@ between each neighbor of the provided `probs`.
 - `R_a::Union{Float64, Vector{Float64}}=R`: the weight on the regularization term for the control pulses
 - `R_da::Union{Float64, Vector{Float64}}=R`: the weight on the regularization term for the control pulse derivatives
 - `R_dda::Union{Float64, Vector{Float64}}=R`: the weight on the regularization term for the control pulse second derivatives
+- `drive_derivative_σ::Float64=0.01`: the standard deviation of the initial guess for the control pulse derivatives
+- `drive_reset_ratio::Float64=0.1`: amount of random noise to add to the control data (can help avoid hitting restoration if provided problems are converged)
 - `subspace::Union{AbstractVector{<:Integer}, Nothing}=nothing`: the subspace to use for the fidelity of each problem
 - `max_iter::Int=1000`: the maximum number of iterations for the Ipopt solver
 - `linear_solver::String="mumps"`: the linear solver to use in Ipopt
@@ -45,6 +47,8 @@ function UnitaryDirectSumProblem(
     R_a::Union{Float64, Vector{Float64}}=R,
     R_da::Union{Float64, Vector{Float64}}=R,
     R_dda::Union{Float64, Vector{Float64}}=R,
+    drive_derivative_σ::Float64=0.01,
+    drive_reset_ratio::Float64=0.50,
     subspace::Union{AbstractVector{<:Integer}, Nothing}=nothing,
     max_iter::Int=1000,
     linear_solver::String="mumps",
@@ -62,6 +66,10 @@ function UnitaryDirectSumProblem(
 
     if N < 2
         throw(ArgumentError("At least two problems are required"))
+    end
+
+    if drive_reset_ratio < 0 || drive_reset_ratio > 1
+        throw(ArgumentError("drive_reset_σ must be in [0, 1]"))
     end
 
     if hessian_approximation
@@ -99,6 +107,21 @@ function UnitaryDirectSumProblem(
         merge_outer, 
         [apply_postfix(p.trajectory, ℓ) for (p, ℓ) ∈ zip(probs, prob_labels)]
     )
+
+    # add noise to control data (avoid restoration)
+    if drive_reset_ratio > 0
+        σs = repeat([drive_derivative_σ], 2)
+        for ℓ in prob_labels
+            a_symb = apply_postfix(:a, ℓ)
+            da_symb = apply_postfix(:da, ℓ)
+            dda_symb = apply_postfix(:dda, ℓ)
+            a_bounds_lower, a_bounds_upper = traj.bounds[a_symb]
+            a, da, dda = randomly_fill_drives(traj.T, a_bounds_lower, a_bounds_upper, σs)
+            update!(traj, a_symb, (1 - drive_reset_ratio) * traj[a_symb] + drive_reset_ratio * a)
+            update!(traj, da_symb, (1 - drive_reset_ratio) * traj[da_symb] + drive_reset_ratio * da)
+            update!(traj, dda_symb, (1 - drive_reset_ratio) * traj[dda_symb] + drive_reset_ratio * dda)
+        end
+    end
 
     # concatenate postfix integrators
     integrators = vcat(
