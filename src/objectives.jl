@@ -309,30 +309,33 @@ function QuantumStateObjective(
 end
 
 function QuadraticRegularizer(;
-	name::Symbol=nothing,
-	times::AbstractVector{Int}=1:traj.T,
-    dim::Int=nothing,
-	R::AbstractVector{<:Real}=ones(traj.dims[name]),
-    values::Union{Nothing,AbstractArray{<:Real}}=nothing,
-	eval_hessian=true,
-    timestep_symbol=:Δt
+	name::Union{Nothing, Symbol}=nothing,
+	times::Union{Nothing, AbstractVector{Int}}=nothing,
+    dim::Union{Nothing, Int}=nothing,
+	R::Union{Nothing, AbstractVector{<:Real}}=nothing,
+    baseline::Union{Nothing, AbstractArray{<:Real}}=nothing,
+	eval_hessian::Bool=true,
+    timestep_symbol::Symbol=:Δt
 )
 
     @assert !isnothing(name) "name must be specified"
     @assert !isnothing(times) "times must be specified"
     @assert !isnothing(dim) "dim must be specified"
-
-    if isnothing(values)
-        values = zeros((length(R), length(times)))
+    @assert !isnothing(R) "R must be specified"
+    if isnothing(baseline)
+        baseline = zeros(length(R), length(times))
     else
-        @assert size(values) == (length(R), length(times)) "values must have the same size as name"
+        if size(baseline) != (length(R), length(times))
+            throw(ArgumentError("size(baseline)=$(size(baseline)) must match $(length(R)) x $(length(times))"))
+        end
     end
-
+    
     params = Dict(
         :type => :QuadraticRegularizer,
         :name => name,
         :times => times,
         :dim => dim,
+        :baseline => baseline,
         :R => R,
         :eval_hessian => eval_hessian
     )
@@ -347,8 +350,9 @@ function QuadraticRegularizer(;
             end
             
             vₜ = Z⃗[slice(t, Z.components[name], Z.dim)]
-            v₀ = values[:, t]
-            rₜ = Δt .* (vₜ .- v₀)
+            Δv = vₜ .- baseline[:, t]
+
+            rₜ = Δt .* Δv
             J += 0.5 * rₜ' * (R .* rₜ)
         end
         return J
@@ -358,18 +362,17 @@ function QuadraticRegularizer(;
         ∇ = zeros(Z.dim * Z.T)        
         Threads.@threads for t ∈ times
             vₜ_slice = slice(t, Z.components[name], Z.dim)
-            vₜ = Z⃗[vₜ_slice]
-            v₀ = values[:, t]
+            Δv = Z⃗[vₜ_slice] .- baseline[:, t]
 
             if Z.timestep isa Symbol
                 Δt_slice = slice(t, Z.components[timestep_symbol], Z.dim)
                 Δt = Z⃗[Δt_slice]
-                ∇[Δt_slice] .= (vₜ .- v₀)' * (R .* (Δt .* (vₜ .- v₀)))
+                ∇[Δt_slice] .= Δv' * (R .* (Δt .* Δv))
             else
                 Δt = Z.timestep
             end
 
-            ∇[vₜ_slice] .= R .* (Δt.^2 .* (vₜ .- v₀))
+            ∇[vₜ_slice] .= R .* (Δt.^2 .* Δv)
         end
         return ∇
     end
@@ -412,11 +415,11 @@ function QuadraticRegularizer(;
                     append!(values, R .* Δt.^2)
                     # ∂²_vₜ_Δt, ∂²_Δt_vₜ
                     vₜ = Z⃗[slice(t, Z.components[name], Z.dim)]
-                    v₀ = values[:, t]
-                    append!(values, 2 * (R .* (Δt .* (vₜ .- v₀))))
-                    append!(values, 2 * (R .* (Δt .* (vₜ .- v₀))))
+                    Δv = vₜ .- baseline[:, t]
+                    append!(values, 2 * (R .* (Δt .* Δv)))
+                    append!(values, 2 * (R .* (Δt .* Δv)))
                     # ∂²_Δt_Δt
-                    append!(values, (vₜ .- v₀)' * (R .* (vₜ .- v₀)))
+                    append!(values, Δv' * (R .* Δv))
                 else
                     Δt = Z.timestep
                     append!(values, R .* Δt.^2)
