@@ -313,6 +313,7 @@ function QuadraticRegularizer(;
 	times::AbstractVector{Int}=1:traj.T,
     dim::Int=nothing,
 	R::AbstractVector{<:Real}=ones(traj.dims[name]),
+    values::Union{Nothing,AbstractArray{<:Real}}=nothing,
 	eval_hessian=true,
     timestep_symbol=:Δt
 )
@@ -320,6 +321,12 @@ function QuadraticRegularizer(;
     @assert !isnothing(name) "name must be specified"
     @assert !isnothing(times) "times must be specified"
     @assert !isnothing(dim) "dim must be specified"
+
+    if isnothing(values)
+        values = zeros((length(R), length(times)))
+    else
+        @assert size(values) == (length(R), length(times)) "values must have the same size as name"
+    end
 
     params = Dict(
         :type => :QuadraticRegularizer,
@@ -330,47 +337,49 @@ function QuadraticRegularizer(;
         :eval_hessian => eval_hessian
     )
 
-	@views function L(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory)
-		J = 0.0
-		for t ∈ times
+    @views function L(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory)
+        J = 0.0
+        for t ∈ times
             if Z.timestep isa Symbol
                 Δt = Z⃗[slice(t, Z.components[timestep_symbol], Z.dim)]
             else
                 Δt = Z.timestep
             end
-
+            
             vₜ = Z⃗[slice(t, Z.components[name], Z.dim)]
-            rₜ = Δt .* vₜ
+            v₀ = values[:, t]
+            rₜ = Δt .* (vₜ .- v₀)
             J += 0.5 * rₜ' * (R .* rₜ)
-		end
-		return J
-	end
+        end
+        return J
+    end
 
-	@views function ∇L(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory)
-		∇ = zeros(Z.dim * Z.T)
-		Threads.@threads for t ∈ times
+    @views function ∇L(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory)
+        ∇ = zeros(Z.dim * Z.T)        
+        Threads.@threads for t ∈ times
             vₜ_slice = slice(t, Z.components[name], Z.dim)
             vₜ = Z⃗[vₜ_slice]
+            v₀ = values[:, t]
 
             if Z.timestep isa Symbol
                 Δt_slice = slice(t, Z.components[timestep_symbol], Z.dim)
                 Δt = Z⃗[Δt_slice]
-                ∇[Δt_slice] .= vₜ' * (R .* (Δt .* vₜ))
+                ∇[Δt_slice] .= (vₜ .- v₀)' * (R .* (Δt .* (vₜ .- v₀)))
             else
                 Δt = Z.timestep
             end
 
-			∇[vₜ_slice] .= R .* (Δt.^2 .* vₜ)
-		end
-		return ∇
-	end
+            ∇[vₜ_slice] .= R .* (Δt.^2 .* (vₜ .- v₀))
+        end
+        return ∇
+    end
 
-	∂²L = nothing
-	∂²L_structure = nothing
+    ∂²L = nothing
+    ∂²L_structure = nothing
 
-	if eval_hessian
+    if eval_hessian
 
-		∂²L_structure = Z -> begin
+        ∂²L_structure = Z -> begin
             structure = []
             # Hessian structure (eq. 17)
             for t ∈ times
@@ -394,7 +403,7 @@ function QuadraticRegularizer(;
             return structure
         end
 
-		∂²L = (Z⃗, Z) -> begin
+        ∂²L = (Z⃗, Z) -> begin
             values = []
             # Match Hessian structure indices
             for t ∈ times
@@ -403,10 +412,11 @@ function QuadraticRegularizer(;
                     append!(values, R .* Δt.^2)
                     # ∂²_vₜ_Δt, ∂²_Δt_vₜ
                     vₜ = Z⃗[slice(t, Z.components[name], Z.dim)]
-                    append!(values, 2 * (R .* (Δt .* vₜ)))
-                    append!(values, 2 * (R .* (Δt .* vₜ)))
+                    v₀ = values[:, t]
+                    append!(values, 2 * (R .* (Δt .* (vₜ .- v₀))))
+                    append!(values, 2 * (R .* (Δt .* (vₜ .- v₀))))
                     # ∂²_Δt_Δt
-                    append!(values, vₜ' * (R .* vₜ))
+                    append!(values, (vₜ .- v₀)' * (R .* (vₜ .- v₀)))
                 else
                     Δt = Z.timestep
                     append!(values, R .* Δt.^2)
@@ -414,9 +424,9 @@ function QuadraticRegularizer(;
             end
             return values
         end
-	end
+    end
 
-	return Objective(L, ∇L, ∂²L, ∂²L_structure, Dict[params])
+    return Objective(L, ∇L, ∂²L, ∂²L_structure, Dict[params])
 end
 
 function QuadraticRegularizer(
