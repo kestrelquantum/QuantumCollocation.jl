@@ -94,7 +94,9 @@ function operator_algebra(
     end
 
     ℓ = 1
-    println("ℓ = $ℓ")
+    if verbose
+        println("ℓ = $ℓ")
+    end
     if is_linearly_dependent(basis)
         println("Linearly dependent generators.")
     else
@@ -133,7 +135,9 @@ function operator_algebra(
             else
                 current_layer = layer
                 ℓ += 1
-                println("ℓ = $ℓ")
+                if verbose
+                    println("ℓ = $ℓ")
+                end
             end
 
             if return_layers
@@ -159,30 +163,18 @@ function fit_gen_to_basis(
 end
 
 function is_in_span(
-    gens::AbstractVector{<:AbstractMatrix},
-    test_gen::AbstractMatrix,
-    test_gen_indices::AbstractVector{<:Int};
-    remove_trace=true,
+    basis::AbstractVector{<:AbstractMatrix},
+    gen::AbstractMatrix;
+    subspace_indices::AbstractVector{<:Int}=1:size(gen, 1),
     atol=eps(Float32),
     return_effective_gen=false,
-    compute_basis=false,
-    verbose=false
 )
-    g = deepcopy(test_gen)
-    if compute_basis
-        basis = operator_algebra(gens, remove_trace=remove_trace, verbose=verbose)
-    else
-        basis = gens
-    end
-    g_basis = [deepcopy(b[test_gen_indices, test_gen_indices]) for b ∈ basis]
-    if remove_trace
-        g .= traceless(g)
-        @. g_basis = traceless(g_basis)
-    end
+    g_basis = [deepcopy(b[subspace_indices, subspace_indices]) for b ∈ basis]
     linearly_independent_subset!(g_basis)
-    x = fit_gen_to_basis(g_basis, g)
+    # Traceless basis needs traceless fit
+    x = fit_gen_to_basis(g_basis, gen)
     g_eff = sum(x .* g_basis)
-    ε = norm(g_eff - g, 2)
+    ε = norm(g_eff - gen, 2)
     if return_effective_gen
         return ε < atol, g_eff
     else
@@ -191,43 +183,42 @@ function is_in_span(
 end
 
 """
-is_reachable(basis, gate, subspace_levels, levels; kwargs...)
+is_reachable(hamiltonians, gate, subspace_levels, levels; kwargs...)
 
-    Check if the gate is reachable by the given basis.
+    Check if the gate is reachable from the given generators.
 
     # Arguments
-    - `basis::AbstractVector{<:AbstractMatrix}`: basis of the Lie algebra
+    - `hamiltonians::AbstractVector{<:AbstractMatrix}`: generators of the Lie algebra
     - `gate::AbstractMatrix`: target gate
     - `subspace_levels::Vector{<:Int}`: levels of the subspace
     - `levels::Vector{<:Int}`: levels of the system
 """
 function is_reachable(
-    basis::AbstractVector{<:AbstractMatrix},
-    gate::AbstractMatrix, 
-    subspace_levels::AbstractVector{<:Int},
-    levels::AbstractVector{<:Int};
-    kwargs...
-)
-    generator = im * log(gate)
-    return is_in_span(
-        basis,
-        generator, 
-        subspace_indices(subspace_levels, levels);
-        kwargs...
-    )
-end
-
-function is_reachable(
-    basis::AbstractVector{<:AbstractMatrix},
+    hamiltonians::AbstractVector{<:AbstractMatrix},
     gate::AbstractMatrix;
-    kwargs...
+    subspace_indices::AbstractVector{<:Int}=1:size(gate, 1),
+    compute_basis=true,
+    remove_trace=true,
+    verbose=false,
+    atol=eps(Float32)
 )
     generator = im * log(gate)
+
+    if remove_trace
+        generator = traceless(generator)
+    end
+
+    if compute_basis
+        basis = operator_algebra(hamiltonians, remove_trace=remove_trace, verbose=verbose)
+    else
+        basis = hamiltonians
+    end
+
     return is_in_span(
         basis,
         generator,
-        1:size(generator, 1);
-        kwargs...
+        subspace_indices=subspace_indices,
+        atol=atol
     )
 end
 
