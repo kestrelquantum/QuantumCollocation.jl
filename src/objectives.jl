@@ -891,7 +891,7 @@ end
 
 @doc raw"""
 InfidelityRobustnessObjective(
-    Hₑ::AbstractMatrix{<:Number},
+    H_error::AbstractMatrix{<:Number},
     Z::NamedTrajectory;
     eval_hessian::Bool=false,
     subspace::Union{AbstractVector{<:Integer}, Nothing}=nothing
@@ -906,7 +906,7 @@ The control dynamics are
 U_C(a)= \prod_t \exp{-i H_C(a_t)}
 ```
 
-In the control frame, the Hₑ operator is (proportional to)
+In the control frame, the H_error operator is (proportional to)
 ```math
 R_{Robust}(a) = \frac{1}{T \norm{H_e}_2} \sum_t U_C(a_t)^\dag H_e U_C(a_t) \Delta t
 ```
@@ -919,23 +919,21 @@ R_{Robust}(a) = \frac{1}{N} \norm{R}^2_F
 where N is the dimension of the Hilbert space.
 """
 function InfidelityRobustnessObjective(
-    Hₑ::AbstractMatrix{<:Number},
+    H_error::AbstractMatrix{<:Number},
     Z::NamedTrajectory;
     eval_hessian::Bool=false,
-    subspace::Union{AbstractVector{<:Integer}, Nothing}=nothing
+    subspace::AbstractVector{<:Integer}=collect(1:size(H_error, 1)),
+    state_symb::Symbol=:Ũ⃗
 )
     # Indices of all non-zero subspace components for iso_vec_operators
     function iso_vec_subspace(subspace::AbstractVector{<:Integer}, Z::NamedTrajectory)
-        d = isqrt(Z.dims[:Ũ⃗] ÷ 2)
+        d = isqrt(Z.dims[state_symb] ÷ 2)
         A = zeros(Complex, d, d)
         A[subspace, subspace] .= 1 + im
         # Return any index where there is a 1.
-        return [
-            j for (s, j) ∈ zip(operator_to_iso_vec(A), Z.components[:Ũ⃗])
-                if convert(Bool, s)
-        ]
+        return [j for (s, j) ∈ zip(operator_to_iso_vec(A), Z.components[state_symb]) if convert(Bool, s)]
     end
-    ivs = iso_vec_subspace(isnothing(subspace) ? collect(1:size(Hₑ, 1)) : subspace, Z)
+    ivs = iso_vec_subspace(subspace, Z)
 
     @views function get_timesteps(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory)
         return map(1:Z.T) do t
@@ -948,40 +946,41 @@ function InfidelityRobustnessObjective(
     end
 
     # Control frame
-    @views function toggle(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory)
+    @views function rotate(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory)
         Δts = get_timesteps(Z⃗, Z)
         T = sum(Δts)
         R = sum(
             map(1:Z.T) do t
                 Uₜ = iso_vec_to_operator(Z⃗[slice(t, ivs, Z.dim)])
-                Uₜ'Hₑ*Uₜ .* Δts[t]
+                Uₜ'H_error*Uₜ .* Δts[t]
             end
-        ) / norm(Hₑ) / T
+        ) / norm(H_error) / T
         return R
     end
 
     function L(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory)
-        R = toggle(Z⃗, Z)
+        R = rotate(Z⃗, Z)
         return real(tr(R'R)) / size(R, 1)
     end
 
     @views function ∇L(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory)
         ∇ = zeros(Z.dim * Z.T)
-        R = toggle(Z⃗, Z)
+        R = rotate(Z⃗, Z)
         Δts = get_timesteps(Z⃗, Z)
         T = sum(Δts)
+        units = 1 / norm(H_error) / T
         Threads.@threads for t ∈ 1:Z.T
-            # State gradients
+            # State
             Uₜ_slice = slice(t, ivs, Z.dim)
             Uₜ = iso_vec_to_operator(Z⃗[Uₜ_slice])
-            ∇[Uₜ_slice] .= 2 .* operator_to_iso_vec(
-                Hₑ * Uₜ * R .* Δts[t]
-            ) / norm(Hₑ) / T
-            # Time gradients
+
+            # State gradient
+            ∇[Uₜ_slice] .= operator_to_iso_vec(2 * H_error * Uₜ * R * Δts[t]) * units
+
+            # Time gradient
             if Z.timestep isa Symbol
-                t_slice = slice(t, Z.components[Z.timestep], Z.dim)
-                ∂R = Uₜ'Hₑ*Uₜ
-                ∇[t_slice] .= tr(∂R*R + R*∂R) / norm(Hₑ) / T
+                ∂R = Uₜ'H_error*Uₜ
+                ∇[slice(t, Z.components[Z.timestep], Z.dim)] .= tr(∂R*R + R*∂R) * units
             end
         end
         return ∇ / size(R, 1)
@@ -999,7 +998,114 @@ function InfidelityRobustnessObjective(
 
     params = Dict(
         :type => :QuantumRobustnessObjective,
-        :error => Hₑ,
+        :error => H_error,
+        :eval_hessian => eval_hessian
+    )
+
+    return Objective(L, ∇L, ∂²L, ∂²L_structure, Dict[params])
+end
+
+function InfidelityRobustnessObjective(
+    H1_error::AbstractMatrix{<:Number},
+    H2_error::AbstractMatrix{<:Number},
+    state1_symb::Symbol=:Ũ⃗1,
+    state2_symb::Symbol=:Ũ⃗2;
+    eval_hessian::Bool=false,
+    # subspace::Union{AbstractVector{<:Integer}, Nothing}=nothing
+)
+    @views function get_timesteps(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory)
+        return map(1:Z.T) do t
+            if Z.timestep isa Symbol
+                Z⃗[slice(t, Z.components[Z.timestep], Z.dim)][1]
+            else
+                Z.timestep
+            end
+        end
+    end
+
+    function L(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory)
+        Δts = get_timesteps(Z⃗, Z)
+        T = sum(Δts)
+        R = 0.0
+        for (i₁, Δt₁) ∈ enumerate(Δts)
+            for (i₂, Δt₂) ∈ enumerate(Δts)
+                # States
+                U1ₜ₁ = iso_vec_to_operator(Z⃗[slice(i₁, Z.components[state1_symb], Z.dim)])
+                U1ₜ₂ = iso_vec_to_operator(Z⃗[slice(i₂, Z.components[state1_symb], Z.dim)])
+                U2ₜ₁ = iso_vec_to_operator(Z⃗[slice(i₁, Z.components[state2_symb], Z.dim)])
+                U2ₜ₂ = iso_vec_to_operator(Z⃗[slice(i₂, Z.components[state2_symb], Z.dim)])
+
+                # Rotating frame
+                rH1ₜ₁ = U1ₜ₁'H1_error*U1ₜ₁
+                rH1ₜ₂ = U1ₜ₂'H1_error*U1ₜ₂
+                rH2ₜ₁ = U2ₜ₁'H2_error*U2ₜ₁
+                rH2ₜ₂ = U2ₜ₂'H2_error*U2ₜ₂
+
+                # Robustness
+                units = 1 / T^2 / norm(H1_error)^2 / norm(H2_error)^2
+                R += real(tr(rH1ₜ₁'rH1ₜ₂) * tr(rH2ₜ₁'rH2ₜ₂) * Δt₁ * Δt₂ * units)
+            end
+        end
+        return R / size(H1_error, 1) / size(H2_error, 1)
+    end
+
+    @views function ∇L(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory)
+        ∇ = zeros(Z.dim * Z.T)
+        Δts = get_timesteps(Z⃗, Z)
+        T = sum(Δts)
+        Threads.@threads for (i₁, i₂) ∈ vec(collect(Iterators.product(1:Z.T, 1:Z.T)))
+            # Times
+            Δt₁ = Δts[i₁]
+            Δt₂ = Δts[i₂]
+
+            # States
+            U1ₜ₁_slice = slice(i₁, Z.components[state1_symb], Z.dim)
+            U1ₜ₂_slice = slice(i₂, Z.components[state1_symb], Z.dim)
+            U2ₜ₁_slice = slice(i₁, Z.components[state2_symb], Z.dim)
+            U2ₜ₂_slice = slice(i₂, Z.components[state2_symb], Z.dim)
+            U1ₜ₁ = iso_vec_to_operator(Z⃗[U1ₜ₁_slice])
+            U1ₜ₂ = iso_vec_to_operator(Z⃗[U1ₜ₂_slice])
+            U2ₜ₁ = iso_vec_to_operator(Z⃗[U2ₜ₁_slice])
+            U2ₜ₂ = iso_vec_to_operator(Z⃗[U2ₜ₂_slice])
+
+            # Rotating frame
+            rH1ₜ₁ = U1ₜ₁'H1_error*U1ₜ₁
+            rH1ₜ₂ = U1ₜ₂'H1_error*U1ₜ₂
+            rH2ₜ₁ = U2ₜ₁'H2_error*U2ₜ₁
+            rH2ₜ₂ = U2ₜ₂'H2_error*U2ₜ₂
+            
+            # ∇Uiₜⱼ (assume H's are Hermitian)
+            units = 1 / T^2 / norm(H1_error)^2 / norm(H2_error)^2
+            R1 = tr(rH1ₜ₁'rH1ₜ₂) * Δt₁ * Δt₂ * units
+            R2 = tr(rH2ₜ₁'rH2ₜ₂) * Δt₁ * Δt₂ * units
+            ∇[U1ₜ₁_slice] += operator_to_iso_vec(2 * H1_error * U1ₜ₁ * rH1ₜ₂) * R2 
+            ∇[U1ₜ₂_slice] += operator_to_iso_vec(2 * H1_error * U1ₜ₂ * rH1ₜ₁) * R2 
+            ∇[U2ₜ₁_slice] += operator_to_iso_vec(2 * H2_error * U2ₜ₁ * rH2ₜ₂) * R1 
+            ∇[U2ₜ₂_slice] += operator_to_iso_vec(2 * H2_error * U2ₜ₂ * rH2ₜ₁) * R1
+
+            # Time gradients
+            if Z.timestep isa Symbol
+                R = real(tr(rH1ₜ₁'rH1ₜ₂) * tr(rH2ₜ₁'rH2ₜ₂)) * units
+                ∇[slice(i₁, Z.components[Z.timestep], Z.dim)] .= R * Δt₂
+                ∇[slice(i₂, Z.components[Z.timestep], Z.dim)] .= R * Δt₁
+            end
+        end
+        return ∇ / size(H1_error, 1) / size(H2_error, 1)
+    end
+
+    # Hessian is dense (Control frame R contains sum over all unitaries).
+    if eval_hessian
+        # TODO
+		∂²L = (Z⃗, Z) -> []
+		∂²L_structure = Z -> []
+	else
+		∂²L = nothing
+		∂²L_structure = nothing
+	end
+
+    params = Dict(
+        :type => :QuantumRobustnessObjective,
+        :error => H1_error ⊗ H2_error,
         :eval_hessian => eval_hessian
     )
 

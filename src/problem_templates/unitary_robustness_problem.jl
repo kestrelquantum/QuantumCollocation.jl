@@ -25,7 +25,7 @@ function UnitaryRobustnessProblem(
     constraints::Vector{<:AbstractConstraint};
     unitary_symbol::Symbol=:Ũ⃗,
     final_fidelity::Float64=unitary_fidelity(trajectory[end][unitary_symbol], trajectory.goal[unitary_symbol]),
-    subspace::Union{AbstractVector{<:Integer}, Nothing}=nothing,
+    subspace::AbstractVector{<:Integer}=1:size(Hₑ, 1),
     eval_hessian::Bool=false,
     verbose::Bool=false,
     ipopt_options::Options=Options(),

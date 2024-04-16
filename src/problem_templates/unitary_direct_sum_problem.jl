@@ -515,7 +515,7 @@ end
     @test sys3.params[:S_3] == 2T
 end
 
-@testitem "Construct problem" begin
+@testitem "Construct direct sum problem" begin
     sys = QuantumSystem(0.01 * GATES[:Z], [GATES[:X], GATES[:Y]])
     U_goal1 = GATES[:X]
     U_ε = haar_identity(2, 0.33)
