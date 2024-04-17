@@ -1,5 +1,60 @@
 @doc """
+    UnitaryRobustGatesetProblem(
+        probs::AbstractVector{<:QuantumControlProblem},
+        final_fidelity::Real;
+        prob_labels::AbstractVector{<:String}=[string(i) for i ∈ 1:length(probs)],
+        crosstalk_graph::Union{
+            AbstractVector{<:Tuple{String, String}}, 
+            AbstractVector{<:Tuple{Symbol, Symbol}}
+        }=Tuple{Symbol, Symbol}[],
+        crosstalk_operators::Union{
+            Tuple{<:AbstractMatrix, <:AbstractMatrix}, 
+            AbstractVector{<:Tuple{<:AbstractMatrix, <:AbstractMatrix}}
+        }=Matrix{ComplexF64}[],
+        local_operators::Union{AbstractDict{<:String, <:AbstractArray}, AbstractDict{<:Symbol, <:AbstractArray}}=Dict{String, Array}(),
+        Q_symb::Symbol=:Ũ⃗,
+        R::Float64=1e-2,
+        R_a::Union{Float64, Vector{Float64}}=R,
+        R_da::Union{Float64, Vector{Float64}}=R,
+        R_dda::Union{Float64, Vector{Float64}}=R,
+        max_iter::Int=1000,
+        linear_solver::String="mumps",
+        verbose::Bool=false,
+        jacobian_structure=true,
+        blas_multithreading=true,
+        ipopt_options=Options(),
+        kwargs...
+    )
 
+    Construct a robust gateset problem from a set of quantum control problems, `probs`. The objective function is the sum of the
+    infidelity robustness objectives with respect to the `crosstalk_operators` for each pair of problems in the `crosstalk_graph`, 
+    as well as any `local_operators` on individual problems. The `crosstalk_operators` are provided as a pair of operators, for
+    example (Z, Z) for ZZ crosstalk. See `UnitaryRobustnessProblem` for more details on this type of objective function.
+    
+    The fidelity constraints are the final unitary fidelity constraints for each problem in the set.
+
+    # Arguments
+    - `probs::AbstractVector{<:QuantumControlProblem}`: A list of quantum control problems.
+    - `final_fidelity::Real`: The shared final fidelity for each problem in the set.
+    - `prob_labels::AbstractVector{<:String}`: The labels for each problem in the set.
+    - `crosstalk_graph::Union{AbstractVector{<:Tuple{String, String}}, AbstractVector{<:Tuple{Symbol, Symbol}}}`: 
+        A list of edges between problems in the set.
+    - `crosstalk_operators::Union{Tuple{<:AbstractMatrix, <:AbstractMatrix}, AbstractVector{<:Tuple{<:AbstractMatrix, <:AbstractMatrix}}}`:
+        A list of crosstalk operators (pairs) for each edge in the `crosstalk_graph`.
+    - `local_operators::Union{AbstractDict{<:String, <:AbstractArray}, AbstractDict{<:Symbol, <:AbstractArray}}`:
+        A dictionary of local operators for each problem in the set.
+    - `Q_symb::Symbol`: The symbol for the unitary trajectory.
+    - `R::Float64`: The regularization parameter for the quadratic regularizer.
+    - `R_a::Union{Float64, Vector{Float64}}`: The regularization parameter for the quadratic regularizer on the amplitudes.
+    - `R_da::Union{Float64, Vector{Float64}}`: The regularization parameter for the quadratic regularizer on the derivatives of the amplitudes.
+    - `R_dda::Union{Float64, Vector{Float64}}`: The regularization parameter for the quadratic regularizer on the second derivatives of the amplitudes.
+    - `max_iter::Int`: The maximum number of iterations for the optimization.
+    - `linear_solver::String`: The linear solver to use for the optimization.
+    - `verbose::Bool`: Whether to print verbose output.
+    - `jacobian_structure::Bool`: Whether to use the jacobian structure.
+    - `blas_multithreading::Bool`: Whether to use BLAS multithreading.
+    - `ipopt_options`: The options for the Ipopt solver.
+    - `kwargs...`: Additional keyword arguments.
 """
 function UnitaryRobustGatesetProblem(
     probs::AbstractVector{<:QuantumControlProblem},
