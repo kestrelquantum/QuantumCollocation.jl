@@ -116,7 +116,7 @@ function UnitaryRobustGatesetProblem(
         graph_symbols = Tuple{Symbol, Symbol}[]
         for (e1, e2) ∈ crosstalk_graph
             if e1 ∈ prob_labels && e2 ∈ prob_labels
-                push!(graph_symbols, (apply_suffix(Q_symb, e1), apply_suffix(Q_symb, e2)))
+                push!(graph_symbols, (append_suffix(Q_symb, e1), append_suffix(Q_symb, e2)))
             else
                 throw(ArgumentError("Edge labels must be in prob_labels"))
             end
@@ -128,19 +128,19 @@ function UnitaryRobustGatesetProblem(
 
     # merge suffix trajectories
     traj = reduce(
-        merge_outer, 
-        [apply_suffix(p.trajectory, ℓ) for (p, ℓ) ∈ zip(probs, prob_labels)]
+        direct_sum, 
+        [append_suffix(p.trajectory, ℓ) for (p, ℓ) ∈ zip(probs, prob_labels)]
     )
 
     # concatenate suffix integrators
     integrators = vcat(
-        [apply_suffix(p.integrators, ℓ) for (p, ℓ) ∈ zip(probs, prob_labels)]...
+        [append_suffix(p.integrators, ℓ) for (p, ℓ) ∈ zip(probs, prob_labels)]...
     )
 
     # direct sum (used for problem saving, only)
     system = reduce(
         direct_sum, 
-        [apply_suffix(p.system, ℓ) for (p, ℓ) ∈ zip(probs, prob_labels)]
+        [append_suffix(p.system, ℓ) for (p, ℓ) ∈ zip(probs, prob_labels)]
     )
 
     # Rebuild trajectory constraints
@@ -151,7 +151,7 @@ function UnitaryRobustGatesetProblem(
     for (p, ℓ) ∈ zip(probs, prob_labels)
         goal_symb, = keys(p.trajectory.goal)
         fidelity_constraint = FinalUnitaryFidelityConstraint(
-            apply_suffix(goal_symb, ℓ),
+            append_suffix(goal_symb, ℓ),
             final_fidelity,
             traj
         )
@@ -165,13 +165,13 @@ function UnitaryRobustGatesetProblem(
     end
 
     for (ℓ, H) ∈ local_operators
-        J += InfidelityRobustnessObjective(H, traj, state_symb=apply_suffix(Q_symb, ℓ))
+        J += InfidelityRobustnessObjective(H, traj, state_symb=append_suffix(Q_symb, ℓ))
     end
 
     for ℓ ∈ prob_labels
-        J += QuadraticRegularizer(apply_suffix(:a, ℓ), traj, R_a)
-        J += QuadraticRegularizer(apply_suffix(:da, ℓ), traj, R_da)
-        J += QuadraticRegularizer(apply_suffix(:dda, ℓ), traj, R_dda)
+        J += QuadraticRegularizer(append_suffix(:a, ℓ), traj, R_a)
+        J += QuadraticRegularizer(append_suffix(:da, ℓ), traj, R_da)
+        J += QuadraticRegularizer(append_suffix(:dda, ℓ), traj, R_dda)
     end
 
     return QuantumControlProblem(
@@ -194,22 +194,32 @@ end
 # *************************************************************************** #
 
 @testitem "Construct gateset robustness problem" begin
-    sys = QuantumSystem(0.01 * GATES[:Z], [GATES[:X], GATES[:Y]])
-    U_goal1 = GATES[:X]
-    U_goal2 = GATES[:X]
-    H_crosstalk = GATES[:Z] ⊗ GATES[:Z]
+    sys = QuantumSystem([GATES[:X] / 2])
+    U_goal = GATES[:X]
+    H_crosstalk = (GATES[:Z], GATES[:Z])
     T = 50
     Δt = 0.2
-    ops = Options(print_level=1)
-    prob1 = UnitarySmoothPulseProblem(sys, U_goal1, T, Δt, free_time=false, ipopt_options=ops)
-    prob2 = UnitarySmoothPulseProblem(sys, U_goal2, T, Δt, free_time=false, ipopt_options=ops)
-
+    
+    prob1 = UnitarySmoothPulseProblem(
+        sys, U_goal, T, Δt, a_guess=π / T * ones(1, T),
+        free_time=false, ipopt_options=Options(print_level=1)
+    )
+    prob2 = UnitarySmoothPulseProblem(
+        sys, U_goal, T, Δt, a_guess=3π / T * ones(1, T),
+        free_time=false, ipopt_options=Options(print_level=1)
+    )
+    
+    solve!(prob1, max_iter=5)
+    solve!(prob2, max_iter=5)
+    
+    # Join the two problems
     prob = UnitaryRobustGatesetProblem(
         [prob1, prob2], 
-        1e-3, 
+        1-1e-5, 
         crosstalk_graph=[("1", "2")], 
-        crosstalk_operators=H_crosstalk
+        crosstalk_operators=H_crosstalk,
+        ipopt_options=Options(print_level=1)
     )
-
+    
     solve!(prob; max_iter=10)
 end

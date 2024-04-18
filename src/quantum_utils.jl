@@ -3,7 +3,6 @@ module QuantumUtils
 export GATES
 export get_gate
 export ⊗
-export direct_sum
 export vec⁻¹
 export operators_from_dict
 export kron_from_dict
@@ -42,17 +41,6 @@ using SparseArrays
 
 ⊗(A::AbstractVecOrMat, B::AbstractVecOrMat) = kron(A, B)
 
-"""
-    direct sum utility
-"""
-
-function direct_sum(A::AbstractMatrix, B::AbstractMatrix)
-    return [A spzeros((size(A, 1), size(B, 2))); spzeros((size(B, 1), size(A, 2))) B]
-end
-
-function direct_sum(Ã⃗::AbstractVector, B̃⃗::AbstractVector)
-    return operator_to_iso_vec(direct_sum(iso_vec_to_operator(Ã⃗), iso_vec_to_operator(B̃⃗)))
-end
 
 """
     quantum gates

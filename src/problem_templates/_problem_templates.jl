@@ -12,6 +12,7 @@ export QuantumStateMinimumTimeProblem
 using ..QuantumSystems
 using ..QuantumUtils
 using ..EmbeddedOperators
+using ..DirectSums
 using ..Rollouts
 using ..TrajectoryInitialization
 using ..Objectives

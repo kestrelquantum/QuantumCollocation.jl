@@ -44,6 +44,9 @@ include("ipopt_options.jl")
 include("problems.jl")
 @reexport using .Problems
 
+include("direct_sums.jl")
+@reexport using .DirectSums
+
 include("rollouts.jl")
 @reexport using .Rollouts
 
