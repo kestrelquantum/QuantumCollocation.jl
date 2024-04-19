@@ -147,14 +147,16 @@ Base.startswith(symb::Symbol, prefix::Symbol) = startswith(String(symb), String(
 # -----------------------
 
 append_suffix(symb::Symbol, suffix::String) = Symbol(string(symb, suffix))
-append_suffix(symb::Tuple, suffix::String) = Tuple(append_suffix(s, suffix) for s ∈ symb)
-append_suffix(symbs::AbstractVector, suffix::String) = [append_suffix(s, suffix) for s ∈ symbs]
-append_suffix(d::Dict{Symbol, Any}, suffix::String) = typeof(d)(append_suffix(k, suffix) => v for (k, v) ∈ d)
+append_suffix(symbs::Tuple, suffix::String; exclude::AbstractVector{<:Symbol}=Symbol[]) = 
+    Tuple(s ∈ exclude ? s : append_suffix(s, suffix) for s ∈ symbs)
+append_suffix(symbs::AbstractVector, suffix::String; exclude::AbstractVector{<:Symbol}=Symbol[]) = 
+    [s ∈ exclude ? s : append_suffix(s, suffix) for s ∈ symbs]
+append_suffix(d::Dict{Symbol, Any}, suffix::String; exclude::AbstractVector{<:Symbol}=Symbol[]) =
+    typeof(d)(k ∈ exclude ? k : append_suffix(k, suffix) => v for (k, v) ∈ d)
 
-function append_suffix(nt::NamedTuple, suffix::String)
-    symbs = Tuple(append_suffix(k, suffix) for k ∈ keys(nt))
-    vals = [v for v ∈ values(nt)]
-    return NamedTuple{symbs}(vals)
+function append_suffix(nt::NamedTuple, suffix::String; exclude::AbstractVector{<:Symbol}=Symbol[])
+    symbs = Tuple(k ∈ exclude ? k : append_suffix(k, suffix) for k ∈ keys(nt))
+    return NamedTuple{symbs}(values(nt))
 end
 
 function append_suffix(components::Union{Tuple, AbstractVector}, traj::NamedTrajectory, suffix::String)
@@ -162,6 +164,7 @@ function append_suffix(components::Union{Tuple, AbstractVector}, traj::NamedTraj
 end
 
 function append_suffix(traj::NamedTrajectory, suffix::String)
+    # Timesteps are appended because of bounds and initial/final constraints.
     component_names = vcat(traj.state_names..., traj.control_names...)
     components = append_suffix(component_names, traj, suffix)
     controls = append_suffix(traj.control_names, suffix)
@@ -225,7 +228,7 @@ function modify_integrator_suffix(
     )
 end
 
-# removed suffix utilities
+# remove suffix utilities
 # -----------------------
 
 function remove_suffix(s::String, suffix::String)
@@ -237,14 +240,16 @@ function remove_suffix(s::String, suffix::String)
 end
 
 remove_suffix(symb::Symbol, suffix::String) = Symbol(remove_suffix(String(symb), suffix))
-remove_suffix(symbs::Tuple, suffix::String) = Tuple(remove_suffix(s, suffix) for s ∈ symbs)
-remove_suffix(symbs::AbstractVector, suffix::String) = [remove_suffix(s, suffix) for s ∈ symbs]
-remove_suffix(d::Dict{Symbol, Any}, suffix::String) = typeof(d)(remove_suffix(k, suffix) => v for (k, v) ∈ d)
+remove_suffix(symbs::Tuple, suffix::String; exclude::AbstractVector{<:Symbol}=Symbol[]) =
+    Tuple(s ∈ exclude ? s : remove_suffix(s, suffix) for s ∈ symbs)
+remove_suffix(symbs::AbstractVector, suffix::String; exclude::AbstractVector{<:Symbol}=Symbol[]) =
+    [s ∈ exclude ? s : remove_suffix(s, suffix) for s ∈ symbs]
+remove_suffix(d::Dict{Symbol, Any}, suffix::String; exclude::AbstractVector{<:Symbol}=Symbol[]) =
+    typeof(d)(k ∈ exclude ? k : remove_suffix(k, suffix) => v for (k, v) ∈ d)
 
-function remove_suffix(nt::NamedTuple, suffix::String)
-    symbs = Tuple(remove_suffix(k, suffix) for k ∈ keys(nt))
-    vals = [v for v ∈ values(nt)]
-    return NamedTuple{symbs}(vals)
+function remove_suffix(nt::NamedTuple, suffix::String; exclude::AbstractVector{<:Symbol}=Symbol[])
+    symbs = Tuple(k ∈ exclude ? k : remove_suffix(k, suffix) for k ∈ keys(nt))
+    return NamedTuple{symbs}(values(nt))
 end
 
 remove_suffix(integrator::AbstractIntegrator, suffix::String) =
@@ -288,42 +293,59 @@ end
 # Get suffix utilities
 # --------------------
 
-function get_suffix(nt::NamedTuple, suffix::String; removed::Bool=false)
-    names = Tuple(removed ? remove_suffix(k, suffix) : k for (k, v) ∈ pairs(nt) if endswith(k, suffix))
+function get_suffix(nt::NamedTuple, suffix::String; remove::Bool=false)
+    names = Tuple(remove ? remove_suffix(k, suffix) : k for (k, v) ∈ pairs(nt) if endswith(k, suffix))
     values = [v for (k, v) ∈ pairs(nt) if endswith(k, suffix)]
     return NamedTuple{names}(values)
 end
 
-function get_suffix(d::Dict{<:Symbol, <:Any}, suffix::String; removed::Bool=false)
-    return Dict(removed ? remove_suffix(k, suffix) : k => v for (k, v) ∈ d if endswith(k, suffix))
+function get_suffix(d::Dict{<:Symbol, <:Any}, suffix::String; remove::Bool=false)
+    return Dict(remove ? remove_suffix(k, suffix) : k => v for (k, v) ∈ d if endswith(k, suffix))
 end
 
-function get_suffix(traj::NamedTrajectory, suffix::String; removed::Bool=false)
+function get_suffix(traj::NamedTrajectory, suffix::String; remove::Bool=false)
     state_names = Tuple(s for s ∈ traj.state_names if endswith(s, suffix))
-    control_names = Tuple(s for s ∈ traj.control_names if endswith(s, suffix))
-    component_names = Tuple(vcat(state_names..., control_names...))
-    component_values = [traj[name] for name ∈ component_names]
-    if removed
-        components = NamedTuple{remove_suffix(component_names, suffix)}(component_values)
+
+    # control names
+    if traj.timestep isa Symbol
+        if endswith(traj.timestep, suffix)
+            control_names = Tuple(s for s ∈ traj.control_names if endswith(s, suffix))
+            timestep = remove ? remove_suffix(traj.timestep, suffix) : traj.timestep
+            exclude = Symbol[]
+        else
+            # extract the shared timestep
+            control_names = Tuple(s for s ∈ traj.control_names if endswith(s, suffix) || s == traj.timestep)
+            timestep = traj.timestep
+            exclude = [timestep]
+        end
     else
-        components = NamedTuple{component_names}(component_values)
+        control_names = Tuple(s for s ∈ traj.control_names if endswith(s, suffix))
+        timestep = traj.timestep
+        exclude = Symbol[]
     end
+
+    component_names = Tuple(vcat(state_names..., control_names...))
+    components = get_components(component_names, traj)
+    if remove
+        components = remove_suffix(components, suffix; exclude=exclude)
+    end
+
     return NamedTrajectory(
         components,
-        controls=removed ? remove_suffix(control_names, suffix) : control_names,
-        timestep=traj.timestep,
-        bounds=get_suffix(traj.bounds, suffix, removed=removed),
-        initial=get_suffix(traj.initial, suffix, removed=removed),
-        final=get_suffix(traj.final, suffix, removed=removed),
-        goal=get_suffix(traj.goal, suffix, removed=removed)
+        controls=remove ? remove_suffix(control_names, suffix; exclude=exclude) : control_names,
+        timestep=timestep,
+        bounds=get_suffix(traj.bounds, suffix, remove=remove),
+        initial=get_suffix(traj.initial, suffix, remove=remove),
+        final=get_suffix(traj.final, suffix, remove=remove),
+        goal=get_suffix(traj.goal, suffix, remove=remove)
     )
 end
 
-function get_suffix(integrators::AbstractVector{<:AbstractIntegrator}, suffix::String; removed::Bool=false)
+function get_suffix(integrators::AbstractVector{<:AbstractIntegrator}, suffix::String; remove::Bool=false)
     found = AbstractIntegrator[]
     for integrator ∈ integrators
         if endswith(integrator, suffix)
-            push!(found, removed ? remove_suffix(integrator, suffix) : deepcopy(integrator))
+            push!(found, remove ? remove_suffix(integrator, suffix) : deepcopy(integrator))
         end
     end
     return found
@@ -333,13 +355,13 @@ function get_suffix(
     prob::QuantumControlProblem,
     suffix::String;
     unitary_prefix::Symbol=:Ũ⃗,
-    removed::Bool=false,
+    remove::Bool=false,
 )
     # Extract the trajectory
-    traj = get_suffix(prob.trajectory, suffix, removed=removed)
+    traj = get_suffix(prob.trajectory, suffix, remove=remove)
 
     # Extract the integrators
-    integrators = get_suffix(prob.integrators, suffix, removed=removed)
+    integrators = get_suffix(prob.integrators, suffix, remove=remove)
     
     # Get direct sum indices
     # TODO: doesn't exclude more than one match
