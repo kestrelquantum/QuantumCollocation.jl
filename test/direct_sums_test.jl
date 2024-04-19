@@ -111,6 +111,57 @@ end
     @test prob1_got.trajectory != append_suffix(prob1.trajectory, "1")
 
     # Remove suffix during extraction
-    prob1_got_without = get_suffix(direct_sum_prob, "1", removed=true)
+    prob1_got_without = get_suffix(direct_sum_prob, "1", remove=true)
     @test prob1_got_without.trajectory == prob1.trajectory
+end
+
+@testitem "Append to default integrators" begin
+    sys = QuantumSystem(0.01 * GATES[:Z], [GATES[:Y]])
+    T = 50
+    Δt = 0.2
+    ops = Options(print_level=1)
+    prob1 = UnitarySmoothPulseProblem(sys, GATES[:Y], T, Δt, free_time=false, ipopt_options=ops)
+    prob2 = UnitarySmoothPulseProblem(sys, GATES[:Y], T, Δt, free_time=true, ipopt_options=ops)
+
+    suffix = "_new"
+    # UnitaryPadeIntegrator
+    prob1_new = append_suffix(prob1.integrators, suffix)
+    @test prob1_new[1].unitary_symb == append_suffix(prob1.integrators[1].unitary_symb, suffix)
+    @test prob1_new[1].drive_symb == append_suffix(prob1.integrators[1].drive_symb, suffix)
+
+    # DerivativeIntegrator
+    @test prob1_new[2].variable == append_suffix(prob1.integrators[2].variable, suffix)
+
+    # UnitaryPadeIntegrator with free time
+    prob2_new = append_suffix(prob2.integrators, suffix)
+    @test prob2_new[1].unitary_symb == append_suffix(prob2.integrators[1].unitary_symb, suffix)
+    @test prob2_new[1].drive_symb == append_suffix(prob2.integrators[1].drive_symb, suffix)
+
+    # DerivativeIntegrator
+    @test prob2_new[2].variable == append_suffix(prob2.integrators[2].variable, suffix)
+end
+
+@testitem "Free time get suffix" begin
+    using NamedTrajectories
+
+    sys = QuantumSystem(0.01 * GATES[:Z], [GATES[:Y]])
+    T = 50
+    Δt = 0.2
+    ops = Options(print_level=1)
+    suffix = "_new"
+    timestep_symbol = :Δt
+
+    prob1 = UnitarySmoothPulseProblem(sys, GATES[:Y], T, Δt, free_time=false, ipopt_options=ops)
+    traj1 = direct_sum(prob1.trajectory, append_suffix(prob1.trajectory, suffix), free_time=true)
+
+    # Direct sum (shared timestep name)
+    @test get_suffix(traj1, suffix).timestep == timestep_symbol
+    @test get_suffix(traj1, suffix, remove=true).timestep == timestep_symbol
+
+    prob2 = UnitarySmoothPulseProblem(sys, GATES[:Y], T, Δt, free_time=true, ipopt_options=ops)
+    traj2 = append_suffix(prob2.trajectory, suffix)
+   
+    # Trajectory (unique timestep name)
+    @test get_suffix(traj2, suffix).timestep == append_suffix(timestep_symbol, suffix)
+    @test get_suffix(traj2, suffix, remove=true).timestep == timestep_symbol
 end
