@@ -57,6 +57,7 @@ function UnitaryDirectSumProblem(
     R_b::Union{Float64, Vector{Float64}}=R,
     drive_derivative_σ::Float64=0.01,
     drive_reset_ratio::Float64=0.50,
+    fidelity_cost::Bool=false,
     subspace::Union{AbstractVector{<:Integer}, Nothing}=nothing,
     max_iter::Int=1000,
     linear_solver::String="mumps",
@@ -156,7 +157,7 @@ function UnitaryDirectSumProblem(
     build_trajectory_constraints = true
     constraints = AbstractConstraint[]
 
-    # Add fidelity constraints for each problem
+    # Add goal constraints for each problem
     for (p, ℓ) ∈ zip(probs, prob_labels)
         goal_symb, = keys(p.trajectory.goal)
         fidelity_constraint = FinalUnitaryFidelityConstraint(
@@ -179,6 +180,13 @@ function UnitaryDirectSumProblem(
         J += QuadraticRegularizer(append_suffix(:a, ℓ), traj, R_a)
         J += QuadraticRegularizer(append_suffix(:da, ℓ), traj, R_da)
         J += QuadraticRegularizer(append_suffix(:dda, ℓ), traj, R_dda)
+    end
+
+    # Add fidelity cost
+    if fidelity_cost
+        for ℓ ∈ prob_labels
+            J += UnitaryInfidelityObjective(append_suffix(:Ũ⃗, ℓ), traj, Q, subspace=subspace)
+        end
     end
 
     return QuantumControlProblem(
