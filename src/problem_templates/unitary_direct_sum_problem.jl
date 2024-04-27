@@ -185,7 +185,11 @@ function UnitaryDirectSumProblem(
     # Add fidelity cost
     if fidelity_cost
         for ℓ ∈ prob_labels
-            J += UnitaryInfidelityObjective(append_suffix(:Ũ⃗, ℓ), traj, Q, subspace=subspace)
+            Q_fid = isa(Q, Number) ? Q : Q[1]
+            J += UnitaryInfidelityObjective(
+                append_suffix(:Ũ⃗, ℓ), traj, Q_fid,
+                subspace=subspace, eval_hessian=!hessian_approximation
+            )
         end
     end
 
