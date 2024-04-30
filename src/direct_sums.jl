@@ -114,36 +114,24 @@ function direct_sum(
 
     # collect component data
     component_names = [vcat(traj.state_names..., traj.control_names...) for traj ∈ trajs]
-    components = reduce(merge_outer, [get_components(names, traj) for (names, traj) ∈ zip(component_names, trajs)])
+    components = merge_outer([get_components(names, traj) for (names, traj) ∈ zip(component_names, trajs)])
     
     # add timestep to components
     if free_time
-        components = merge_outer(components, NamedTuple{(timestep_symbol,)}([get_timesteps(traj1)]))
+        components = merge_outer(components, NamedTuple{(timestep_symbol,)}([get_timesteps(trajs[1])]))
     end
     
     return NamedTrajectory(
         components,
-        controls=reduce(merge_outer, [traj.control_names for traj in trajs]),
+        controls=merge_outer([traj.control_names for traj in trajs]),
         timestep=free_time ? timestep_symbol : timestep,
-        bounds=reduce(merge_outer, [traj.bounds for traj in trajs]),
-        initial=reduce(merge_outer, [traj.initial for traj in trajs]),
-        final=reduce(merge_outer, [traj.final for traj in trajs]),
-        goal=reduce(merge_outer, [traj.goal for traj in trajs])
+        bounds=merge_outer([traj.bounds for traj in trajs]),
+        initial=merge_outer([traj.initial for traj in trajs]),
+        final=merge_outer([traj.final for traj in trajs]),
+        goal=merge_outer([traj.goal for traj in trajs])
     )
 end
 
-# function Base.reduce(f::typeof(direct_sum), args::AbstractVector{<:NamedTrajectory}; free_time::Bool=false)
-#     # init unimplemented for NamedTrajectory to avoid issues with free_time
-#     if length(args) > 2
-#         return f(reduce(f, args[1:end-1], free_time=false), args[end], free_time=free_time)
-#     elseif length(args) == 2
-#         return f(args[1], args[2], free_time=free_time)
-#     elseif length(args) == 1
-#         return args[1]
-#     else
-#         throw(DomainError(args, "reducing over an empty collection is not allowed"))
-#     end
-# end
 
 function get_components(components::Union{Tuple, AbstractVector}, traj::NamedTrajectory)
     symbs = Tuple(c for c in components)
@@ -178,6 +166,7 @@ function add_suffix(components::Union{Tuple, AbstractVector}, traj::NamedTraject
 end
 
 function add_suffix(traj::NamedTrajectory, suffix::String)
+    # TODO: Inplace
     # Timesteps are appended because of bounds and initial/final constraints.
     component_names = vcat(traj.state_names..., traj.control_names...)
     components = add_suffix(component_names, traj, suffix)
@@ -274,6 +263,15 @@ remove_suffix(integrators::AbstractVector{<:AbstractIntegrator}, suffix::String)
 
 # Merge utilities
 # ---------------
+
+function merge_outer(objs::AbstractVector{<:Any})
+    return reduce(merge_outer, objs)
+end
+
+function merge_outer(objs::AbstractVector{<:Tuple})
+    # only construct final tuple
+    return Tuple(mᵢ for mᵢ in reduce(merge_outer, [[tᵢ for tᵢ in tup] for tup in objs]))
+end
 
 function merge_outer(nt1::NamedTuple, nt2::NamedTuple)
     common_keys = intersect(keys(nt1), keys(nt2))
