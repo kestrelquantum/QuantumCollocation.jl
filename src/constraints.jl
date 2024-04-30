@@ -67,8 +67,8 @@ struct NonlinearEqualityConstraint <: NonlinearConstraint
     g::Function
     ∂g::Function
     ∂g_structure::Vector{Tuple{Int, Int}}
-    μ∂²g::Function
-    μ∂²g_structure::Vector{Tuple{Int, Int}}
+    μ∂²g::Union{Nothing, Function}
+    μ∂²g_structure::Union{Nothing, Vector{Tuple{Int, Int}}}
     dim::Int
     params::Dict{Symbol, Any}
 end
@@ -94,8 +94,8 @@ struct NonlinearInequalityConstraint <: NonlinearConstraint
     g::Function
     ∂g::Function
     ∂g_structure::Vector{Tuple{Int, Int}}
-    μ∂²g::Function
-    μ∂²g_structure::Vector{Tuple{Int, Int}}
+    μ∂²g::Union{Nothing, Function}
+    μ∂²g_structure::Union{Nothing, Vector{Tuple{Int, Int}}}
     dim::Int
     params::Dict{Symbol, Any}
 end
@@ -129,7 +129,8 @@ function FinalFidelityConstraint(;
     statedim::Union{Int,Nothing}=nothing,
     zdim::Union{Int,Nothing}=nothing,
     T::Union{Int,Nothing}=nothing,
-    subspace::Union{AbstractVector{<:Integer}, Nothing}=nothing
+    subspace::Union{AbstractVector{<:Integer}, Nothing}=nothing,
+    hessian::Bool=true
 )
     @assert !isnothing(fidelity_function) "must provide a fidelity function"
     @assert !isnothing(value) "must provide a fidelity value"
@@ -193,23 +194,29 @@ function FinalFidelityConstraint(;
         end
     end
 
-    ∂²ℱ(x) = ForwardDiff.hessian(fid, x)
+    if hessian
+        ∂²ℱ(x) = ForwardDiff.hessian(fid, x)
 
-    ∂²ℱ_structure = hessian_of_lagrangian_structure(∂²ℱ, statedim, 1)
+        ∂²ℱ_structure = hessian_of_lagrangian_structure(∂²ℱ, statedim, 1)
 
-    μ∂²g_structure = [ij .+ col_offset for ij in ∂²ℱ_structure]
+        μ∂²g_structure = [ij .+ col_offset for ij in ∂²ℱ_structure]
 
-    @views function μ∂²g(Z⃗, μ; ipopt=true)
-        HoL = spzeros(T * zdim, T * zdim)
-        μ∂²ℱ = μ[1] * ∂²ℱ(Z⃗[state_slice])
-        for (i, j) ∈ ∂²ℱ_structure
-            HoL[i + col_offset, j + col_offset] = μ∂²ℱ[i, j]
+        @views function μ∂²g(Z⃗, μ; ipopt=true)
+            HoL = spzeros(T * zdim, T * zdim)
+            μ∂²ℱ = μ[1] * ∂²ℱ(Z⃗[state_slice])
+            for (i, j) ∈ ∂²ℱ_structure
+                HoL[i + col_offset, j + col_offset] = μ∂²ℱ[i, j]
+            end
+            if ipopt
+                return [HoL[i, j] for (i, j) in μ∂²g_structure]
+            else
+                return HoL
+            end
         end
-        if ipopt
-            return [HoL[i, j] for (i, j) in μ∂²g_structure]
-        else
-            return HoL
-        end
+
+    else
+        μ∂²g_structure = nothing
+        μ∂²g = nothing
     end
 
     return NonlinearInequalityConstraint(
@@ -234,7 +241,8 @@ function FinalUnitaryFidelityConstraint(
     statesymb::Symbol,
     val::Float64,
     traj::NamedTrajectory;
-    subspace::Union{AbstractVector{<:Integer}, Nothing}=nothing
+    subspace::Union{AbstractVector{<:Integer}, Nothing}=nothing,
+    hessian::Bool=true
 )
     @assert statesymb ∈ traj.names
     return FinalFidelityConstraint(;
@@ -245,7 +253,8 @@ function FinalUnitaryFidelityConstraint(
         statedim=traj.dims[statesymb],
         zdim=traj.dim,
         T=traj.T,
-        subspace=subspace
+        subspace=subspace,
+        hessian=hessian
     )
 end
 
@@ -259,7 +268,7 @@ is the NamedTrajectory symbol representing the unitary.
 function FinalQuantumStateFidelityConstraint(
     statesymb::Symbol,
     val::Float64,
-    traj::NamedTrajectory
+    traj::NamedTrajectory,
 )
     @assert statesymb ∈ traj.names
     return FinalFidelityConstraint(;

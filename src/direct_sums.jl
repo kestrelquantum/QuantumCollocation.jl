@@ -1,6 +1,6 @@
 module DirectSums
 
-export append_suffix
+export add_suffix
 export get_suffix
 export direct_sum
 
@@ -61,6 +61,8 @@ function direct_sum(sys1::QuantumSystem, sys2::QuantumSystem)
     )
 end
 
+direct_sum(systems::AbstractVector{<:QuantumSystem}) = reduce(direct_sum, systems)
+
 """
     direct_sum(traj1::NamedTrajectory, traj2::NamedTrajectory)
 
@@ -85,51 +87,63 @@ function direct_sum(
     free_time::Bool=false,
     timestep_symbol::Symbol=:Δt,
 )
-    if traj1.timestep isa Symbol || traj2.timestep isa Symbol
-        throw(ArgumentError("Provided trajectories must have fixed timesteps"))
+    return direct_sum([traj1, traj2]; free_time=free_time, timestep_symbol=timestep_symbol)
+end
+
+function direct_sum(
+    trajs::AbstractVector{<:NamedTrajectory};
+    free_time::Bool=false,
+    timestep_symbol::Symbol=:Δt,
+)
+    if length(trajs) < 2
+        throw(ArgumentError("At least two trajectories must be provided"))
     end
-    
-    if traj1.timestep != traj2.timestep
-        throw(ArgumentError("Fixed timesteps must be equal"))
+
+    for traj in trajs
+        if traj.timestep isa Symbol
+            throw(ArgumentError("Provided trajectories must have fixed timesteps"))
+        end
+    end
+
+    timestep = trajs[1].timestep
+    for traj in trajs[2:end]
+        if timestep != traj.timestep
+            throw(ArgumentError("Fixed timesteps must be equal"))
+        end
     end
 
     # collect component data
-    component_names1 = vcat(traj1.state_names..., traj1.control_names...)
-    component_names2 = vcat(traj2.state_names..., traj2.control_names...)
-
-    components = merge_outer(
-        get_components(component_names1, traj1),
-        get_components(component_names2, traj2)
-    )
+    component_names = [vcat(traj.state_names..., traj.control_names...) for traj ∈ trajs]
+    components = reduce(merge_outer, [get_components(names, traj) for (names, traj) ∈ zip(component_names, trajs)])
     
-    # Add timestep to components
+    # add timestep to components
     if free_time
         components = merge_outer(components, NamedTuple{(timestep_symbol,)}([get_timesteps(traj1)]))
     end
     
     return NamedTrajectory(
         components,
-        controls=merge_outer(traj1.control_names, traj2.control_names),
-        timestep=free_time ? timestep_symbol : traj1.timestep,
-        bounds=merge_outer(traj1.bounds, traj2.bounds),
-        initial=merge_outer(traj1.initial, traj2.initial),
-        final=merge_outer(traj1.final, traj2.final),
-        goal=merge_outer(traj1.goal, traj2.goal)
+        controls=reduce(merge_outer, [traj.control_names for traj in trajs]),
+        timestep=free_time ? timestep_symbol : timestep,
+        bounds=reduce(merge_outer, [traj.bounds for traj in trajs]),
+        initial=reduce(merge_outer, [traj.initial for traj in trajs]),
+        final=reduce(merge_outer, [traj.final for traj in trajs]),
+        goal=reduce(merge_outer, [traj.goal for traj in trajs])
     )
 end
 
-function Base.reduce(f::typeof(direct_sum), args::AbstractVector{<:NamedTrajectory}; free_time::Bool=false)
-    # init unimplemented for NamedTrajectory to avoid issues with free_time
-    if length(args) > 2
-        return f(reduce(f, args[1:end-1], free_time=false), args[end], free_time=free_time)
-    elseif length(args) == 2
-        return f(args[1], args[2], free_time=free_time)
-    elseif length(args) == 1
-        return args[1]
-    else
-        throw(DomainError(args, "reducing over an empty collection is not allowed"))
-    end
-end
+# function Base.reduce(f::typeof(direct_sum), args::AbstractVector{<:NamedTrajectory}; free_time::Bool=false)
+#     # init unimplemented for NamedTrajectory to avoid issues with free_time
+#     if length(args) > 2
+#         return f(reduce(f, args[1:end-1], free_time=false), args[end], free_time=free_time)
+#     elseif length(args) == 2
+#         return f(args[1], args[2], free_time=free_time)
+#     elseif length(args) == 1
+#         return args[1]
+#     else
+#         throw(DomainError(args, "reducing over an empty collection is not allowed"))
+#     end
+# end
 
 function get_components(components::Union{Tuple, AbstractVector}, traj::NamedTrajectory)
     symbs = Tuple(c for c in components)
@@ -143,53 +157,53 @@ Base.endswith(integrator::DerivativeIntegrator, suffix::String) = endswith(integ
 Base.startswith(symb::Symbol, prefix::AbstractString) = startswith(String(symb), prefix)
 Base.startswith(symb::Symbol, prefix::Symbol) = startswith(String(symb), String(prefix))
 
-# Append suffix utilities
+# Add suffix utilities
 # -----------------------
 
-append_suffix(symb::Symbol, suffix::String) = Symbol(string(symb, suffix))
-append_suffix(symbs::Tuple, suffix::String; exclude::AbstractVector{<:Symbol}=Symbol[]) = 
-    Tuple(s ∈ exclude ? s : append_suffix(s, suffix) for s ∈ symbs)
-append_suffix(symbs::AbstractVector, suffix::String; exclude::AbstractVector{<:Symbol}=Symbol[]) = 
-    [s ∈ exclude ? s : append_suffix(s, suffix) for s ∈ symbs]
-append_suffix(d::Dict{Symbol, Any}, suffix::String; exclude::AbstractVector{<:Symbol}=Symbol[]) =
-    typeof(d)(k ∈ exclude ? k : append_suffix(k, suffix) => v for (k, v) ∈ d)
+add_suffix(symb::Symbol, suffix::String) = Symbol(string(symb, suffix))
+add_suffix(symbs::Tuple, suffix::String; exclude::AbstractVector{<:Symbol}=Symbol[]) = 
+    Tuple(s ∈ exclude ? s : add_suffix(s, suffix) for s ∈ symbs)
+add_suffix(symbs::AbstractVector, suffix::String; exclude::AbstractVector{<:Symbol}=Symbol[]) = 
+    [s ∈ exclude ? s : add_suffix(s, suffix) for s ∈ symbs]
+add_suffix(d::Dict{Symbol, Any}, suffix::String; exclude::AbstractVector{<:Symbol}=Symbol[]) =
+    typeof(d)(k ∈ exclude ? k : add_suffix(k, suffix) => v for (k, v) ∈ d)
 
-function append_suffix(nt::NamedTuple, suffix::String; exclude::AbstractVector{<:Symbol}=Symbol[])
-    symbs = Tuple(k ∈ exclude ? k : append_suffix(k, suffix) for k ∈ keys(nt))
+function add_suffix(nt::NamedTuple, suffix::String; exclude::AbstractVector{<:Symbol}=Symbol[])
+    symbs = Tuple(k ∈ exclude ? k : add_suffix(k, suffix) for k ∈ keys(nt))
     return NamedTuple{symbs}(values(nt))
 end
 
-function append_suffix(components::Union{Tuple, AbstractVector}, traj::NamedTrajectory, suffix::String)
-    return append_suffix(get_components(components, traj), suffix)
+function add_suffix(components::Union{Tuple, AbstractVector}, traj::NamedTrajectory, suffix::String)
+    return add_suffix(get_components(components, traj), suffix)
 end
 
-function append_suffix(traj::NamedTrajectory, suffix::String)
+function add_suffix(traj::NamedTrajectory, suffix::String)
     # Timesteps are appended because of bounds and initial/final constraints.
     component_names = vcat(traj.state_names..., traj.control_names...)
-    components = append_suffix(component_names, traj, suffix)
-    controls = append_suffix(traj.control_names, suffix)
+    components = add_suffix(component_names, traj, suffix)
+    controls = add_suffix(traj.control_names, suffix)
     return NamedTrajectory(
         components;
         controls=controls,
-        timestep=traj.timestep isa Symbol ? append_suffix(traj.timestep, suffix) : traj.timestep,
-        bounds=append_suffix(traj.bounds, suffix),
-        initial=append_suffix(traj.initial, suffix),
-        final=append_suffix(traj.final, suffix),
-        goal=append_suffix(traj.goal, suffix)
+        timestep=traj.timestep isa Symbol ? add_suffix(traj.timestep, suffix) : traj.timestep,
+        bounds=add_suffix(traj.bounds, suffix),
+        initial=add_suffix(traj.initial, suffix),
+        final=add_suffix(traj.final, suffix),
+        goal=add_suffix(traj.goal, suffix)
     )
 end
 
-append_suffix(integrator::AbstractIntegrator, suffix::String) = 
-    modify_integrator_suffix(integrator, suffix, append_suffix)
+add_suffix(integrator::AbstractIntegrator, suffix::String) = 
+    modify_integrator_suffix(integrator, suffix, add_suffix)
 
-append_suffix(integrators::AbstractVector{<:AbstractIntegrator}, suffix::String) =
-    [append_suffix(integrator, suffix) for integrator ∈ integrators]
+add_suffix(integrators::AbstractVector{<:AbstractIntegrator}, suffix::String) =
+    [add_suffix(integrator, suffix) for integrator ∈ integrators]
 
-function append_suffix(sys::QuantumSystem, suffix::String)
+function add_suffix(sys::QuantumSystem, suffix::String)
     return QuantumSystem(
         sys.H_drift,
         sys.H_drives,
-        params=append_suffix(sys.params, suffix)
+        params=add_suffix(sys.params, suffix)
     )
 end
 

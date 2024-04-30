@@ -97,7 +97,7 @@ function UnitaryDirectSumProblem(
     boundary = Tuple{Symbol, Array}[]
     if isnothing(graph)
         graph = [
-            (append_suffix(Q_symb, i), append_suffix(Q_symb, j))
+            (add_suffix(Q_symb, i), add_suffix(Q_symb, j))
             for (i, j) ∈ zip(prob_labels[1:N-1], prob_labels[2:N])
         ]
     else
@@ -106,11 +106,11 @@ function UnitaryDirectSumProblem(
             graph_symbols = Tuple{Symbol, Symbol}[]
             for edge in graph
                 if edge[1] in prob_labels && edge[2] in prob_labels
-                    push!(graph_symbols, (append_suffix(Q_symb, edge[1]), append_suffix(Q_symb, edge[2])))
+                    push!(graph_symbols, (add_suffix(Q_symb, edge[1]), add_suffix(Q_symb, edge[2])))
                 elseif edge[1] in keys(boundary_values) && edge[2] in prob_labels
-                    push!(boundary, (append_suffix(Q_symb, edge[2]), boundary_values[edge[1]]))
+                    push!(boundary, (add_suffix(Q_symb, edge[2]), boundary_values[edge[1]]))
                 elseif edge[1] in prob_labels && edge[2] in keys(boundary_values)
-                    push!(boundary, (append_suffix(Q_symb, edge[1]), boundary_values[edge[2]]))
+                    push!(boundary, (add_suffix(Q_symb, edge[1]), boundary_values[edge[2]]))
                 else
                     throw(ArgumentError("Edge labels must be in prob_labels or boundary_values"))
                 end
@@ -121,19 +121,18 @@ function UnitaryDirectSumProblem(
 
     # Build the direct sum system
 
+    println("...trajectories...")
+
     # merge suffix trajectories
-    traj = reduce(
-        direct_sum, 
-        [append_suffix(p.trajectory, ℓ) for (p, ℓ) ∈ zip(probs, prob_labels)]
-    )
+    traj = direct_sum([add_suffix(p.trajectory, ℓ) for (p, ℓ) ∈ zip(probs, prob_labels)])
 
     # add noise to control data (avoid restoration)
     if drive_reset_ratio > 0
         σs = repeat([drive_derivative_σ], 2)
         for ℓ in prob_labels
-            a_symb = append_suffix(:a, ℓ)
-            da_symb = append_suffix(:da, ℓ)
-            dda_symb = append_suffix(:dda, ℓ)
+            a_symb = add_suffix(:a, ℓ)
+            da_symb = add_suffix(:da, ℓ)
+            dda_symb = add_suffix(:dda, ℓ)
             a_bounds_lower, a_bounds_upper = traj.bounds[a_symb]
             a, da, dda = randomly_fill_drives(traj.T, a_bounds_lower, a_bounds_upper, σs)
             update!(traj, a_symb, (1 - drive_reset_ratio) * traj[a_symb] + drive_reset_ratio * a)
@@ -144,27 +143,27 @@ function UnitaryDirectSumProblem(
 
     # concatenate suffix integrators
     integrators = vcat(
-        [append_suffix(p.integrators, ℓ) for (p, ℓ) ∈ zip(probs, prob_labels)]...
+        [add_suffix(p.integrators, ℓ) for (p, ℓ) ∈ zip(probs, prob_labels)]...
     )
 
     # direct sum (used for problem saving, only)
-    system = reduce(
-        direct_sum, 
-        [append_suffix(p.system, ℓ) for (p, ℓ) ∈ zip(probs, prob_labels)]
-    )
+    system = direct_sum([add_suffix(p.system, ℓ) for (p, ℓ) ∈ zip(probs, prob_labels)])
 
     # Rebuild trajectory constraints
     build_trajectory_constraints = true
     constraints = AbstractConstraint[]
 
+    println("...constraints...")
+
     # Add goal constraints for each problem
     for (p, ℓ) ∈ zip(probs, prob_labels)
         goal_symb, = keys(p.trajectory.goal)
         fidelity_constraint = FinalUnitaryFidelityConstraint(
-            append_suffix(goal_symb, ℓ),
+            add_suffix(goal_symb, ℓ),
             final_fidelity,
-            traj;
-            subspace=subspace
+            traj,
+            subspace=subspace,
+            hessian=!hessian_approximation
         )
         push!(constraints, fidelity_constraint)
     end
@@ -177,9 +176,9 @@ function UnitaryDirectSumProblem(
     end
 
     for ℓ ∈ prob_labels
-        J += QuadraticRegularizer(append_suffix(:a, ℓ), traj, R_a)
-        J += QuadraticRegularizer(append_suffix(:da, ℓ), traj, R_da)
-        J += QuadraticRegularizer(append_suffix(:dda, ℓ), traj, R_dda)
+        J += QuadraticRegularizer(add_suffix(:a, ℓ), traj, R_a)
+        J += QuadraticRegularizer(add_suffix(:da, ℓ), traj, R_da)
+        J += QuadraticRegularizer(add_suffix(:dda, ℓ), traj, R_dda)
     end
 
     # Add fidelity cost
@@ -187,8 +186,9 @@ function UnitaryDirectSumProblem(
         for ℓ ∈ prob_labels
             Q_fid = isa(Q, Number) ? Q : Q[1]
             J += UnitaryInfidelityObjective(
-                append_suffix(:Ũ⃗, ℓ), traj, Q_fid,
-                subspace=subspace, eval_hessian=!hessian_approximation
+                add_suffix(:Ũ⃗, ℓ), traj, Q_fid,
+                subspace=subspace, 
+                eval_hessian=!hessian_approximation
             )
         end
     end
@@ -226,12 +226,12 @@ end
     # Test default
     direct_sum_prob1 = UnitaryDirectSumProblem([prob1, prob2], 0.99, ipopt_options=ops)
     state_names = vcat(
-        append_suffix(prob1.trajectory.state_names, "1")...,
-        append_suffix(prob2.trajectory.state_names, "2")...
+        add_suffix(prob1.trajectory.state_names, "1")...,
+        add_suffix(prob2.trajectory.state_names, "2")...
     )
     control_names = vcat(
-        append_suffix(prob1.trajectory.control_names, "1")...,
-        append_suffix(prob2.trajectory.control_names, "2")...
+        add_suffix(prob1.trajectory.control_names, "1")...,
+        add_suffix(prob2.trajectory.control_names, "2")...
     )
     @test issetequal(direct_sum_prob1.trajectory.state_names, state_names)
     @test issetequal(direct_sum_prob1.trajectory.control_names, control_names)
@@ -244,12 +244,12 @@ end
         graph=[("a", "b")],
         ipopt_options=ops)
     state_names_ab = vcat(
-        append_suffix(prob1.trajectory.state_names, "a")...,
-        append_suffix(prob2.trajectory.state_names, "b")...
+        add_suffix(prob1.trajectory.state_names, "a")...,
+        add_suffix(prob2.trajectory.state_names, "b")...
     )
     control_names_ab = vcat(
-        append_suffix(prob1.trajectory.control_names, "a")...,
-        append_suffix(prob2.trajectory.control_names, "b")...
+        add_suffix(prob1.trajectory.control_names, "a")...,
+        add_suffix(prob2.trajectory.control_names, "b")...
     )
     @test issetequal(direct_sum_prob2.trajectory.state_names, state_names_ab)
     @test issetequal(direct_sum_prob2.trajectory.control_names, control_names_ab)
@@ -275,8 +275,8 @@ end
 
     # Test triple
     direct_sum_prob4 = UnitaryDirectSumProblem([prob1, prob2, prob1], 0.99, ipopt_options=ops)
-    state_names_triple = vcat(state_names..., append_suffix(prob1.trajectory.state_names, "3")...)
-    control_names_triple = vcat(control_names..., append_suffix(prob1.trajectory.control_names, "3")...)
+    state_names_triple = vcat(state_names..., add_suffix(prob1.trajectory.state_names, "3")...)
+    control_names_triple = vcat(control_names..., add_suffix(prob1.trajectory.control_names, "3")...)
     @test issetequal(direct_sum_prob4.trajectory.state_names, state_names_triple)
     @test issetequal(direct_sum_prob4.trajectory.control_names, control_names_triple)
 

@@ -277,9 +277,10 @@ function UnitaryInfidelityObjective(
     name::Symbol,
     traj::NamedTrajectory,
     Q::Float64;
-    subspace=nothing
+    subspace=nothing,
+	eval_hessian::Bool=true
 )
-    return UnitaryInfidelityObjective(name=name, goal=traj.goal[name], Q=Q, subspace=subspace)
+    return UnitaryInfidelityObjective(name=name, goal=traj.goal[name], Q=Q, subspace=subspace, eval_hessian=eval_hessian)
 end
 
 function QuantumObjective(

@@ -116,7 +116,7 @@ function UnitaryRobustGatesetProblem(
         graph_symbols = Tuple{Symbol, Symbol}[]
         for (e1, e2) ∈ crosstalk_graph
             if e1 ∈ prob_labels && e2 ∈ prob_labels
-                push!(graph_symbols, (append_suffix(Q_symb, e1), append_suffix(Q_symb, e2)))
+                push!(graph_symbols, (add_suffix(Q_symb, e1), add_suffix(Q_symb, e2)))
             else
                 throw(ArgumentError("Edge labels must be in prob_labels"))
             end
@@ -127,21 +127,15 @@ function UnitaryRobustGatesetProblem(
     # Build the direct sum system
 
     # merge suffix trajectories
-    traj = reduce(
-        direct_sum, 
-        [append_suffix(p.trajectory, ℓ) for (p, ℓ) ∈ zip(probs, prob_labels)]
-    )
+    traj = direct_sum([add_suffix(p.trajectory, ℓ) for (p, ℓ) ∈ zip(probs, prob_labels)])
 
     # concatenate suffix integrators
     integrators = vcat(
-        [append_suffix(p.integrators, ℓ) for (p, ℓ) ∈ zip(probs, prob_labels)]...
+        [add_suffix(p.integrators, ℓ) for (p, ℓ) ∈ zip(probs, prob_labels)]...
     )
 
     # direct sum (used for problem saving, only)
-    system = reduce(
-        direct_sum, 
-        [append_suffix(p.system, ℓ) for (p, ℓ) ∈ zip(probs, prob_labels)]
-    )
+    system = direct_sum([add_suffix(p.system, ℓ) for (p, ℓ) ∈ zip(probs, prob_labels)])
 
     # Rebuild trajectory constraints
     build_trajectory_constraints = true
@@ -151,9 +145,10 @@ function UnitaryRobustGatesetProblem(
     for (p, ℓ) ∈ zip(probs, prob_labels)
         goal_symb, = keys(p.trajectory.goal)
         fidelity_constraint = FinalUnitaryFidelityConstraint(
-            append_suffix(goal_symb, ℓ),
+            add_suffix(goal_symb, ℓ),
             final_fidelity,
-            traj
+            traj,
+            hessian=!hessian_approximation
         )
         push!(constraints, fidelity_constraint)
     end
@@ -165,13 +160,13 @@ function UnitaryRobustGatesetProblem(
     end
 
     for (ℓ, H) ∈ local_operators
-        J += InfidelityRobustnessObjective(H, traj, state_symb=append_suffix(Q_symb, ℓ))
+        J += InfidelityRobustnessObjective(H, traj, state_symb=add_suffix(Q_symb, ℓ))
     end
 
     for ℓ ∈ prob_labels
-        J += QuadraticRegularizer(append_suffix(:a, ℓ), traj, R_a)
-        J += QuadraticRegularizer(append_suffix(:da, ℓ), traj, R_da)
-        J += QuadraticRegularizer(append_suffix(:dda, ℓ), traj, R_dda)
+        J += QuadraticRegularizer(add_suffix(:a, ℓ), traj, R_a)
+        J += QuadraticRegularizer(add_suffix(:da, ℓ), traj, R_da)
+        J += QuadraticRegularizer(add_suffix(:dda, ℓ), traj, R_dda)
     end
 
     return QuantumControlProblem(
