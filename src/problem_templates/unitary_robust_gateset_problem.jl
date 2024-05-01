@@ -44,10 +44,12 @@
     - `local_operators::Union{AbstractDict{<:String, <:AbstractArray}, AbstractDict{<:Symbol, <:AbstractArray}}`:
         A dictionary of local operators for each problem in the set.
     - `Q_symb::Symbol`: The symbol for the unitary trajectory.
+    - `Q::Float64`: The regularization parameter for the infidelity cost, if using.
     - `R::Float64`: The regularization parameter for the quadratic regularizer.
     - `R_a::Union{Float64, Vector{Float64}}`: The regularization parameter for the quadratic regularizer on the amplitudes.
     - `R_da::Union{Float64, Vector{Float64}}`: The regularization parameter for the quadratic regularizer on the derivatives of the amplitudes.
     - `R_dda::Union{Float64, Vector{Float64}}`: The regularization parameter for the quadratic regularizer on the second derivatives of the amplitudes.
+    - `fidelity_cost::Bool`: Whether to include the fidelity cost in the objective function.
     - `max_iter::Int`: The maximum number of iterations for the optimization.
     - `linear_solver::String`: The linear solver to use for the optimization.
     - `verbose::Bool`: Whether to print verbose output.
@@ -68,10 +70,12 @@ function UnitaryRobustGatesetProblem(
         AbstractVector{<:Tuple{<:AbstractMatrix, <:AbstractMatrix}}}=Matrix{ComplexF64}[],
     local_operators::Union{AbstractDict{<:String, <:AbstractArray}, AbstractDict{<:Symbol, <:AbstractArray}}=Dict{String, Array}(),
     Q_symb::Symbol=:Ũ⃗,
+    Q::Float64=100.0,
     R::Float64=1e-2,
     R_a::Union{Float64, Vector{Float64}}=R,
     R_da::Union{Float64, Vector{Float64}}=R,
     R_dda::Union{Float64, Vector{Float64}}=R,
+    fidelity_cost::Bool=false,
     max_iter::Int=1000,
     linear_solver::String="mumps",
     verbose::Bool=false,
@@ -157,6 +161,17 @@ function UnitaryRobustGatesetProblem(
     J = NullObjective()
     for ((s1, s2), (H1, H2)) ∈ zip(crosstalk_graph, crosstalk_operators)
         J += InfidelityRobustnessObjective(H1, H2, s1, s2)
+    end
+
+    # Add (optional) fidelity cost
+    if fidelity_cost
+        for ℓ ∈ prob_labels
+            J += UnitaryInfidelityObjective(
+                add_suffix(:Ũ⃗, ℓ), traj, Q,
+                # subspace=subspace, 
+                eval_hessian=!hessian_approximation
+            )
+        end
     end
 
     for (ℓ, H) ∈ local_operators

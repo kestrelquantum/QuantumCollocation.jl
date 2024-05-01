@@ -33,6 +33,7 @@ between each neighbor of the provided `probs`.
 - `R_b::Union{Float64, Vector{Float64}}=R`: the weight on the regularization term for the boundary values
 - `drive_derivative_σ::Float64=0.01`: the standard deviation of the initial guess for the control pulse derivatives
 - `drive_reset_ratio::Float64=0.1`: amount of random noise to add to the control data (can help avoid hitting restoration if provided problems are converged)
+- `fidelity_cost::Bool=false`: whether or not to include a fidelity cost in the objective
 - `subspace::Union{AbstractVector{<:Integer}, Nothing}=nothing`: the subspace to use for the fidelity of each problem
 - `max_iter::Int=1000`: the maximum number of iterations for the Ipopt solver
 - `linear_solver::String="mumps"`: the linear solver to use in Ipopt
