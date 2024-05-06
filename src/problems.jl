@@ -8,6 +8,7 @@ export initialize_trajectory!
 export update_trajectory!
 export get_traj_data
 export get_datavec
+export get_objective
 
 using ..QuantumSystems
 using ..Integrators
@@ -50,6 +51,7 @@ function QuantumControlProblem(
     traj::NamedTrajectory,
     obj::Objective,
     dynamics::QuantumDynamics;
+    additional_objective::Union{Nothing, Objective}=nothing,
     eval_hessian::Bool=true,
     options::Options=Options(),
     constraints::Vector{<:AbstractConstraint}=AbstractConstraint[],
@@ -64,6 +66,10 @@ function QuantumControlProblem(
     options.linear_solver = linear_solver
 
     nonlinear_constraints = NonlinearConstraint[con for con ∈ constraints if con isa NonlinearConstraint]
+
+    if !isnothing(additional_objective)
+        obj += additional_objective
+    end
 
     if verbose
         println("    building evaluator...")
@@ -284,6 +290,15 @@ end
 @views function update_trajectory!(prob::QuantumControlProblem)
     Z⃗ = get_datavec(prob)
     prob.trajectory = NamedTrajectory(Z⃗, prob.trajectory)
+end
+
+"""
+    get_objective(prob::QuantumControlProblem)
+
+Return the objective function of the `prob::QuantumControlProblem`.
+"""
+function get_objective(prob::QuantumControlProblem)
+    return Objective(prob.params[:objective_terms])
 end
 
 

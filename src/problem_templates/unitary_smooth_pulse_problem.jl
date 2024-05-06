@@ -104,6 +104,7 @@ function UnitarySmoothPulseProblem(
     jacobian_structure=true,
     hessian_approximation=false,
     blas_multithreading=true,
+    kwargs...
 )
     if operator isa EmbeddedOperator
         U_goal = operator.operator
@@ -274,7 +275,8 @@ function UnitarySmoothPulseProblem(
         ipopt_options=ipopt_options,
         jacobian_structure=jacobian_structure,
         hessian_approximation=hessian_approximation,
-        eval_hessian=!hessian_approximation
+        eval_hessian=!hessian_approximation,
+        kwargs...
     )
 end
 
