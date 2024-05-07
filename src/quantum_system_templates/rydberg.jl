@@ -62,7 +62,7 @@ function RydbergChainSystem(;
         H_drift = sum([C*kron_from_dict(generate_pattern(N,i),PAULIS)/(distance^6) for i in 1:N-1])
     elseif cutoff_order == 2
         H_drift = sum([C*kron_from_dict(generate_pattern(N,i),PAULIS)/(distance^6) for i in 1:N-1])
-        H_drift += sum([C*kron_from_dict(generate_pattern_with_gap(N,i,1),PAULIS)/(distance^6) for i in 1:N-2])
+        H_drift += sum([C*kron_from_dict(generate_pattern_with_gap(N,i,1),PAULIS)/((2*distance)^6) for i in 1:N-2])
     else
         error("Higher cutoff order not supported")
     end
