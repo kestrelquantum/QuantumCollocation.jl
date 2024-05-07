@@ -24,7 +24,7 @@ H = \sum_i 0.5*\Omega_i(t)\cos(\phi_i(t)) \sigma_i^x - 0.5*\Omega_i(t)\sin(\phi_
 function generate_pattern(N::Int, i::Int)
     # Create an array filled with 'I'
     qubits = fill('I', N)
-    # Insert 'Z' at position i and i+1, ensuring it doesn't exceed the array bounds
+    # Insert 'n' at position i and i+1, ensuring it doesn't exceed the array bounds
     if i <= N && i+1 <= N
         qubits[i] = 'n'
         qubits[i+1] = 'n'
@@ -34,7 +34,7 @@ end
 function generate_pattern_with_gap(N::Int, i::Int, gap::Int)
     # Create an array filled with 'I'
     qubits = fill('I', N)
-    # Insert 'Z' at position i and i+gap+1, ensuring it doesn't exceed the array bounds
+    # Insert 'n' at position i and i+gap+1, ensuring it doesn't exceed the array bounds
     if i <= N && i+gap+1 <= N
         qubits[i] = 'n'
         qubits[i+gap+1] = 'n'
