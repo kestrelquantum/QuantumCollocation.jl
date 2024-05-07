@@ -1,4 +1,3 @@
-using QuantumCollocation
 @doc raw"""
     RydbergChainSystem(;
         C::Float64=862690*2π,  
