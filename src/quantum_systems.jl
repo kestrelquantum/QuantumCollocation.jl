@@ -32,9 +32,9 @@ where ``\Im(H)`` and ``\Re(H)`` are the imaginary and real parts of ``H`` and th
 \widetilde{H} = \mqty(1 & 0 \\ 0 & 1) \otimes \Re(H) + \mqty(0 & -1 \\ 1 & 0) \otimes \Im(H)
 ```
 """
-G(H::AbstractMatrix{<:Number}) = I(2) ⊗ imag(H) - Im2 ⊗ real(H)
+G(H::AbstractMatrix{<:Number}) = I(2) ⊗ imag(H) - typeof(H)(Im2) ⊗ real(H)
 
-iso(H::AbstractMatrix{<:Number}) = I(2) ⊗ real(H) + Im2 ⊗ imag(H)
+iso(H::AbstractMatrix{<:Number}) = I(2) ⊗ real(H) + typeof(H)(Im2) ⊗ imag(H)
 
 
 """

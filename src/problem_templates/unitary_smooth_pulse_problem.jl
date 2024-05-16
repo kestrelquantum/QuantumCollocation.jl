@@ -97,7 +97,7 @@ function UnitarySmoothPulseProblem(
     constraints::Vector{<:AbstractConstraint}=AbstractConstraint[],
     timesteps_all_equal::Bool=true,
     verbose::Bool=false,
-    integrator=Integrators.fourth_order_pade,
+    integrator::Symbol=:pade,
     geodesic=true,
     pade_order=4,
     autodiff=pade_order != 4,
@@ -251,8 +251,19 @@ function UnitarySmoothPulseProblem(
         end
     end
 
+    if integrator == :pade
+        unitary_integrator =
+            UnitaryPadeIntegrator(system, :Ũ⃗, :a; order=pade_order, autodiff=autodiff)
+    elseif integrator == :exponential
+        unitary_integrator =
+            UnitaryExponentialIntegrator(system, :Ũ⃗, :a)
+    else
+        error("integrator must be one of (:pade, :exponential)")
+    end
+
+
     integrators = [
-        UnitaryPadeIntegrator(system, :Ũ⃗, :a; order=pade_order, autodiff=autodiff),
+        unitary_integrator,
         DerivativeIntegrator(:a, :da, traj),
         DerivativeIntegrator(:da, :dda, traj),
     ]
