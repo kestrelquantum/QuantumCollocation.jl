@@ -143,7 +143,13 @@ function UnitarySmoothPulseProblem(
                 Ũ⃗ = unitary_linear_interpolation(U_init, U_goal, T)
             end
 
-            a_dists =  [Uniform(-a_bounds[i], a_bounds[i]) for i = 1:n_drives]
+            if a_bounds isa AbstractVector
+                a_dists = [Uniform(-a_bounds[i], a_bounds[i]) for i = 1:n_drives]
+            elseif a_bounds isa Tuple
+                a_dists = [Uniform(aᵢ_lb, aᵢ_ub) for (aᵢ_lb, aᵢ_ub) ∈ zip(a_bounds...)]
+            else
+                error("a_bounds must be a Vector or Tuple")
+            end
 
             a = hcat([
                 zeros(n_drives),
