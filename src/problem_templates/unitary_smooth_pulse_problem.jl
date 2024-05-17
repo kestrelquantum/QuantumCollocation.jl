@@ -73,7 +73,7 @@ function UnitarySmoothPulseProblem(
     system::AbstractQuantumSystem,
     operator::Union{EmbeddedOperator, AbstractMatrix{<:Number}},
     T::Int,
-    Δt::Float64;
+    Δt::Union{Float64, Vector{Float64}};
     free_time=true,
     init_trajectory::Union{NamedTrajectory, Nothing}=nothing,
     a_bound::Float64=1.0,
@@ -98,6 +98,7 @@ function UnitarySmoothPulseProblem(
     timesteps_all_equal::Bool=true,
     verbose::Bool=false,
     integrator::Symbol=:pade,
+    rollout_integrator=exp,
     geodesic=true,
     pade_order=4,
     autodiff=pade_order != 4,
@@ -129,7 +130,9 @@ function UnitarySmoothPulseProblem(
         traj = init_trajectory
     else
         if free_time
-            Δt = fill(Δt, 1, T)
+            if Δt isa Float64
+                Δt = fill(Δt, 1, T)
+            end
         end
 
         if isnothing(a_guess)
@@ -165,7 +168,7 @@ function UnitarySmoothPulseProblem(
                 a_guess,
                 Δt,
                 system;
-                integrator=integrator
+                integrator=rollout_integrator
             )
             a = a_guess
             da = derivative(a, Δt)
