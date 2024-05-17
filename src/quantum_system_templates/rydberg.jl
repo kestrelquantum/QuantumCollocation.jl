@@ -49,21 +49,32 @@ function lift(x::Char,i::Int, N::Int)
     return join(qubits)
 end
 
+
 function RydbergChainSystem(;
     N::Int=3, # number of atoms
     C::Float64=862690*2π,  
-    distance::Float64=10.0, # μm
+    distance::Float64=8.7, # μm
     cutoff_order::Int=1, # 1 is nearest neighbor, 2 is next-nearest neighbor, etc.
     local_detune::Bool=false,
+    all2all::Bool=true,
 )
     PAULIS = Dict("I" => [1 0; 0 1], "X" => [0 1; 1 0], "Y" => [0 -im; im 0], "Z" => [1 0; 0 -1], "n" => [0 0; 0 1])
-    if cutoff_order == 1
-        H_drift = sum([C*kron_from_dict(generate_pattern(N,i),PAULIS)/(distance^6) for i in 1:N-1])
-    elseif cutoff_order == 2
-        H_drift = sum([C*kron_from_dict(generate_pattern(N,i),PAULIS)/(distance^6) for i in 1:N-1])
-        H_drift += sum([C*kron_from_dict(generate_pattern_with_gap(N,i,1),PAULIS)/((2*distance)^6) for i in 1:N-2])
+    if all2all
+        H_drift = zeros(ComplexF64, 2^N, 2^N)
+        for gap in 0:N-2
+            for i in 1:N-gap-1
+                H_drift += C*kron_from_dict(generate_pattern_with_gap(N,i,gap),PAULIS)/(((gap+1)*distance)^6)
+            end
+        end
     else
-        error("Higher cutoff order not supported")
+        if cutoff_order == 1
+            H_drift = sum([C*kron_from_dict(generate_pattern(N,i),PAULIS)/(distance^6) for i in 1:N-1])
+        elseif cutoff_order == 2
+            H_drift = sum([C*kron_from_dict(generate_pattern(N,i),PAULIS)/(distance^6) for i in 1:N-1])
+            H_drift += sum([C*kron_from_dict(generate_pattern_with_gap(N,i,1),PAULIS)/((2*distance)^6) for i in 1:N-2])
+        else
+            error("Higher cutoff order not supported")
+        end
     end
     H_drives = Matrix{ComplexF64}[]
     # Add global X drive
@@ -81,6 +92,7 @@ function RydbergChainSystem(;
         :distance => distance,
         :cutoff_order => cutoff_order,
         :local_detune => local_detune,
+        :all2all => all2all,
     )
     return QuantumSystem(
         H_drift,
@@ -89,3 +101,5 @@ function RydbergChainSystem(;
         params=params,
     )
 end
+
+
