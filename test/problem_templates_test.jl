@@ -7,7 +7,7 @@
 # ------------------------------------------------
 
 
-@testset "Problem Templates" begin
+@testitem "Problem Templates" begin
     H_drift = GATES[:Z]
     H_drives = [GATES[:X], GATES[:Y]]
     U_goal = GATES[:H]
@@ -18,7 +18,7 @@
     # 1. test UnitarySmoothPulseProblem
     # --------------------------------------------
     prob = UnitarySmoothPulseProblem(
-        H_drift, H_drives, U_goal, T, Δt, 
+        H_drift, H_drives, U_goal, T, Δt,
         ipopt_options=Options(print_level=4)
     )
 
@@ -33,8 +33,8 @@
     final_fidelity = 0.99
 
     mintime_prob = UnitaryMinimumTimeProblem(
-        prob, 
-        final_fidelity=final_fidelity, 
+        prob,
+        final_fidelity=final_fidelity,
         ipopt_options=Options(print_level=4)
     )
 
@@ -43,12 +43,11 @@
     @test unitary_fidelity(mintime_prob) > final_fidelity
 
     @test sum(mintime_prob.trajectory[:Δt]) < sum(prob.trajectory[:Δt])
-
 end
 
 
 
-@testset "Robust and Subspace Templates" begin
+@testitem "Robust and Subspace Templates" begin
     # TODO: Improve these tests.
     # --------------------------------------------
     # Initialize with UnitarySmoothPulseProblem
@@ -112,8 +111,8 @@ end
 
     probs["unconstrained"] = UnitaryRobustnessProblem(
         H_error, trajectory, system, objective, integrators, constraints,
-        final_fidelity=0.99, 
-        subspace=subspace, 
+        final_fidelity=0.99,
+        subspace=subspace,
         ipopt_options=Options(recalc_y="yes", recalc_y_feas_tol=1e-1, print_level=4)
     )
     solve!(probs["unconstrained"]; max_iter=100)

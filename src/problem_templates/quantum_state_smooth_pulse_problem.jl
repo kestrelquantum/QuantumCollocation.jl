@@ -54,6 +54,7 @@ function QuantumStateSmoothPulseProblem(
     L1_regularized_names=Symbol[],
     L1_regularized_indices::NamedTuple=NamedTuple(),
     verbose=false,
+    kwargs...
 )
     @assert all(name ∈ L1_regularized_names for name in keys(L1_regularized_indices) if !isempty(L1_regularized_indices[name]))
 
@@ -239,6 +240,7 @@ function QuantumStateSmoothPulseProblem(
         linear_solver=linear_solver,
         verbose=verbose,
         ipopt_options=ipopt_options,
+        kwargs...
     )
 end
 
