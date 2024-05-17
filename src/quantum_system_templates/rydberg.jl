@@ -48,7 +48,7 @@ function lift(x::Char,i::Int, N::Int)
     qubits[i] = x
     return join(qubits)
 end
-generate_pattern_with_gap(5,1,0)
+
 
 function RydbergChainSystem(;
     N::Int=3, # number of atoms
