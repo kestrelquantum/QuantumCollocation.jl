@@ -88,4 +88,6 @@ Documentation:
 Functionality:
 
 - [ ] custom `QuantumTrajectory` types (repr. of isomorphic states)
-- [ ] better quantum system constructors (e.g. storing composite system info) 
+- [ ] better quantum system constructors (e.g. storing composite system info)
+
+Hi!
