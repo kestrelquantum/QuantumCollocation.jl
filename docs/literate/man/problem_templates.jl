@@ -4,12 +4,12 @@
 
 # ## Unitary Smooth Pulse Problem
 
+# ```@docs
+# UnitarySmoothPulseProblem
+# ```
+
 # ## Unitary Minimum Time Problem
 
 # ```@docs
 # UnitaryMinimumTimeProblem
-# ```
-
-# ```@docs
-# UnitarySmoothPulseProblem
 # ```

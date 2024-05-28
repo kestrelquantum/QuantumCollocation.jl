@@ -60,7 +60,12 @@ with
 - `constraints::Vector{<:AbstractConstraint}=AbstractConstraint[]`: additional constraints to add to the problem
 - `timesteps_all_equal::Bool=true`: whether or not to enforce that all time steps are equal
 - `verbose::Bool=false`: whether or not to print constructor output
-- `integrator=Integrators.fourth_order_pade`: the integrator to use for the unitary
+- `integrator=:pade`: the integrator to use for the unitary, either `:pade` or `:exponential`
+- `rollout_integrator=exp`: the integrator to use for the rollout
+- `bound_unitary=integrator == :exponential`: whether or not to bound the unitary
+- `control_norm_constraint=false`: whether or not to enforce a constraint on the control pulse norm
+- `control_norm_constraint_components=nothing`: the components of the control pulse to use for the norm constraint
+- `control_norm_R=nothing`: the weight on the control pulse norm constraint
 - `geodesic=true`: whether or not to use the geodesic as the initial guess for the unitary
 - `pade_order=4`: the order of the Pade approximation to use for the unitary integrator
 - `autodiff=pade_order != 4`: whether or not to use automatic differentiation for the unitary integrator
@@ -73,14 +78,14 @@ function UnitarySmoothPulseProblem(
     system::AbstractQuantumSystem,
     operator::Union{EmbeddedOperator, AbstractMatrix{<:Number}},
     T::Int,
-    Δt::Float64;
+    Δt::Union{Float64, Vector{Float64}};
     free_time=true,
     init_trajectory::Union{NamedTrajectory, Nothing}=nothing,
     a_bound::Float64=1.0,
-    a_bounds::Vector{Float64}=fill(a_bound, length(system.G_drives)),
+    a_bounds=fill(a_bound, length(system.G_drives)),
     a_guess::Union{Matrix{Float64}, Nothing}=nothing,
     dda_bound::Float64=1.0,
-    dda_bounds::Vector{Float64}=fill(dda_bound, length(system.G_drives)),
+    dda_bounds=fill(dda_bound, length(system.G_drives)),
     Δt_min::Float64=0.5 * Δt,
     Δt_max::Float64=1.5 * Δt,
     drive_derivative_σ::Float64=0.01,
@@ -97,7 +102,13 @@ function UnitarySmoothPulseProblem(
     constraints::Vector{<:AbstractConstraint}=AbstractConstraint[],
     timesteps_all_equal::Bool=true,
     verbose::Bool=false,
-    integrator=Integrators.fourth_order_pade,
+    integrator::Symbol=:pade,
+    rollout_integrator=exp,
+    bound_unitary=integrator == :exponential,
+    # TODO: control modulus norm, advanced feature, needs documentation
+    control_norm_constraint=false,
+    control_norm_constraint_components=nothing,
+    control_norm_R=nothing,
     geodesic=true,
     pade_order=4,
     autodiff=pade_order != 4,
@@ -129,7 +140,9 @@ function UnitarySmoothPulseProblem(
         traj = init_trajectory
     else
         if free_time
-            Δt = fill(Δt, 1, T)
+            if Δt isa Float64
+                Δt = fill(Δt, 1, T)
+            end
         end
 
         if isnothing(a_guess)
@@ -143,7 +156,13 @@ function UnitarySmoothPulseProblem(
                 Ũ⃗ = unitary_linear_interpolation(U_init, U_goal, T)
             end
 
-            a_dists =  [Uniform(-a_bounds[i], a_bounds[i]) for i = 1:n_drives]
+            if a_bounds isa AbstractVector
+                a_dists = [Uniform(-a_bounds[i], a_bounds[i]) for i = 1:n_drives]
+            elseif a_bounds isa Tuple
+                a_dists = [Uniform(aᵢ_lb, aᵢ_ub) for (aᵢ_lb, aᵢ_ub) ∈ zip(a_bounds...)]
+            else
+                error("a_bounds must be a Vector or Tuple")
+            end
 
             a = hcat([
                 zeros(n_drives),
@@ -159,11 +178,14 @@ function UnitarySmoothPulseProblem(
                 a_guess,
                 Δt,
                 system;
-                integrator=integrator
+                integrator=rollout_integrator
             )
             a = a_guess
             da = derivative(a, Δt)
             dda = derivative(da, Δt)
+
+            # to avoid constraint violation error at initial iteration
+            da[:, end] = da[:, end-1] + Δt[end-1] * dda[:, end-1]
         end
 
         initial = (
@@ -179,6 +201,19 @@ function UnitarySmoothPulseProblem(
             Ũ⃗ = operator_to_iso_vec(U_goal),
         )
 
+        bounds = (
+            a = a_bounds,
+            dda = dda_bounds,
+        )
+
+        if bound_unitary
+            Ũ⃗_dim = size(Ũ⃗, 1)
+            Ũ⃗_bound = (
+                Ũ⃗ = (-ones(Ũ⃗_dim), ones(Ũ⃗_dim)),
+            )
+            bounds = merge(bounds, Ũ⃗_bound)
+        end
+
         if free_time
             components = (
                 Ũ⃗ = Ũ⃗,
@@ -188,11 +223,7 @@ function UnitarySmoothPulseProblem(
                 Δt = Δt,
             )
 
-            bounds = (
-                a = a_bounds,
-                dda = dda_bounds,
-                Δt = (Δt_min, Δt_max),
-            )
+            bounds = merge(bounds, (Δt = (Δt_min, Δt_max),))
 
             traj = NamedTrajectory(
                 components;
@@ -209,11 +240,6 @@ function UnitarySmoothPulseProblem(
                 a = a,
                 da = da,
                 dda = dda,
-            )
-
-            bounds = (
-                a = a_bounds,
-                dda = dda_bounds,
             )
 
             traj = NamedTrajectory(
@@ -251,8 +277,19 @@ function UnitarySmoothPulseProblem(
         end
     end
 
+    if integrator == :pade
+        unitary_integrator =
+            UnitaryPadeIntegrator(system, :Ũ⃗, :a; order=pade_order, autodiff=autodiff)
+    elseif integrator == :exponential
+        unitary_integrator =
+            UnitaryExponentialIntegrator(system, :Ũ⃗, :a)
+    else
+        error("integrator must be one of (:pade, :exponential)")
+    end
+
+
     integrators = [
-        UnitaryPadeIntegrator(system, :Ũ⃗, :a; order=pade_order, autodiff=autodiff),
+        unitary_integrator,
         DerivativeIntegrator(:a, :da, traj),
         DerivativeIntegrator(:da, :dda, traj),
     ]
@@ -261,6 +298,18 @@ function UnitarySmoothPulseProblem(
         if timesteps_all_equal
             push!(constraints, TimeStepsAllEqualConstraint(:Δt, traj))
         end
+    end
+
+    if control_norm_constraint
+        @assert !isnothing(control_norm_constraint_components) "control_norm_constraint_components must be provided"
+        @assert !isnothing(control_norm_R) "control_norm_R must be provided"
+        norm_con = ComplexModulusContraint(
+            :a,
+            control_norm_R,
+            traj;
+            name_comps=control_norm_constraint_components,
+        )
+        push!(constraints, norm_con)
     end
 
     return QuantumControlProblem(

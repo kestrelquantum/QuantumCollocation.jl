@@ -8,14 +8,14 @@ We provide a number of problem templates for making it simple and easy to set up
 
 ## Unitary Smooth Pulse Problem
 
+```@docs
+UnitarySmoothPulseProblem
+```
+
 ## Unitary Minimum Time Problem
 
 ```@docs
 UnitaryMinimumTimeProblem
-```
-
-```@docs
-UnitarySmoothPulseProblem
 ```
 
 ---

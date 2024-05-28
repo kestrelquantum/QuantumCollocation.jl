@@ -1,6 +1,6 @@
 @doc raw"""
     RydbergChainSystem(;
-        C::Float64=862690*2π,  
+        C::Float64=862690*2π,
         distance::Float64=10.0, # μm
         cutoff_order::Int=2, # 1 is nearest neighbor, 2 is next-nearest neighbor, etc.
         local_detune::Bool=false, # If true, include one local detuning pattern.
@@ -52,11 +52,12 @@ end
 
 function RydbergChainSystem(;
     N::Int=3, # number of atoms
-    C::Float64=862690*2π,  
+    C::Float64=862690*2π,
     distance::Float64=8.7, # μm
     cutoff_order::Int=1, # 1 is nearest neighbor, 2 is next-nearest neighbor, etc.
     local_detune::Bool=false,
     all2all::Bool=true,
+    ignore_Y_drive::Bool=false,
 )
     PAULIS = Dict("I" => [1 0; 0 1], "X" => [0 1; 1 0], "Y" => [0 -im; im 0], "Z" => [1 0; 0 -1], "n" => [0 0; 0 1])
     if all2all
@@ -80,9 +81,11 @@ function RydbergChainSystem(;
     # Add global X drive
     Hx = sum([0.5*kron_from_dict(lift('X',i,N), PAULIS) for i in 1:N])
     push!(H_drives, Hx)
-    # Add global Y drive
-    Hy = sum([0.5*kron_from_dict(lift('Y',i,N), PAULIS) for i in 1:N])
-    push!(H_drives, Hy)
+    if !ignore_Y_drive
+        # Add global Y drive
+        Hy = sum([0.5*kron_from_dict(lift('Y',i,N), PAULIS) for i in 1:N])
+        push!(H_drives, Hy)
+    end
     # Add global detuning
     H_detune = -sum([kron_from_dict(lift('n',i,N), PAULIS) for i in 1:N])
     push!(H_drives, H_detune)
@@ -101,5 +104,3 @@ function RydbergChainSystem(;
         params=params,
     )
 end
-
-
