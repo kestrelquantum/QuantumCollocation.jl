@@ -158,7 +158,7 @@ Number of inequality constraint evaluations          = 0
 Number of equality constraint Jacobian evaluations   = 51
 Number of inequality constraint Jacobian evaluations = 0
 Number of Lagrangian Hessian evaluations             = 50
-Total seconds in IPOPT                               = 16.458
+Total seconds in IPOPT                               = 17.041
 
 EXIT: Maximum Number of Iterations Exceeded.</code></pre><p>Let&#39;s look at the fidelity in the subspace</p><pre><code class="language-julia hljs">println(&quot;Fidelity: &quot;, unitary_fidelity(prob; subspace=op.subspace_indices))</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Fidelity: 0.9999842782034291</code></pre><p>and plot the result using the <code>plot_unitary_populations</code> function.</p><pre><code class="language-julia hljs">plot_unitary_populations(prob; fig_size=(900, 700))</code></pre><img src="efb30bc2.png" alt="Example block output"/><h2 id="Leakage-suppresion"><a class="docs-heading-anchor" href="#Leakage-suppresion">Leakage suppresion</a><a id="Leakage-suppresion-1"></a><a class="docs-heading-anchor-permalink" href="#Leakage-suppresion" title="Permalink"></a></h2><p>As can be seen from the above plot, there is a substantial amount of leakage into the higher levels during the evolution. To mitigate this, we have implemented the ability to add a cost to populating the leakage levels, in particular this is an <span>$L_1$</span> norm cost, which is implemented via slack variables and should ideally drive those leakage populations down to zero. To implement this, pass <code>leakage_suppresion=true</code> and <code>R_leakage={value}</code> to the <code>UnitarySmoothPulseProblem</code> template.</p><pre><code class="language-julia hljs"># create the a leakage suppression problem, initializing with the previous solution
 
@@ -196,81 +196,81 @@ Total number of inequality constraints...............:        0
         inequality constraints with only upper bounds:        0
 
 iter    objective    inf_pr   inf_du lg(mu)  ||d||  lg(rg) alpha_du alpha_pr  ls
-   0  5.8459849e+01 1.26e+00 9.23e-01  -1.0 0.00e+00    -  0.00e+00 0.00e+00   0
-   1  5.5983683e+01 5.02e-01 9.24e+01  -1.0 1.03e+00  -4.0 3.46e-01 6.02e-01f  1
-   2  6.6987018e+01 3.72e-02 1.15e+02  -1.0 3.81e-01  -4.5 5.22e-01 1.00e+00f  1
-   3  6.6702940e+01 3.18e-03 5.19e+01  -1.0 1.49e-01   1.4 1.00e+00 1.00e+00h  1
-   4  6.6580716e+01 6.21e-04 4.39e+00  -1.0 2.73e-02   1.8 1.00e+00 1.00e+00h  1
-   5  6.7038458e+01 1.26e-04 9.04e-01  -1.0 2.08e-02   1.3 1.00e+00 1.00e+00f  1
-   6  6.5927193e+01 5.73e-05 1.37e-01  -1.7 1.98e-02   0.8 1.00e+00 1.00e+00f  1
-   7  6.1150149e+01 9.46e-05 1.23e-01  -2.5 5.34e-02   0.4 1.00e+00 1.00e+00f  1
-   8  4.7070301e+01 1.76e-04 1.06e-01  -2.5 1.38e-01  -0.1 1.00e+00 1.00e+00f  1
-   9  2.8882260e+01 1.47e-04 9.42e+01  -2.5 3.73e-01  -0.6 1.00e+00 4.80e-01f  1
+   0  5.8465962e+01 1.26e+00 9.22e-01  -1.0 0.00e+00    -  0.00e+00 0.00e+00   0
+   1  5.5960805e+01 5.04e-01 9.24e+01  -1.0 1.03e+00  -4.0 3.46e-01 6.01e-01f  1
+   2  6.6913800e+01 3.65e-02 1.13e+02  -1.0 3.80e-01  -4.5 5.25e-01 1.00e+00f  1
+   3  6.6710108e+01 3.43e-03 5.02e+01  -1.0 1.48e-01   1.4 1.00e+00 1.00e+00h  1
+   4  6.6569572e+01 8.24e-04 5.40e+00  -1.0 3.33e-02   1.8 1.00e+00 1.00e+00h  1
+   5  6.7030024e+01 2.48e-04 1.43e+00  -1.0 2.13e-02   1.3 1.00e+00 1.00e+00f  1
+   6  6.8379150e+01 9.38e-05 3.00e-01  -1.0 4.35e-02   0.8 1.00e+00 1.00e+00f  1
+   7  6.5457415e+01 9.42e-05 9.97e-02  -1.7 4.33e-02   0.4 1.00e+00 1.00e+00f  1
+   8  5.2443049e+01 1.66e-04 1.00e-01  -2.5 1.31e-01  -0.1 1.00e+00 1.00e+00f  1
+   9  2.5009916e+01 1.83e-04 9.44e+01  -2.5 3.68e-01  -0.6 1.00e+00 7.46e-01f  1
 iter    objective    inf_pr   inf_du lg(mu)  ||d||  lg(rg) alpha_du alpha_pr  ls
-  10  1.1296358e+01 7.56e-04 2.60e+01  -2.5 1.04e+00  -1.1 1.00e+00 2.76e-01f  1
-  11  8.8012347e+00 1.65e-04 9.47e+01  -2.5 5.22e-02   0.3 1.00e+00 1.00e+00f  1
-  12  5.3749296e+00 5.28e-04 8.08e+01  -2.5 1.46e-01  -0.2 1.00e+00 8.53e-01f  1
-  13  5.3120907e+00 7.78e-05 5.37e+00  -2.5 3.00e-02   1.1 1.00e+00 1.00e+00f  1
-  14  5.1106971e+00 2.11e-05 8.15e-02  -2.5 1.89e-02   0.6 1.00e+00 1.00e+00f  1
-  15  4.6803167e+00 5.91e-05 7.49e-02  -2.5 5.21e-02   0.2 1.00e+00 1.00e+00f  1
-  16  4.3326903e+00 4.02e-04 4.66e-02  -2.5 9.72e-02  -0.3 1.00e+00 8.50e-01f  1
-  17  4.2523721e+00 2.61e-03 9.66e+01  -2.5 2.51e-01  -0.8 1.00e+00 5.00e-01f  2
-  18  4.3196169e+00 1.66e-03 5.12e+01  -2.5 1.75e-01  -0.4 6.10e-01 5.31e-01H  1
-  19  4.1765064e+00 7.29e-05 1.85e+00  -2.5 1.77e-02   1.0 1.00e+00 1.00e+00f  1
+  10  1.0088366e+01 6.54e-04 2.56e+01  -2.5 9.94e-01  -1.1 1.00e+00 2.71e-01f  1
+  11  7.7333171e+00 1.16e-04 9.49e+01  -2.5 4.98e-02   0.3 1.00e+00 1.00e+00f  1
+  12  4.8770778e+00 5.42e-04 8.15e+01  -2.5 1.34e-01  -0.2 1.00e+00 8.58e-01f  1
+  13  4.8431838e+00 6.46e-05 4.84e+00  -2.5 2.99e-02   1.1 1.00e+00 1.00e+00f  1
+  14  4.7261315e+00 1.81e-05 7.30e-02  -2.5 1.69e-02   0.6 1.00e+00 1.00e+00f  1
+  15  4.5071190e+00 5.98e-05 6.12e-02  -2.5 4.26e-02   0.2 1.00e+00 1.00e+00f  1
+  16  4.3248616e+00 5.58e-04 9.59e+01  -2.5 6.04e-02  -0.3 1.00e+00 1.00e+00h  1
+  17  4.2726982e+00 1.28e-03 4.02e+01  -2.5 1.98e-01  -0.8 1.00e+00 4.18e-01h  2
+  18  4.2353351e+00 3.55e-04 9.62e+01  -2.5 1.35e-02   0.5 1.00e+00 1.00e+00h  1
+  19  4.2248529e+00 4.56e-05 9.63e+01  -2.5 1.25e-02   0.1 1.00e+00 1.00e+00h  1
 iter    objective    inf_pr   inf_du lg(mu)  ||d||  lg(rg) alpha_du alpha_pr  ls
-  20  4.1914966e+00 6.32e-06 2.18e-02  -2.5 7.22e-03   0.5 1.00e+00 1.00e+00h  1
-  21  1.8416478e+00 4.46e-04 9.69e+01  -3.8 3.49e-02   0.0 9.65e-01 1.00e+00f  1
-  22  1.5941127e+00 5.96e-04 2.76e+01  -3.8 1.14e-01  -0.5 4.34e-01 2.84e-01f  1
-  23  1.4584354e+00 7.69e-04 7.68e+01  -3.8 1.43e-01  -0.0 2.33e-01 2.40e-01f  1
-  24  1.3082104e+00 7.17e-04 5.85e+01  -3.8 1.02e-01  -0.5 2.88e-01 2.38e-01h  1
-  25  1.2928441e+00 6.49e-04 5.30e+01  -3.8 1.68e-01  -1.0 2.16e-01 2.35e-01h  1
-  26  1.2771398e+00 6.42e-04 4.52e+01  -3.8 2.55e+00   0.3 1.06e-02 1.28e-02f  1
-  27  1.2224623e+00 4.99e-04 6.24e+01  -3.8 5.37e-02   0.8 4.64e-01 2.23e-01h  1
-  28  1.1685239e+00 2.04e-04 7.34e+01  -3.8 3.60e-02   1.2 5.21e-01 6.12e-01f  1
-  29  1.1604798e+00 1.89e-04 2.99e+01  -3.8 1.75e-02   0.7 1.65e-01 7.80e-02f  1
+  20  4.2192122e+00 1.63e-05 3.20e+00  -2.5 7.49e-03   1.4 1.00e+00 1.00e+00h  1
+  21  4.2163045e+00 5.62e-06 3.18e-02  -2.5 3.95e-03   0.9 1.00e+00 1.00e+00h  1
+  22  4.2005601e+00 1.67e-05 2.09e-02  -2.5 7.77e-03   0.4 1.00e+00 1.00e+00h  1
+  23  1.7771144e+00 5.59e-04 9.69e+01  -3.8 3.47e-02  -0.0 9.73e-01 1.00e+00f  1
+  24  1.5888739e+00 7.23e-04 2.18e+01  -3.8 1.26e-01  -0.5 2.96e-01 2.24e-01f  1
+  25  1.4541424e+00 6.46e-04 8.08e+01  -3.8 1.03e-01  -0.1 2.33e-01 2.35e-01f  1
+  26  1.3038415e+00 6.06e-04 4.15e+01  -3.8 9.80e-02  -0.6 2.92e-01 3.06e-01f  1
+  27  1.1547523e+00 5.65e-05 9.44e+01  -3.8 7.50e-03   0.8 1.00e+00 9.25e-01h  1
+  28  1.1222956e+00 4.54e-05 9.76e+01  -3.8 9.97e-03   0.3 1.00e+00 1.00e+00f  1
+  29  1.1258361e+00 9.65e-07 7.04e-01  -3.8 2.25e-03   1.6 5.84e-01 1.00e+00h  1
 iter    objective    inf_pr   inf_du lg(mu)  ||d||  lg(rg) alpha_du alpha_pr  ls
-  30  1.1505615e+00 1.68e-04 7.13e+01  -3.8 3.00e-02   0.2 4.32e-01 1.21e-01f  1
-  31  1.1563780e+00 1.59e-04 3.22e+01  -3.8 5.18e-02  -0.3 7.03e-01 8.24e-02h  1
-  32  1.1252802e+00 1.29e-04 8.32e+01  -3.8 3.11e-02   0.2 2.12e-01 5.49e-01f  1
-  33  1.1183006e+00 1.05e-04 3.72e+01  -3.8 3.09e-02  -0.3 6.68e-01 2.72e-01f  2
-  34  1.1089494e+00 8.52e-05 2.94e+01  -3.8 2.26e-02   0.1 3.01e-01 2.09e-01h  1
-  35  1.0819981e+00 2.18e-04 6.92e+01  -3.8 1.71e+00  -0.4 1.37e-02 1.65e-02f  1
-  36  1.0968901e+00 1.84e-04 4.24e+01  -3.8 7.69e-02  -0.8 2.94e-01 1.94e-01h  2
-  37  1.0826498e+00 1.51e-04 3.36e+01  -3.8 4.04e-02   0.5 4.83e-01 2.07e-01h  1
-  38  1.0729080e+00 1.13e-04 7.36e+01  -3.8 3.58e-02   0.0 3.03e-01 2.70e-01f  2
-  39  1.0889626e+00 9.62e-05 4.38e+01  -3.8 4.12e-02  -0.5 3.22e-01 2.61e-01h  1
+  30  1.1220092e+00 8.40e-07 2.93e-02  -3.8 2.18e-03   1.1 1.00e+00 1.00e+00h  1
+  31  1.1146647e+00 4.07e-06 1.71e-02  -3.8 3.82e-03   0.7 1.00e+00 1.00e+00h  1
+  32  1.1018317e+00 2.86e-05 1.30e-02  -3.8 8.75e-03   0.2 1.00e+00 1.00e+00h  1
+  33  1.0782627e+00 2.05e-04 9.81e+01  -3.8 2.30e-02  -0.3 8.22e-01 9.79e-01h  1
+  34  1.0672324e+00 2.15e-04 7.05e+01  -3.8 3.49e-02  -0.8 2.58e-01 7.18e-01f  1
+  35  1.0681257e+00 1.88e-04 6.17e+01  -3.8 4.31e-03   1.5 2.64e-01 1.25e-01f  4
+  36  1.0685271e+00 1.30e-05 1.95e+00  -3.8 8.15e-03   1.0 1.00e+00 1.00e+00h  1
+  37  1.0658891e+00 6.83e-06 1.83e-02  -3.8 5.83e-03   0.5 1.00e+00 1.00e+00h  1
+  38  1.0581519e+00 2.71e-05 1.37e-02  -3.8 1.31e-02   0.0 1.00e+00 1.00e+00h  1
+  39  1.0384343e+00 1.49e-04 9.85e+01  -3.8 3.09e-02  -0.5 1.00e+00 1.00e+00h  1
 iter    objective    inf_pr   inf_du lg(mu)  ||d||  lg(rg) alpha_du alpha_pr  ls
-  40  1.0830146e+00 1.35e-04 6.22e+01  -3.8 9.39e-02  -0.0 7.51e-02 1.82e-01f  2
-  41  1.0795712e+00 1.23e-04 4.46e+01  -3.8 6.05e-02  -0.5 5.48e-01 1.41e-01h  1
-  42  1.0801932e+00 1.10e-04 3.97e+01  -3.8 1.62e-02   0.8 2.52e-01 1.10e-01f  4
-  43  1.0691808e+00 8.46e-05 2.21e+01  -3.8 2.79e-02   0.3 2.91e-01 4.44e-01h  1
-  44  1.0653274e+00 6.40e-05 1.04e+01  -3.8 2.69e-02  -0.1 3.97e-01 5.28e-01f  1
-  45  1.0509864e+00 1.37e-04 9.14e+01  -3.8 5.27e-02  -0.6 4.49e-01 3.39e-01f  1
-  46  1.0511273e+00 1.29e-04 1.37e+01  -3.8 4.78e-02  -1.1 5.39e-01 7.48e-02f  3
-  47  1.0404435e+00 5.60e-04 9.60e+01  -3.8 5.57e-02  -0.7 4.70e-01 8.05e-01h  1
-  48  1.0156291e+00 4.30e-04 3.75e+01  -3.8 7.85e-02  -1.1 5.15e-01 3.63e-01f  1
-  49  1.0328203e+00 4.32e-05 9.86e+01  -3.8 1.63e-02   0.2 8.08e-01 1.00e+00h  1
+  40  1.0355668e+00 9.95e-05 5.94e+01  -3.8 5.26e-02  -0.9 7.34e-01 6.02e-01h  1
+  41  1.0362225e+00 8.71e-05 5.19e+01  -3.8 2.47e-03   1.3 8.97e-01 1.25e-01f  4
+  42  1.0360927e+00 7.78e-06 9.32e-01  -3.8 6.88e-03   0.8 1.00e+00 1.00e+00h  1
+  43  1.0354001e+00 5.96e-06 1.61e-02  -3.8 7.30e-03   0.3 1.00e+00 1.00e+00h  1
+  44  1.0300041e+00 2.46e-05 1.01e-02  -3.8 1.37e-02  -0.1 1.00e+00 1.00e+00h  1
+  45  1.0157805e+00 1.41e-04 7.23e-03  -3.8 2.85e-02  -0.6 1.00e+00 1.00e+00h  1
+  46  1.0027353e+00 3.93e-04 9.89e+01  -3.8 5.05e-02  -1.1 7.26e-01 7.72e-01h  1
+  47  1.0031489e+00 1.57e-04 6.75e+01  -3.8 7.88e-02  -1.6 6.58e-01 6.82e-01h  1
+  48  1.0108689e+00 5.62e-07 3.65e-01  -3.8 3.29e-03   1.6 4.37e-01 1.00e+00h  1
+  49  1.0083786e+00 5.36e-07 2.00e-02  -3.8 1.61e-03   1.1 1.00e+00 1.00e+00h  1
 iter    objective    inf_pr   inf_du lg(mu)  ||d||  lg(rg) alpha_du alpha_pr  ls
-  50  1.0216516e+00 2.59e-05 3.75e+01  -3.8 1.35e-02  -0.3 1.00e+00 3.80e-01h  1
+  50  1.0058015e+00 1.40e-06 1.16e-02  -3.8 2.81e-03   0.6 1.00e+00 1.00e+00h  1
 
 Number of Iterations....: 50
 
                                    (scaled)                 (unscaled)
-Objective...............:   1.0216515881947459e+00    1.0216515881947459e+00
-Dual infeasibility......:   3.7536821735907374e+01    3.7536821735907374e+01
-Constraint violation....:   2.5872338760279945e-05    2.5872338760279945e-05
+Objective...............:   1.0058014972782541e+00    1.0058014972782541e+00
+Dual infeasibility......:   1.1640323954749574e-02    1.1640323954749574e-02
+Constraint violation....:   1.4000098789660603e-06    1.4000098789660603e-06
 Variable bound violation:   0.0000000000000000e+00    0.0000000000000000e+00
-Complementarity.........:   1.8889562627389194e-04    1.8889562627389194e-04
-Overall NLP error.......:   3.7536821735907374e+01    3.7536821735907374e+01
+Complementarity.........:   1.6123360720982901e-04    1.6123360720982901e-04
+Overall NLP error.......:   1.1640323954749574e-02    1.1640323954749574e-02
 
 
-Number of objective function evaluations             = 67
+Number of objective function evaluations             = 60
 Number of objective gradient evaluations             = 51
-Number of equality constraint evaluations            = 67
+Number of equality constraint evaluations            = 60
 Number of inequality constraint evaluations          = 0
 Number of equality constraint Jacobian evaluations   = 51
 Number of inequality constraint Jacobian evaluations = 0
 Number of Lagrangian Hessian evaluations             = 50
-Total seconds in IPOPT                               = 3.804
+Total seconds in IPOPT                               = 3.377
 
-EXIT: Maximum Number of Iterations Exceeded.</code></pre><p>Let&#39;s look at the fidelity in the subspace</p><pre><code class="language-julia hljs">println(&quot;Fidelity: &quot;, unitary_fidelity(prob_leakage; subspace=op.subspace_indices))</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Fidelity: 0.9998644346230545</code></pre><p>and plot the result using the <code>plot_unitary_populations</code> function.</p><pre><code class="language-julia hljs">plot_unitary_populations(prob_leakage; fig_size=(900, 700))</code></pre><img src="28d96645.png" alt="Example block output"/><p>Here we can see that the leakage populations have been driven substantially down.</p><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../../man/losses/">« Losses</a><a class="docs-footer-nextpage" href="../../../lib/">Library »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="auto">Automatic (OS)</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.2.1 on <span class="colophon-date" title="Friday 17 May 2024 13:27">Friday 17 May 2024</span>. Using Julia version 1.10.3.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+EXIT: Maximum Number of Iterations Exceeded.</code></pre><p>Let&#39;s look at the fidelity in the subspace</p><pre><code class="language-julia hljs">println(&quot;Fidelity: &quot;, unitary_fidelity(prob_leakage; subspace=op.subspace_indices))</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Fidelity: 0.999884421231116</code></pre><p>and plot the result using the <code>plot_unitary_populations</code> function.</p><pre><code class="language-julia hljs">plot_unitary_populations(prob_leakage; fig_size=(900, 700))</code></pre><img src="18366b6e.png" alt="Example block output"/><p>Here we can see that the leakage populations have been driven substantially down.</p><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../../man/losses/">« Losses</a><a class="docs-footer-nextpage" href="../../../lib/">Library »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="auto">Automatic (OS)</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.2.1 on <span class="colophon-date" title="Tuesday 28 May 2024 22:33">Tuesday 28 May 2024</span>. Using Julia version 1.10.3.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
