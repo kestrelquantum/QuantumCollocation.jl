@@ -10,6 +10,7 @@ using ..Constraints
 
 using NamedTrajectories
 using MathOptInterface
+using LinearAlgebra
 const MOI = MathOptInterface
 
 mutable struct PicoEvaluator <: MOI.AbstractNLPEvaluator

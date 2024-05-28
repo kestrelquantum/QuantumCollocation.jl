@@ -2,6 +2,7 @@ module TrajectoryInitialization
 
 export unitary_linear_interpolation
 export unitary_geodesic
+export linear_interpolation
 
 using LinearAlgebra
 
@@ -121,5 +122,8 @@ function unitary_geodesic(
         return Ũ⃗_geo
     end
 end
+
+linear_interpolation(x::AbstractVector, y::AbstractVector, n::Int) =
+    hcat(range(x, y, n)...)
 
 end

@@ -8,6 +8,7 @@ export QuantumPadeIntegrator
 export QuantumStatePadeIntegrator
 export UnitaryPadeIntegrator
 export UnitaryExponentialIntegrator
+export QuantumStateExponentialIntegrator
 
 export DerivativeIntegrator
 
