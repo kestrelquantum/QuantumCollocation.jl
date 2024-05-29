@@ -32,6 +32,7 @@ export quantum_state
 
 using TrajectoryIndexingUtils
 using LinearAlgebra
+using SparseArrays
 
 
 """
