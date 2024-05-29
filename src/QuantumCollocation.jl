@@ -29,7 +29,7 @@ include("constraints.jl")
 include("objectives.jl")
 @reexport using .Objectives
 
-include("integrators.jl")
+include("integrators/_integrators.jl")
 @reexport using .Integrators
 
 include("dynamics.jl")
@@ -43,6 +43,9 @@ include("ipopt_options.jl")
 
 include("problems.jl")
 @reexport using .Problems
+
+include("direct_sums.jl")
+@reexport using .DirectSums
 
 include("rollouts.jl")
 @reexport using .Rollouts

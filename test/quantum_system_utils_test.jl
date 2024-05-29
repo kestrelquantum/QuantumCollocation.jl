@@ -66,21 +66,35 @@ end
     @test is_reachable(gen, target, compute_basis=true, verbose=false)
 
     # Check 2 qubit with complete basis
-    complete_gen = map(
-        AB -> kron_from_dict(AB, H_ops),
-        ["XX+YY","XI", "YI", "IY", "IX"]
-    )
+    XI = GATES[:X] ⊗ GATES[:I]
+    IX = GATES[:I] ⊗ GATES[:X]
+    YI = GATES[:Y] ⊗ GATES[:I]
+    IY = GATES[:I] ⊗ GATES[:Y]
+    XX = GATES[:X] ⊗ GATES[:X]
+    YY = GATES[:Y] ⊗ GATES[:Y]
+    ZI = GATES[:Z] ⊗ GATES[:I]
+    IZ = GATES[:I] ⊗ GATES[:Z]
+    ZZ = GATES[:Z] ⊗ GATES[:Z]
+
+    complete_gen = [XX+YY, XI, YI, IX, IY]
+    incomplete_gen = [XI, ZZ]
     r = [0, 1, 2, 3, 4]
     r /= norm(r)
-    target = exp(-im * sum([θ * H for (H, θ) in zip(complete_gen, r)]))
-    @test is_reachable(complete_gen, target, compute_basis=true, verbose=false)
+    R2 = exp(-im * sum([θ * H for (H, θ) in zip(complete_gen, r)]))
+    CZ = [1 0 0 0; 0 1 0 0; 0 0 1 0; 0 0 0 -1]
+    CX = [1 0 0 0; 0 1 0 0; 0 0 0 1; 0 0 1 0]
+    
+    # Pass
+    @test is_reachable(complete_gen, R2)
+    @test is_reachable(complete_gen, CZ)
+    @test is_reachable(complete_gen, CX)
+    @test is_reachable(complete_gen, XI)
 
-    # Check 2 qubit with incomplete basis
-    incomplete_gen = map(
-        AB -> kron_from_dict(AB, H_ops),
-        ["XX+YY", "IY", "IX"]
-    )
-    @test !is_reachable(incomplete_gen, target, compute_basis=true, verbose=false)
+    # Mostly fail
+    @test !is_reachable(incomplete_gen, R2)
+    @test !is_reachable(incomplete_gen, CZ)
+    @test !is_reachable(incomplete_gen, CX)
+    @test is_reachable(incomplete_gen, XI)
 end
 
 @testitem "Lie Algebra subspace reachability" begin
