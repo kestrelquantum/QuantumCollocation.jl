@@ -11,6 +11,7 @@ println("")
 pages = [
     "Home" => "index.md",
     "Quickstart Guide" => "generated/quickstart.md",
+    "Contribution Guide" => "contribution_guide.md",
     "Manual" => [
         "Problem Templates" => "generated/man/problem_templates.md",
         "Utilities" => "generated/man/utils.md",

@@ -24,7 +24,7 @@
 \end{aligned}
 ```
 
-Where the dynamics between *knot points* $(U_t, a_t)$ and $(U_{t+1}, a_{t+1})$ are enforced as constraints on the states which are free variables in the solver; this optimization framework is called *direct collocation*.  For details of our implementation please see our award-winning paper [Direct Collocation for Quantum Optimal Control](https://arxiv.org/abs/2305.03261). 
+Where the dynamics between *knot points* $(U_t, a_t)$ and $(U_{t+1}, a_{t+1})$ are enforced as constraints on the states which are free variables in the solver; this optimization framework is called *direct collocation*.  For details of our implementation please see our award-winning IEEE QCE 2023 paper, [Direct Collocation for Quantum Optimal Control](https://arxiv.org/abs/2305.03261). If you use QuantumCollocation.jl in your work, please cite :raised_hands:!
 
 QuantumCollocation.jl gives the user the ability to add other constraints and objective functions to this problem and solve it efficiently using [Ipopt.jl](https://github.com/jump-dev/Ipopt.jl) and [MathOptInterface.jl](https://github.com/jump-dev/MathOptInterface.jl) under the hood.
 
@@ -48,44 +48,3 @@ See the example script [examples/scripts/single_qubit_gate.jl](examples/scripts/
 
 ![Single Qubit X-Gate](images/T_100_Q_1000_iter_1000_00004_fidelity_0.9999999999994745.png)
 
-## Development Guidelines
-
-### Documentation
-
-Documentation is built using [Documenter.jl](https://github.com/JuliaDocs/Documenter.jl) and uses [Literate.jl](https://github.com/fredrikekre/Literate.jl) to generate markdown files from scripts stored in [docs/literate](docs/literate). To build the documentation locally, start julia with the docs environment:
-
-```bash
-julia --project=docs
-```
-
-Then (for ease of development) load the following packages:
-
-```julia
-using Revise, LiveServer, QuantumCollocation
-```
-
-To live-serve the docs, run
-```julia
-servedocs(literate_dir="docs/literate", skip_dir="docs/src/generated")
-```
-
-Changes made to files in the docs directory should be automatically reflected in the live server. To reflect changes in the source code (e.g. doc strings), since we are using Revise, simply kill the live server running in the REPL (with, e.g., Ctrl-C) and restart it with the above command. 
-
-## TODO:
-
-Documentation:
-
-- [ ] cross-referencing to library
-- [ ] notation explanation
-- [ ] examples
-  - [ ] two-qubit
-  - [ ] cat qubit 
-  - [ ] three-qubit 
-  - [ ] qubit-cavity
-  - [ ] qubit-cavity-qubit
-- [ ] contributing guidelines
-
-Functionality:
-
-- [ ] custom `QuantumTrajectory` types (repr. of isomorphic states)
-- [ ] better quantum system constructors (e.g. storing composite system info) 
