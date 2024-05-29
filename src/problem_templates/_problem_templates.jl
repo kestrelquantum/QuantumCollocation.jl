@@ -4,7 +4,6 @@ export UnitarySmoothPulseProblem
 export UnitaryMinimumTimeProblem
 export UnitaryRobustnessProblem
 export UnitaryDirectSumProblem
-export UnitaryRobustGatesetProblem
 
 export QuantumStateSmoothPulseProblem
 export QuantumStateMinimumTimeProblem
