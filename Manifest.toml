@@ -1112,7 +1112,7 @@ version = "1.0.2"
 
 [[deps.NamedTrajectories]]
 deps = ["CairoMakie", "JLD2", "LaTeXStrings", "Latexify", "OrderedCollections", "Random", "Reexport", "Revise", "Unidecode"]
-path = "../NamedTrajectories.jl"
+git-tree-sha1 = "a109d8dee4055adb47bb435fd479dd67a50776af"
 uuid = "538bc3a1-5ab9-4fc3-b776-35ca1e893e08"
 version = "0.1.5"
 
