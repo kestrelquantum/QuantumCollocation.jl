@@ -133,3 +133,36 @@ function UnitaryMinimumTimeProblem(
         kwargs...
     )
 end
+
+# *************************************************************************** #
+
+@testitem "Minimum time Hadamard gate" begin
+    H_drift = GATES[:Z]
+    H_drives = [GATES[:X], GATES[:Y]]
+    U_goal = GATES[:H]
+    T = 51
+    Δt = 0.2
+
+    prob = UnitarySmoothPulseProblem(
+        H_drift, H_drives, U_goal, T, Δt,
+        ipopt_options=Options(print_level=1)
+    )
+
+    solve!(prob, max_iter=100)
+
+    @test unitary_fidelity(prob) > 0.99
+
+    final_fidelity = 0.99
+
+    mintime_prob = UnitaryMinimumTimeProblem(
+        prob,
+        final_fidelity=final_fidelity,
+        ipopt_options=Options(print_level=1)
+    )
+
+    solve!(mintime_prob; max_iter=100)
+
+    @test unitary_fidelity(mintime_prob) > final_fidelity
+
+    @test sum(mintime_prob.trajectory[:Δt]) < sum(prob.trajectory[:Δt])
+end

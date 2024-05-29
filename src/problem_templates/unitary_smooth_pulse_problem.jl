@@ -352,3 +352,21 @@ function UnitarySmoothPulseProblem(
     system = QuantumSystem(H_drift, H_drives)
     return UnitarySmoothPulseProblem(system, args...; kwargs...)
 end
+
+# *************************************************************************** #
+
+@testitem "Hadamard gate" begin
+    H_drift = GATES[:Z]
+    H_drives = [GATES[:X], GATES[:Y]]
+    U_goal = GATES[:H]
+    T = 51
+    Δt = 0.2
+
+    prob = UnitarySmoothPulseProblem(
+        H_drift, H_drives, U_goal, T, Δt,
+        ipopt_options=Options(print_level=4)
+    )
+
+    solve!(prob, max_iter=100)
+    @test unitary_fidelity(prob) > 0.99
+end
