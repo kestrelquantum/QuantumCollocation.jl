@@ -4,7 +4,7 @@
 
 We welcome contributiuons to QuantumCollocation.jl! This document outlines the guidelines for contributing to the project. If you know what you want to see, but are unsure of the best way to achieve it, [add an issue](https://github.com/aarontrowbridge/QuantumCollocation.jl/issues) and start a discussion with the community! 
 
-*Let us know how you are using Piccolo!* We enjoy hearing about the problems our users are solving. If you find 
+*Let us know how you are using Piccolo!* We enjoy hearing about the problems our users are solving.
 
 ## Developing
 
