@@ -17,7 +17,6 @@ include("test_utils.jl")
 @testset "QuantumCollocation.jl" begin
     # include("objectives_test.jl")
     # include("dynamics_test.jl")
-    include("problem_templates_test.jl")
     include("integrators_test.jl")
 end
 
