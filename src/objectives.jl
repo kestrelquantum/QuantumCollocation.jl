@@ -228,7 +228,7 @@ function UnitaryInfidelityObjective(;
         Ũ⃗_slice = slice(Z.T, Z.components[name], Z.dim)
         Ũ⃗ = Z⃗[Ũ⃗_slice]
         ∇l = l(Ũ⃗; gradient=true)
-        ∇[Ũ⃗_slice] .= Q * ∇l
+        ∇[Ũ⃗_slice] = Q * ∇l
         return ∇
     end
 

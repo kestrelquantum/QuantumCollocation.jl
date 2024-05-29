@@ -29,7 +29,7 @@ include("constraints.jl")
 include("objectives.jl")
 @reexport using .Objectives
 
-include("integrators.jl")
+include("integrators/_integrators.jl")
 @reexport using .Integrators
 
 include("dynamics.jl")

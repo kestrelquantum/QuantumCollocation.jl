@@ -422,15 +422,17 @@ Returns a ComplexModulusContraint for the complex control NamedTrajector symbol
 where R is the maximum allowed complex modulus.
 """
 function ComplexModulusContraint(
-    symb::Symbol,
+    name::Symbol,
     R::Float64,
     traj::NamedTrajectory;
-    times=1:traj.T
+    times=1:traj.T,
+    name_comps=1:traj.dims[name]
 )
-    @assert symb ∈ traj.names
+    @assert name ∈ traj.names
+    comps = traj.components[name][name_comps]
     return ComplexModulusContraint(;
         R=R,
-        comps=traj.components[symb],
+        comps=comps,
         times=times,
         zdim=traj.dim,
         T=traj.T

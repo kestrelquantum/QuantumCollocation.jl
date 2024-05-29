@@ -5,7 +5,7 @@ export unitary_rollout
 export lab_frame_unitary_rollout
 export lab_frame_unitary_rollout_trajectory
 export sample_at
-export upsample
+export resample
 
 using ..QuantumUtils
 using ..QuantumSystems
@@ -209,32 +209,6 @@ function QuantumUtils.unitary_fidelity(
     )
 end
 
-function sample_at(t::Float64, controls::AbstractMatrix{Float64}, Δt::Float64)
-    @assert t >= 0 "t must be non-negative"
-    @assert Δt > 0 "Δt must be positive"
-    @assert t <= size(controls, 2) * Δt "t must be less than the duration of the controls"
-
-    i = floor(Int, t / Δt) + 1
-    controls[:, i]
-end
-
-function upsample(
-    controls::AbstractMatrix{Float64},
-    duration::Float64,
-    Δt::Float64,
-    Δt_new::Float64
-)
-    @assert Δt > 0 "Δt must be positive"
-    @assert Δt_new > 0 "Δt_new must be positive"
-    @assert Δt_new < Δt "Δt_new must be less than Δt"
-
-    times_upsampled = LinRange(0, duration, floor(Int, duration / Δt_new) + 1)
-
-    controls_upsampled = stack([sample_at(t, controls, Δt) for t in times_upsampled])
-
-    return controls_upsampled, times_upsampled
-end
-
 """
     lab_frame_unitary_rollout(
         sys::AbstractQuantumSystem,
@@ -304,5 +278,74 @@ function lab_frame_unitary_rollout_trajectory(
         )
     )
 end
+
+"""
+    sample_at(controls::AbstractMatrix{Float64}, t::Float64, ts::AbstractVector{Float64}; interp_method::Symbol=:linear)
+
+Sample the controls at time `t` using linear interpolation.
+
+# Keyword Arguments
+- `interp_method::Symbol=:linear`: Interpolation method. Either `:linear` or `:constant`.
+"""
+function sample_at(
+    t::Float64,
+    controls::AbstractMatrix{Float64},
+    ts::AbstractVector{Float64};
+    interp_method::Symbol=:linear
+)
+    @assert interp_method ∈ (:constant, :linear) "interp_method must be either :constant or :linear"
+    @assert t >= 0 "t must be non-negative"
+    @assert t <= ts[end] "t must be less than the duration of the controls"
+    if interp_method == :constant
+        return controls[:, searchsortedfirst(ts, t)]
+    else
+        i = searchsortedfirst(ts, t)
+        if i == 1
+            return controls[:, 1]
+        else
+            t_prev = ts[i - 1]
+            t_next = ts[i]
+            α = (t - t_prev) / (t_next - t_prev)
+            return (1 - α) * controls[:, i - 1] + α * controls[:, i]
+        end
+    end
+end
+
+
+
+function resample(
+    controls::AbstractMatrix{Float64},
+    ts::AbstractVector{Float64},
+    ts_new::AbstractVector{Float64};
+    kwargs...
+)
+    controls_new = stack([sample_at(t, controls, ts; kwargs...) for t ∈ ts_new])
+    controls_new[:, end] = controls[:, end]
+    return controls_new
+end
+
+function resample(controls, ts, Δt::Float64; kwargs...)
+    n_samples = Int(ts[end] / Δt)
+    ts_new = range(0, step=Δt, length=n_samples)
+    return resample(controls, ts, ts_new)
+end
+
+function resample(controls, ts, N::Int; kwargs...)
+    Δt = ts[end] / N
+    ts_new = range(0, step=Δt, length=N)
+    return resample(controls, ts, ts_new; kwargs...)
+end
+
+"""
+    resample(controls::AbstractMatrix{Float64}, ts::AbstractVector{Float64}, ts_new::AbstractVector{Float64})
+    resample(controls::AbstractMatrix{Float64}, ts::AbstractVector{Float64}, Δt::Float64)
+    resample(controls::AbstractMatrix{Float64}, ts::AbstractVector{Float64}, N::Int)
+
+Resample the controls at new time points.
+
+# Keyword Arguments
+- `interp_method::Symbol=:linear`: Interpolation method. Either `:linear` or `:constant`.
+"""
+function resample end
 
 end
