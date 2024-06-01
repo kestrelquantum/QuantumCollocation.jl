@@ -10,7 +10,7 @@ using QuantumOptics
 function OpticsSystem(;
     N_cutoff::Int=10,
     ωc::Float64=0.1,
-    ωa::Float64=0.1.
+    ωa::Float64=0.1,
     Ω::Float64=1.,
     ωd::Float64=0.1,
     ϵ::Float64=1.,  
