@@ -36,7 +36,7 @@ end
     #Distributivity: A ⊗( B + C ) = A ⊗ B + A ⊗ C    @test GATES[:X] ⊗ (GATES[:Y] + GATES[:Z]) == GATES[:X] ⊗ GATES[:Y] + GATES[:X] ⊗ GATES[:Z]
 end 
 
-testsetitem "Test apply function with Pauli gates" begin
+@testitem "Test apply function with Pauli gates" begin
     using QuantumUtils
     # Define the initial state
     ψ₀ = [1.0 + 0.0im, 0.0 + 0.0im]  # Example initial state for a single qubit
