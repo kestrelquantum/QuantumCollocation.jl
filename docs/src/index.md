@@ -36,6 +36,5 @@ This implementation is possible because direct collocation allows for the dynami
 
 ## Index
 
-
 ```@index
 ```
