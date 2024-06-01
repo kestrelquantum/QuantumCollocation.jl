@@ -107,3 +107,30 @@ end
     # Test iso_operator_to_iso_vec function: Converts a real matrix representing an isomorphism operator into a complex vector.
     @test iso_operator_to_iso_vec(iso_vec_to_iso_operator(iso_vec)) == iso_vec
 end
+
+
+# Define test cases for quantum harmonic oscillator operators
+@testitem "quantum harmonic oscillator operators" begin
+    using QuantumUtils
+   
+    # Define a tolerance for floating-point comparisons
+    const tol = 1e-10
+    # Test with 2 levels
+    levels = 2
+    # For 2 levels, the expected matrix should have a 1 at (1,2) position
+    # since the annihilation operator acts to lower the energy level by one
+    expected₂ = [0.0+0.0im  1.0+0.0im; 
+			 0.0+0.0im  0.0+0.0im]
+    @test annihilate(levels) == expected₂
+    # Test with 3 levels
+    levels = 3
+    # For 3 levels, the expected matrix should have a square root of 2 at (2,3) position
+    # since the annihilation operator acts to lower the energy level by one
+    expected₃ = [0.0+0.0im  1.0+0.0im      0.0+0.0im;
+                 0.0+0.0im  0.0+0.0im  1.41421+0.0im;
+                 0.0+0.0im  0.0+0.0im      0.0+0.0im]
+    # There is some imprecision in floating-point arithmetic, 
+    # which is why we use a tolerance to check for approximate equality
+    @test isapprox(expected₃, annihilate(3), atol=1e-2) == true
+
+end
