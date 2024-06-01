@@ -9,6 +9,18 @@ using LinearAlgebra
     @test get_gate(:Y) * get_gate(:Y) ==  get_gate(:I)
     @test -get_gate(:Z) * get_gate(:Z) ==  get_gate(:I)
     @test -get_gate(:X) * get_gate(:Y) == get_gate(:Z)
+    # There is some imprecision in floating-point arithmetic, 
+    # which is why we use a tolerance to check for approximate equality
+    #HXH† = Z
+    @test isapprox(GATES[:H]*GATES[:X]*GATES[:H]', GATES[:Z], atol=1e-2) == true
+    @test isapprox(get_gate(:H)*get_gate(:X)*get_gate(:H)', get_gate(:Z), atol=1e-2) == true
+    #HZH† = X
+    @test isapprox(GATES[:H]*GATES[:Z]*GATES[:H]', GATES[:X], atol=1e-2) == true
+    @test isapprox(get_gate(:H)*get_gate(:Z)*get_gate(:H)', get_gate(:X), atol=1e-2) == true
+    #HYH† = -Y
+    @test isapprox(GATES[:H]*GATES[:Y]*GATES[:H]', -GATES[:Y], atol=1e-2) == true
+    @test isapprox(get_gate(:H)*get_gate(:Y)*get_gate(:H)', -get_gate(:Y), atol=1e-2) == true
+
     @test Int.(round.(real.(GATES[:H]*GATES[:H]))) == GATES[:I]
     @test GATES[:X] ^ 2 == GATES[:I]
     @test GATES[:Y] ^ 2 == GATES[:I]
