@@ -1,6 +1,7 @@
 """
 Tests: QuantumUtils submodule
 """
+using LinearAlgebra
 
 @testitem "GATES" begin
     using QuantumUtils
@@ -83,28 +84,28 @@ end
 # Define test cases for isomorphism utilities
 @testitem "Test isomorphism utilities" begin
     using QuantumUtils
-    # Test vector for conversion
+    # vector for conversion
     iso_vec = [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0]
     
-    # Test vec⁻¹ function: Converts a vector into a square matrix.
+    # vec⁻¹ function: Converts a vector into a square matrix.
     @test vec⁻¹([1.0, 2.0, 3.0, 4.0]) == [1.0 3.0; 2.0 4.0]
 
-    # Test ket_to_iso function: Converts a ket vector into a complex vector with real and imaginary parts.
+    # ket_to_iso function: Converts a ket vector into a complex vector with real and imaginary parts.
     @test ket_to_iso([1.0, 2.0]) == [1.0, 2.0, 0.0, 0.0]
 
-    # Test iso_to_ket function: Converts a complex vector with real and imaginary parts into a ket vector.
+    # iso_to_ket function: Converts a complex vector with real and imaginary parts into a ket vector.
     @test iso_to_ket([1.0, 2.0, 0.0, 0.0]) == [1.0, 2.0]
 
-    # Test iso_vec_to_operator function: Converts a complex vector into a complex matrix representing an operator.
+    # iso_vec_to_operator function: Converts a complex vector into a complex matrix representing an operator.
     @test iso_vec_to_operator(iso_vec) == [1.0 0.0; 0.0 1.0]
 
-    # Test iso_vec_to_iso_operator function: Converts a complex vector into a real matrix representing an isomorphism operator.
+    # iso_vec_to_iso_operator function: Converts a complex vector into a real matrix representing an isomorphism operator.
     @test iso_vec_to_iso_operator(iso_vec) == [1.0 0.0 -0.0 -0.0; 0.0 1.0 -0.0 -0.0; 0.0 0.0 1.0 0.0; 0.0 0.0 0.0 1.0]
 
-    # Test operator_to_iso_vec function: Converts a complex matrix representing an operator into a complex vector.
+    # operator_to_iso_vec function: Converts a complex matrix representing an operator into a complex vector.
     @test operator_to_iso_vec(Complex[1.0 0.0; 0.0 1.0]) == iso_vec
     
-    # Test iso_operator_to_iso_vec function: Converts a real matrix representing an isomorphism operator into a complex vector.
+    # iso_operator_to_iso_vec function: Converts a real matrix representing an isomorphism operator into a complex vector.
     @test iso_operator_to_iso_vec(iso_vec_to_iso_operator(iso_vec)) == iso_vec
 end
 
@@ -132,5 +133,17 @@ end
     # There is some imprecision in floating-point arithmetic, 
     # which is why we use a tolerance to check for approximate equality
     @test isapprox(expected₃, annihilate(3), atol=1e-2) == true
-
+  
+    # `create` returns the adjoint of `annihilate` for the specified levels.
+    @test annihilate(2) == create(2)' 
+    @test annihilate(3) == create(3)'
+    @test annihilate(4) == create(4)'
+   
+    # `number = a'a` computes the number operator for a system with `levels` levels.
+    @test number(3) == create(3)* annihilate(3) == true
+    @test number(4) == create(4)* annihilate(4) == true 
+    
+    # `Quad = `n(n - I)` for a quantum system with `levels` energy levels, where `n` is the number operator and `I` is the identity operator.
+    @test quad(3) == number(3) * (number(3) - I(3))
+    @test quad(4) == number(4) * (number(4) - I(4))
 end

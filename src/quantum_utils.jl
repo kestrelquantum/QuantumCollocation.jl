@@ -219,6 +219,9 @@ end
 
 
 function cavity_state(level::Int, cavity_levels::Int)
+    if level < 0 || level >= cavity_levels
+        throw(BoundsError("Invalid level index $level for a cavity with $cavity_levels levels."))
+    end
     state = zeros(ComplexF64, cavity_levels)
     state[level + 1] = 1.
     return state
