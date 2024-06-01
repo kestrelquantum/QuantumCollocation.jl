@@ -1,16 +1,15 @@
 """
 Tests: QuantumUtils submodule
 """
-using LinearAlgebra
 
 @testitem "GATES" begin
-    using QuantumUtils
     @test get_gate(:X) * get_gate(:X) ==  get_gate(:I)
     @test get_gate(:Y) * get_gate(:Y) ==  get_gate(:I)
     @test -get_gate(:Z) * get_gate(:Z) ==  get_gate(:I)
     @test -get_gate(:X) * get_gate(:Y) == get_gate(:Z)
     # There is some imprecision in floating-point arithmetic, 
-    # which is why we use a tolerance to check for approximate equality
+    # which is why we use a tolerance to check for approximate equality.
+
     #H*X*H† = Z
     @test isapprox(GATES[:H]*GATES[:X]*GATES[:H]', GATES[:Z], atol=1e-2) == true
     @test isapprox(get_gate(:H)*get_gate(:X)*get_gate(:H)', get_gate(:Z), atol=1e-2) == true
@@ -39,7 +38,6 @@ using LinearAlgebra
 end
 
 @testitem "⊗" begin
-    using QuantumUtilis
     @test Int.(round.(real.(GATES[:X] ⊗ GATES[:X]))) == [0  0  0  1;
 											 0  0  1  0;
 											 0  1  0  0;
@@ -59,7 +57,6 @@ end
 end 
 
 @testitem "Test apply function with Pauli gates" begin
-    using QuantumUtils
     # Define the initial state
     ψ₀ = [1.0 + 0.0im, 0.0 + 0.0im]  # Example initial state for a single qubit
     ψ₁ = [0.0 + 0.0im, 1.0 + 0.0im]
@@ -90,7 +87,6 @@ end
 
 # Define a test set for qubit_system_state function
 @testitem "Test qubit_system_state function" begin
-    using QuantumUtils
     @test qubit_system_state("0") == [1, 0]
     @test qubit_system_state("1") == [0, 1]
     @test qubit_system_state("00") == [1, 0, 0, 0]
@@ -101,7 +97,6 @@ end
 
 # Define a test set for lift function
 @testitem "Test lift function" begin
-    using QuantumUtils
     #Lift 2x2 identity matrix U to the first qubit in a 2-qubit system
     U1 = [1 0; 0 1]  # Identity matrix
     @test size(lift(U1, 1, 2)) == (4, 4) 
@@ -115,7 +110,6 @@ end
 
 # Define test cases for isomorphism utilities
 @testitem "Test isomorphism utilities" begin
-    using QuantumUtils
     # vector for conversion
     iso_vec = [1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0]
     
@@ -144,8 +138,6 @@ end
 
 # Define test cases for quantum harmonic oscillator operators
 @testitem "quantum harmonic oscillator operators" begin
-    using QuantumUtils
-   
     # Define a tolerance for floating-point comparisons
     const tol = 1e-10
     # Test with 2 levels
