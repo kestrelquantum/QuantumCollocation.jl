@@ -11,6 +11,7 @@ using NamedTrajectories
 
 
 
+
 include("test_utils.jl")
 
 @testset "QuantumCollocation.jl" begin
