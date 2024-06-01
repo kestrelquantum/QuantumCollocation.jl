@@ -11,15 +11,23 @@ using LinearAlgebra
     @test -get_gate(:X) * get_gate(:Y) == get_gate(:Z)
     # There is some imprecision in floating-point arithmetic, 
     # which is why we use a tolerance to check for approximate equality
-    #HXH† = Z
+    #H*X*H† = Z
     @test isapprox(GATES[:H]*GATES[:X]*GATES[:H]', GATES[:Z], atol=1e-2) == true
     @test isapprox(get_gate(:H)*get_gate(:X)*get_gate(:H)', get_gate(:Z), atol=1e-2) == true
-    #HZH† = X
+    #H*Z*H† = X
     @test isapprox(GATES[:H]*GATES[:Z]*GATES[:H]', GATES[:X], atol=1e-2) == true
     @test isapprox(get_gate(:H)*get_gate(:Z)*get_gate(:H)', get_gate(:X), atol=1e-2) == true
-    #HYH† = -Y
+    #H*Y*H† = -Y
     @test isapprox(GATES[:H]*GATES[:Y]*GATES[:H]', -GATES[:Y], atol=1e-2) == true
     @test isapprox(get_gate(:H)*get_gate(:Y)*get_gate(:H)', -get_gate(:Y), atol=1e-2) == true
+
+    #H*H = I
+    @test isapprox(GATES[:H]*GATES[:H], GATES[:I], atol=1e-2) == true
+    @test isapprox(get_gate(:H)*get_gate(:H), get_gate(:I), atol=1e-2) == true
+    
+    #CNOT*CNOT = I
+    @test GATES[:CX]*GATES[:CX] == I(4)
+    @test get_gate(:CX)*get_gate(:CX) == I(4)
 
     @test Int.(round.(real.(GATES[:H]*GATES[:H]))) == GATES[:I]
     @test GATES[:X] ^ 2 == GATES[:I]
@@ -65,6 +73,18 @@ end
          0.0 + 1.0im 0.0 + 0.0im]
     @test apply(:Y, ψ₀) == GATES[:Y] * ψ₀  # Apply the Y gate to the state |0⟩
     @test apply(:Y, ψ₁) == GATES[:Y] * ψ₁  # Apply the Y gate to the state |1⟩
+   
+    @test apply(:H, apply(:H, [1,  0])) == [1, 0] == true
+    @test isapprox(apply(:H, apply(:H, apply(:H, [1,  0]))), [0.7071, 0.7071], atol=1e-1) == true
+    
+    # CNOT |00⟩ = |00⟩
+    @test apply(:CX, [1, 0, 0, 0]) == [1, 0, 0, 0] 
+    # CNOT |10⟩ = |10⟩
+    @test apply(:CX, [0, 1, 0, 0]) == [0, 1, 0, 0] 
+    # CNOT |01⟩ = |11⟩
+    @test apply(:CX, [0, 0, 1, 0]) == [0, 0, 0, 1] 
+    # CNOT |11⟩ = |10⟩
+    @test apply(:CX, [0, 0, 0, 1]) == [0, 0, 1, 0] 
 
 end
 
