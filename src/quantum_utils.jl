@@ -35,14 +35,14 @@ using LinearAlgebra
 using SparseArrays
 
 
-"""
+@doc raw"""
     kronecker product utility
 """
 
 ⊗(A::AbstractVecOrMat, B::AbstractVecOrMat) = kron(A, B)
 
 
-"""
+@doc raw"""
     quantum gates
 """
 
@@ -106,7 +106,7 @@ function haar_identity(n::Int, radius::Number)
     return F.Q * Λ
 end
 
-"""
+@doc raw"""
 operators_from_dict(keys::AbstractVector{<:Any}, operator_dictionary; I_key=:I)
 
     Replace the vector of keys using the operators from a dictionary.
@@ -118,7 +118,7 @@ function operators_from_dict(keys::AbstractVector{<:Any}, operator_dictionary; I
     return replace(replace(keys, operator_dictionary...), I_key => I_default)
 end
 
-"""
+@doc raw"""
 operators_from_dict(key_string::String, operator_dictionary; I_key="I")
 
     Replace the string (each character is one key) with operators from a dictionary.
@@ -126,7 +126,7 @@ operators_from_dict(key_string::String, operator_dictionary; I_key="I")
 operators_from_dict(key_string::String, operator_dictionary; I_key="I") =
     operators_from_dict([string(c) for c ∈ key_string], operator_dictionary, I_key=I_key)
 
-"""
+@doc raw"""
 kron_from_dict(keys, dict; kwargs...)
 
     Reduce the keys to a single operator by using the provided dictionary and the kronecker product.
@@ -181,7 +181,7 @@ end
     quantum harmonic oscillator operators
 """
 
-"""
+@doc raw"""
     annihilate(levels::Int)
 
 Get the annihilation operator for a system with `levels` levels.
@@ -190,7 +190,7 @@ function annihilate(levels::Int)::Matrix{ComplexF64}
     return diagm(1 => map(sqrt, 1:levels - 1))
 end
 
-"""
+@doc raw"""
     create(levels::Int)
 
 Get the creation operator for a system with `levels` levels.
@@ -199,7 +199,7 @@ function create(levels::Int)
     return collect(annihilate(levels)')
 end
 
-"""
+@doc raw"""
     number(levels::Int)
 
 Get the number operator `n = a'a` for a system with `levels` levels.
@@ -208,7 +208,7 @@ function number(levels::Int)
     return create(levels) * annihilate(levels)
 end
 
-"""
+@doc raw"""
     quad(levels::Int)
 
 Get the operator `n(n - I)` for a system with `levels` levels.
@@ -228,7 +228,7 @@ function cavity_state(level::Int, cavity_levels::Int)
 end
 
 
-"""
+@doc raw"""
     multimode system utilities
 """
 
@@ -379,7 +379,7 @@ function populations(ψ̃::AbstractVector{<:Real})
 end
 
 
-"""
+@doc raw"""
     quantum_state(
         ket::String,
         levels::Vector{Int};
