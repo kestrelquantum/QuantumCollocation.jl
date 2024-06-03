@@ -6,6 +6,15 @@ Tests: QuantumUtils submodule
     using LinearAlgebra
     @test get_gate(:X) * get_gate(:X) ==  get_gate(:I)
     @test get_gate(:Y) * get_gate(:Y) ==  get_gate(:I)
+
+    # Cayley Pauli Table
+    @test im*get_gate(:Y)*get_gate(:X) == get_gate(:Z)  # Z = iYX 
+    @test -im*get_gate(:X)*get_gate(:Y) == get_gate(:Z) # Z = -iXY 
+    @test -im*get_gate(:Z)*get_gate(:X) == get_gate(:Y) # Y = -iZX
+    @test im*get_gate(:X)*get_gate(:Z) == get_gate(:Y)  # Y = iXZ
+    @test im*get_gate(:Z)*get_gate(:Y) == get_gate(:X)  # X = iZY
+    @test -im*get_gate(:Y)*get_gate(:Z) == get_gate(:X) # X = -iYZ
+
     # There is some imprecision in floating-point arithmetic, 
     # which is why we use a tolerance to check for approximate equality.
 
@@ -20,7 +29,7 @@ Tests: QuantumUtils submodule
     #H*Y*H† = -Y
     @test isapprox(GATES[:H]*GATES[:Y]*GATES[:H]', -GATES[:Y], atol=1e-2) == true
     @test isapprox(get_gate(:H)*get_gate(:Y)*get_gate(:H)', -get_gate(:Y), atol=1e-2) == true
-
+    
     #H*H = I
     @test isapprox(GATES[:H]*GATES[:H], GATES[:I], atol=1e-2) == true
     @test isapprox(get_gate(:H)*get_gate(:H), get_gate(:I), atol=1e-2) == true
