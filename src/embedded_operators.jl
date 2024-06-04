@@ -19,6 +19,138 @@ using ..QuantumUtils
 using ..QuantumSystems
 
 
+function embed(op::Matrix{ComplexF64}, subspace_indices::AbstractVector{Int}, levels::Int)
+    """
+    Embed an operator in a subspace defined at `subspace_indices` within `levels`.
+    """
+    @assert size(op, 1) == size(op, 2) "Operator must be square."
+    op_embedded = zeros(ComplexF64, levels, levels)
+    op_embedded[subspace_indices, subspace_indices] = op
+    return op_embedded
+end
+
+# ====================
+
+struct EmbeddedOperator
+    operator::Matrix{ComplexF64}
+    subspace_indices::Vector{Int}
+    subsystem_levels::Vector{Int}
+
+    function EmbeddedOperator(
+        op::Matrix{<:Number},
+        subspace_indices::AbstractVector{Int},
+        subsystem_levels::AbstractVector{Int}
+    )
+    """
+    Create an embedded operator.
+
+    The operator `op` is embedded in the subspace defined by `subspace_indices` in `subsystem_levels`.
+    """
+        op_embedded = embed(Matrix{ComplexF64}(op), subspace_indices, prod(subsystem_levels))
+        return new(op_embedded, subspace_indices, subsystem_levels)
+    end
+end
+
+EmbeddedOperator(op::Matrix{<:Number}, subspace_indices::AbstractVector{Int}, levels::Int) =
+    EmbeddedOperator(op, subspace_indices, [levels])
+
+function unembed(op::EmbeddedOperator)::Matrix{ComplexF64}
+    return op.operator[op.subspace_indices, op.subspace_indices]
+end
+
+Base.size(op::EmbeddedOperator) = size(op.operator)
+Base.size(op::EmbeddedOperator, dim::Union{Int, Nothing}) = size(op.operator, dim)
+
+function Base.:*(
+    op1::EmbeddedOperator,
+    op2::EmbeddedOperator
+)
+    @assert size(op1) == size(op2) "Operators must be of the same size."
+    @assert op1.subspace_indices == op2.subspace_indices "Operators must have the same subspace."
+    @assert op1.subsystem_levels == op2.subsystem_levels "Operators must have the same subsystem levels."
+    return EmbeddedOperator(
+        unembed(op1) * unembed(op2),
+        op1.subspace_indices,
+        op1.subsystem_levels
+    )
+end
+
+function EmbeddedOperator(
+    op::AbstractMatrix{<:Number},
+    system::QuantumSystem;
+    subspace=1:size(op, 1)
+)
+    return EmbeddedOperator(
+        op,
+        get_subspace_indices(subspace, system.levels),
+        [system.levels]
+    )
+end
+
+function EmbeddedOperator(
+    op::AbstractMatrix{<:Number},
+    csystem::CompositeQuantumSystem,
+    op_subsystem_indices::AbstractVector{Int};
+    subspaces=fill(1:2, length(csystem.subsystems)),
+)
+    @assert all(diff(op_subsystem_indices) .== 1) "op_subsystem_indices must be consecutive (for now)."
+
+    if size(op, 1) == prod(length.(subspaces[op_subsystem_indices]))
+        Is = Matrix{ComplexF64}.(I.(length.(subspaces)))
+        Is[op_subsystem_indices[1]] = op
+        deleteat!(Is, op_subsystem_indices[2:end])
+        op = kron(Is...)
+    else
+        @assert(
+            size(op, 1) == prod(length.(subspaces)),
+            """\n
+                Operator size ($(size(op, 1))) must match product of subsystem subspaces ($(prod(length.(subspaces)))).
+            """
+        )
+    end
+
+    subspace_indices = get_subspace_indices(subspaces, csystem.subsystem_levels)
+
+    return EmbeddedOperator(
+        op,
+        subspace_indices,
+        csystem.subsystem_levels
+    )
+end
+
+function EmbeddedOperator(
+    op::AbstractMatrix{<:Number},
+    csystem::CompositeQuantumSystem,
+    op_subsystem_index::Int;
+    kwargs...
+)
+    return EmbeddedOperator(
+        op,
+        csystem,
+        [op_subsystem_index];
+        kwargs...
+    )
+end
+
+function EmbeddedOperator(op::Symbol, args...; kwargs...)
+    @assert op ∈ keys(GATES) "Operator must be a valid gate. See QuantumCollocation.QuantumUtils.GATES dict for available gates."
+    return EmbeddedOperator(GATES[op], args...; kwargs...)
+end
+
+function EmbeddedOperator(
+    ops::AbstractVector{Symbol},
+    sys::CompositeQuantumSystem,
+    op_indices::AbstractVector{Int}
+)
+    ops_embedded = [
+        EmbeddedOperator(op, sys, op_indices[i])
+            for (op, i) ∈ zip(ops, op_indices)
+    ]
+    return *(ops_embedded...)
+end
+
+# ====================
+
 basis_labels(subsystem_levels::AbstractVector{Int}; baseline=1) =
     kron([""], [string.(baseline:levels - 1 + baseline) for levels ∈ subsystem_levels]...)
 
@@ -60,6 +192,15 @@ end
 get_subspace_leakage_indices(subspace_indices::AbstractVector{Int}, levels::Int) =
     setdiff(1:levels, subspace_indices)
 
+get_subspace_leakage_indices(op::EmbeddedOperator) = 
+    get_subspace_leakage_indices(op.subspace_indices, size(op)[1])
+
+get_unitary_isomorphism_subspace_indices(op::EmbeddedOperator) =
+    get_unitary_isomorphism_subspace_indices(op.subspace_indices, op.subsystem_levels)
+
+get_unitary_isomorphism_leakage_indices(op::EmbeddedOperator) =
+    get_unitary_isomorphism_leakage_indices(op.subspace_indices, op.subsystem_levels)
+
 function get_unitary_isomorphism_subspace_indices(
     subspace_indices::AbstractVector{Int},
     subsystem_levels::AbstractVector{Int}
@@ -95,186 +236,13 @@ function get_unitary_isomorphism_leakage_indices(
     return iso_leakage_indices
 end
 
-
-struct EmbeddedOperator
-    operator::Matrix{ComplexF64}
-    subspace_indices::Vector{Int}
-    subsystem_levels::Vector{Int}
-end
-
-Base.size(op::EmbeddedOperator) = size(op.operator)
-
-function EmbeddedOperator(
-    op::AbstractMatrix{<:Number},
-    system::QuantumSystem;
-    subspace=1:size(op, 1)
-)
-    op_embedded = embed(op, system)
-    return EmbeddedOperator(
-        op_embedded,
-        get_subspace_indices(subspace, system.levels),
-        [system.levels]
-    )
-end
-
-function EmbeddedOperator(
-    op::AbstractMatrix{<:Number},
-    system::CompositeQuantumSystem,
-    op_subsystem_index::Int;
-    subspaces=fill(1:2, length(system.subsystems)),
-)
-    op_embedded = embed(op, system, op_subsystem_index; subspaces=subspaces)
-    return EmbeddedOperator(
-        op_embedded,
-        get_subspace_indices(subspaces, system.subsystem_levels),
-        system.subsystem_levels
-    )
-end
-
-function EmbeddedOperator(
-    op::AbstractMatrix{<:Number},
-    system::CompositeQuantumSystem,
-    op_subsystem_indices::AbstractVector{Int};
-    subspaces=fill(1:2, length(system.subsystems)),
-)
-    op_embedded = embed(op, system, op_subsystem_indices; subspaces=subspaces)
-    return EmbeddedOperator(
-        op_embedded,
-        get_subspace_indices(subspaces, system.subsystem_levels),
-        system.subsystem_levels
-    )
-end
-
-function Base.:*(
-    op1::EmbeddedOperator,
-    op2::EmbeddedOperator
-)
-    @assert size(op1) == size(op2) "Operators must be of the same size."
-    @assert op1.subspace_indices == op2.subspace_indices "Operators must have the same subspace."
-    @assert op1.subsystem_levels == op2.subsystem_levels "Operators must have the same subsystem levels."
-    return EmbeddedOperator(
-        op1.operator * op2.operator,
-        op1.subspace_indices,
-        op1.subsystem_levels
-    )
-end
-
-function EmbeddedOperator(op::Symbol, args...; kwargs...)
-    @assert op ∈ keys(GATES) "Operator must be a valid gate. See QuantumCollocation.QuantumUtils.GATES dict for available gates."
-    op = GATES[op]
-    return EmbeddedOperator(op, args...; kwargs...)
-end
-
-function EmbeddedOperator(
-    ops::AbstractVector{Symbol},
-    sys::CompositeQuantumSystem,
-    op_indices::AbstractVector{Int}
-)
-    ops_embedded = [
-        EmbeddedOperator(op, sys, op_indices[i])
-            for (op, i) ∈ zip(ops, op_indices)
-    ]
-    return *(ops_embedded...)
-end
-
-
-
-
 function get_subspace_identity(op::EmbeddedOperator)
     return embed(
         Matrix{ComplexF64}(I(length(op.subspace_indices))),
         op.subspace_indices,
-        size(op)[1]
+        size(op, 1)
     )
 end
-
-function embed(op::Matrix{ComplexF64}, subspace_indices::AbstractVector{Int}, levels::Int)
-    op_embedded = zeros(ComplexF64, levels, levels)
-    op_embedded[subspace_indices, subspace_indices] = op
-    return op_embedded
-end
-
-function embed(A::AbstractMatrix{<:Number}, op::EmbeddedOperator)
-    @assert size(A, 1) == size(A, 2) "Operator must be square."
-    @assert size(A, 1) == length(op.subspace_indices) "Operator size must match subspace size."
-    return embed(A, op.subspace_indices, size(op)[1])
-end
-
-function unembed(op::EmbeddedOperator)::Matrix{ComplexF64}
-    return op.operator[op.subspace_indices, op.subspace_indices]
-end
-
-function get_subspace_leakage_indices(op::EmbeddedOperator)
-    return get_subspace_leakage_indices(op.subspace_indices, size(op)[1])
-end
-
-get_unitary_isomorphism_subspace_indices(op::EmbeddedOperator) =
-    get_unitary_isomorphism_subspace_indices(op.subspace_indices, op.subsystem_levels)
-
-get_unitary_isomorphism_leakage_indices(op::EmbeddedOperator) =
-    get_unitary_isomorphism_leakage_indices(op.subspace_indices, op.subsystem_levels)
-
-
-# embed(op::AbstractMatrix)
-
-function embed(
-    op::Matrix{ComplexF64},
-    sys::QuantumSystem;
-    subspace=1:size(op, 1)
-)::Matrix{ComplexF64}
-    @assert size(op, 1) == size(op, 2) "Operator must be square."
-    op_embedded = embed(op, subspace, sys.levels)
-    return op_embedded
-end
-
-embed(op::AbstractMatrix{<:Number}, sys; kwargs...) =
-    embed(Matrix{ComplexF64}(op), sys; kwargs...)
-
-
-function embed(
-    op::Matrix{ComplexF64},
-    csys::CompositeQuantumSystem,
-    op_subsystem_indices::AbstractVector{Int};
-    subspaces::Vector{<:AbstractVector{Int}}=fill(1:2, length(csys.subsystems))
-)
-    @assert size(op, 1) == size(op, 2) "Operator must be square."
-    @assert all(diff(op_subsystem_indices) .== 1) "op_subsystem_indices must be consecutive (for now)."
-
-    if size(op, 1) == prod(length.(subspaces[op_subsystem_indices]))
-        Is = Matrix{ComplexF64}.(I.(length.(subspaces)))
-        Is[op_subsystem_indices[1]] = op
-        deleteat!(Is, op_subsystem_indices[2:end])
-        op = kron(Is...)
-    else
-        @assert(
-            size(op, 1) == prod(length.(subspaces)),
-            """\n
-                Operator size ($(size(op, 1))) must match product of subsystem subspaces ($(prod(length.(subspaces)))). Or
-            """
-        )
-    end
-
-    subspace_indices = get_subspace_indices(subspaces, csys.subsystem_levels)
-
-    op_embedded = embed(op, subspace_indices, csys.levels)
-
-    return op_embedded
-end
-
-function embed(
-    op::Matrix{ComplexF64},
-    csys::CompositeQuantumSystem,
-    op_subsystem_index::Int;
-    kwargs...
-)
-    return embed(op, csys, [op_subsystem_index]; kwargs...)
-end
-
-embed(op::AbstractMatrix{<:Number}, sys::AbstractQuantumSystem, args...; kwargs...) =
-    embed(Matrix{ComplexF64}(op), sys, args...; kwargs...)
-
-
-
 
 
 end

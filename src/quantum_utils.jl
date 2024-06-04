@@ -67,6 +67,11 @@ const GATES = Dict{Symbol, Matrix{ComplexF64}}(
             0 0 0 1;
             0 0 1 0],
 
+    :CZ => [1 0 0 0;
+            0 1 0 0;
+            0 0 1 0;
+            0 0 0 -1],
+
     :XI => [0 0 -im 0;
             0 0 0 -im;
             -im 0 0 0;

@@ -44,3 +44,68 @@ end
 @testitem "Subspace Leakage Indices" begin
     # TODO: Implement tests
 end
+
+@testitem "Embedded operator" begin
+    # Embed X
+    op = Matrix{ComplexF64}([0 1; 1 0])
+    embedded_op = Matrix{ComplexF64}([0 1 0 0; 1 0 0 0; 0 0 0 0; 0 0 0 0])
+    @test embed(op, 1:2, 4) == embedded_op
+    embedded_op_struct = EmbeddedOperator(op, 1:2, 4)
+    @test embedded_op_struct.operator == embedded_op
+    @test embedded_op_struct.subspace_indices == 1:2
+    @test embedded_op_struct.subsystem_levels == [4]
+
+    # Properties
+    @test size(embedded_op_struct) == size(embedded_op)
+    @test size(embedded_op_struct, 1) == size(embedded_op, 1)
+
+    # X^2 = I
+    x2 = (embedded_op_struct * embedded_op_struct).operator
+    id = get_subspace_identity(embedded_op_struct)
+    @test x2 == id
+
+    # Embed X twice
+    op2 = op ⊗ op
+    embedded_op2 = [
+        0  0  0  0  1  0  0  0  0;
+        0  0  0  1  0  0  0  0  0;
+        0  0  0  0  0  0  0  0  0;
+        0  1  0  0  0  0  0  0  0;
+        1  0  0  0  0  0  0  0  0;
+        0  0  0  0  0  0  0  0  0;
+        0  0  0  0  0  0  0  0  0;
+        0  0  0  0  0  0  0  0  0;
+        0  0  0  0  0  0  0  0  0
+    ]
+    subspace_indices = get_subspace_indices([1:2, 1:2], [3, 3])
+    @test embed(op2, subspace_indices, 9) == embedded_op2
+    embedded_op2_struct = EmbeddedOperator(op2, subspace_indices, [3, 3])
+    @test embedded_op2_struct.operator == embedded_op2
+    @test embedded_op2_struct.subspace_indices == subspace_indices
+    @test embedded_op2_struct.subsystem_levels == [3, 3]
+end
+
+@testitem "Embedded operator from system" begin
+    CZ = GATES[:CZ]
+    a = annihilate(3)
+    σ_x = a + a'
+    σ_y = -1im*(a - a')
+    system = QuantumSystem([σ_x ⊗ σ_x, σ_y ⊗ σ_y])
+
+    op_explicit_qubit = EmbeddedOperator(
+        CZ,
+        system,
+        subspace=get_subspace_indices([1:2, 1:2], [3, 3])
+    )
+    op_implicit_qubit = EmbeddedOperator(CZ, system)
+    # This does not work (implicit puts indicies in 1:4)
+    @test op_implicit_qubit.operator != op_explicit_qubit.operator
+    # But the ops are the same
+    @test unembed(op_explicit_qubit) == unembed(op_implicit_qubit)
+    @test unembed(op_implicit_qubit) == CZ
+end
+
+@testitem "Embedded operator from composite system" begin
+
+end
+
