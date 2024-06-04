@@ -38,8 +38,8 @@ struct EmbeddedOperator
 
     function EmbeddedOperator(
         op::Matrix{<:Number},
-        subspace_indices::Vector{Int},
-        subsystem_levels::Vector{Int}
+        subspace_indices::AbstractVector{Int},
+        subsystem_levels::AbstractVector{Int}
     )
     """
     Create an embedded operator.
