@@ -70,9 +70,11 @@ function unitary_geodesic(
     U_init = Matrix{ComplexF64}(I(size(U_goal, 1)))
     Ũ⃗ = unitary_geodesic(U_init, U_goal, samples; kwargs...)
     return hcat([
-        operator_to_iso_vec(EmbeddedOperators.embed(iso_vec_to_operator(Ũ⃗ₜ), operator))
-            for Ũ⃗ₜ ∈ eachcol(Ũ⃗)
-    ]...)
+        operator_to_iso_vec(embed(
+            iso_vec_to_operator(Ũ⃗ₜ), 
+            operator.subspace_indices, 
+            prod(operator.subsystem_levels))
+        ) for Ũ⃗ₜ ∈ eachcol(Ũ⃗)]...)
 end
 
 function unitary_geodesic(
