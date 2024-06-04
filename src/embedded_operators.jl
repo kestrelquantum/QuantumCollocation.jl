@@ -59,6 +59,7 @@ function unembed(op::EmbeddedOperator)::Matrix{ComplexF64}
 end
 
 Base.size(op::EmbeddedOperator) = size(op.operator)
+Base.size(op::EmbeddedOperator, dim::Union{Int, Nothing}) = size(op.operator, dim)
 
 function Base.:*(
     op1::EmbeddedOperator,
@@ -68,7 +69,7 @@ function Base.:*(
     @assert op1.subspace_indices == op2.subspace_indices "Operators must have the same subspace."
     @assert op1.subsystem_levels == op2.subsystem_levels "Operators must have the same subsystem levels."
     return EmbeddedOperator(
-        op1.operator * op2.operator,
+        unembed(op1) * unembed(op2),
         op1.subspace_indices,
         op1.subsystem_levels
     )

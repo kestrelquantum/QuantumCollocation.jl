@@ -55,6 +55,15 @@ end
     @test embedded_op_struct.subspace_indices == 1:2
     @test embedded_op_struct.subsystem_levels == [4]
 
+    # Properties
+    @test size(embedded_op_struct) == size(embedded_op)
+    @test size(embedded_op_struct, 1) == size(embedded_op, 1)
+
+    # X^2 = I
+    x2 = (embedded_op_struct * embedded_op_struct).operator
+    id = get_subspace_identity(embedded_op_struct)
+    @test x2 == id
+
     # Embed X twice
     op2 = op ⊗ op
     embedded_op2 = [
