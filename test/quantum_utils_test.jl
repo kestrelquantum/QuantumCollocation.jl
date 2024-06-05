@@ -107,8 +107,6 @@ end
     using LinearAlgebra
     const tol = 1e-10
     levels = 2
-    # For 2 levels, the expected matrix should have a 1 at (1,2) position
-    # since the annihilation operator acts to lower the energy level by one
     expected₂ = [0.0+0.0im  1.0+0.0im; 
 			 0.0+0.0im  0.0+0.0im]
     @test annihilate(levels) == expected₂
@@ -117,14 +115,11 @@ end
                  0.0+0.0im  0.0+0.0im  1.41421+0.0im;
                  0.0+0.0im  0.0+0.0im      0.0+0.0im]
     @test isapprox(expected₃, annihilate(3), atol=1e-2) == true
-  
     @test annihilate(2) == create(2)' 
     @test annihilate(3) == create(3)'
     @test annihilate(4) == create(4)'
-   
     @test number(3) == create(3)* annihilate(3) 
     @test number(4) == create(4)* annihilate(4)
-   
     @test quad(3) == number(3) * (number(3) - I(3))
     @test quad(4) == number(4) * (number(4) - I(4))
 end
