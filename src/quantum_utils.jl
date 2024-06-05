@@ -61,6 +61,7 @@ A constant dictionary `GATES` containing common quantum gate matrices as complex
 - `GATES[:Z]` - Pauli-Z gate: Flips the phase of the qubit state.
 - `GATES[:H]` - Hadamard gate: Creates superposition by transforming basis states.
 - `GATES[:CX]` - Controlled-X (CNOT) gate: Flips the second qubit (target) if the first qubit (control) is |1⟩.
+- `GATES[:CZ]` - Controlled-Z (CZ) gate: Flips the phase of the second qubit (target) if the first qubit (control) is |1⟩.
 - `GATES[:XI]` - Complex gate: A specific gate used for complex operations.
 - `GATES[:sqrtiSWAP]` - Square root of iSWAP gate: Partially swaps two qubits with a phase.
 
@@ -110,6 +111,11 @@ const GATES = Dict{Symbol, Matrix{ComplexF64}}(
             0 1 0 0;
             0 0 0 1;
             0 0 1 0],
+
+    :CZ => [1 0 0 0;
+            0 1 0 0;
+            0 0 1 0;
+            0 0 0 -1],
 
     :XI => [0 0 -im 0;
             0 0 0 -im;
