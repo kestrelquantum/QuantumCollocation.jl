@@ -23,12 +23,14 @@ Tests: QuantumUtils submodule
     @test isapprox(GATES[:H]*GATES[:Y]*GATES[:H]', -GATES[:Y], atol=1e-2) == true
     @test isapprox(get_gate(:H)*get_gate(:Y)*get_gate(:H)', -get_gate(:Y), atol=1e-2) == true
     
-    #H*H = I, CNOT*CNOT = I, X² = I, Y² = I, Z² = I
+    #H² = I, CNOT² = I, CZ² = I, X² = I, Y² = I, Z² = I
     @test isapprox(GATES[:H]*GATES[:H], GATES[:I], atol=1e-2) == true
     @test isapprox(get_gate(:H)*get_gate(:H), get_gate(:I), atol=1e-2) == true
     @test Int.(round.(real.(GATES[:H]*GATES[:H]))) == GATES[:I]
     @test GATES[:CX]*GATES[:CX] == I(4)
+    @test GATES[:CZ]*GATES[:CZ] == I(4)
     @test get_gate(:CX)*get_gate(:CX) == I(4)
+    @test get_gate(:CZ)*get_gate(:CZ) == I(4)
     @test GATES[:X] ^ 2 == GATES[:I]
     @test isapprox(GATES[:X] ^ 2, GATES[:I], atol=1e-2) == true
     @test GATES[:Y] ^ 2 == GATES[:I]
@@ -62,9 +64,13 @@ end
     @test apply(:H, apply(:H, [1,  0])) == [1, 0]
     @test isapprox(apply(:H, apply(:H, apply(:H, [1,  0]))), [0.7071, 0.7071], atol=1e-1) == true
     @test apply(:CX, [1, 0, 0, 0]) == [1, 0, 0, 0]  # CNOT |00⟩ = |00⟩
-    @test apply(:CX, [0, 1, 0, 0]) == [0, 1, 0, 0]  # CNOT |10⟩ = |10⟩
-    @test apply(:CX, [0, 0, 1, 0]) == [0, 0, 0, 1]  # CNOT |01⟩ = |11⟩
+    @test apply(:CX, [0, 1, 0, 0]) == [0, 1, 0, 0]  # CNOT |01⟩ = |01⟩
+    @test apply(:CX, [0, 0, 1, 0]) == [0, 0, 0, 1]  # CNOT |10⟩ = |11⟩
     @test apply(:CX, [0, 0, 0, 1]) == [0, 0, 1, 0]  # CNOT |11⟩ = |10⟩
+    @test apply(:CZ, [1, 0, 0, 0]) == [1, 0, 0, 0]  # CZ |00⟩ = |00⟩
+    @test apply(:CZ, [0, 1, 0, 0]) == [0, 1, 0, 0]  # CZ |01⟩ = |01⟩
+    @test apply(:CZ, [0, 0, 1, 0]) == [0, 0, 1, 0]  # CZ |10⟩ = |10⟩
+    @test apply(:CZ, [0, 0, 0, 1]) == [0, 0, 0, -1] # CZ |11⟩ = -|11⟩
 end
 
 @testitem "Test qubit_system_state function" begin
