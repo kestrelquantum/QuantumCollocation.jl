@@ -68,16 +68,6 @@ A constant dictionary `GATES` containing common quantum gate matrices as complex
 Each gate is represented by its unitary matrix.
 
 ```julia
-julia> GATES[:X]
-2×2 Matrix{ComplexF64}:
- 0.0+0.0im  1.0+0.0im
- 1.0+0.0im  0.0+0.0im
-
-julia> GATES[:Y]
-2×2 Matrix{ComplexF64}:
- 0.0+0.0im  0.0-1.0im
- 0.0+1.0im  0.0+0.0im
-
 julia> GATES[:Z]
 2×2 Matrix{ComplexF64}:
  1.0+0.0im   0.0+0.0im
