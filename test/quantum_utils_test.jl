@@ -16,15 +16,11 @@ Tests: QuantumUtils submodule
     @test -im*get_gate(:Y)*get_gate(:Z) == get_gate(:X) # X = -iYZ
 
     # H*X*H† = Z, H*Z*H† = X, H*Y*H† = -Y
-    @test isapprox(GATES[:H]*GATES[:X]*GATES[:H]', GATES[:Z], atol=1e-2) == true
     @test isapprox(get_gate(:H)*get_gate(:X)*get_gate(:H)', get_gate(:Z), atol=1e-2) == true
-    @test isapprox(GATES[:H]*GATES[:Z]*GATES[:H]', GATES[:X], atol=1e-2) == true
     @test isapprox(get_gate(:H)*get_gate(:Z)*get_gate(:H)', get_gate(:X), atol=1e-2) == true
-    @test isapprox(GATES[:H]*GATES[:Y]*GATES[:H]', -GATES[:Y], atol=1e-2) == true
     @test isapprox(get_gate(:H)*get_gate(:Y)*get_gate(:H)', -get_gate(:Y), atol=1e-2) == true
     
     #H² = I, CNOT² = I, CZ² = I, X² = I, Y² = I, Z² = I
-    @test isapprox(GATES[:H]*GATES[:H], GATES[:I], atol=1e-2) == true
     @test isapprox(get_gate(:H)*get_gate(:H), get_gate(:I), atol=1e-2) == true
     @test Int.(round.(real.(GATES[:H]*GATES[:H]))) == GATES[:I]
     @test GATES[:CX]*GATES[:CX] == I(4)
@@ -32,9 +28,7 @@ Tests: QuantumUtils submodule
     @test get_gate(:CX)*get_gate(:CX) == I(4)
     @test get_gate(:CZ)*get_gate(:CZ) == I(4)
     @test GATES[:X] ^ 2 == GATES[:I]
-    @test isapprox(GATES[:X] ^ 2, GATES[:I], atol=1e-2) == true
     @test GATES[:Y] ^ 2 == GATES[:I]
-    @test isapprox(GATES[:Y] ^ 2, GATES[:I], atol=1e-2) == true
     @test isapprox(GATES[:Z] ^ 2, GATES[:I], atol=1e-2) == true
     @test Int.(round.(real.(GATES[:X]*GATES[:Y] + GATES[:Y]*GATES[:X]))) == zeros(2, 2)
     @test Int.(round.(real.(GATES[:Y]*GATES[:Z] + GATES[:Z]*GATES[:Y]))) == zeros(2, 2)
