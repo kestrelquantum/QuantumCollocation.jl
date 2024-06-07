@@ -53,7 +53,7 @@ julia> GATES[:X] ⊗ GATES[:Y]
 
 
 @doc raw"""
-A constant dictionary `GATES` containing common quantum gate matrices as complex-valued matrices.
+A constant dictionary `GATES` containing common quantum gate matrices as complex-valued matrices. Each gate is represented by its unitary matrix.
 
 - `GATES[:I]` - Identity gate: Leaves the state unchanged.
 - `GATES[:X]` - Pauli-X (NOT) gate: Flips the qubit state.
@@ -64,8 +64,6 @@ A constant dictionary `GATES` containing common quantum gate matrices as complex
 - `GATES[:CZ]` - Controlled-Z (CZ) gate: Flips the phase of the second qubit (target) if the first qubit (control) is |1⟩.
 - `GATES[:XI]` - Complex gate: A specific gate used for complex operations.
 - `GATES[:sqrtiSWAP]` - Square root of iSWAP gate: Partially swaps two qubits with a phase.
-
-Each gate is represented by its unitary matrix.
 
 ```julia
 julia> GATES[:Z]

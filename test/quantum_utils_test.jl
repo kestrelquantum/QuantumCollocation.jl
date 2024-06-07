@@ -36,7 +36,6 @@ Tests: QuantumUtils submodule
     @test GATES[:Y] ^ 2 == GATES[:I]
     @test isapprox(GATES[:Y] ^ 2, GATES[:I], atol=1e-2) == true
     @test isapprox(GATES[:Z] ^ 2, GATES[:I], atol=1e-2) == true
-
     @test Int.(round.(real.(GATES[:X]*GATES[:Y] + GATES[:Y]*GATES[:X]))) == zeros(2, 2)
     @test Int.(round.(real.(GATES[:Y]*GATES[:Z] + GATES[:Z]*GATES[:Y]))) == zeros(2, 2)
     @test Int.(round.(real.(GATES[:Z]*GATES[:X] + GATES[:X]*GATES[:Z]))) == zeros(2, 2)
@@ -45,10 +44,8 @@ end
 @testitem "⊗" begin
     using LinearAlgebra
     @test Int.(real.(GATES[:I] ⊗ GATES[:I])) == I(4)
-    #Associativity
-    @test (GATES[:X] ⊗ GATES[:Y]) ⊗ GATES[:Z] == GATES[:X] ⊗ (GATES[:Y] ⊗ GATES[:Z])
-    #Distributivity    
-    @test GATES[:X] ⊗ (GATES[:Y] + GATES[:Z]) == GATES[:X] ⊗ GATES[:Y] + GATES[:X] ⊗ GATES[:Z]
+    @test (GATES[:X] ⊗ GATES[:Y]) ⊗ GATES[:Z] == GATES[:X] ⊗ (GATES[:Y] ⊗ GATES[:Z]) # Associativity
+    @test GATES[:X] ⊗ (GATES[:Y] + GATES[:Z]) == GATES[:X] ⊗ GATES[:Y] + GATES[:X] ⊗ GATES[:Z] # Distributivity   
 end 
 
 @testitem "Test apply function with Pauli gates" begin
