@@ -19,4 +19,9 @@ end
     H = a + a';
     sys = QuantumOpticsSystem(H, [H, H]);
     @test typeof(sys) == QuantumSystem
+    @test sys.constructor == QuantumOpticsSystem
+    @test sys.H_drift == H.data
+
+    # creation with non-Hermitian operators
+    @test_broken QuantumOpticsSystem(a, [a])
 end
