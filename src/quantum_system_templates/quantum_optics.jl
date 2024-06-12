@@ -1,4 +1,4 @@
-using QuantumOptics
+using QuantumOpticsBase
 using QuantumToolbox
 
 function QuantumOpticsSystem(
