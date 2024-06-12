@@ -12,7 +12,7 @@ using NamedTrajectories
 
 
 
-# include("test_utils.jl")
+include("test_utils.jl")
 
 @testset "QuantumCollocation.jl" begin
     # include("objectives_test.jl")
