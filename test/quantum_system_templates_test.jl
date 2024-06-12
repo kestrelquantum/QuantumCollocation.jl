@@ -11,9 +11,11 @@ end
 end
 
 @testitem "Quantum Optics System" begin
-    using QuantumToolbox
+    using QuantumOpticsBase
     N = rand(1:5);
-    a =  QuantumToolbox.create(N);
+    T = ComplexF64;
+    b = FockBasis(N);
+    a =  QuantumOpticsBase.create(T, b);
     H = a + a';
     sys = QuantumOpticsSystem(H, [H, H]);
     @test typeof(sys) == QuantumSystem
