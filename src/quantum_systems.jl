@@ -145,7 +145,32 @@ function (sys::QuantumSystem)(; params...)
         key ∈ keys(sys.params) for key ∈ keys(params)
     ]) "Invalid parameter(s) provided."
     return sys.constructor(; merge(sys.params, Dict(params...))...)
+end 
+
+function QuantumSystem(
+    H_drift::SparseMatrixCSC{ComplexF64, Int64},
+    H_drives::Vector{SparseMatrixCSC{ComplexF64, Int64}};
+    constructor::Union{Function, Nothing}=nothing,
+    params::Dict{Symbol, <:Any}=Dict{Symbol, Any}(),
+    kwargs...
+)
+    H_drift = sparse(H_drift)
+    H_drives = sparse.(H_drives)
+    G_drift = G(H_drift)
+    G_drives = G.(H_drives)
+    params = merge(params, Dict{Symbol, Any}(kwargs...))
+    levels = size(H_drift, 1)
+    return QuantumSystem(
+        H_drift,
+        H_drives,
+        G_drift,
+        G_drives,
+        levels,
+        constructor,
+        params
+    )
 end
+
 
 function Base.copy(sys::QuantumSystem)
     return QuantumSystem(
