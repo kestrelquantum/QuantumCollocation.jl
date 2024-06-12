@@ -11,6 +11,8 @@ using ..QuantumUtils
 
 using LinearAlgebra
 using SparseArrays
+using QuantumOptics
+using QuantumToolbox
 
 const Im2 = [
     0 -1;
@@ -146,6 +148,8 @@ function (sys::QuantumSystem)(; params...)
     ]) "Invalid parameter(s) provided."
     return sys.constructor(; merge(sys.params, Dict(params...))...)
 end
+
+# 
 
 function Base.copy(sys::QuantumSystem)
     return QuantumSystem(
