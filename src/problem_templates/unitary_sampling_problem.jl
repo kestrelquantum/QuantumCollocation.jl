@@ -192,3 +192,50 @@ function UnitarySamplingProblem(
     )
 end
 
+# =============================================================================
+
+@testitem "Sample robustness test" begin
+    using Distributions
+
+    n_samples = 3
+    T = 50
+    Δt = 0.2
+    timesteps = fill(Δt, T)
+    operator = GATES[:H]
+    systems(ζ) = QuantumSystem(ζ * GATES[:Z], [GATES[:X], GATES[:Y]])
+
+    prob = UnitarySamplingProblem(
+        systems,
+        Normal(0, 0.1),
+        n_samples,
+        operator,
+        T,
+        Δt;
+        verbose=false,
+        ipopt_options=Options(print_level=1, recalc_y = "yes", recalc_y_feas_tol = 1e1)
+    )
+
+    solve!(prob, max_iter=20)
+
+    d_prob = UnitarySmoothPulseProblem(
+        systems(0),
+        operator,
+        T,
+        Δt;
+        verbose=false,
+        ipopt_options=Options(print_level=1, recalc_y = "yes", recalc_y_feas_tol = 1e1)
+    )
+    solve!(prob, max_iter=20)
+
+    # Check that the solution improves over the default
+    ζ_test = 0.02
+    Ũ⃗_goal = operator_to_iso_vec(operator)
+
+    Ũ⃗_end = unitary_rollout(prob.trajectory.a, timesteps, systems(ζ_test))[:, end]
+    fid = unitary_fidelity(Ũ⃗_end, Ũ⃗_goal)
+    
+    d_Ũ⃗_end = unitary_rollout(d_prob.trajectory.a, timesteps, systems(ζ_test))[:, end]
+    default_fid = unitary_fidelity(d_Ũ⃗_end, Ũ⃗_goal)
+
+    @test fid > default_fid
+end
