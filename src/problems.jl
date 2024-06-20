@@ -98,7 +98,8 @@ function QuantumControlProblem(
         linear_constraints,
         n_dynamics_constraints,
         nonlinear_constraints,
-        n_variables
+        n_variables,
+        verbose=verbose
     )
 
     variables = reshape(variables, traj.dim, traj.T)
@@ -231,7 +232,8 @@ function initialize_optimizer!(
     linear_constraints::Vector{LinearConstraint},
     n_dynamics_constraints::Int,
     nonlinear_constraints::Vector{NonlinearConstraint},
-    n_variables::Int
+    n_variables::Int;
+    verbose=true
 )
     nl_cons = fill(
         MOI.NLPBoundsPair(0.0, 0.0),
@@ -261,7 +263,7 @@ function initialize_optimizer!(
     variables = MOI.add_variables(optimizer, n_variables)
 
     # add linear constraints
-    constrain!(optimizer, variables, linear_constraints, trajectory, verbose=true)
+    constrain!(optimizer, variables, linear_constraints, trajectory, verbose=verbose)
 
     return variables
 end
