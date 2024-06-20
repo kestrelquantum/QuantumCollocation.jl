@@ -172,9 +172,23 @@ function UnitarySamplingProblem(
     )
 end
 
-
-# ζs = range(-.05, .05, length=5)
-# systems = [system(ζ) for ζ ∈ ζs];
-# system_labels = string.(1:length(systems))
-# system_weights = fill(1.0, length(systems))
+function UnitarySamplingProblem(
+    system::Function,
+    distribution::Sampleable,
+    num_samples::Int,
+    operator::Union{EmbeddedOperator, AbstractMatrix{<:Number}},
+    T::Int,
+    Δt::Union{Float64, Vector{Float64}};
+    kwargs...
+)   
+    samples = rand(distribution, num_samples)
+    systems = [system(x) for x in samples]
+    return UnitarySamplingProblem(
+        systems,
+        operator,
+        T,
+        Δt;
+        kwargs...
+    )
+end
 
