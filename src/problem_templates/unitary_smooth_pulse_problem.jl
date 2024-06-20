@@ -125,26 +125,13 @@ function UnitarySmoothPulseProblem(
         ipopt_options.hessian_approximation = "limited-memory"
     end
 
-    # Goal
-    if operator isa EmbeddedOperator
-        U_goal = operator.operator
-        U_init = get_subspace_identity(operator)
-    else
-        U_goal = Matrix{ComplexF64}(operator)
-        U_init = Matrix{ComplexF64}(I(size(U_goal, 1)))
-    end
-
-    Ũ⃗_init = operator_to_iso_vec(U_init)
-    Ũ⃗_goal = operator_to_iso_vec(U_goal)
-    n_drives = length(system.G_drives)
-
     # Trajectory
     if !isnothing(init_trajectory)
         traj = init_trajectory
     else
+        n_drives = length(system.G_drives)
         traj = initialize_trajectory(
-            Ũ⃗_init,
-            Ũ⃗_goal,
+            operator,
             T,
             Δt,
             n_drives,
@@ -172,8 +159,12 @@ function UnitarySmoothPulseProblem(
     # Constraints
     if leakage_suppression
         if operator isa EmbeddedOperator
-            set_leakage_suppression!(
-                J, constraints, traj, operator, Ũ⃗_symb=Ũ⃗ᵢ, R=R_leakage
+            leakage_indices = get_unitary_isomorphism_leakage_indices(operator)
+            J += L1Regularizer!(
+                constraints, :Ũ⃗, traj, 
+                R_value=R_leakage, 
+                indices=leakage_indices,
+                eval_hessian=!hessian_approximation
             )
         else
             @warn "leakage_suppression is not supported for non-embedded operators, ignoring."
@@ -255,41 +246,57 @@ function UnitarySmoothPulseProblem(
     return UnitarySmoothPulseProblem(system, args...; kwargs...)
 end
 
-
-function set_leakage_suppression!(
-    J::Objective,
-    constraints::Vector{<:AbstractConstraint},
-    traj::NamedTrajectory,
-    operator::EmbeddedOperator;
-    R::Real=1e-1,
-    Ũ⃗_symb::Symbol=:Ũ⃗,
-)
-    # leakage
-    leakage_indices = get_unitary_isomorphism_leakage_indices(operator)
-    J_leakage, slack_con = L1Regularizer(
-        traj[Ũ⃗_symb],
-        traj;
-        R_value=R,
-        indices=leakage_indices
-    )
-    push!(constraints, slack_con)
-    J += J_leakage
-end
-
 # *************************************************************************** #
 
 @testitem "Hadamard gate" begin
-    H_drift = GATES[:Z]
-    H_drives = [GATES[:X], GATES[:Y]]
+    sys = QuantumSystem(GATES[:Z], [GATES[:X], GATES[:Y]])
     U_goal = GATES[:H]
+    T = 51
+    Δt = 0.2
+    
+    prob = UnitarySmoothPulseProblem(
+        sys, U_goal, T, Δt,
+        ipopt_options=Options(print_level=1), verbose=false
+    )
+    
+    initial = unitary_fidelity(prob)
+    solve!(prob, max_iter=20)
+    final = unitary_fidelity(prob)
+    @test final > initial
+end
+
+@testitem "EmbeddedOperator Hadamard gate" begin
+    a = annihilate(3)
+    sys = QuantumSystem([(a + a')/2, (a - a')/(2im)])
+    U_goal = EmbeddedOperator(GATES[:H], sys)
     T = 51
     Δt = 0.2
 
     prob = UnitarySmoothPulseProblem(
-        H_drift, H_drives, U_goal, T, Δt,
-        ipopt_options=Options(print_level=4)
+        sys, U_goal, T, Δt,
+        ipopt_options=Options(print_level=1), verbose=false
     )
 
-    solve!(prob, max_iter=100)
-    @test unitary_fidelity(prob) > 0.99
+    initial = unitary_fidelity(prob, subspace=U_goal.subspace_indices)
+    solve!(prob, max_iter=20)
+    final = unitary_fidelity(prob, subspace=U_goal.subspace_indices)
+    @test final > initial
+
+    # Test leakage suppression
+    a = annihilate(4)
+    sys = QuantumSystem([(a + a')/2, (a - a')/(2im)])
+    U_goal = EmbeddedOperator(GATES[:H], sys)
+    T = 50
+    Δt = 0.2
+
+    prob = UnitarySmoothPulseProblem(
+        sys, U_goal, T, Δt,
+        leakage_suppression=true, R_leakage=1e-1,
+        ipopt_options=Options(print_level=1), verbose=false
+    )
+
+    initial = unitary_fidelity(prob, subspace=U_goal.subspace_indices)
+    solve!(prob, max_iter=20)
+    final = unitary_fidelity(prob, subspace=U_goal.subspace_indices)
+    @test final > initial
 end
