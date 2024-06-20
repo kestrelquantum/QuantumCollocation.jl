@@ -65,38 +65,27 @@ Compute a geodesic connecting two unitary operators.
 function unitary_geodesic end
 
 function unitary_geodesic(
-    operator::EmbeddedOperator,
+    U_init::AbstractMatrix{<:Number},
+    U_goal::EmbeddedOperator,
     samples::Int;
     kwargs...
-)
-    U_goal = unembed(operator)
-    U_init = Matrix{ComplexF64}(I(size(U_goal, 1)))
-    Ũ⃗ = unitary_geodesic(U_init, U_goal, samples; kwargs...)
+)   
+    U1 = unembed(U_init, U_goal)
+    U2 = unembed(U_goal)
+    Ũ⃗ = unitary_geodesic(U1, U2, samples; kwargs...)
     return hcat([
-        operator_to_iso_vec(embed(
-            iso_vec_to_operator(Ũ⃗ₜ), 
-            operator.subspace_indices, 
-            prod(operator.subsystem_levels))
-        ) for Ũ⃗ₜ ∈ eachcol(Ũ⃗)]...)
+        operator_to_iso_vec(embed(iso_vec_to_operator(Ũ⃗ₜ), U_goal))
+        for Ũ⃗ₜ ∈ eachcol(Ũ⃗)
+    ]...)
 end
 
 function unitary_geodesic(
+    U_init::AbstractMatrix{<:Number},
     U_goal::AbstractMatrix{<:Number},
-    samples::Int;
-    kwargs...
-)
-    N = size(U_goal, 1)
-    U₀ = Matrix{ComplexF64}(I(N))
-    return unitary_geodesic(U₀, U_goal, samples; kwargs...)
-end
-
-function unitary_geodesic(
-    U₀::AbstractMatrix{<:Number},
-    U₁::AbstractMatrix{<:Number},
     samples::Number;
     kwargs...
 )
-    return unitary_geodesic(U₀, U₁, range(0, 1, samples); kwargs...)
+    return unitary_geodesic(U_init, U_goal, range(0, 1, samples); kwargs...)
 end
 
 function unitary_geodesic(
@@ -137,15 +126,13 @@ VectorBound = Union{AbstractVector{R}, Tuple{AbstractVector{R}, AbstractVector{R
 ScalarBound = Union{R, Tuple{R, R}} where R <: Real
 
 function initialize_unitaries(
-    Ũ⃗_init::AbstractVector{<:Number},
-    Ũ⃗_goal::AbstractVector{<:Number},
+    U_init::AbstractMatrix{<:Number},
+    U_goal::Union{EmbeddedOperator, AbstractMatrix{<:Number}},
     T::Int;
     geodesic=true
 )
-    U_init = iso_vec_to_operator(Ũ⃗_init)
-    U_goal = iso_vec_to_operator(Ũ⃗_goal)
     if geodesic
-        Ũ⃗ = unitary_geodesic(U_goal, T)
+        Ũ⃗ = unitary_geodesic(U_init, U_goal, T)
     else
         Ũ⃗ = unitary_linear_interpolation(U_init, U_goal, T)
     end
@@ -191,13 +178,13 @@ function initialize_controls(
 end
 
 function initialize_trajectory(
-    Ũ⃗_init::AbstractVector{<:Number},
-    Ũ⃗_goal::AbstractVector{<:Number},
+    U_goal::Union{EmbeddedOperator, AbstractMatrix{<:Number}},
     T::Int,
     Δt::Real,
     n_drives::Int,
     a_bounds::VectorBound,
     dda_bounds::VectorBound;
+    U_init::AbstractMatrix{<:Number}=Matrix{ComplexF64}(I(size(U_goal, 1))),
     geodesic=true,
     bound_unitary=false,
     free_time=false,
@@ -214,9 +201,16 @@ function initialize_trajectory(
         end
     end
 
+    Ũ⃗_init = operator_to_iso_vec(U_init)
+    if U_goal isa EmbeddedOperator
+        Ũ⃗_goal = operator_to_iso_vec(U_goal.operator)
+    else
+        Ũ⃗_goal = operator_to_iso_vec(U_goal)
+    end
+
     # Initial state and controls
     if isnothing(a_guess)
-        Ũ⃗ = initialize_unitaries(Ũ⃗_init, Ũ⃗_goal, T; geodesic=geodesic)
+        Ũ⃗ = initialize_unitaries(U_init, U_goal, T, geodesic=geodesic)
         a, da, dda = initialize_controls(n_drives, T, a_bounds, drive_derivative_σ)
     else
         @assert !isnothing(system) "system must be provided if a_guess is provided"
