@@ -90,6 +90,21 @@ function Objective(terms::Vector{Dict})
     return +(Objective.(terms)...)
 end
 
+function Base.:*(num::Real, obj::Objective)
+	L = (Z⃗, Z) -> num * obj.L(Z⃗, Z)
+	∇L = (Z⃗, Z) -> num * obj.∇L(Z⃗, Z)
+    if isnothing(obj.∂²L)
+        ∂²L = nothing
+        ∂²L_structure = nothing
+    else
+        ∂²L = (Z⃗, Z) -> num * obj.∂²L(Z⃗, Z)
+        ∂²L_structure = obj.∂²L_structure
+    end
+	return Objective(L, ∇L, ∂²L, ∂²L_structure, obj.terms)
+end
+
+Base.:*(obj::Objective, num::Real) = num * obj
+
 function Objective(term::Dict)
     return eval(term[:type])(; delete!(term, :type)...)
 end
