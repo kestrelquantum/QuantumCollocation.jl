@@ -15,6 +15,7 @@ export QuadraticRegularizer
 export PairwiseQuadraticRegularizer
 export QuadraticSmoothnessRegularizer
 export L1Regularizer
+export L1Regularizer!
 
 using TrajectoryIndexingUtils
 using ..QuantumUtils
@@ -849,6 +850,16 @@ function L1Regularizer(
     return J, slack_con
 end
 
+function L1Regularizer!(
+    constraints::Vector{<:AbstractConstraint},
+    name::Symbol,
+    traj::NamedTrajectory;
+    kwargs...
+)
+    J, slack_con = L1Regularizer(name, traj; kwargs...)
+    push!(constraints, slack_con)
+    return J
+end
 
 function MinimumTimeObjective(;
     D::Float64=1.0,
