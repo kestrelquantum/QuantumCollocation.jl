@@ -124,7 +124,7 @@ function UnitarySamplingProblem(
             bound_unitary=bound_unitary,
             drive_derivative_σ=drive_derivative_σ,
             a_guess=a_guess,
-            system=systems[1],
+            system=systems,
             rollout_integrator=rollout_integrator,
             Ũ⃗_keys=Ũ⃗_keys
         )
@@ -284,4 +284,29 @@ end
     default_fid = unitary_fidelity(d_Ũ⃗_end, Ũ⃗_goal)
 
     @test fid > default_fid
+
+    # Check initial guess initialization
+    a_guess = prob.trajectory.a
+    
+    g1_prob = UnitarySamplingProblem(
+        [systems(0), systems(0)],
+        operator,
+        T,
+        Δt;
+        verbose=false,
+        a_guess=a_guess,
+    )
+
+    @test g1_prob.trajectory.Ũ⃗1 ≈ g1_prob.trajectory.Ũ⃗2
+
+    g2_prob = UnitarySamplingProblem(
+        [systems(0), systems(0.1)],
+        operator,
+        T,
+        Δt;
+        verbose=false,
+        a_guess=a_guess,
+    )
+
+    @test ~(g2_prob.trajectory.Ũ⃗1 ≈ g2_prob.trajectory.Ũ⃗2)
 end
