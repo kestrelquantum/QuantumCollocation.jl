@@ -10,6 +10,8 @@ using LinearAlgebra
 using Distributions
 
 using ..QuantumUtils
+using ..QuantumSystems
+using ..Rollouts
 using ..EmbeddedOperators
 
 """
@@ -164,10 +166,7 @@ function initialize_controls(
     return a, da, dda
 end
 
-function initialize_controls(
-    a_guess::AbstractMatrix,
-)
-    a = a_guess
+function initialize_controls(a::AbstractMatrix, Δt::AbstractVecOrMat)
     da = derivative(a, Δt)
     dda = derivative(da, Δt)
 
@@ -191,7 +190,7 @@ function initialize_trajectory(
     Δt_bounds::ScalarBound=(0.5 * Δt, 1.5 * Δt),
     drive_derivative_σ::Float64=0.1,
     a_guess::Union{AbstractMatrix{<:Float64}, Nothing}=nothing,
-    system=Union{AbstractQuantumSystem, Nothing}=nothing,
+    system::Union{AbstractQuantumSystem, AbstractVector{<:AbstractQuantumSystem}, Nothing}=nothing,
     rollout_integrator::Function=exp,
     Ũ⃗_keys::AbstractVector{<:Symbol}=[:Ũ⃗],
 )
@@ -206,22 +205,6 @@ function initialize_trajectory(
         Ũ⃗_goal = operator_to_iso_vec(U_goal.operator)
     else
         Ũ⃗_goal = operator_to_iso_vec(U_goal)
-    end
-
-    # Initial state and controls
-    if isnothing(a_guess)
-        Ũ⃗ = initialize_unitaries(U_init, U_goal, T, geodesic=geodesic)
-        a, da, dda = initialize_controls(n_drives, T, a_bounds, drive_derivative_σ)
-    else
-        @assert !isnothing(system) "system must be provided if a_guess is provided"
-        Ũ⃗ = unitary_rollout(
-            Ũ⃗_init,
-            a_guess,
-            Δt,
-            system;
-            integrator=rollout_integrator
-        )
-        a, da, dda = initialize_controls(a_guess)
     end
 
     # Constraints
@@ -247,8 +230,26 @@ function initialize_trajectory(
         merge!(bounds, (; (Ũ⃗_keys .=> Ũ⃗_bounds)...))
     end
 
+    # Initial state and control values
+    if isnothing(a_guess)
+        Ũ⃗ = initialize_unitaries(U_init, U_goal, T, geodesic=geodesic)
+        Ũ⃗_values = repeat([Ũ⃗], length(Ũ⃗_keys))
+        a, da, dda = initialize_controls(n_drives, T, a_bounds, drive_derivative_σ)
+    else
+        @assert !isnothing(system) "system must be provided if a_guess is provided"
+        if system isa AbstractVector
+            @assert length(system) == length(Ũ⃗_keys) "systems must have the same length as Ũ⃗_keys"
+            Ũ⃗_values = map(system) do sys
+                unitary_rollout(Ũ⃗_init, a_guess, Δt, sys; integrator=rollout_integrator)
+            end
+        else
+            unitary_rollout(Ũ⃗_init, a_guess, Δt, system; integrator=rollout_integrator)
+            Ũ⃗_values = repeat([Ũ⃗], length(Ũ⃗_keys))
+        end
+        a, da, dda = initialize_controls(a_guess, Δt)
+    end
+
     # Trajectory
-    Ũ⃗_values = repeat([Ũ⃗], length(Ũ⃗_keys))
     keys = [Ũ⃗_keys..., :a, :da, :dda]
     values = [Ũ⃗_values..., a, da, dda]
 
