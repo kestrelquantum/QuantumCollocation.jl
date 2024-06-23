@@ -1,7 +1,53 @@
 @doc raw"""
     UnitarySamplingProblem
 
-    TODO: systems might need flexible bounds.
+A `UnitarySamplingProblem` is a quantum control problem where the goal is to find a control pulse that generates a target unitary operator for a set of quantum systems. 
+The controls are shared among all systems, and the optimization seeks to find the control pulse that achieves the operator for each system. The idea is to enforce a 
+robust solution by including multiple systems reflecting the problem uncertainty.
+
+# Arguments
+- `systems::AbstractVector{<:AbstractQuantumSystem}`: A vector of quantum systems.
+- `operator::Union{EmbeddedOperator, AbstractMatrix{<:Number}}`: The target unitary operator.
+- `T::Int`: The number of time steps.
+- `Δt::Union{Float64, Vector{Float64}}`: The time step size.
+- `system_labels::Vector{String}`: The labels for each system.
+- `system_weights::Vector{Float64}`: The weights for each system.
+- `free_time::Bool`: Whether to optimize the time steps.
+- `init_trajectory::Union{NamedTrajectory, Nothing}`: The initial trajectory.
+- `a_bound::Float64`: The bound for the control amplitudes.
+- `a_bounds::Vector{Float64}`: The bounds for the control amplitudes.
+- `a_guess::Union{Matrix{Float64}, Nothing}`: The initial guess for the control amplitudes.
+- `dda_bound::Float64`: The bound for the control second derivatives.
+- `dda_bounds::Vector{Float64}`: The bounds for the control second derivatives.
+- `Δt_min::Float64`: The minimum time step size.
+- `Δt_max::Float64`: The maximum time step size.
+- `drive_derivative_σ::Float64`: The standard deviation for the drive derivative noise.
+- `Q::Float64`: The fidelity weight.
+- `R::Float64`: The regularization weight.
+- `R_a::Union{Float64, Vector{Float64}}`: The regularization weight for the control amplitudes.
+- `R_da::Union{Float64, Vector{Float64}}`: The regularization weight for the control first derivatives.
+- `R_dda::Union{Float64, Vector{Float64}}`: The regularization weight for the control second derivatives.
+- `leakage_suppression::Bool`: Whether to suppress leakage.
+- `R_leakage::Float64`: The regularization weight for the leakage.
+- `max_iter::Int`: The maximum number of iterations.
+- `linear_solver::String`: The linear solver.
+- `ipopt_options::Options`: The IPOPT options.
+- `constraints::Vector{<:AbstractConstraint}`: The constraints.
+- `timesteps_all_equal::Bool`: Whether to enforce equal time steps.
+- `verbose::Bool`: Whether to print verbose output.
+- `integrator::Symbol`: The integrator to use.
+- `rollout_integrator`: The integrator for the rollout.
+- `bound_unitary::Bool`: Whether to bound the unitary.
+- `control_norm_constraint::Bool`: Whether to enforce a control norm constraint.
+- `control_norm_constraint_components`: The components for the control norm constraint.
+- `control_norm_R`: The regularization weight for the control norm constraint.
+- `geodesic::Bool`: Whether to use the geodesic.
+- `pade_order::Int`: The order of the Pade approximation.
+- `autodiff::Bool`: Whether to use automatic differentiation.
+- `jacobian_structure::Bool`: Whether to evaluate the Jacobian structure.
+- `hessian_approximation::Bool`: Whether to approximate the Hessian.
+- `blas_multithreading::Bool`: Whether to use BLAS multithreading.
+- `kwargs...`: Additional keyword arguments.
 
 """
 function UnitarySamplingProblem(
