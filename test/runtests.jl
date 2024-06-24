@@ -14,10 +14,5 @@ using NamedTrajectories
 
 include("test_utils.jl")
 
-@testset "QuantumCollocation.jl" begin
-    # include("objectives_test.jl")
-    # include("dynamics_test.jl")
-    include("quantum_system_templates_test.jl")
-end
-
+# Run testitem 
 @run_package_tests
