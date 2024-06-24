@@ -48,3 +48,41 @@ See the example script [examples/scripts/single_qubit_gate.jl](examples/scripts/
 
 ![Single Qubit X-Gate](images/T_100_Q_1000_iter_1000_00004_fidelity_0.9999999999994745.png)
 
+## Quickstart developers guide
+
+__Install Julia__ [Juliaup](https://github.com/JuliaLang/juliaup) is an installer and version manager. This is one useful way to manage Julia versions and keep up with the latest changes. After installing, run `julia` to obtain the Julia _REPL_.
+
+__Julia environments__
+[(Documentation)](https://pkgdocs.julialang.org/v1/environments/#Using-someone-else's-project) Your project's environment is stored in _Project.toml_. You can interactively add packages to an environment by using the Julia command line _REPL_ and _package manager_.  Start Julia in the project folder. Type `]` to enter the package manager. Type `activate .` to activate or create an environment specified by _Project.toml_ located in the current folder. Separately, you generate a manifest (solving the versions to create a valid environment) by running `instantiate`; instantiate will check that the environment is correct after you add all the packages you want.
+
+__Adding packages__
+[(Documentation)](https://pkgdocs.julialang.org/v1/managing-packages/#Adding-packages) The initial cell for a Piccolo notebook might look something like the following:
+```Julia
+using QuantumCollocation
+using NamedTrajectories
+using TrajectoryIndexingUtils
+
+using LinearAlgebra
+using CairoMakie
+```
+
+First, let's install a standard library packages. From the package manager and in the current environment (type `julia`, `]`, and `activate .`), you can type `add LinearAlgebra` to install and precompile _LinearAlgebra_. Same with `CairoMakie`. These are like Numpy and Matplotlib.
+
+Second, let's install _Piccolo_. The first three packages (_QuantumCollocation_, _NamedTrajetories_, _TrajectoryIndexingUtils_) are the core of [Piccolo](https://docs.juliahub.com/General/Piccolo/stable/). We could do `add Piccolo` to get the three as a bundle from the Julia repository, which requires only `using Piccolo`.
+
+As a developer, we want to use the git repositories directly from [our Github page](https://github.com/aarontrowbridge). Clone, then add to the Project file with e.g. `dev ../relative/path/to/repo/QuantumCollocation` to obtain a development version of _QuantumCollocation_ pointing to the local Github code instead of the package repository. You can repeat this for the others, also.
+
+__Developing__
+[Revise.jl](https://timholy.github.io/Revise.jl/stable/) will let you edit source code, update packages, and reload the changes in your notebook---automatically! This is a great tool for development. `add Revise` from the REPL and then include it before any packages you intend to edit:
+```Julia
+using Revise
+using QuantumCollocation
+```
+
+### Tips for Visual Studio Code
+__Julia extension__ You can run Julia notebooks and much more with [the Julia extension](https://code.visualstudio.com/docs/languages/julia). Upon opening your project folder in VS code and attempting to run an `.ipynb`, you will see that VS Code finds the interpreters managed by juliaup and defaults to using the environment based on the _Project.toml_ in the project directory.
+
+__Fonts__ VS Code will not display all characters allowed by Julia. You can change the editor font family in the settings to `'JuliaMono'` to get full support. If you don't want to mix and mash, you can create a new VS Code settings profile for working in Julia at _File>Preferences>Profile_.
+
+__Tests__ Tests should automatically populate in VS Code when working with a Piccolo package. For example, just by adding the `QuantumCollocation.jl` folder to your workspace, you should see tests appear if you click on the _Testing_ sidebar icon. If you run one of these tests, a new Julia kernel is spawned for the test. You can find the kernel if you click on the _Julia_ sidebar icon (after installing the Julia extensions). Sometimes, for the tests to recognize new changes, you may need to manually kill this kernel to see your changes reflected.
+
