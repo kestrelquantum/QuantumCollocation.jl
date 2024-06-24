@@ -58,22 +58,24 @@ __Julia environments__
 __Adding packages__
 [(Documentation)](https://pkgdocs.julialang.org/v1/managing-packages/#Adding-packages) The initial cell for a Piccolo notebook might look something like the following:
 ```Julia
+# Standard packages
+using LinearAlgebra
+using CairoMakie
+
+# Piccolo packages
 using QuantumCollocation
 using NamedTrajectories
 using TrajectoryIndexingUtils
-
-using LinearAlgebra
-using CairoMakie
 ```
 
-First, let's install a standard library packages. From the package manager and in the current environment (type `julia`, `]`, and `activate .`), you can type `add LinearAlgebra` to install and precompile _LinearAlgebra_. Same with `CairoMakie`. These are like Numpy and Matplotlib.
+First, let's install some standard packages (these are like Numpy and Matplotlib). Open the package manager in the current environment (type `julia`, `]`, and `activate .`), type `add LinearAlgebra` to install and precompile _LinearAlgebra_. Same with `CairoMakie`. 
 
-Second, let's install _Piccolo_. The first three packages (_QuantumCollocation_, _NamedTrajetories_, _TrajectoryIndexingUtils_) are the core of [Piccolo](https://docs.juliahub.com/General/Piccolo/stable/). We could do `add Piccolo` to get the three as a bundle from the Julia repository, which requires only `using Piccolo`.
+Second, let's install _Piccolo_. There are three packages (_QuantumCollocation_, _NamedTrajetories_, _TrajectoryIndexingUtils_) inside [Piccolo](https://docs.juliahub.com/General/Piccolo/stable/). We could do `add Piccolo` to get the three as a bundle from the Julia repository. Instead of individually calling `using ...` for each, this approach only requires `using Piccolo` at the start of a file or notebook.
 
-As a developer, we want to use the git repositories directly from [our Github page](https://github.com/aarontrowbridge). Clone, then add to the Project file with e.g. `dev ../relative/path/to/repo/QuantumCollocation` to obtain a development version of _QuantumCollocation_ pointing to the local Github code instead of the package repository. You can repeat this for the others, also.
+As a developer, we want to use the git repositories directly from [the Kestrel Quantum Github page](https://github.com/kestrelquantum). Clone, then add the local packages to the Project file with e.g. `dev ../relative/path/to/repo/QuantumCollocation`. This command installs the development version of _QuantumCollocation_ pointing to the local Github code instead of the package repository. You can repeat this for the others, also.
 
 __Developing__
-[Revise.jl](https://timholy.github.io/Revise.jl/stable/) will let you edit source code, update packages, and reload the changes in your notebook---automatically! This is a great tool for development. `add Revise` from the REPL and then include it before any packages you intend to edit:
+[Revise.jl](https://timholy.github.io/Revise.jl/stable/) will let you edit source code, update packages, and reload the changes in a notebook---automatically! This is a great tool for development. `add Revise` from the REPL and then include it before any packages you intend to edit:
 ```Julia
 using Revise
 using QuantumCollocation
