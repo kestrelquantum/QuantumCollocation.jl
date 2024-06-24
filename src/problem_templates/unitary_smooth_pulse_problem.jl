@@ -130,7 +130,7 @@ function UnitarySmoothPulseProblem(
         traj = init_trajectory
     else
         n_drives = length(system.G_drives)
-        traj = initialize_trajectory(
+        traj = initialize_unitary_trajectory(
             operator,
             T,
             Δt,

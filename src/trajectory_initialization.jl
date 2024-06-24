@@ -3,7 +3,7 @@ module TrajectoryInitialization
 export unitary_linear_interpolation
 export unitary_geodesic
 export linear_interpolation
-export initialize_trajectory
+export initialize_unitary_trajectory
 
 using NamedTrajectories
 using LinearAlgebra
@@ -176,7 +176,7 @@ function initialize_controls(a::AbstractMatrix, Δt::AbstractVecOrMat)
     return a, da, dda
 end
 
-function initialize_trajectory(
+function initialize_unitary_trajectory(
     U_goal::Union{EmbeddedOperator, AbstractMatrix{<:Number}},
     T::Int,
     Δt::Real,
