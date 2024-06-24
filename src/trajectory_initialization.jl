@@ -275,4 +275,82 @@ function initialize_unitary_trajectory(
     )
 end
 
+function initialize_state_trajectory(
+    ψ̃_goals::AbstractVector{<:AbstractVector{<:Real}},
+    ψ̃_inits::AbstractVector{<:AbstractVector{<:Real}},
+    T::Int,
+    Δt::Real,
+    n_drives::Int,
+    a_bounds::VectorBound,
+    dda_bounds::VectorBound;
+    free_time=false,
+    Δt_bounds::ScalarBound=(0.5 * Δt, 1.5 * Δt),
+    drive_derivative_σ::Float64=0.1,
+    a_guess::Union{AbstractMatrix{<:Float64}, Nothing}=nothing,
+    system::Union{AbstractQuantumSystem, AbstractVector{<:AbstractQuantumSystem}, Nothing}=nothing,
+    rollout_integrator::Function=exp,    
+    ψ̃_keys::AbstractVector{<:Symbol}=[Symbol("ψ̃$i") for i = 1:length(ψ̃_goals)]
+)
+    @assert length(ψ̃_inits) == length(ψ̃_goals) "ψ̃_inits and ψ̃_goals must have the same length"
+    @assert length(ψ̃_keys) == length(ψ̃_goals) "ψ̃_keys and ψ̃_goals must have the same length"
+
+    if free_time
+        if Δt isa Float64
+            Δt = fill(Δt, 1, T)
+        end
+    end
+
+    # Constraints
+    state_initial = (; (ψ̃_keys .=> ψ̃_inits)...)
+    control_initial = (a = zeros(n_drives),)
+    initial = merge(state_initial, control_initial)
+
+    final = (a = zeros(n_drives),)
+
+    goal = (; (ψ̃_keys .=> ψ̃_goals)...)
+
+    # Bounds
+    bounds = (a = a_bounds, dda = dda_bounds,)
+
+    # Initial state and control values
+    if isnothing(a_guess)
+        ψ̃s = NamedTuple([
+            k => linear_interpolation(ψ̃_init, ψ̃_goal, T)
+                for (k, ψ̃_init, ψ̃_goal) in zip(ψ̃_keys, ψ̃_inits, ψ̃_goals)
+        ])
+        a, da, dda = initialize_controls(n_drives, T, a_bounds, drive_derivative_σ)
+    else
+        ψ̃s = NamedTuple([
+            k => rollout(ψ̃_init, a_guess, Δt, system, integrator=rollout_integrator)
+                for (i, ψ̃_init) in zip(ψ̃_keys, ψ̃_inits)
+        ])
+        a, da, dda = initialize_controls(a_guess, Δt)
+    end
+
+    # Trajectory
+    keys = [ψ̃_keys..., :a, :da, :dda]
+    values = [ψ̃s..., a, da, dda]
+
+    if free_time
+        push!(keys, :Δt)
+        push!(values, Δt)
+        controls = (:dda, :Δt)
+        timestep = :Δt
+        bounds = merge(bounds, (Δt = Δt_bounds,))
+    else
+        controls = (:dda,)
+        timestep = Δt
+    end
+
+    return NamedTrajectory(
+        (; (keys .=> values)...);
+        controls=controls,
+        timestep=timestep,
+        bounds=bounds,
+        initial=initial,
+        final=final,
+        goal=goal
+    )
+end
+
 end
