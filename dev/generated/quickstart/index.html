@@ -32,14 +32,7 @@ prob = UnitarySmoothPulseProblem(
 )
 
 # solve the problem
-solve!(prob; max_iter=30)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">applying constraint: initial value of Ũ⃗
-applying constraint: initial value of a
-applying constraint: final value of a
-applying constraint: bounds on a
-applying constraint: bounds on dda
-applying constraint: bounds on Δt
-applying constraint: time step all equal constraint
-This is Ipopt version 3.14.14, running with linear solver MUMPS 5.6.2.
+solve!(prob; max_iter=30)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">This is Ipopt version 3.14.14, running with linear solver MUMPS 5.6.2.
 
 Number of nonzeros in equality constraint Jacobian...:    10442
 Number of nonzeros in inequality constraint Jacobian.:        0
@@ -56,62 +49,62 @@ Total number of inequality constraints...............:        0
         inequality constraints with only upper bounds:        0
 
 iter    objective    inf_pr   inf_du lg(mu)  ||d||  lg(rg) alpha_du alpha_pr  ls
-   0  3.4329397e-03 1.90e+00 2.93e-05  -1.0 0.00e+00    -  0.00e+00 0.00e+00   0
-   1  7.4680075e+00 4.06e-01 7.81e+01  -1.0 3.14e+00    -  1.24e-02 1.00e+00f  1
-   2  3.9654699e+00 6.01e-02 2.33e+01  -1.0 1.99e+00   0.0 6.16e-01 1.00e+00f  1
-   3  2.7159896e+01 3.33e-02 1.02e+02  -1.0 1.00e+00   0.4 7.75e-01 1.00e+00h  1
-   4  2.5723175e+01 8.08e-03 9.67e+01  -1.0 6.10e-01   0.9 1.00e+00 1.00e+00f  1
-   5  1.8192162e+01 1.51e-02 9.91e+01  -1.0 6.05e-01   0.4 1.00e+00 1.00e+00f  1
-   6  6.0447905e+00 1.06e-03 9.86e+01  -1.0 2.66e-01   0.8 1.00e+00 1.00e+00f  1
-   7  3.9200024e+00 9.16e-05 3.91e+00  -1.0 4.75e-02   1.2 1.00e+00 1.00e+00f  1
-   8  1.7253847e+00 1.86e-04 4.24e-01  -1.0 7.55e-02   0.7 1.00e+00 1.00e+00f  1
-   9  1.4512191e-02 2.37e-04 2.14e-01  -1.7 9.84e-02   0.3 1.00e+00 1.00e+00f  1
+   0  3.5301216e-03 1.85e+00 3.11e-05  -1.0 0.00e+00    -  0.00e+00 0.00e+00   0
+   1  6.4980712e+00 2.56e-01 8.06e+01  -1.0 2.59e+00    -  1.21e-02 1.00e+00f  1
+   2  6.1883715e+01 2.41e-01 7.52e+01  -1.0 2.42e+01    -  2.49e-01 6.98e-02h  3
+   3  1.4927672e+02 1.22e-01 9.71e+01  -1.0 3.26e+00   0.0 3.97e-01 6.79e-01h  1
+   4  5.4375180e+01 1.63e-01 1.52e+02  -1.0 4.13e+00    -  4.75e-01 1.00e+00f  1
+   5  3.4151114e+01 6.63e-02 1.63e+02  -1.0 1.57e+00   0.4 4.25e-01 6.52e-01f  1
+   6  3.7603809e+01 3.84e-02 9.24e+01  -1.0 1.64e+00  -0.1 3.92e-01 8.88e-01f  1
+   7  1.8522302e+01 3.61e-02 8.51e+01  -1.0 3.63e+00  -0.5 1.99e-01 7.94e-02f  1
+   8  1.3629621e+01 3.66e-02 8.48e+01  -1.0 7.08e+01  -1.0 1.21e-02 3.97e-03f  1
+   9  2.1978739e+01 3.49e-02 7.95e+01  -1.0 3.68e+00  -0.6 2.85e-01 1.46e-01h  1
 iter    objective    inf_pr   inf_du lg(mu)  ||d||  lg(rg) alpha_du alpha_pr  ls
-  10  2.8467104e-01 1.64e-04 1.00e+02  -1.7 7.67e-02  -0.2 1.00e+00 1.00e+00h  1
-  11  9.7118518e-02 2.92e-04 1.00e+02  -1.7 7.18e-02  -0.7 1.00e+00 1.00e+00f  1
-  12  3.7719271e-02 2.51e-05 1.00e+02  -1.7 2.75e-02   0.6 1.00e+00 1.00e+00h  1
-  13  3.1387992e-02 6.59e-06 1.00e+02  -1.7 1.23e-02   0.2 1.00e+00 1.00e+00f  1
-  14  1.5367303e-02 5.07e-05 1.00e+02  -1.7 3.83e-02   0.6 1.00e+00 1.00e+00f  1
-  15  1.6773709e-02 4.46e-05 1.25e+01  -1.7 2.66e-02   0.1 1.00e+00 1.25e-01f  4
-  16  2.5367071e-03 2.48e-06 1.00e+02  -1.7 3.39e-02  -0.4 1.00e+00 1.00e+00F  1
-  17  3.8117364e-03 1.99e-04 1.00e+02  -1.7 7.08e-02  -0.8 1.00e+00 1.00e+00f  1
-  18  5.8671822e-03 1.03e-07 8.07e-02  -1.7 1.54e-03   1.4 1.00e+00 1.00e+00h  1
-  19  4.4693644e-03 7.57e-08 1.23e-02  -2.5 1.48e-03   0.9 1.00e+00 1.00e+00h  1
+  10  1.6907564e+01 1.22e-02 5.56e+01  -1.0 9.97e-01  -0.2 4.34e-01 7.56e-01f  1
+  11  8.8090860e+00 8.99e-03 4.28e+01  -1.0 4.57e+00  -0.6 1.71e-01 2.59e-01f  1
+  12  7.7468636e+00 8.96e-03 4.13e+01  -1.0 3.26e+01    -  3.48e-02 3.64e-02f  1
+  13  4.9934253e+00 6.95e-03 9.79e+01  -1.0 2.04e+00    -  6.99e-01 5.50e-01f  1
+  14  2.0800580e+00 5.84e-03 2.24e+01  -1.0 1.68e+00    -  2.12e-01 2.07e-01f  2
+  15  4.5828096e+00 1.51e-02 1.00e+02  -1.0 7.32e-01  -1.1 1.00e+00 1.00e+00f  1
+  16  1.5837548e+01 7.52e-03 9.97e+01  -1.0 4.04e-01   0.2 1.00e+00 1.00e+00h  1
+  17  8.0589918e-01 8.38e-04 9.93e+01  -1.0 1.67e-01   0.6 1.00e+00 1.00e+00f  1
+  18  2.0886081e+00 2.76e-04 1.00e+02  -1.0 8.86e-02   0.2 1.00e+00 1.00e+00f  1
+  19  4.3825802e-01 2.90e-04 3.59e+01  -1.0 2.62e-01   0.6 1.00e+00 1.00e+00F  1
 iter    objective    inf_pr   inf_du lg(mu)  ||d||  lg(rg) alpha_du alpha_pr  ls
-  20  2.5232776e-03 2.29e-07 6.87e-03  -3.8 2.48e-03   0.4 1.00e+00 1.00e+00h  1
-  21  2.5267549e-03 1.29e-07 1.00e+02  -3.8 2.04e-03  -0.0 1.00e+00 1.00e+00h  1
-  22  2.4966753e-03 3.36e-08 1.00e+02  -3.8 9.78e-04  -0.5 1.00e+00 1.00e+00h  1
-  23  2.3047003e-03 3.60e-08 6.57e-02  -3.8 1.00e-03   0.8 1.00e+00 1.00e+00h  1
-  24  2.2871193e-03 1.14e-08 1.28e-03  -3.8 5.85e-04   0.3 1.00e+00 1.00e+00h  1
-  25  2.2823786e-03 1.19e-08 1.00e+02  -4.0 5.34e-04  -0.1 1.00e+00 1.00e+00h  1
-  26  2.2793632e-03 4.55e-09 1.00e+02  -4.0 4.33e-04  -0.6 1.00e+00 1.00e+00h  1
-  27  2.2688240e-03 1.42e-09 4.95e-03  -4.0 2.26e-04   0.7 1.00e+00 1.00e+00h  1
-  28  2.2680846e-03 1.01e-09 2.07e-04  -4.0 1.20e-04   0.2 1.00e+00 1.00e+00h  1
-  29  2.2675542e-03 1.58e-09 1.00e+02  -4.0 1.76e-04  -0.2 1.00e+00 1.00e+00h  1
+  20  2.2100439e-01 2.32e-04 1.00e+02  -1.0 9.47e-02   0.1 1.00e+00 1.00e+00f  1
+  21  3.6649649e-01 9.29e-03 1.00e+02  -1.0 5.30e-01    -  1.00e+00 1.00e+00f  1
+  22  2.1997898e+00 9.81e-03 3.22e+01  -1.0 5.13e+00   0.5 1.35e-01 3.11e-02h  4
+  23  1.7620330e+00 7.79e-04 9.96e+01  -1.0 1.42e-01   1.0 1.00e+00 1.00e+00f  1
+  24  8.5458661e+00 7.14e-04 3.62e+01  -1.0 5.46e-01   0.5 1.00e+00 1.00e+00H  1
+  25  8.7327837e-01 4.65e-04 8.71e+00  -1.0 2.91e-01   0.0 1.00e+00 1.00e+00F  1
+  26  8.8619647e-01 1.25e-02 1.00e+02  -1.0 4.83e-01    -  1.00e+00 1.00e+00f  1
+  27  3.5763409e-01 1.24e-02 2.36e+00  -1.0 3.08e+00    -  5.85e-01 1.93e-02f  5
+  28  3.4024785e-01 2.67e-03 1.00e+02  -1.0 1.97e-01    -  1.00e+00 1.00e+00h  1
+  29  3.8482379e-02 2.81e-03 1.25e+01  -1.0 7.11e-01    -  1.00e+00 1.25e-01f  4
 iter    objective    inf_pr   inf_du lg(mu)  ||d||  lg(rg) alpha_du alpha_pr  ls
-  30  2.2661730e-03 6.13e-09 1.00e+02  -4.0 5.19e-04  -0.7 1.00e+00 1.00e+00h  1
+  30  6.4743642e-02 2.15e-04 1.00e+02  -1.0 4.61e-02  -0.5 1.00e+00 1.00e+00h  1
 
 Number of Iterations....: 30
 
                                    (scaled)                 (unscaled)
-Objective...............:   2.2661730013978218e-03    2.2661730013978218e-03
-Dual infeasibility......:   9.9999999699994717e+01    9.9999999699994717e+01
-Constraint violation....:   6.1339597845488925e-09    6.1339597845488925e-09
+Objective...............:   6.4743642115510813e-02    6.4743642115510813e-02
+Dual infeasibility......:   9.9999623305890935e+01    9.9999623305890935e+01
+Constraint violation....:   2.1472837432984226e-04    2.1472837432984226e-04
 Variable bound violation:   0.0000000000000000e+00    0.0000000000000000e+00
-Complementarity.........:   9.9999999999999585e-05    9.9999999999999585e-05
-Overall NLP error.......:   9.9999999699994717e+01    9.9999999699994717e+01
+Complementarity.........:   1.0001628177348884e-01    1.0001628177348884e-01
+Overall NLP error.......:   9.9999623305890935e+01    9.9999623305890935e+01
 
 
-Number of objective function evaluations             = 35
+Number of objective function evaluations             = 59
 Number of objective gradient evaluations             = 31
-Number of equality constraint evaluations            = 35
+Number of equality constraint evaluations            = 59
 Number of inequality constraint evaluations          = 0
 Number of equality constraint Jacobian evaluations   = 31
 Number of inequality constraint Jacobian evaluations = 0
 Number of Lagrangian Hessian evaluations             = 30
-Total seconds in IPOPT                               = 2.400
+Total seconds in IPOPT                               = 2.822
 
-EXIT: Maximum Number of Iterations Exceeded.</code></pre><p>The above output comes from the Ipopt.jl solver. To see the final fidelity we can use the <code>unitary_fidelity</code> function exported by QuantumCollocation.jl.</p><pre><code class="language-julia hljs">println(&quot;Final fidelity: &quot;, unitary_fidelity(prob))</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Final fidelity: 0.9999999856466126</code></pre><p>We can also easily plot the solutions using the <code>plot</code> function exported by NamedTrajectories.jl.</p><pre><code class="language-julia hljs">plot(prob.trajectory, [:Ũ⃗, :a])</code></pre><img src="fae4f21c.png" alt="Example block output"/><h2 id="Minimum-Time-Problems"><a class="docs-heading-anchor" href="#Minimum-Time-Problems">Minimum Time Problems</a><a id="Minimum-Time-Problems-1"></a><a class="docs-heading-anchor-permalink" href="#Minimum-Time-Problems" title="Permalink"></a></h2><p>We can also easily set up and solve a minimum time problem, where we enforce a constraint on the final fidelity:</p><p class="math-container">\[\mathcal{F}(U_T, U_{\text{goal}}) \geq \mathcal{F}_{\text{min}}\]</p><p>Using the problem we just solved we can do the following:</p><pre><code class="language-julia hljs"># final fidelity constraint
+EXIT: Maximum Number of Iterations Exceeded.</code></pre><p>The above output comes from the Ipopt.jl solver. To see the final fidelity we can use the <code>unitary_fidelity</code> function exported by QuantumCollocation.jl.</p><pre><code class="language-julia hljs">println(&quot;Final fidelity: &quot;, unitary_fidelity(prob))</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Final fidelity: 0.9999299766623114</code></pre><p>We can also easily plot the solutions using the <code>plot</code> function exported by NamedTrajectories.jl.</p><pre><code class="language-julia hljs">plot(prob.trajectory, [:Ũ⃗, :a])</code></pre><img src="7b3fd692.png" alt="Example block output"/><h2 id="Minimum-Time-Problems"><a class="docs-heading-anchor" href="#Minimum-Time-Problems">Minimum Time Problems</a><a id="Minimum-Time-Problems-1"></a><a class="docs-heading-anchor-permalink" href="#Minimum-Time-Problems" title="Permalink"></a></h2><p>We can also easily set up and solve a minimum time problem, where we enforce a constraint on the final fidelity:</p><p class="math-container">\[\mathcal{F}(U_T, U_{\text{goal}}) \geq \mathcal{F}_{\text{min}}\]</p><p>Using the problem we just solved we can do the following:</p><pre><code class="language-julia hljs"># final fidelity constraint
 final_fidelity = 0.99
 
 # weight on the minimum time objective
@@ -123,14 +116,7 @@ prob_min_time = UnitaryMinimumTimeProblem(
     D=D
 )
 
-solve!(prob_min_time; max_iter=30)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">applying constraint: initial value of Ũ⃗
-applying constraint: initial value of a
-applying constraint: final value of a
-applying constraint: bounds on a
-applying constraint: bounds on dda
-applying constraint: bounds on Δt
-applying constraint: time step all equal constraint
-This is Ipopt version 3.14.14, running with linear solver MUMPS 5.6.2.
+solve!(prob_min_time; max_iter=30)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">This is Ipopt version 3.14.14, running with linear solver MUMPS 5.6.2.
 
 Number of nonzeros in equality constraint Jacobian...:    10442
 Number of nonzeros in inequality constraint Jacobian.:        4
@@ -147,66 +133,66 @@ Total number of inequality constraints...............:        1
         inequality constraints with only upper bounds:        0
 
 iter    objective    inf_pr   inf_du lg(mu)  ||d||  lg(rg) alpha_du alpha_pr  ls
-   0  1.1455421e+02 6.13e-09 4.24e-01  -1.0 0.00e+00    -  0.00e+00 0.00e+00   0
-   1  9.0501009e+01 6.70e-03 1.27e+00  -1.0 2.75e-01   0.0 8.59e-01 1.00e+00f  1
-   2  7.5240263e+01 9.56e-03 1.00e+02  -1.0 3.69e-01  -0.5 5.04e-01 1.00e+00f  1
-   3  7.3856497e+01 4.94e-03 4.89e+01  -1.0 2.21e-01  -0.1 1.00e+00 4.89e-01f  1
-   4  7.0906519e+01 3.28e-03 1.00e+02  -1.0 4.10e-01  -0.5 1.21e-01 1.00e+00H  1
-   5  6.9424569e+01 4.28e-03 9.19e+01  -1.0 1.93e+00    -  3.38e-01 8.09e-02f  2
-   6  6.9147226e+01 2.55e-03 4.41e+01  -1.0 2.64e-01  -1.0 1.00e+00 3.92e-01f  1
-   7  6.6707492e+01 3.37e-03 1.00e+02  -1.0 4.11e-01  -0.6 6.03e-02 1.00e+00f  1
-   8  6.5579765e+01 3.36e-03 1.04e+02  -1.0 5.03e+00  -1.1 3.03e-01 4.64e-03f  2
-   9  6.5837840e+01 3.33e-03 1.00e+02  -1.0 3.56e+00    -  2.92e-02 7.24e-03h  5
+   0  1.0224646e+02 2.15e-04 3.93e-01  -1.0 0.00e+00    -  0.00e+00 0.00e+00   0
+   1  1.0181120e+02 1.19e-06 9.99e+01  -1.0 5.36e-03   2.0 1.00e+00 1.00e+00f  1
+   2  1.0105727e+02 7.63e-06 1.11e+00  -1.0 1.13e-02   1.5 1.00e+00 1.00e+00f  1
+   3  9.9088761e+01 5.32e-05 2.92e-01  -1.0 2.61e-02   1.0 1.00e+00 1.00e+00f  1
+   4  9.4136976e+01 3.93e-04 2.47e-01  -1.7 6.88e-02   0.6 1.00e+00 1.00e+00f  1
+   5  8.1897232e+01 4.56e-03 1.25e+00  -1.7 2.93e-01   0.1 1.00e+00 8.20e-01f  1
+   6  7.5139797e+01 7.45e-04 1.89e+00  -1.7 1.13e-01   0.5 1.00e+00 1.00e+00f  1
+   7  6.6740006e+01 1.24e-03 6.55e+00  -1.7 1.49e-01   0.0 8.40e-01 1.00e+00f  1
+   8  5.5331465e+01 3.41e-03 1.00e+02  -1.7 3.12e-01  -0.4 1.00e+00 1.00e+00f  1
+   9  5.5361637e+01 2.82e-03 1.93e+01  -1.7 9.22e-01  -0.9 8.42e-01 1.81e-01h  1
 iter    objective    inf_pr   inf_du lg(mu)  ||d||  lg(rg) alpha_du alpha_pr  ls
-  10  6.5607069e+01 3.33e-03 1.01e+02  -1.0 5.25e+01  -1.5 1.89e-02 1.67e-04f  3
-  11  6.7951525e+01 3.19e-03 9.95e+01  -1.0 1.54e+00  -1.1 1.76e-02 3.91e-02h  4
-  12  6.6362162e+01 3.20e-03 9.82e+01  -1.0 2.51e+00  -0.7 7.93e-01 3.11e-02f  1
-  13  6.6126228e+01 3.08e-03 9.49e+01  -1.0 1.92e+00    -  3.58e-02 2.71e-02f  5
-  14  6.5854423e+01 3.08e-03 9.66e+01  -1.0 9.00e+00  -1.2 4.33e-01 3.75e-03f  6
-  15  6.5207426e+01 3.07e-03 1.24e+02  -1.0 1.28e+01    -  1.06e-01 2.75e-03f  2
-  16  6.4971693e+01 2.78e-03 1.03e+02  -1.0 5.70e+00    -  2.48e-01 4.57e-02f  3
-  17  6.9076005e+01 2.55e-03 9.82e+01  -1.0 6.54e-01    -  1.29e-01 5.00e-01h  2
-  18  6.6422431e+01 2.53e-03 9.51e+01  -1.0 3.51e+00    -  3.67e-01 3.19e-02f  2
-  19  6.6167182e+01 2.55e-03 9.59e+01  -1.0 7.31e+00    -  2.27e-01 2.48e-02f  1
+  10  5.4717610e+01 1.38e-04 6.94e+01  -1.7 1.44e-01  -0.5 3.05e-01 1.00e+00h  1
+  11  5.4148526e+01 3.15e-04 1.24e+01  -1.7 2.68e-01  -1.0 1.00e+00 1.00e+00F  1
+  12  5.3895315e+01 1.72e-03 9.60e+00  -1.7 3.06e+00    -  4.03e-01 2.24e-01f  1
+  13  5.4532135e+01 8.68e-04 1.00e+02  -1.7 3.02e-01    -  6.89e-01 1.00e+00h  1
+  14  5.4021005e+01 5.70e-03 8.52e+01  -1.7 3.67e+00    -  2.00e-01 1.48e-01f  2
+  15  5.3297414e+01 4.11e-03 3.87e+01  -1.7 2.44e-01  -0.5 9.18e-01 2.81e-01f  2
+  16  5.3158623e+01 2.83e-03 2.51e+01  -1.7 4.99e-01  -1.0 4.19e-01 3.53e-01F  1
+  17  5.2713288e+01 2.00e-04 8.79e+01  -1.7 3.57e-01    -  3.91e-02 1.00e+00f  1
+  18  5.2181008e+01 9.83e-03 1.00e+02  -1.7 3.63e+00    -  1.71e-01 1.20e-01f  2
+  19  5.2990370e+01 9.73e-03 8.64e+01  -1.7 5.86e+00    -  2.41e-01 1.09e-02h  1
 iter    objective    inf_pr   inf_du lg(mu)  ||d||  lg(rg) alpha_du alpha_pr  ls
-  20  6.6361533e+01 2.01e-03 7.60e+01  -1.0 9.07e-01  -1.6 2.11e-01 1.84e-01f  3
-  21  6.8756053e+01 2.06e-03 9.46e+01  -1.0 1.43e+00  -1.2 1.00e+00 8.17e-02h  4
-  22  6.6325040e+01 1.90e-03 1.23e+02  -1.0 1.24e+00  -1.7 7.27e-01 1.11e-01f  2
-  23  6.6137766e+01 2.36e-03 1.41e+02  -1.0 9.63e-01  -1.3 1.00e+00 2.63e-01f  2
-  24  6.7040498e+01 1.50e-03 1.00e+02  -1.0 2.01e-01  -0.8 7.53e-01 1.00e+00h  1
-  25  6.6553123e+01 3.39e-03 4.19e+01  -1.0 1.67e+00  -1.3 4.67e-01 1.61e-01f  2
-  26  6.6432453e+01 4.93e-03 8.79e+01  -1.0 8.71e-01  -0.9 2.40e-01 2.50e-01f  3
-  27  6.6232794e+01 3.67e-03 3.71e+01  -1.0 2.69e-01  -0.5 1.00e+00 2.85e-01h  1
-  28  6.6213994e+01 1.54e-02 3.54e+01  -1.0 1.24e+01  -0.9 4.64e-02 4.73e-02f  2
-  29  6.5716927e+01 1.52e-02 6.49e+01  -1.0 1.72e+00  -0.5 5.63e-01 8.72e-03f  7
+  20  5.2807963e+01 1.44e-03 8.93e+01  -1.7 2.26e-01    -  1.05e-01 1.00e+00h  1
+  21  5.2715483e+01 1.56e-03 1.00e+02  -1.7 1.98e+00    -  6.63e-02 5.75e-02f  4
+  22  5.3113371e+01 1.60e-03 6.77e+01  -1.7 8.66e-01    -  1.00e+00 2.07e-01H  1
+  23  5.3396392e+01 6.11e-04 1.00e+02  -1.7 1.96e-01  -0.6 1.84e-02 1.00e+00h  1
+  24  5.2907612e+01 5.73e-04 4.64e+01  -1.7 3.90e-01    -  1.00e+00 2.97e-01f  1
+  25  5.2256088e+01 5.12e-04 7.77e+01  -1.7 3.46e-01  -1.1 8.54e-03 2.50e-01f  3
+  26  5.2908778e+01 5.12e-04 5.67e+01  -1.7 8.49e-01  -0.6 9.10e-01 5.20e-02h  1
+  27  5.2945687e+01 4.60e-04 1.00e+02  -1.7 1.36e-01  -0.2 2.20e-02 1.00e+00f  1
+  28  5.2978645e+01 3.54e-04 4.99e+01  -1.7 5.33e-01    -  1.00e+00 2.62e-01f  1
+  29  5.2490056e+01 2.77e-04 8.69e+01  -1.7 1.87e-01  -0.7 1.63e-02 5.00e-01f  2
 iter    objective    inf_pr   inf_du lg(mu)  ||d||  lg(rg) alpha_du alpha_pr  ls
-  30  6.5999610e+01 1.47e-02 5.69e+01  -1.0 4.35e-01  -0.1 9.13e-01 3.45e-02h  1
+  30  5.2215224e+01 2.98e-04 5.49e+01  -1.7 6.54e-01    -  1.00e+00 5.97e-02f  2
 
 Number of Iterations....: 30
 
                                    (scaled)                 (unscaled)
-Objective...............:   6.5999610153731822e+01    6.5999610153731822e+01
-Dual infeasibility......:   5.6863139913696251e+01    5.6863139913696251e+01
-Constraint violation....:   1.4728262275668647e-02    1.4728262275668647e-02
+Objective...............:   5.2215223533712901e+01    5.2215223533712901e+01
+Dual infeasibility......:   5.4905957930193580e+01    5.4905957930193580e+01
+Constraint violation....:   2.9787285724619528e-04    2.9787285724619528e-04
 Variable bound violation:   0.0000000000000000e+00    0.0000000000000000e+00
-Complementarity.........:   1.4158053802484974e-01    1.4158053802484974e-01
-Overall NLP error.......:   5.6863139913696251e+01    5.6863139913696251e+01
+Complementarity.........:   3.7889195490651860e-02    3.7889195490651860e-02
+Overall NLP error.......:   5.4905957930193580e+01    5.4905957930193580e+01
 
 
-Number of objective function evaluations             = 110
+Number of objective function evaluations             = 56
 Number of objective gradient evaluations             = 31
-Number of equality constraint evaluations            = 110
-Number of inequality constraint evaluations          = 110
+Number of equality constraint evaluations            = 56
+Number of inequality constraint evaluations          = 56
 Number of equality constraint Jacobian evaluations   = 31
 Number of inequality constraint Jacobian evaluations = 31
 Number of Lagrangian Hessian evaluations             = 30
-Total seconds in IPOPT                               = 5.834
+Total seconds in IPOPT                               = 5.568
 
-EXIT: Maximum Number of Iterations Exceeded.</code></pre><p>We can see that the final fidelity is indeed greater than the minimum fidelity we set.</p><pre><code class="language-julia hljs">println(&quot;Final fidelity:    &quot;, unitary_fidelity(prob_min_time))</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Final fidelity:    0.8701471114054447</code></pre><p>and that the duration of the pulse has decreased.</p><pre><code class="language-julia hljs">initial_dur = get_times(prob.trajectory)[end]
+EXIT: Maximum Number of Iterations Exceeded.</code></pre><p>We can see that the final fidelity is indeed greater than the minimum fidelity we set.</p><pre><code class="language-julia hljs">println(&quot;Final fidelity:    &quot;, unitary_fidelity(prob_min_time))</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Final fidelity:    0.9822357447898766</code></pre><p>and that the duration of the pulse has decreased.</p><pre><code class="language-julia hljs">initial_dur = get_times(prob.trajectory)[end]
 min_time_dur = get_times(prob_min_time.trajectory)[end]
 
 println(&quot;Initial duration:  &quot;, initial_dur)
 println(&quot;Minimum duration:  &quot;, min_time_dur)
-println(&quot;Duration decrease: &quot;, initial_dur - min_time_dur)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Initial duration:  11.340642303998557
-Minimum duration:  6.436133149104498
-Duration decrease: 4.9045091548940585</code></pre><p>We can also plot the solutions for the minimum time problem.</p><pre><code class="language-julia hljs">plot(prob_min_time.trajectory, [:Ũ⃗, :a])</code></pre><img src="94b67892.png" alt="Example block output"/><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../../">« Home</a><a class="docs-footer-nextpage" href="../../contribution_guide/">Contribution Guide »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="auto">Automatic (OS)</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.2.1 on <span class="colophon-date" title="Thursday 13 June 2024 00:06">Thursday 13 June 2024</span>. Using Julia version 1.10.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+println(&quot;Duration decrease: &quot;, initial_dur - min_time_dur)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Initial duration:  10.115989919184207
+Minimum duration:  5.145581284164938
+Duration decrease: 4.970408635019269</code></pre><p>We can also plot the solutions for the minimum time problem.</p><pre><code class="language-julia hljs">plot(prob_min_time.trajectory, [:Ũ⃗, :a])</code></pre><img src="f9ac4981.png" alt="Example block output"/><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../../">« Home</a><a class="docs-footer-nextpage" href="../../contribution_guide/">Contribution Guide »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="auto">Automatic (OS)</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.2.1 on <span class="colophon-date" title="Monday 24 June 2024 20:44">Monday 24 June 2024</span>. Using Julia version 1.10.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
