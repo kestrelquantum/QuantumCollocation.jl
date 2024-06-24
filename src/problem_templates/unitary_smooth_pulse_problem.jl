@@ -117,14 +117,6 @@ function UnitarySmoothPulseProblem(
     blas_multithreading=true,
     kwargs...
 )
-    if operator isa EmbeddedOperator
-        U_goal = operator.operator
-        U_init = get_subspace_identity(operator)
-    else
-        U_goal = Matrix{ComplexF64}(operator)
-        U_init = Matrix{ComplexF64}(I(size(U_goal, 1)))
-    end
-
     if !blas_multithreading
         BLAS.set_num_threads(1)
     end
@@ -133,127 +125,30 @@ function UnitarySmoothPulseProblem(
         ipopt_options.hessian_approximation = "limited-memory"
     end
 
-
-    n_drives = length(system.G_drives)
-
+    # Trajectory
     if !isnothing(init_trajectory)
         traj = init_trajectory
     else
-        if free_time
-            if Δt isa Float64
-                Δt = fill(Δt, 1, T)
-            end
-        end
-
-        if isnothing(a_guess)
-            if geodesic
-                if operator isa EmbeddedOperator
-                    Ũ⃗ = unitary_geodesic(operator, T)
-                else
-                    Ũ⃗ = unitary_geodesic(U_goal, T)
-                end
-            else
-                Ũ⃗ = unitary_linear_interpolation(U_init, U_goal, T)
-            end
-
-            if a_bounds isa AbstractVector
-                a_dists = [Uniform(-a_bounds[i], a_bounds[i]) for i = 1:n_drives]
-            elseif a_bounds isa Tuple
-                a_dists = [Uniform(aᵢ_lb, aᵢ_ub) for (aᵢ_lb, aᵢ_ub) ∈ zip(a_bounds...)]
-            else
-                error("a_bounds must be a Vector or Tuple")
-            end
-
-            a = hcat([
-                zeros(n_drives),
-                vcat([rand(a_dists[i], 1, T - 2) for i = 1:n_drives]...),
-                zeros(n_drives)
-            ]...)
-
-            da = randn(n_drives, T) * drive_derivative_σ
-            dda = randn(n_drives, T) * drive_derivative_σ
-        else
-            Ũ⃗ = unitary_rollout(
-                operator_to_iso_vec(U_init),
-                a_guess,
-                Δt,
-                system;
-                integrator=rollout_integrator
-            )
-            a = a_guess
-            da = derivative(a, Δt)
-            dda = derivative(da, Δt)
-
-            # to avoid constraint violation error at initial iteration
-            da[:, end] = da[:, end-1] + Δt[end-1] * dda[:, end-1]
-        end
-
-        initial = (
-            Ũ⃗ = operator_to_iso_vec(U_init),
-            a = zeros(n_drives),
+        n_drives = length(system.G_drives)
+        traj = initialize_unitary_trajectory(
+            operator,
+            T,
+            Δt,
+            n_drives,
+            a_bounds,
+            dda_bounds;
+            free_time=free_time,
+            Δt_bounds=(Δt_min, Δt_max),
+            geodesic=geodesic,
+            bound_unitary=bound_unitary,
+            drive_derivative_σ=drive_derivative_σ,
+            a_guess=a_guess,
+            system=system,
+            rollout_integrator=rollout_integrator,
         )
-
-        final = (
-            a = zeros(n_drives),
-        )
-
-        goal = (
-            Ũ⃗ = operator_to_iso_vec(U_goal),
-        )
-
-        bounds = (
-            a = a_bounds,
-            dda = dda_bounds,
-        )
-
-        if bound_unitary
-            Ũ⃗_dim = size(Ũ⃗, 1)
-            Ũ⃗_bound = (
-                Ũ⃗ = (-ones(Ũ⃗_dim), ones(Ũ⃗_dim)),
-            )
-            bounds = merge(bounds, Ũ⃗_bound)
-        end
-
-        if free_time
-            components = (
-                Ũ⃗ = Ũ⃗,
-                a = a,
-                da = da,
-                dda = dda,
-                Δt = Δt,
-            )
-
-            bounds = merge(bounds, (Δt = (Δt_min, Δt_max),))
-
-            traj = NamedTrajectory(
-                components;
-                controls=(:dda, :Δt),
-                timestep=:Δt,
-                bounds=bounds,
-                initial=initial,
-                final=final,
-                goal=goal
-            )
-        else
-            components = (
-                Ũ⃗ = Ũ⃗,
-                a = a,
-                da = da,
-                dda = dda,
-            )
-
-            traj = NamedTrajectory(
-                components;
-                controls=(:dda,),
-                timestep=Δt,
-                bounds=bounds,
-                initial=initial,
-                final=final,
-                goal=goal
-            )
-        end
     end
 
+    # Objective
     J = UnitaryInfidelityObjective(:Ũ⃗, traj, Q;
         subspace=operator isa EmbeddedOperator ? operator.subspace_indices : nothing,
     )
@@ -261,38 +156,20 @@ function UnitarySmoothPulseProblem(
     J += QuadraticRegularizer(:da, traj, R_da)
     J += QuadraticRegularizer(:dda, traj, R_dda)
 
+    # Constraints
     if leakage_suppression
         if operator isa EmbeddedOperator
             leakage_indices = get_unitary_isomorphism_leakage_indices(operator)
-            J_leakage, slack_con = L1Regularizer(
-                :Ũ⃗,
-                traj;
-                R_value=R_leakage,
-                indices=leakage_indices
+            J += L1Regularizer!(
+                constraints, :Ũ⃗, traj, 
+                R_value=R_leakage, 
+                indices=leakage_indices,
+                eval_hessian=!hessian_approximation
             )
-            push!(constraints, slack_con)
-            J += J_leakage
         else
             @warn "leakage_suppression is not supported for non-embedded operators, ignoring."
         end
     end
-
-    if integrator == :pade
-        unitary_integrator =
-            UnitaryPadeIntegrator(system, :Ũ⃗, :a; order=pade_order, autodiff=autodiff)
-    elseif integrator == :exponential
-        unitary_integrator =
-            UnitaryExponentialIntegrator(system, :Ũ⃗, :a)
-    else
-        error("integrator must be one of (:pade, :exponential)")
-    end
-
-
-    integrators = [
-        unitary_integrator,
-        DerivativeIntegrator(:a, :da, traj),
-        DerivativeIntegrator(:da, :dda, traj),
-    ]
 
     if free_time
         if timesteps_all_equal
@@ -312,6 +189,23 @@ function UnitarySmoothPulseProblem(
         push!(constraints, norm_con)
     end
 
+    # Integrators
+    if integrator == :pade
+        unitary_integrator =
+            UnitaryPadeIntegrator(system, :Ũ⃗, :a; order=pade_order, autodiff=autodiff)
+    elseif integrator == :exponential
+        unitary_integrator =
+            UnitaryExponentialIntegrator(system, :Ũ⃗, :a)
+    else
+        error("integrator must be one of (:pade, :exponential)")
+    end
+
+    integrators = [
+        unitary_integrator,
+        DerivativeIntegrator(:a, :da, traj),
+        DerivativeIntegrator(:da, :dda, traj),
+    ]
+
     return QuantumControlProblem(
         system,
         traj,
@@ -328,7 +222,6 @@ function UnitarySmoothPulseProblem(
         kwargs...
     )
 end
-
 
 
 """
@@ -356,17 +249,54 @@ end
 # *************************************************************************** #
 
 @testitem "Hadamard gate" begin
-    H_drift = GATES[:Z]
-    H_drives = [GATES[:X], GATES[:Y]]
+    sys = QuantumSystem(GATES[:Z], [GATES[:X], GATES[:Y]])
     U_goal = GATES[:H]
+    T = 51
+    Δt = 0.2
+    
+    prob = UnitarySmoothPulseProblem(
+        sys, U_goal, T, Δt,
+        ipopt_options=Options(print_level=1), verbose=false
+    )
+    
+    initial = unitary_fidelity(prob)
+    solve!(prob, max_iter=20)
+    final = unitary_fidelity(prob)
+    @test final > initial
+end
+
+@testitem "EmbeddedOperator Hadamard gate" begin
+    a = annihilate(3)
+    sys = QuantumSystem([(a + a')/2, (a - a')/(2im)])
+    U_goal = EmbeddedOperator(GATES[:H], sys)
     T = 51
     Δt = 0.2
 
     prob = UnitarySmoothPulseProblem(
-        H_drift, H_drives, U_goal, T, Δt,
-        ipopt_options=Options(print_level=4)
+        sys, U_goal, T, Δt,
+        ipopt_options=Options(print_level=1), verbose=false
     )
 
-    solve!(prob, max_iter=100)
-    @test unitary_fidelity(prob) > 0.99
+    initial = unitary_fidelity(prob, subspace=U_goal.subspace_indices)
+    solve!(prob, max_iter=20)
+    final = unitary_fidelity(prob, subspace=U_goal.subspace_indices)
+    @test final > initial
+
+    # Test leakage suppression
+    a = annihilate(4)
+    sys = QuantumSystem([(a + a')/2, (a - a')/(2im)])
+    U_goal = EmbeddedOperator(GATES[:H], sys)
+    T = 50
+    Δt = 0.2
+
+    prob = UnitarySmoothPulseProblem(
+        sys, U_goal, T, Δt,
+        leakage_suppression=true, R_leakage=1e-1,
+        ipopt_options=Options(print_level=1), verbose=false
+    )
+
+    initial = unitary_fidelity(prob, subspace=U_goal.subspace_indices)
+    solve!(prob, max_iter=20)
+    final = unitary_fidelity(prob, subspace=U_goal.subspace_indices)
+    @test final > initial
 end

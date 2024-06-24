@@ -53,7 +53,7 @@ struct UnitaryPadeIntegrator <: QuantumPadeIntegrator
     dim::Int
     order::Int
     autodiff::Bool
-    G::Union{Function, Nothing}
+    G::Function
 
     """
         UnitaryPadeIntegrator(
@@ -111,6 +111,7 @@ struct UnitaryPadeIntegrator <: QuantumPadeIntegrator
 
         G_drift = sys.G_drift
         G_drives = sys.G_drives
+        G = isnothing(G) ? G_bilinear : G
 
         drive_anticomms, drift_anticomms =
             order == 4 ? build_anticomms(G_drift, G_drives, n_drives) : (nothing, nothing)
@@ -193,13 +194,14 @@ struct QuantumStatePadeIntegrator <: QuantumPadeIntegrator
         @assert order ∈ [4, 6, 8, 10] "order must be in [4, 6, 8, 10]"
         @assert !isnothing(state_symb) "state_symb must be specified"
         @assert !isnothing(drive_symb) "drive_symb must be specified"
-        n_drives = length(sys.H_drives_real)
-        N = size(sys.H_drift_real, 1)
+        n_drives = length(sys.H_drives)
+        N = size(sys.H_drift, 1)
         dim = 2N
         I_2N = sparse(I(2N))
 
         G_drift = sys.G_drift
         G_drives = sys.G_drives
+        G = isnothing(G) ? G_bilinear : G
 
         drive_anticomms, drift_anticomms =
             order == 4 ? build_anticomms(G_drift, G_drives, n_drives) : (nothing, nothing)
@@ -234,7 +236,7 @@ function nth_order_pade(
 )
     Ũₜ₊₁ = iso_vec_to_iso_operator(Ũ⃗ₜ₊₁)
     Ũₜ = iso_vec_to_iso_operator(Ũ⃗ₜ)
-    Gₜ = isnothing(P.G) ? G(aₜ, P.G_drift, P.G_drives) : P.G(aₜ, P.G_drift, P.G_drives)
+    Gₜ = P.G(aₜ, P.G_drift, P.G_drives)
     n = P.order ÷ 2
     Gₜ_powers = compute_powers(Gₜ, n)
     B = P.I_2N + sum([
@@ -278,7 +280,7 @@ function nth_order_pade(
     aₜ::AbstractVector,
     Δt::Real
 )
-    Gₜ = isnothing(P.G) ? G(aₜ, P.G_drift, P.G_drives) : P.G(aₜ, P.G_drift, P.G_drives)
+    Gₜ = P.G(aₜ, P.G_drift, P.G_drives)
     n = P.order ÷ 2
     Gₜ_powers = compute_powers(Gₜ, n)
     B = P.I_2N + sum([
@@ -341,7 +343,7 @@ function ∂aₜ(
         for j = 1:n_drives
             Gʲ = P.G_drives[j]
             Gʲ_anticomm_Gₜ =
-                G(aₜ, P.G_drift_anticomms[j], P.G_drive_anticomms[:, j])
+                P.G(aₜ, P.G_drift_anticomms[j], P.G_drive_anticomms[:, j])
             for i = 0:P.N-1
                 ψ̃ⁱₜ₊₁ = @view Ũ⃗ₜ₊₁[i * isodim .+ (1:isodim)]
                 ψ̃ⁱₜ = @view Ũ⃗ₜ[i * isodim .+ (1:isodim)]
@@ -381,7 +383,7 @@ function ∂aₜ(
         for j = 1:n_drives
             Gʲ = P.G_drives[j]
             Gʲ_anticomm_Gₜ =
-                G(aₜ, P.G_drift_anticomms[j], P.G_drive_anticomms[:, j])
+                P.G(aₜ, P.G_drift_anticomms[j], P.G_drive_anticomms[:, j])
             ∂aP[:, j] =
                 -Δtₜ / 2 * Gʲ * (ψ̃ₜ₊₁ + ψ̃ₜ) +
                 Δtₜ^2 / 12 * Gʲ_anticomm_Gₜ * (ψ̃ₜ₊₁ - ψ̃ₜ)
@@ -402,8 +404,7 @@ function ∂Δtₜ(
     aₜ::AbstractVector,
     Δtₜ::Real
 )
-
-    Gₜ = isnothing(P.G) ? G(aₜ, P.G_drift, P.G_drives) : P.G(aₜ)
+    Gₜ = P.G(aₜ, P.G_drift, P.G_drives)
     Ũₜ₊₁ = iso_vec_to_iso_operator(Ũ⃗ₜ₊₁)
     Ũₜ = iso_vec_to_iso_operator(Ũ⃗ₜ)
     if P.order == 4
@@ -435,7 +436,7 @@ function ∂Δtₜ(
     Δtₜ::Real
 )
 
-    Gₜ = isnothing(P.G) ? G(aₜ, P.G_drift, P.G_drives) : P.G(aₜ)
+    Gₜ = P.G(aₜ, P.G_drift, P.G_drives)
     if P.order==4
         ∂ΔtₜP = -1/2 * Gₜ * (ψ̃ₜ₊₁ + ψ̃ₜ) + 1/6 * Δtₜ * Gₜ^2 * (ψ̃ₜ₊₁ - ψ̃ₜ)
     else
@@ -481,7 +482,7 @@ end
 
     ∂Ũ⃗ₜP = spzeros(T, P.dim, P.dim)
     ∂Ũ⃗ₜ₊₁P = spzeros(T, P.dim, P.dim)
-    Gₜ = isnothing(P.G) ? G(aₜ, P.G_drift, P.G_drives) : P.G(aₜ, P.G_drift, P.G_drives)
+    Gₜ = P.G(aₜ, P.G_drift, P.G_drives)
     n = P.order ÷ 2
 
     # can memoize this chunk of code, prly memoize G powers
@@ -531,7 +532,7 @@ end
         ∂ΔtₜP = ∂Δtₜ(P, ψ̃ₜ₊₁, ψ̃ₜ, aₜ, Δtₜ)
     end
 
-    Gₜ = isnothing(P.G) ? G(aₜ, P.G_drift, P.G_drives) : P.G(aₜ, P.G_drift, P.G_drives)
+    Gₜ = P.G(aₜ, P.G_drift, P.G_drives)
     n = P.order ÷ 2
     Gₜ_powers = compute_powers(Gₜ, n)
     B = P.I_2N + sum([(-1)^k * PADE_COEFFICIENTS[P.order][k] * Δtₜ^k * Gₜ_powers[k] for k = 1:n])
@@ -562,14 +563,14 @@ function μ∂aₜ∂Ũ⃗ₜ(
 
     n_drives = P.n_drives
 
-    if P.autodiff || !isnothing(P.G)
+    if P.autodiff
 
     elseif P.order == 4
         μ∂aₜ∂Ũ⃗ₜP = Array{T}(undef, P.dim, n_drives)
 
         for j = 1:n_drives
             Gʲ = P.G_drives[j]
-            Ĝʲ = G(aₜ, P.G_drift_anticomms[j], P.G_drive_anticomms[:, j])
+            Ĝʲ = P.G(aₜ, P.G_drift_anticomms[j], P.G_drive_anticomms[:, j])
             ∂aₜ∂Ũ⃗ₜ_block_i = -(Δtₜ / 2 * Gʲ + Δtₜ^2 / 12 * Ĝʲ)
             # sparse is necessary since blockdiag doesn't accept dense matrices
             ∂aₜ∂Ũ⃗ₜ = blockdiag(fill(sparse(∂aₜ∂Ũ⃗ₜ_block_i), P.N)...)
@@ -593,7 +594,7 @@ function μ∂Ũ⃗ₜ₊₁∂aₜ(
 
     for j = 1:n_drives
         Gʲ = P.G_drives[j]
-        Ĝʲ = G(aₜ, P.G_drift_anticomms[j], P.G_drive_anticomms[:, j])
+        Ĝʲ = P.G(aₜ, P.G_drift_anticomms[j], P.G_drive_anticomms[:, j])
         ∂Ũ⃗ₜ₊₁∂aₜ_block_i = -Δtₜ / 2 * Gʲ + Δtₜ^2 / 12 * Ĝʲ
         # sparse is necessary since blockdiag doesn't accept dense matrices
         ∂Ũ⃗ₜ₊₁∂aₜ = blockdiag(fill(sparse(∂Ũ⃗ₜ₊₁∂aₜ_block_i), P.N)...)
@@ -615,7 +616,7 @@ function μ∂aₜ∂ψ̃ₜ(
 
     for j = 1:n_drives
         Gʲ = P.G_drives[j]
-        Ĝʲ = G(aₜ, P.G_drift_anticomms[j], P.G_drive_anticomms[:, j])
+        Ĝʲ = P.G(aₜ, P.G_drift_anticomms[j], P.G_drive_anticomms[:, j])
         ∂aₜ∂ψ̃ₜP = -(Δtₜ / 2 * Gʲ + Δtₜ^2 / 12 * Ĝʲ)
         μ∂aₜ∂ψ̃ₜP[:, j] = ∂aₜ∂ψ̃ₜP' * μₜ
     end
@@ -635,7 +636,7 @@ function μ∂ψ̃ₜ₊₁∂aₜ(
 
     for j = 1:n_drives
         Gʲ = P.G_drives[j]
-        Ĝʲ = G(aₜ, P.G_drift_anticomms[j], P.G_drive_anticomms[:, j])
+        Ĝʲ = P.G(aₜ, P.G_drift_anticomms[j], P.G_drive_anticomms[:, j])
         ∂ψ̃ₜ₊₁∂aₜP = -Δtₜ / 2 * Gʲ + Δtₜ^2 / 12 * Ĝʲ
         μ∂ψ̃ₜ₊₁∂aₜP[j, :] = μₜ' * ∂ψ̃ₜ₊₁∂aₜP
     end
@@ -677,7 +678,7 @@ function μ∂²aₜ(
     μₜ::AbstractVector{T},
 ) where T <: Real
 
-    n_drives = length(drive_indices)
+    n_drives = P.n_drives
     μ∂²aₜP = Array{T}(undef, n_drives, n_drives)
 
     if P.order==4
@@ -707,7 +708,7 @@ function μ∂Δtₜ∂aₜ(
     if P.order == 4
         for j = 1:n_drives
             Gʲ = P.G_drives[j]
-            Ĝʲ = G(aₜ, P.G_drift_anticomms[j], P.G_drive_anticomms[:, j])
+            Ĝʲ = P.G(aₜ, P.G_drift_anticomms[j], P.G_drive_anticomms[:, j])
             B = blockdiag(fill(sparse(-1/2 * Gʲ + 1/6 * Δtₜ * Ĝʲ), P.N)...)
             F = blockdiag(fill(sparse(1/2 * Gʲ + 1/6 * Δtₜ * Ĝʲ), P.N)...)
             ∂Δtₜ∂aₜ_j =  B*Ũ⃗ₜ₊₁ - F*Ũ⃗ₜ
@@ -732,7 +733,7 @@ function μ∂Δtₜ∂aₜ(
     if P.order == 4
         for j = 1:n_drives
             Gʲ = P.G_drives[j]
-            Ĝʲ = G(aₜ, P.G_drift_anticomms[j], P.G_drive_anticomms[:, j])
+            Ĝʲ = P.G(aₜ, P.G_drift_anticomms[j], P.G_drive_anticomms[:, j])
             ∂Δt∂aʲP =
                 -1 / 2 * Gʲ * (ψ̃ₜ₊₁ + ψ̃ₜ) +
                 1 / 6 * Δtₜ * Ĝʲ * (ψ̃ₜ₊₁ - ψ̃ₜ)
@@ -748,7 +749,7 @@ function μ∂Δtₜ∂Ũ⃗ₜ(
     Δtₜ::Real,
     μₜ::AbstractVector
 )
-    Gₜ = G(aₜ, P.G_drift, P.G_drives)
+    Gₜ = P.G(aₜ, P.G_drift, P.G_drives)
     minus_F = -(1/2 * Gₜ + 1/6 * Δtₜ * Gₜ^2)
     big_minus_F = blockdiag(fill(sparse(minus_F), P.N)...)
     return big_minus_F' * μₜ
@@ -760,7 +761,7 @@ function μ∂Ũ⃗ₜ₊₁∂Δtₜ(
     Δtₜ::Real,
     μₜ::AbstractVector
 )
-    Gₜ = G(aₜ, P.G_drift, P.G_drives)
+    Gₜ = P.G(aₜ, P.G_drift, P.G_drives)
     B = -1/2 * Gₜ + 1/6 * Δtₜ * Gₜ^2
     big_B = blockdiag(fill(sparse(B), P.N)...)
     return μₜ' * big_B
@@ -773,7 +774,7 @@ function μ∂Δtₜ∂ψ̃ₜ(
     μₜ::AbstractVector
 )
     # memoize the calc here
-    Gₜ = G(aₜ, P.G_drift, P.G_drives)
+    Gₜ = P.G(aₜ, P.G_drift, P.G_drives)
     minus_F = -(1/2 * Gₜ + 1/6 * Δtₜ * Gₜ^2)
     return minus_F' * μₜ
 end
@@ -784,7 +785,7 @@ function μ∂ψ̃ₜ₊₁∂Δtₜ(
     Δtₜ::Real,
     μₜ::AbstractVector
 )
-    Gₜ = G(aₜ, P.G_drift, P.G_drives)
+    Gₜ = P.G(aₜ, P.G_drift, P.G_drives)
     B = -1/2 * Gₜ + 1/6 * Δtₜ * Gₜ^2
     return μₜ' * B
 end
@@ -796,7 +797,7 @@ function μ∂²Δtₜ(
     aₜ::AbstractVector,
     μₜ::AbstractVector
 )
-    Gₜ = G(aₜ, P.G_drift, P.G_drives)
+    Gₜ = P.G(aₜ, P.G_drift, P.G_drives)
     ∂²Δtₜ_gen_block = 1/6 * Gₜ^2
     ∂²Δtₜ_gen = blockdiag(fill(sparse(∂²Δtₜ_gen_block), P.N)...)
     ∂²Δtₜ = ∂²Δtₜ_gen * (Ũ⃗ₜ₊₁ -  Ũ⃗ₜ)
@@ -810,7 +811,7 @@ function μ∂²Δtₜ(
     aₜ::AbstractVector,
     μₜ::AbstractVector
 )
-    Gₜ = G(aₜ, P.G_drift, P.G_drives)
+    Gₜ = P.G(aₜ, P.G_drift, P.G_drives)
     ∂²Δtₜ = 1/6 * Gₜ^2 * (ψ̃ₜ₊₁ - ψ̃ₜ)
     return μₜ' * ∂²Δtₜ
 end

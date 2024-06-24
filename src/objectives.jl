@@ -15,6 +15,7 @@ export QuadraticRegularizer
 export PairwiseQuadraticRegularizer
 export QuadraticSmoothnessRegularizer
 export L1Regularizer
+export L1Regularizer!
 
 using TrajectoryIndexingUtils
 using ..QuantumUtils
@@ -88,6 +89,21 @@ Base.:+(obj::Objective, ::Nothing) = obj
 function Objective(terms::Vector{Dict})
     return +(Objective.(terms)...)
 end
+
+function Base.:*(num::Real, obj::Objective)
+	L = (Z⃗, Z) -> num * obj.L(Z⃗, Z)
+	∇L = (Z⃗, Z) -> num * obj.∇L(Z⃗, Z)
+    if isnothing(obj.∂²L)
+        ∂²L = nothing
+        ∂²L_structure = nothing
+    else
+        ∂²L = (Z⃗, Z) -> num * obj.∂²L(Z⃗, Z)
+        ∂²L_structure = obj.∂²L_structure
+    end
+	return Objective(L, ∇L, ∂²L, ∂²L_structure, obj.terms)
+end
+
+Base.:*(obj::Objective, num::Real) = num * obj
 
 function Objective(term::Dict)
     return eval(term[:type])(; delete!(term, :type)...)
@@ -849,6 +865,16 @@ function L1Regularizer(
     return J, slack_con
 end
 
+function L1Regularizer!(
+    constraints::Vector{<:AbstractConstraint},
+    name::Symbol,
+    traj::NamedTrajectory;
+    kwargs...
+)
+    J, slack_con = L1Regularizer(name, traj; kwargs...)
+    push!(constraints, slack_con)
+    return J
+end
 
 function MinimumTimeObjective(;
     D::Float64=1.0,

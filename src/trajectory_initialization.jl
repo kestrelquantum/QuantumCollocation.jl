@@ -1,12 +1,18 @@
 module TrajectoryInitialization
 
-export unitary_linear_interpolation
 export unitary_geodesic
 export linear_interpolation
+export unitary_linear_interpolation
+export initialize_unitary_trajectory
+export initialize_state_trajectory
 
+using NamedTrajectories
 using LinearAlgebra
+using Distributions
 
 using ..QuantumUtils
+using ..QuantumSystems
+using ..Rollouts
 using ..EmbeddedOperators
 
 """
@@ -28,6 +34,14 @@ function unitary_linear_interpolation(
     Ũ⃗s = [Ũ⃗_init + (Ũ⃗_goal - Ũ⃗_init) * t for t ∈ range(0, 1, length=samples)]
     Ũ⃗ = hcat(Ũ⃗s...)
     return Ũ⃗
+end
+
+function unitary_linear_interpolation(
+    U_init::AbstractMatrix{<:Number},
+    U_goal::EmbeddedOperator,
+    samples::Int
+) 
+    return unitary_linear_interpolation(U_init, U_goal.operator, samples)
 end
 
 """
@@ -62,38 +76,38 @@ Compute a geodesic connecting two unitary operators.
 function unitary_geodesic end
 
 function unitary_geodesic(
-    operator::EmbeddedOperator,
+    U_init::AbstractMatrix{<:Number},
+    U_goal::EmbeddedOperator,
     samples::Int;
     kwargs...
-)
-    U_goal = unembed(operator)
-    U_init = Matrix{ComplexF64}(I(size(U_goal, 1)))
-    Ũ⃗ = unitary_geodesic(U_init, U_goal, samples; kwargs...)
+)   
+    U1 = unembed(U_init, U_goal)
+    U2 = unembed(U_goal)
+    Ũ⃗ = unitary_geodesic(U1, U2, samples; kwargs...)
     return hcat([
-        operator_to_iso_vec(embed(
-            iso_vec_to_operator(Ũ⃗ₜ), 
-            operator.subspace_indices, 
-            prod(operator.subsystem_levels))
-        ) for Ũ⃗ₜ ∈ eachcol(Ũ⃗)]...)
+        operator_to_iso_vec(embed(iso_vec_to_operator(Ũ⃗ₜ), U_goal))
+        for Ũ⃗ₜ ∈ eachcol(Ũ⃗)
+    ]...)
 end
 
 function unitary_geodesic(
+    U_init::AbstractMatrix{<:Number},
     U_goal::AbstractMatrix{<:Number},
     samples::Int;
     kwargs...
 )
-    N = size(U_goal, 1)
-    U₀ = Matrix{ComplexF64}(I(N))
-    return unitary_geodesic(U₀, U_goal, samples; kwargs...)
+    return unitary_geodesic(U_init, U_goal, range(0, 1, samples); kwargs...)
 end
 
 function unitary_geodesic(
-    U₀::AbstractMatrix{<:Number},
-    U₁::AbstractMatrix{<:Number},
-    samples::Number;
+    U_goal::Union{EmbeddedOperator, AbstractMatrix{<:Number}},
+    samples::Int;
     kwargs...
 )
-    return unitary_geodesic(U₀, U₁, range(0, 1, samples); kwargs...)
+    if U_goal isa EmbeddedOperator
+        U_goal = U_goal.operator
+    end
+    return unitary_geodesic(Matrix{ComplexF64}(I(size(U_goal, 1))), U_goal, samples; kwargs...)
 end
 
 function unitary_geodesic(
@@ -127,5 +141,236 @@ end
 
 linear_interpolation(x::AbstractVector, y::AbstractVector, n::Int) =
     hcat(range(x, y, n)...)
+
+# =============================================================================
+
+VectorBound = Union{AbstractVector{R}, Tuple{AbstractVector{R}, AbstractVector{R}}} where R <: Real
+ScalarBound = Union{R, Tuple{R, R}} where R <: Real
+
+function initialize_unitaries(
+    U_init::AbstractMatrix{<:Number},
+    U_goal::Union{EmbeddedOperator, AbstractMatrix{<:Number}},
+    T::Int;
+    geodesic=true
+)
+    if geodesic
+        Ũ⃗ = unitary_geodesic(U_init, U_goal, T)
+    else
+        Ũ⃗ = unitary_linear_interpolation(U_init, U_goal, T)
+    end
+    return Ũ⃗
+end
+
+function initialize_controls(
+    n_drives::Int,
+    T::Int,
+    a_bounds::VectorBound,
+    drive_derivative_σ::Float64
+)
+    if a_bounds isa AbstractVector
+        a_dists = [Uniform(-a_bounds[i], a_bounds[i]) for i = 1:n_drives]
+    elseif a_bounds isa Tuple
+        a_dists = [Uniform(aᵢ_lb, aᵢ_ub) for (aᵢ_lb, aᵢ_ub) ∈ zip(a_bounds...)]
+    else
+        error("a_bounds must be a Vector or Tuple")
+    end
+
+    a = hcat([
+        zeros(n_drives),
+        vcat([rand(a_dists[i], 1, T - 2) for i = 1:n_drives]...),
+        zeros(n_drives)
+    ]...)
+
+    da = randn(n_drives, T) * drive_derivative_σ
+    dda = randn(n_drives, T) * drive_derivative_σ
+    return a, da, dda
+end
+
+function initialize_controls(a::AbstractMatrix, Δt::AbstractVecOrMat)
+    da = derivative(a, Δt)
+    dda = derivative(da, Δt)
+
+    # to avoid constraint violation error at initial iteration
+    da[:, end] = da[:, end-1] + Δt[end-1] * dda[:, end-1]
+
+    return a, da, dda
+end
+
+function initialize_unitary_trajectory(
+    U_goal::Union{EmbeddedOperator, AbstractMatrix{<:Number}},
+    T::Int,
+    Δt::Real,
+    n_drives::Int,
+    a_bounds::VectorBound,
+    dda_bounds::VectorBound;
+    U_init::AbstractMatrix{<:Number}=Matrix{ComplexF64}(I(size(U_goal, 1))),
+    geodesic=true,
+    bound_unitary=false,
+    free_time=false,
+    Δt_bounds::ScalarBound=(0.5 * Δt, 1.5 * Δt),
+    drive_derivative_σ::Float64=0.1,
+    a_guess::Union{AbstractMatrix{<:Float64}, Nothing}=nothing,
+    system::Union{AbstractQuantumSystem, AbstractVector{<:AbstractQuantumSystem}, Nothing}=nothing,
+    rollout_integrator::Function=exp,
+    Ũ⃗_keys::AbstractVector{<:Symbol}=[:Ũ⃗],
+)
+    if free_time
+        if Δt isa Float64
+            Δt = fill(Δt, 1, T)
+        end
+    end
+
+    Ũ⃗_init = operator_to_iso_vec(U_init)
+    if U_goal isa EmbeddedOperator
+        Ũ⃗_goal = operator_to_iso_vec(U_goal.operator)
+    else
+        Ũ⃗_goal = operator_to_iso_vec(U_goal)
+    end
+
+    # Constraints
+    Ũ⃗_inits = repeat([Ũ⃗_init], length(Ũ⃗_keys))
+    initial = (;
+        (Ũ⃗_keys .=> Ũ⃗_inits)...,
+        a = zeros(n_drives),
+    )
+
+    final = (
+        a = zeros(n_drives),
+    )
+
+    Ũ⃗_goals = repeat([Ũ⃗_goal], length(Ũ⃗_keys))
+    goal = (; (Ũ⃗_keys .=> Ũ⃗_goals)...)
+
+    # Bounds
+    bounds = (a = a_bounds, dda = dda_bounds,)
+
+    if bound_unitary
+        Ũ⃗_dim = length(Ũ⃗_init)
+        Ũ⃗_bounds = repeat([(-ones(Ũ⃗_dim), ones(Ũ⃗_dim))], length(Ũ⃗_keys))
+        merge!(bounds, (; (Ũ⃗_keys .=> Ũ⃗_bounds)...))
+    end
+
+    # Initial state and control values
+    if isnothing(a_guess)
+        Ũ⃗ = initialize_unitaries(U_init, U_goal, T, geodesic=geodesic)
+        Ũ⃗_values = repeat([Ũ⃗], length(Ũ⃗_keys))
+        a, da, dda = initialize_controls(n_drives, T, a_bounds, drive_derivative_σ)
+    else
+        @assert !isnothing(system) "system must be provided if a_guess is provided"
+        if system isa AbstractVector
+            @assert length(system) == length(Ũ⃗_keys) "systems must have the same length as Ũ⃗_keys"
+            Ũ⃗_values = map(system) do sys
+                unitary_rollout(Ũ⃗_init, a_guess, Δt, sys; integrator=rollout_integrator)
+            end
+        else
+            unitary_rollout(Ũ⃗_init, a_guess, Δt, system; integrator=rollout_integrator)
+            Ũ⃗_values = repeat([Ũ⃗], length(Ũ⃗_keys))
+        end
+        a, da, dda = initialize_controls(a_guess, Δt)
+    end
+
+    # Trajectory
+    keys = [Ũ⃗_keys..., :a, :da, :dda]
+    values = [Ũ⃗_values..., a, da, dda]
+
+    if free_time
+        push!(keys, :Δt)
+        push!(values, Δt)
+        controls = (:dda, :Δt)
+        timestep = :Δt
+        bounds = merge(bounds, (Δt = Δt_bounds,))
+    else
+        controls = (:dda,)
+        timestep = Δt
+    end
+
+    return NamedTrajectory(
+        (; (keys .=> values)...);
+        controls=controls,
+        timestep=timestep,
+        bounds=bounds,
+        initial=initial,
+        final=final,
+        goal=goal
+    )
+end
+
+function initialize_state_trajectory(
+    ψ̃_goals::AbstractVector{<:AbstractVector{<:Real}},
+    ψ̃_inits::AbstractVector{<:AbstractVector{<:Real}},
+    T::Int,
+    Δt::Real,
+    n_drives::Int,
+    a_bounds::VectorBound,
+    dda_bounds::VectorBound;
+    free_time=false,
+    Δt_bounds::ScalarBound=(0.5 * Δt, 1.5 * Δt),
+    drive_derivative_σ::Float64=0.1,
+    a_guess::Union{AbstractMatrix{<:Float64}, Nothing}=nothing,
+    system::Union{AbstractQuantumSystem, AbstractVector{<:AbstractQuantumSystem}, Nothing}=nothing,
+    rollout_integrator::Function=exp,    
+    ψ̃_keys::AbstractVector{<:Symbol}=[Symbol("ψ̃$i") for i = 1:length(ψ̃_goals)]
+)
+    @assert length(ψ̃_inits) == length(ψ̃_goals) "ψ̃_inits and ψ̃_goals must have the same length"
+    @assert length(ψ̃_keys) == length(ψ̃_goals) "ψ̃_keys and ψ̃_goals must have the same length"
+
+    if free_time
+        if Δt isa Float64
+            Δt = fill(Δt, 1, T)
+        end
+    end
+
+    # Constraints
+    state_initial = (; (ψ̃_keys .=> ψ̃_inits)...)
+    control_initial = (a = zeros(n_drives),)
+    initial = merge(state_initial, control_initial)
+
+    final = (a = zeros(n_drives),)
+
+    goal = (; (ψ̃_keys .=> ψ̃_goals)...)
+
+    # Bounds
+    bounds = (a = a_bounds, dda = dda_bounds,)
+
+    # Initial state and control values
+    if isnothing(a_guess)
+        ψ̃s = NamedTuple([
+            k => linear_interpolation(ψ̃_init, ψ̃_goal, T)
+                for (k, ψ̃_init, ψ̃_goal) in zip(ψ̃_keys, ψ̃_inits, ψ̃_goals)
+        ])
+        a, da, dda = initialize_controls(n_drives, T, a_bounds, drive_derivative_σ)
+    else
+        ψ̃s = NamedTuple([
+            k => rollout(ψ̃_init, a_guess, Δt, system, integrator=rollout_integrator)
+                for (i, ψ̃_init) in zip(ψ̃_keys, ψ̃_inits)
+        ])
+        a, da, dda = initialize_controls(a_guess, Δt)
+    end
+
+    # Trajectory
+    keys = [ψ̃_keys..., :a, :da, :dda]
+    values = [ψ̃s..., a, da, dda]
+
+    if free_time
+        push!(keys, :Δt)
+        push!(values, Δt)
+        controls = (:dda, :Δt)
+        timestep = :Δt
+        bounds = merge(bounds, (Δt = Δt_bounds,))
+    else
+        controls = (:dda,)
+        timestep = Δt
+    end
+
+    return NamedTrajectory(
+        (; (keys .=> values)...);
+        controls=controls,
+        timestep=timestep,
+        bounds=bounds,
+        initial=initial,
+        final=final,
+        goal=goal
+    )
+end
 
 end
