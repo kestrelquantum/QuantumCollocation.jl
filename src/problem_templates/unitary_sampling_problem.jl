@@ -111,7 +111,7 @@ function UnitarySamplingProblem(
     else
         n_drives = length(systems[1].G_drives)
         # TODO: Initial system?
-        traj = initialize_trajectory(
+        traj = initialize_unitary_trajectory(
             operator,
             T,
             Δt,
