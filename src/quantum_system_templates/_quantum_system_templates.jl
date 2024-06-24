@@ -10,6 +10,7 @@ using ..QuantumUtils
 using ..QuantumSystems
 
 using LinearAlgebra
+using TestItemRunner
 
 include("transmons.jl")
 include("rydberg.jl")

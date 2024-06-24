@@ -4,7 +4,7 @@ export AbstractProblem
 export FixedTimeProblem
 export QuantumControlProblem
 
-export initialize_trajectory!
+export set_trajectory!
 export update_trajectory!
 export get_traj_data
 export get_datavec
@@ -230,7 +230,7 @@ function initialize_optimizer!(
     n_dynamics_constraints::Int,
     nonlinear_constraints::Vector{NonlinearConstraint},
     n_variables::Int;
-    verbose::Bool=true
+    verbose=true
 )
     nl_cons = fill(
         MOI.NLPBoundsPair(0.0, 0.0),
@@ -265,7 +265,7 @@ function initialize_optimizer!(
     return variables
 end
 
-function initialize_trajectory!(
+function set_trajectory!(
     prob::QuantumControlProblem,
     traj::NamedTrajectory
 )
@@ -277,8 +277,8 @@ function initialize_trajectory!(
     )
 end
 
-initialize_trajectory!(prob::QuantumControlProblem) =
-    initialize_trajectory!(prob, prob.trajectory)
+set_trajectory!(prob::QuantumControlProblem) =
+    set_trajectory!(prob, prob.trajectory)
 
 function get_datavec(prob::QuantumControlProblem)
     Z⃗ = MOI.get(

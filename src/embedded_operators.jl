@@ -54,8 +54,16 @@ end
 EmbeddedOperator(op::Matrix{<:Number}, subspace_indices::AbstractVector{Int}, levels::Int) =
     EmbeddedOperator(op, subspace_indices, [levels])
 
+function embed(matrix::Matrix{ComplexF64}, op::EmbeddedOperator)
+    return embed(matrix, op.subspace_indices, prod(op.subsystem_levels))
+end  
+
 function unembed(op::EmbeddedOperator)::Matrix{ComplexF64}
     return op.operator[op.subspace_indices, op.subspace_indices]
+end
+
+function unembed(matrix::AbstractMatrix, op::EmbeddedOperator)
+    return matrix[op.subspace_indices, op.subspace_indices]
 end
 
 Base.size(op::EmbeddedOperator) = size(op.operator)

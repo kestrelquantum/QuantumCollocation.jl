@@ -25,9 +25,9 @@ function solve!(
     set!(prob.optimizer, prob.options)
 
     if !isnothing(init_traj)
-        initialize_trajectory!(prob, init_traj)
+        set_trajectory!(prob, init_traj)
     else
-        initialize_trajectory!(prob)
+        set_trajectory!(prob)
     end
 
     MOI.optimize!(prob.optimizer)

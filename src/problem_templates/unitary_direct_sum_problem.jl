@@ -122,8 +122,6 @@ function UnitaryDirectSumProblem(
 
     # Build the direct sum system
 
-    println("...trajectories...")
-
     # merge suffix trajectories
     traj = direct_sum([add_suffix(p.trajectory, ℓ) for (p, ℓ) ∈ zip(probs, prob_labels)])
 
@@ -153,8 +151,6 @@ function UnitaryDirectSumProblem(
     # Rebuild trajectory constraints
     build_trajectory_constraints = true
     constraints = AbstractConstraint[]
-
-    println("...constraints...")
 
     # Add goal constraints for each problem
     for (p, ℓ) ∈ zip(probs, prob_labels)
@@ -280,11 +276,11 @@ end
     T = 50
     Δt = 0.2
     ops = Options(print_level=1)
-    prob1 = UnitarySmoothPulseProblem(sys, U_goal1, T, Δt, free_time=false, ipopt_options=ops)
-    prob2 = UnitarySmoothPulseProblem(sys, U_goal2, T, Δt, free_time=false, ipopt_options=ops)
+    prob1 = UnitarySmoothPulseProblem(sys, U_goal1, T, Δt, free_time=false, verbose=false, ipopt_options=ops)
+    prob2 = UnitarySmoothPulseProblem(sys, U_goal2, T, Δt, free_time=false, verbose=false, ipopt_options=ops)
 
     # Test default
-    direct_sum_prob1 = UnitaryDirectSumProblem([prob1, prob2], 0.99, ipopt_options=ops)
+    direct_sum_prob1 = UnitaryDirectSumProblem([prob1, prob2], 0.99, verbose=false, ipopt_options=ops)
     state_names = vcat(
         add_suffix(prob1.trajectory.state_names, "1")...,
         add_suffix(prob2.trajectory.state_names, "2")...
@@ -302,6 +298,7 @@ end
         0.99,
         prob_labels=["a", "b"],
         graph=[("a", "b")],
+        verbose=false, 
         ipopt_options=ops)
     state_names_ab = vcat(
         add_suffix(prob1.trajectory.state_names, "a")...,
@@ -320,6 +317,7 @@ end
         0.99, 
         prob_labels=["a", "b"],
         graph=[("x", "b")],
+        verbose=false, 
         ipopt_options=ops
     )
 
@@ -328,6 +326,7 @@ end
         [prob1, prob2], 
         0.99, 
         graph=[(:a1, :a2)],
+        verbose=false, 
         ipopt_options=ops
     )
     @test issetequal(direct_sum_prob3.trajectory.state_names, state_names)
@@ -348,6 +347,7 @@ end
         R_b=1e3,
         Q_symb=:dda,
         boundary_values=Dict("x"=>copy(prob1.trajectory[:dda])),
+        verbose=false, 
         ipopt_options=ops
     )
     # # TODO: Check for objectives?
