@@ -1,4 +1,4 @@
-@testset "testing UnitaryExponentialIntegrator" begin
+@testitem "testing UnitaryExponentialIntegrator" begin
     using NamedTrajectories
     using ForwardDiff
 
@@ -45,7 +45,7 @@
     @test ∂Δtₜℰ ≈ ∂ℰ_forwarddiff[:, Z.components.Δt]
 end
 
-@testset "testing QuantumStateExponentialIntegrator" begin
+@testitem "testing QuantumStateExponentialIntegrator" begin
     using NamedTrajectories
     using ForwardDiff
 
