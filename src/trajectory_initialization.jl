@@ -4,6 +4,7 @@ export unitary_linear_interpolation
 export unitary_geodesic
 export linear_interpolation
 export initialize_unitary_trajectory
+export initialize_state_trajectory
 
 using NamedTrajectories
 using LinearAlgebra
