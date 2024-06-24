@@ -12,24 +12,14 @@ concurrency:
   cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
 jobs:
   test:
-    name: Julia ${{ matrix.version }} - ${{ matrix.os }} - ${{ matrix.arch }} - ${{ github.event_name }}
-    runs-on: ${{ matrix.os }}
+    name: Julia self-hosted - ${{ github.event_name }}
+    runs-on: self-hosted
     strategy:
       fail-fast: false
-      matrix:
-        version:
-          - '1.10'
-        os:
-          - ubuntu-latest
-        arch:
-          - x64
-          # - x86
+
     steps:
       - uses: actions/checkout@v2
       - uses: julia-actions/setup-julia@v1
-        with:
-          version: ${{ matrix.version }}
-          arch: ${{ matrix.arch }}
       - uses: julia-actions/cache@v1
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
@@ -39,7 +29,7 @@ jobs:
           files: lcov.info
   docs:
     name: Documentation
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     permissions:
       contents: write
       statuses: write
