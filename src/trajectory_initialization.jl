@@ -1,8 +1,8 @@
 module TrajectoryInitialization
 
-export unitary_linear_interpolation
 export unitary_geodesic
 export linear_interpolation
+export unitary_linear_interpolation
 export initialize_unitary_trajectory
 export initialize_state_trajectory
 
@@ -34,6 +34,14 @@ function unitary_linear_interpolation(
     Ũ⃗s = [Ũ⃗_init + (Ũ⃗_goal - Ũ⃗_init) * t for t ∈ range(0, 1, length=samples)]
     Ũ⃗ = hcat(Ũ⃗s...)
     return Ũ⃗
+end
+
+function unitary_linear_interpolation(
+    U_init::AbstractMatrix{<:Number},
+    U_goal::EmbeddedOperator,
+    samples::Int
+) 
+    return unitary_linear_interpolation(U_init, U_goal.operator, samples)
 end
 
 """
