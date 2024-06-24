@@ -19,6 +19,7 @@ include("test_utils.jl")
     # include("dynamics_test.jl")
     include("integrators_test.jl")
     include("quantum_utils_test.jl")
+    include("quantum_system_templates_test.jl")
 end
 
 @run_package_tests
