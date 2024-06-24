@@ -85,10 +85,21 @@ end
 function unitary_geodesic(
     U_init::AbstractMatrix{<:Number},
     U_goal::AbstractMatrix{<:Number},
-    samples::Number;
+    samples::Int;
     kwargs...
 )
     return unitary_geodesic(U_init, U_goal, range(0, 1, samples); kwargs...)
+end
+
+function unitary_geodesic(
+    U_goal::Union{EmbeddedOperator, AbstractMatrix{<:Number}},
+    samples::Int;
+    kwargs...
+)
+    if U_goal isa EmbeddedOperator
+        U_goal = U_goal.operator
+    end
+    return unitary_geodesic(Matrix{ComplexF64}(I(size(U_goal, 1))), U_goal, samples; kwargs...)
 end
 
 function unitary_geodesic(
