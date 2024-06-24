@@ -32,11 +32,11 @@ function QuantumStateSmoothPulseProblem(
     Δt::Float64;
     free_time=true,
     init_trajectory::Union{NamedTrajectory, Nothing}=nothing,
-    a_bound::Float64=Inf,
+    a_bound::Float64=1.0,
     a_bounds::Vector{Float64}=fill(a_bound, length(system.G_drives)),
     a_guess::Union{Matrix{Float64}, Nothing}=nothing,
     rollout_integrator=exp,
-    dda_bound::Float64=Inf,
+    dda_bound::Float64=1.0,
     dda_bounds::Vector{Float64}=fill(dda_bound, length(system.G_drives)),
     Δt_min::Float64=0.5 * Δt,
     Δt_max::Float64=1.5 * Δt,
@@ -68,11 +68,8 @@ function QuantumStateSmoothPulseProblem(
         ψ_goals = ψ_goal
     end
 
-    ψ_inits = Vector{ComplexF64}.(ψ_init)
-    ψ̃_inits = ket_to_iso.(ψ_init)
-
-    ψ_goals = Vector{ComplexF64}.(ψ_goal)
-    ψ̃_goals = ket_to_iso.(ψ_goal)
+    ψ̃_inits = ket_to_iso.(Vector{ComplexF64}.(ψ_inits))
+    ψ̃_goals = ket_to_iso.(Vector{ComplexF64}.(ψ_goals))
 
     n_drives = length(system.G_drives)
 
@@ -168,4 +165,32 @@ end
 
 # *************************************************************************** #
 
-# TODO: Tests
+@testitem "Test quantum state smooth pulse" begin
+    # System
+    T = 50
+    Δt = 0.2
+    sys = QuantumSystem(0.1 * GATES[:Z], [GATES[:X], GATES[:Y]])
+    ψ_init = [1.0, 0.0]
+    ψ_target = [0.0, 1.0]
+
+    prob = QuantumStateSmoothPulseProblem(
+        sys, ψ_init, ψ_target, T, Δt;
+        ipopt_options=Options(print_level=1), verbose=false
+    )
+    initial = fidelity(prob)
+    solve!(prob, max_iter=20)
+    final = fidelity(prob)
+    @test final > initial
+
+    # Multiple initial and target states
+    ψ_inits = [[1.0, 0.0], [0.0, 1.0]]
+    ψ_targets = [[0.0, 1.0], [1.0, 0.0]]
+    prob = QuantumStateSmoothPulseProblem(
+        sys, ψ_inits, ψ_targets, T, Δt;
+        ipopt_options=Options(print_level=1), verbose=false
+    )
+    initial = fidelity(prob)
+    solve!(prob, max_iter=20)
+    final = fidelity(prob)
+    @test all(final .> initial)
+end

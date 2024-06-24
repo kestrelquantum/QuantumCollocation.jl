@@ -1,5 +1,5 @@
-# G(a) helper function
-function G(
+# G_bilinear(a) helper function
+function G_bilinear(
     a::AbstractVector,
     G_drift::AbstractMatrix,
     G_drives::AbstractVector{<:AbstractMatrix}
