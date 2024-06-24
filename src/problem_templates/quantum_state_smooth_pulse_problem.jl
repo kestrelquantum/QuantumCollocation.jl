@@ -58,7 +58,6 @@ function QuantumStateSmoothPulseProblem(
     integrator::Symbol=:pade,
     pade_order::Int=4,
     autodiff::Bool=pade_order != 4,
-    rollout_integrator=exp,
     bound_state=integrator == :exponential,
     # TODO: control modulus norm, advanced feature, needs documentation
     control_norm_constraint=false,
@@ -136,14 +135,6 @@ function QuantumStateSmoothPulseProblem(
             )
         end
     end
-
-
-
-    integrators = [
-        ψ̃_integrators...,
-        DerivativeIntegrator(:a, :da, traj),
-        DerivativeIntegrator(:da, :dda, traj)
-    ]
 
     if free_time
         if timesteps_all_equal
