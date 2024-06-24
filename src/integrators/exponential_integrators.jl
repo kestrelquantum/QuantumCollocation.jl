@@ -15,6 +15,7 @@ struct UnitaryExponentialIntegrator <: QuantumExponentialIntegrator
     n_drives::Int
     ketdim::Int
     dim::Int
+    G::Function
 
     function UnitaryExponentialIntegrator(
         sys::AbstractQuantumSystem,
@@ -32,7 +33,8 @@ struct UnitaryExponentialIntegrator <: QuantumExponentialIntegrator
             drive_names,
             n_drives,
             ketdim,
-            dim
+            dim,
+            G_bilinear
         )
     end
 end
@@ -60,7 +62,7 @@ controls(integrator::UnitaryExponentialIntegrator) = integrator.drive_names
         aₜ = zₜ[traj.components[ℰ.drive_names]]
     end
 
-    Gₜ = G(aₜ, ℰ.G_drift, ℰ.G_drives)
+    Gₜ = ℰ.G(aₜ, ℰ.G_drift, ℰ.G_drives)
 
     return Ũ⃗ₜ₊₁ - expv(Δtₜ, I(ℰ.ketdim) ⊗ Gₜ, Ũ⃗ₜ)
 end
@@ -98,7 +100,7 @@ end
 
     aₜ = zₜ[inds]
 
-    Gₜ = G(aₜ, ℰ.G_drift, ℰ.G_drives)
+    Gₜ = ℰ.G(aₜ, ℰ.G_drift, ℰ.G_drives)
 
     Id = I(ℰ.ketdim)
 
@@ -108,7 +110,7 @@ end
     ∂Ũ⃗ₜℰ = -expĜₜ
 
     ∂aₜℰ = -ForwardDiff.jacobian(
-        a -> expv(Δtₜ, Id ⊗ G(a, ℰ.G_drift, ℰ.G_drives), Ũ⃗ₜ),
+        a -> expv(Δtₜ, Id ⊗ ℰ.G(a, ℰ.G_drift, ℰ.G_drives), Ũ⃗ₜ),
         aₜ
     )
 
@@ -128,6 +130,7 @@ struct QuantumStateExponentialIntegrator <: QuantumExponentialIntegrator
     n_drives::Int
     ketdim::Int
     dim::Int
+    G::Function
 
     function QuantumStateExponentialIntegrator(
         sys::AbstractQuantumSystem,
@@ -145,7 +148,8 @@ struct QuantumStateExponentialIntegrator <: QuantumExponentialIntegrator
             drive_names,
             n_drives,
             ketdim,
-            dim
+            dim,
+            G_bilinear
         )
     end
 end
@@ -173,7 +177,7 @@ controls(integrator::QuantumStateExponentialIntegrator) = integrator.drive_names
         aₜ = zₜ[traj.components[ℰ.drive_names]]
     end
 
-    Gₜ = G(aₜ, ℰ.G_drift, ℰ.G_drives)
+    Gₜ = ℰ.G(aₜ, ℰ.G_drift, ℰ.G_drives)
 
     return ψ̃ₜ₊₁ - expv(Δtₜ, Gₜ, ψ̃ₜ)
 end
@@ -203,7 +207,7 @@ end
 
     aₜ = zₜ[inds]
 
-    Gₜ = G(aₜ, ℰ.G_drift, ℰ.G_drives)
+    Gₜ = ℰ.G(aₜ, ℰ.G_drift, ℰ.G_drives)
 
     expGₜ = hermitian_exp(Δtₜ * Gₜ)
 
@@ -211,7 +215,7 @@ end
     ∂ψ̃ₜℰ = -expGₜ
 
     ∂aₜℰ = -ForwardDiff.jacobian(
-        a -> expv(Δtₜ, G(a, ℰ.G_drift, ℰ.G_drives), ψ̃ₜ),
+        a -> expv(Δtₜ, ℰ.G(a, ℰ.G_drift, ℰ.G_drives), ψ̃ₜ),
         aₜ
     )
 
