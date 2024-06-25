@@ -69,7 +69,7 @@ function QuantumStateSmoothPulseProblem(
     if !isnothing(init_trajectory)
         traj = init_trajectory
     else
-        traj = initialize_state_trajectory(
+        traj = initialize_quantum_state_trajectory(
             ψ̃_goals,
             ψ̃_inits,
             T,

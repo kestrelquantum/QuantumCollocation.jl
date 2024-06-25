@@ -4,7 +4,7 @@ export unitary_geodesic
 export linear_interpolation
 export unitary_linear_interpolation
 export initialize_unitary_trajectory
-export initialize_state_trajectory
+export initialize_quantum_state_trajectory
 
 using NamedTrajectories
 using LinearAlgebra
@@ -111,15 +111,15 @@ function unitary_geodesic(
 end
 
 function unitary_geodesic(
-    U₀::AbstractMatrix{<:Number},
-    U₁::AbstractMatrix{<:Number},
+    U_init::AbstractMatrix{<:Number},
+    U_goal::AbstractMatrix{<:Number},
     timesteps::AbstractVector{<:Number};
     return_generator=false
 )
     """
     Compute the effective generator of the geodesic connecting U₀ and U₁.
-        U₁ = exp(-im * H * T) U₀
-        log(U₁ * U₀') = -im * H * T
+        U_goal = exp(-im * H * T) U_init
+        log(U_goal * U_init') = -im * H * T
 
     Allow for the possibiltiy of unequal timesteps and ranges outside [0,1].
 
@@ -128,9 +128,9 @@ function unitary_geodesic(
     """
     t₀ = timesteps[1]
     T = timesteps[end] - t₀
-    H = im * log(U₁ * U₀') / T
+    H = im * log(U_goal * U_init') / T
     # -im prefactor is not included in H
-    U_geo = [exp(-im * H * (t - t₀)) * U₀ for t ∈ timesteps]
+    U_geo = [exp(-im * H * (t - t₀)) * U_init for t ∈ timesteps]
     Ũ⃗_geo = stack(operator_to_iso_vec.(U_geo), dims=2)
     if return_generator
         return Ũ⃗_geo, H
@@ -295,7 +295,7 @@ function initialize_unitary_trajectory(
     )
 end
 
-function initialize_state_trajectory(
+function initialize_quantum_state_trajectory(
     ψ̃_goals::AbstractVector{<:AbstractVector{<:Real}},
     ψ̃_inits::AbstractVector{<:AbstractVector{<:Real}},
     T::Int,
