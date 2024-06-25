@@ -9,6 +9,7 @@ export update_trajectory!
 export get_traj_data
 export get_datavec
 export get_objective
+export get_constraints
 
 using ..QuantumSystems
 using ..Integrators
@@ -43,6 +44,7 @@ mutable struct QuantumControlProblem <: AbstractProblem
     trajectory::NamedTrajectory
     integrators::Union{Nothing,Vector{<:AbstractIntegrator}}
     ipopt_options::IpoptOptions
+    piccolo_options::PiccoloOptions
     params::Dict{Symbol, Any}
 end
 
@@ -113,10 +115,8 @@ function QuantumControlProblem(
 
     variables = reshape(variables, traj.dim, traj.T)
 
+    # Container for saving constraints and objectives
     params = merge(kwargs, params)
-
-    params[:ipopt_options] = ipopt_options
-    params[:piccolo_options] = piccolo_options
     params[:linear_constraints] = linear_constraints
     params[:nonlinear_constraints] = [
         nl_constraint.params for nl_constraint ∈ nonlinear_constraints
@@ -130,6 +130,7 @@ function QuantumControlProblem(
         traj,
         dynamics.integrators,
         ipopt_options,
+        piccolo_options,
         params
     )
 end
@@ -306,5 +307,16 @@ function get_objective(prob::QuantumControlProblem)
     return Objective(prob.params[:objective_terms])
 end
 
+"""
+    get_constraints(prob::QuantumControlProblem)
+
+Return the constraints of the `prob::QuantumControlProblem`.
+"""
+function get_constraints(prob::QuantumControlProblem)
+    return AbstractConstraint[
+        prob.params[:linear_constraints]...,
+        NonlinearConstraint.(prob.params[:nonlinear_constraints])...
+    ]
+end
 
 end

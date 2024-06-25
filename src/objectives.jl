@@ -910,10 +910,10 @@ function MinimumTimeObjective(;
 	return Objective(L, ∇L, ∂²L, ∂²L_structure, Dict[params])
 end
 
-function MinimumTimeObjective(traj::NamedTrajectory; D=1.0)
+function MinimumTimeObjective(traj::NamedTrajectory; D=1.0, kwargs...)
     @assert traj.timestep isa Symbol "trajectory does not have a dynamical timestep"
     Δt_indices = [index(t, traj.components[traj.timestep][1], traj.dim) for t = 1:traj.T]
-    return MinimumTimeObjective(; D=D, Δt_indices=Δt_indices)
+    return MinimumTimeObjective(; D=D, Δt_indices=Δt_indices, kwargs...)
 end
 
 @doc raw"""

@@ -17,10 +17,7 @@
 
 Create a quantum control problem for smooth pulse optimization of a quantum state trajectory.
 
-# Keyword Arguments
-
-# TODO: clean up this whole constructor
-
+TODO: Document args
 """
 function QuantumStateSmoothPulseProblem end
 
