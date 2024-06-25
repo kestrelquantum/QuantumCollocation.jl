@@ -63,12 +63,12 @@ function QuantumStateMinimumTimeProblem(
     new_piccolo_options.build_trajectory_constraints = build_trajectory_constraints
 
     return QuantumStateMinimumTimeProblem(
-        prob.trajectory,
+        copy(prob.trajectory),
         prob.system,
         obj,
         prob.integrators,
-        constraints,
-        ipopt_options=prob.ipopt_options,
+        constraints;
+        ipopt_options=deepcopy(prob.ipopt_options),
         piccolo_options=new_piccolo_options,
         kwargs...
     )

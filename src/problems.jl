@@ -302,20 +302,26 @@ end
     get_objective(prob::QuantumControlProblem)
 
 Return the objective function of the `prob::QuantumControlProblem`.
+
+TODO: Is deepcopy necessary?
 """
 function get_objective(prob::QuantumControlProblem)
-    return Objective(prob.params[:objective_terms])
+    params = deepcopy(prob.params)
+    return Objective(params[:objective_terms])
 end
 
 """
     get_constraints(prob::QuantumControlProblem)
 
 Return the constraints of the `prob::QuantumControlProblem`.
+
+TODO: Is deepcopy necessary?
 """
 function get_constraints(prob::QuantumControlProblem)
+    params = deepcopy(prob.params)
     return AbstractConstraint[
-        prob.params[:linear_constraints]...,
-        NonlinearConstraint.(prob.params[:nonlinear_constraints])...
+        params[:linear_constraints]...,
+        NonlinearConstraint.(params[:nonlinear_constraints])...
     ]
 end
 
