@@ -199,7 +199,7 @@ end
 function QuantumDynamics(
     integrators::Vector{<:AbstractIntegrator},
     traj::NamedTrajectory;
-    hessian_approximation=false,
+    eval_hessian=true,
     jacobian_structure=true,
     verbose=false
 )
@@ -235,10 +235,10 @@ function QuantumDynamics(
 
     ∂f = dynamics_jacobian(integrators, traj)
 
-    if hessian_approximation
-        μ∂²f = nothing
-    else
+    if eval_hessian
         μ∂²f = dynamics_hessian_of_lagrangian(integrators, traj)
+    else
+        μ∂²f = nothing
     end
 
     if verbose
@@ -247,13 +247,7 @@ function QuantumDynamics(
 
     dynamics_dim = dim(integrators)
 
-    if hessian_approximation
-        ∂f_structure, ∂F_structure = dynamics_structure(∂f, traj, dynamics_dim;
-            verbose=verbose,
-            jacobian=jacobian_structure,
-        )
-        μ∂²F_structure = nothing
-    else
+    if eval_hessian
         ∂f_structure, ∂F_structure, μ∂²f_structure, μ∂²F_structure =
             dynamics_structure(∂f, μ∂²f, traj, dynamics_dim;
                 verbose=verbose,
@@ -263,6 +257,12 @@ function QuantumDynamics(
                 )
             )
         μ∂²f_nnz = length(μ∂²f_structure)
+    else
+        ∂f_structure, ∂F_structure = dynamics_structure(∂f, traj, dynamics_dim;
+            verbose=verbose,
+            jacobian=jacobian_structure,
+        )
+        μ∂²F_structure = nothing
     end
 
     ∂f_nnz = length(∂f_structure)
@@ -294,9 +294,7 @@ function QuantumDynamics(
         return ∂s
     end
 
-    if hessian_approximation
-        μ∂²F = nothing
-    else
+    if eval_hessian
         @views μ∂²F = (Z⃗::AbstractVector{<:Real}, μ⃗::AbstractVector{<:Real}) -> begin
             μ∂²s = Vector{eltype(Z⃗)}(undef, length(μ∂²F_structure))
             Threads.@threads for t = 1:traj.T-1
@@ -310,7 +308,10 @@ function QuantumDynamics(
             end
             return μ∂²s
         end
+    else
+        μ∂²F = nothing
     end
+    
     return QuantumDynamics(
         integrators,
         F,

@@ -63,7 +63,7 @@ Tests are implemented using the [`TestItemRunner.jl`](https://github.com/julia-v
 
     prob = UnitarySmoothPulseProblem(
         H_drift, H_drives, U_goal, T, Δt,
-        ipopt_options=Options(print_level=1)
+        ipopt_options=IpoptOptions(print_level=1)
     )
 
     solve!(prob, max_iter=100)

@@ -5,7 +5,7 @@ export solve!
 using ..Constraints
 using ..Problems
 using ..SaveLoadUtils
-using ..IpoptOptions
+using ..Options
 
 using NamedTrajectories
 using MathOptInterface
@@ -16,18 +16,18 @@ function solve!(
     init_traj=nothing,
     save_path=nothing,
     controls_save_path=nothing,
-    max_iter::Int=prob.options.max_iter,
-    linear_solver::String=prob.options.linear_solver,
+    max_iter::Int=prob.ipopt_options.max_iter,
+    linear_solver::String=prob.ipopt_options.linear_solver,
 )
-    prob.options.max_iter = max_iter
-    prob.options.linear_solver = linear_solver
+    prob.ipopt_options.max_iter = max_iter
+    prob.ipopt_options.linear_solver = linear_solver
 
-    set!(prob.optimizer, prob.options)
+    set!(prob.optimizer, prob.ipopt_options)
 
     if !isnothing(init_traj)
-        initialize_trajectory!(prob, init_traj)
+        set_trajectory!(prob, init_traj)
     else
-        initialize_trajectory!(prob)
+        set_trajectory!(prob)
     end
 
     MOI.optimize!(prob.optimizer)

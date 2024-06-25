@@ -38,8 +38,8 @@ include("dynamics.jl")
 include("evaluators.jl")
 @reexport using .Evaluators
 
-include("ipopt_options.jl")
-@reexport using .IpoptOptions
+include("options.jl")
+@reexport using .Options
 
 include("problems.jl")
 @reexport using .Problems

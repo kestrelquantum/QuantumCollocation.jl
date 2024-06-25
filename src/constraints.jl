@@ -130,7 +130,7 @@ function FinalFidelityConstraint(;
     zdim::Union{Int,Nothing}=nothing,
     T::Union{Int,Nothing}=nothing,
     subspace::Union{AbstractVector{<:Integer}, Nothing}=nothing,
-    hessian::Bool=true
+    eval_hessian::Bool=true
 )
     @assert !isnothing(fidelity_function) "must provide a fidelity function"
     @assert !isnothing(value) "must provide a fidelity value"
@@ -194,7 +194,7 @@ function FinalFidelityConstraint(;
         end
     end
 
-    if hessian
+    if eval_hessian
         ∂²ℱ(x) = ForwardDiff.hessian(fid, x)
 
         ∂²ℱ_structure = hessian_of_lagrangian_structure(∂²ℱ, statedim, 1)
@@ -242,7 +242,7 @@ function FinalUnitaryFidelityConstraint(
     val::Float64,
     traj::NamedTrajectory;
     subspace::Union{AbstractVector{<:Integer}, Nothing}=nothing,
-    hessian::Bool=true
+    eval_hessian::Bool=true
 )
     @assert statesymb ∈ traj.names
     return FinalFidelityConstraint(;
@@ -254,7 +254,7 @@ function FinalUnitaryFidelityConstraint(
         zdim=traj.dim,
         T=traj.T,
         subspace=subspace,
-        hessian=hessian
+        eval_hessian=eval_hessian
     )
 end
 
@@ -268,7 +268,8 @@ is the NamedTrajectory symbol representing the unitary.
 function FinalQuantumStateFidelityConstraint(
     statesymb::Symbol,
     val::Float64,
-    traj::NamedTrajectory,
+    traj::NamedTrajectory;
+    kwargs...
 )
     @assert statesymb ∈ traj.names
     return FinalFidelityConstraint(;
@@ -278,25 +279,11 @@ function FinalQuantumStateFidelityConstraint(
         goal=traj.goal[statesymb],
         statedim=traj.dims[statesymb],
         zdim=traj.dim,
-        T=traj.T
+        T=traj.T,
+        kwargs...
     )
 end
 
-
-
-# function FinalStateFidelityConstraint(
-#     val::Float64,
-#     statesymb::Symbol,
-#     statedim::Int;
-#     fidelity_function::Function=fidelity
-# )
-#     return FinalFidelityConstraint(;
-#         fidelity_function=fidelity_function,
-#         value=val,
-#         statesymb=statesymb,
-#         statedim=statedim
-#     )
-# end
 
 """
     ComplexModulusContraint(<keyword arguments>)

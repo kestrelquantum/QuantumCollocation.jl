@@ -12,6 +12,7 @@ using ..QuantumSystems
 using ..EmbeddedOperators
 using ..Integrators
 using ..Problems
+using ..DirectSums
 
 using LinearAlgebra
 using NamedTrajectories
@@ -21,7 +22,8 @@ function rollout(
     controls::AbstractMatrix{Float64},
     Δt::Union{AbstractVector{Float64}, AbstractMatrix{Float64}, Float64},
     system::AbstractQuantumSystem;
-    integrator=Integrators.fourth_order_pade
+    integrator=exp,
+    G=Integrators.G_bilinear
 )
     if Δt isa AbstractMatrix
         @assert size(Δt, 1) == 1
@@ -41,11 +43,7 @@ function rollout(
 
     for t = 2:T
         aₜ₋₁ = controls[:, t - 1]
-        Gₜ = Integrators.G(
-            aₜ₋₁,
-            G_drift,
-            G_drives
-        )
+        Gₜ = G(aₜ₋₁, G_drift, G_drives)
         Ψ̃[:, t] .= integrator(Gₜ * Δt[t - 1]) * Ψ̃[:, t - 1]
     end
 
@@ -81,16 +79,46 @@ function QuantumUtils.fidelity(
     system::AbstractQuantumSystem;
     kwargs...
 )
-    return fidelity(ket_to_iso(ψ₁), ket_to_iso(ψ_goal), args...; kwargs...)
+    return fidelity(ket_to_iso(ψ₁), ket_to_iso(ψ_goal), controls, Δt, system; kwargs...)
 end
 
+function QuantumUtils.fidelity(
+    trajectory::NamedTrajectory,
+    system::AbstractQuantumSystem;
+    state_symb::Symbol=:ψ̃,
+    control_symb=:a,
+    kwargs...
+)
+    fids = []
+    for symb in trajectory.names
+        if startswith(symb, state_symb)
+            init = trajectory.initial[symb]
+            goal = trajectory.goal[symb]
+            push!(
+                fids, 
+                fidelity(init, goal, trajectory[control_symb], get_timesteps(trajectory), system; kwargs...)
+            )
+        end
+    end
+    return fids
+end
+
+function QuantumUtils.fidelity(
+    prob::QuantumControlProblem;
+    kwargs...
+)
+    return fidelity(prob.trajectory, prob.system; kwargs...)
+end
+
+# ============================================================================= #
 
 function unitary_rollout(
     Ũ⃗₁::AbstractVector{<:Real},
     controls::AbstractMatrix{Float64},
     Δt::Union{AbstractVector{Float64}, AbstractMatrix{Float64}, Float64},
     system::AbstractQuantumSystem;
-    integrator=exp
+    integrator=exp,
+    G=Integrators.G_bilinear
 )
     if Δt isa AbstractMatrix
         @assert size(Δt, 1) == 1
@@ -110,11 +138,7 @@ function unitary_rollout(
 
     for t = 2:T
         aₜ₋₁ = controls[:, t - 1]
-        Gₜ = Integrators.G(
-            aₜ₋₁,
-            G_drift,
-            G_drives
-        )
+        Gₜ = G(aₜ₋₁, G_drift, G_drives)
         Ũ⃗ₜ₋₁ = Ũ⃗[:, t - 1]
         Ũₜ₋₁ = iso_vec_to_iso_operator(Ũ⃗ₜ₋₁)
         Ũₜ = integrator(Gₜ * Δt[t - 1]) * Ũₜ₋₁
@@ -124,8 +148,6 @@ function unitary_rollout(
 
     return Ũ⃗
 end
-
-
 
 function unitary_rollout(
     controls::AbstractMatrix{Float64},

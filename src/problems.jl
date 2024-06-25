@@ -4,16 +4,17 @@ export AbstractProblem
 export FixedTimeProblem
 export QuantumControlProblem
 
-export initialize_trajectory!
+export set_trajectory!
 export update_trajectory!
 export get_traj_data
 export get_datavec
 export get_objective
+export get_constraints
 
 using ..QuantumSystems
 using ..Integrators
 using ..Evaluators
-using ..IpoptOptions
+using ..Options
 using ..Constraints
 using ..Dynamics
 using ..Objectives
@@ -42,7 +43,8 @@ mutable struct QuantumControlProblem <: AbstractProblem
     system::AbstractQuantumSystem
     trajectory::NamedTrajectory
     integrators::Union{Nothing,Vector{<:AbstractIntegrator}}
-    options::Options
+    ipopt_options::IpoptOptions
+    piccolo_options::PiccoloOptions
     params::Dict{Symbol, Any}
 end
 
@@ -51,43 +53,52 @@ function QuantumControlProblem(
     traj::NamedTrajectory,
     obj::Objective,
     dynamics::QuantumDynamics;
+    ipopt_options::IpoptOptions=IpoptOptions(),
+    piccolo_options::PiccoloOptions=PiccoloOptions(),
+    scale_factor_objective::Float64=1.0,
     additional_objective::Union{Nothing, Objective}=nothing,
-    eval_hessian::Bool=true,
-    options::Options=Options(),
     constraints::Vector{<:AbstractConstraint}=AbstractConstraint[],
     params::Dict{Symbol, Any}=Dict{Symbol, Any}(),
-    max_iter::Int=options.max_iter,
-    linear_solver::String=options.linear_solver,
-    verbose=false,
-    build_trajectory_constraints::Bool=true,
     kwargs...
 )
-    options.max_iter = max_iter
-    options.linear_solver = linear_solver
+    if !piccolo_options.blas_multithreading
+        BLAS.set_num_threads(1)
+    end
+
+    if !piccolo_options.eval_hessian
+        ipopt_options.hessian_approximation = "limited-memory"
+    end
 
     nonlinear_constraints = NonlinearConstraint[con for con ∈ constraints if con isa NonlinearConstraint]
+
+    if scale_factor_objective != 1
+        obj = scale_factor_objective * obj
+    end
 
     if !isnothing(additional_objective)
         obj += additional_objective
     end
 
-    if verbose
+    if piccolo_options.verbose
         println("    building evaluator...")
     end
-    evaluator = PicoEvaluator(traj, obj, dynamics, nonlinear_constraints, eval_hessian)
+    
+    evaluator = PicoEvaluator(
+        traj, obj, dynamics, nonlinear_constraints, eval_hessian=piccolo_options.eval_hessian
+    )
 
     n_dynamics_constraints = dynamics.dim * (traj.T - 1)
     n_variables = traj.dim * traj.T
 
     linear_constraints = LinearConstraint[con for con ∈ constraints if con isa LinearConstraint]
 
-    if build_trajectory_constraints
+    if piccolo_options.build_trajectory_constraints
         linear_constraints = LinearConstraint[trajectory_constraints(traj); linear_constraints]
     end
 
     optimizer = Ipopt.Optimizer()
 
-    if verbose
+    if piccolo_options.verbose
         println("    initializing optimizer...")
     end
 
@@ -98,15 +109,14 @@ function QuantumControlProblem(
         linear_constraints,
         n_dynamics_constraints,
         nonlinear_constraints,
-        n_variables
+        n_variables,
+        verbose=piccolo_options.verbose
     )
 
     variables = reshape(variables, traj.dim, traj.T)
 
+    # Container for saving constraints and objectives
     params = merge(kwargs, params)
-
-    params[:eval_hessian] = eval_hessian
-    params[:options] = options
     params[:linear_constraints] = linear_constraints
     params[:nonlinear_constraints] = [
         nl_constraint.params for nl_constraint ∈ nonlinear_constraints
@@ -119,7 +129,8 @@ function QuantumControlProblem(
         system,
         traj,
         dynamics.integrators,
-        options,
+        ipopt_options,
+        piccolo_options,
         params
     )
 end
@@ -130,28 +141,26 @@ function QuantumControlProblem(
     obj::Objective,
     integrators::Vector{<:AbstractIntegrator};
     params::Dict{Symbol,Any}=Dict{Symbol, Any}(),
-    ipopt_options::Options=Options(),
-    verbose=false,
-    jacobian_structure=true,
-    hessian_approximation=false,
+    ipopt_options::IpoptOptions=IpoptOptions(),
+    piccolo_options::PiccoloOptions=PiccoloOptions(),
     kwargs...
 )
-    if verbose
+    if piccolo_options.verbose
         println("    building dynamics from integrators...")
     end
     dynamics = QuantumDynamics(integrators, traj;
-        jacobian_structure=jacobian_structure,
-        hessian_approximation=hessian_approximation,
-        verbose=verbose
+        jacobian_structure=piccolo_options.jacobian_structure,
+        eval_hessian=piccolo_options.eval_hessian,
+        verbose=piccolo_options.verbose
     )
     return QuantumControlProblem(
         system,
         traj,
         obj,
         dynamics;
-        options=ipopt_options,
+        ipopt_options=ipopt_options,
+        piccolo_options=piccolo_options,
         params=params,
-        verbose=verbose,
         kwargs...
     )
 end
@@ -163,28 +172,26 @@ function QuantumControlProblem(
     obj::Objective,
     integrator::AbstractIntegrator;
     params::Dict{Symbol,Any}=Dict{Symbol, Any}(),
-    ipopt_options::Options=Options(),
-    verbose=false,
-    jacobian_structure=true,
-    hessian_approximation=false,
+    ipopt_options::IpoptOptions=IpoptOptions(),
+    piccolo_options::PiccoloOptions=PiccoloOptions(),
     kwargs...
 )
-    if verbose
+    if piccolo_options.verbose
         println("    building dynamics from integrator...")
     end
     dynamics = QuantumDynamics(integrator, traj;
-        jacobian_structure=jacobian_structure,
-        hessian_approximation=hessian_approximation,
-        verbose=verbose
+        jacobian_structure=piccolo_options.jacobian_structure,
+        eval_hessian=piccolo_options.eval_hessian,
+        verbose=piccolo_options.verbose
     )
     return QuantumControlProblem(
         system,
         traj,
         obj,
         dynamics;
-        options=ipopt_options,
+        ipopt_options=ipopt_options,
+        piccolo_options=piccolo_options,
         params=params,
-        verbose=verbose,
         kwargs...
     )
 end
@@ -195,28 +202,26 @@ function QuantumControlProblem(
     obj::Objective,
     f::Function;
     params::Dict{Symbol,Any}=Dict{Symbol, Any}(),
-    ipopt_options::Options=Options(),
-    verbose=false,
-    jacobian_structure=true,
-    hessian_approximation=false,
+    ipopt_options::IpoptOptions=IpoptOptions(),
+    piccolo_options::PiccoloOptions=PiccoloOptions(),
     kwargs...
 )
-    if verbose
+    if piccolo_options.verbose
         println("    building dynamics from function...")
     end
     dynamics = QuantumDynamics(f, traj;
-        jacobian_structure=jacobian_structure,
-        hessian_approximation=hessian_approximation,
-        verbose=verbose
+        jacobian_structure=piccolo_options.jacobian_structure,
+        eval_hessian=piccolo_options.eval_hessian,
+        verbose=piccolo_options.verbose
     )
     return QuantumControlProblem(
         system,
         traj,
         obj,
         dynamics;
-        options=ipopt_options,
+        ipopt_options=ipopt_options,
+        piccolo_options=piccolo_options,
         params=params,
-        verbose=verbose,
         kwargs...
     )
 end
@@ -228,7 +233,8 @@ function initialize_optimizer!(
     linear_constraints::Vector{LinearConstraint},
     n_dynamics_constraints::Int,
     nonlinear_constraints::Vector{NonlinearConstraint},
-    n_variables::Int
+    n_variables::Int;
+    verbose=true
 )
     nl_cons = fill(
         MOI.NLPBoundsPair(0.0, 0.0),
@@ -258,12 +264,12 @@ function initialize_optimizer!(
     variables = MOI.add_variables(optimizer, n_variables)
 
     # add linear constraints
-    constrain!(optimizer, variables, linear_constraints, trajectory, verbose=true)
+    constrain!(optimizer, variables, linear_constraints, trajectory, verbose=verbose)
 
     return variables
 end
 
-function initialize_trajectory!(
+function set_trajectory!(
     prob::QuantumControlProblem,
     traj::NamedTrajectory
 )
@@ -275,8 +281,8 @@ function initialize_trajectory!(
     )
 end
 
-initialize_trajectory!(prob::QuantumControlProblem) =
-    initialize_trajectory!(prob, prob.trajectory)
+set_trajectory!(prob::QuantumControlProblem) =
+    set_trajectory!(prob, prob.trajectory)
 
 function get_datavec(prob::QuantumControlProblem)
     Z⃗ = MOI.get(
@@ -296,10 +302,27 @@ end
     get_objective(prob::QuantumControlProblem)
 
 Return the objective function of the `prob::QuantumControlProblem`.
+
+TODO: Is deepcopy necessary?
 """
 function get_objective(prob::QuantumControlProblem)
-    return Objective(prob.params[:objective_terms])
+    params = deepcopy(prob.params)
+    return Objective(params[:objective_terms])
 end
 
+"""
+    get_constraints(prob::QuantumControlProblem)
+
+Return the constraints of the `prob::QuantumControlProblem`.
+
+TODO: Is deepcopy necessary?
+"""
+function get_constraints(prob::QuantumControlProblem)
+    params = deepcopy(prob.params)
+    return AbstractConstraint[
+        params[:linear_constraints]...,
+        NonlinearConstraint.(params[:nonlinear_constraints])...
+    ]
+end
 
 end

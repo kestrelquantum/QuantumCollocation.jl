@@ -35,6 +35,7 @@ using TrajectoryIndexingUtils
 using LinearAlgebra
 using SparseArrays
 using ForwardDiff
+using TestItemRunner
 
 abstract type AbstractIntegrator end
 

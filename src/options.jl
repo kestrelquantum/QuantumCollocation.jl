@@ -1,18 +1,21 @@
-module IpoptOptions
+module Options
 
-export Options
+export IpoptOptions
+export PiccoloOptions
 export set!
 
 using Ipopt
 using Libdl
 using Base: @kwdef
 
+abstract type AbstractOptions end
+
 """
     Solver options for Ipopt
 
     https://coin-or.github.io/Ipopt/OPTIONS.html#OPT_print_options_documentation
 """
-@kwdef mutable struct Options{T}
+@kwdef mutable struct IpoptOptions{T} <: AbstractOptions
     tol::T = 1e-8
     s_max::T = 100.0
     max_iter::Int = 1_000
@@ -49,7 +52,26 @@ using Base: @kwdef
     watchdog_trial_iter_max = 3
 end
 
-function set!(optimizer::Ipopt.Optimizer, options::Options)
+
+"""
+    Solver settings for Quantum Collocation.
+""" 
+@kwdef mutable struct PiccoloOptions <: AbstractOptions
+    verbose::Bool = true
+    free_time::Bool = true
+    timesteps_all_equal::Bool = true
+    integrator::Symbol = :pade
+    pade_order::Int = 4
+    eval_hessian::Bool = false
+    jacobian_structure::Bool = true
+    rollout_integrator::Function = exp
+    geodesic = true
+    blas_multithreading::Bool = true
+    build_trajectory_constraints::Bool = true
+end
+
+
+function set!(optimizer::Ipopt.Optimizer, options::AbstractOptions)
     for name in fieldnames(typeof(options))
         value = getfield(options, name)
         if name == :linear_solver

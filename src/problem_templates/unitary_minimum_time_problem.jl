@@ -13,11 +13,6 @@
         kwargs...
     )
 
-    UnitaryMinimumTimeProblem(
-        data_path::String;
-        kwargs...
-    )
-
 Create a minimum-time problem for unitary control.
 
 ```math
@@ -41,8 +36,8 @@ J(\vec{\tilde{U}}, a, \dot{a}, \ddot{a}) + D \sum_t \Delta t_t \\
 - `unitary_symbol::Symbol=:Ũ⃗`: The symbol for the unitary control.
 - `final_fidelity::Float64=0.99`: The final fidelity.
 - `D=1.0`: The weight for the minimum-time objective.
-- `verbose::Bool=false`: Whether to print additional information.
-- `ipopt_options::Options=Options()`: The options for the Ipopt solver.
+- `ipopt_options::IpoptOptions=IpoptOptions()`: The options for the Ipopt solver.
+- `piccolo_options::PiccoloOptions=PiccoloOptions()`: The options for the Piccolo solver.
 - `kwargs...`: Additional keyword arguments to pass to `QuantumControlProblem`.
 """
 function UnitaryMinimumTimeProblem end
@@ -54,25 +49,32 @@ function UnitaryMinimumTimeProblem(
     integrators::Vector{<:AbstractIntegrator},
     constraints::Vector{<:AbstractConstraint};
     unitary_symbol::Symbol=:Ũ⃗,
-    final_fidelity::Float64=0.99,
+    final_fidelity::Union{Real, Nothing}=nothing,
     D=1.0,
-    verbose::Bool=false,
-    ipopt_options::Options=Options(),
+    ipopt_options::IpoptOptions=IpoptOptions(),
+    piccolo_options::PiccoloOptions=PiccoloOptions(),
     subspace=nothing,
     kwargs...
 )
     @assert unitary_symbol ∈ trajectory.names
 
-    objective += MinimumTimeObjective(trajectory; D=D)
+    if isnothing(final_fidelity)
+        final_fidelity = unitary_fidelity(
+            trajectory[unitary_symbol][:, end], trajectory.goal[unitary_symbol]
+        )
+    end
+
+    objective += MinimumTimeObjective(trajectory; D=D, eval_hessian=piccolo_options.eval_hessian)
 
     fidelity_constraint = FinalUnitaryFidelityConstraint(
         unitary_symbol,
         final_fidelity,
         trajectory;
-        subspace=subspace
+        subspace=subspace,
+        eval_hessian=piccolo_options.eval_hessian
     )
 
-    constraints = AbstractConstraint[constraints..., fidelity_constraint]
+    constraints = push!(constraints, fidelity_constraint) 
 
     return QuantumControlProblem(
         system,
@@ -80,56 +82,31 @@ function UnitaryMinimumTimeProblem(
         objective,
         integrators;
         constraints=constraints,
-        verbose=verbose,
         ipopt_options=ipopt_options,
+        piccolo_options=piccolo_options,
         kwargs...
     )
 end
 
 function UnitaryMinimumTimeProblem(
     prob::QuantumControlProblem;
+    objective::Objective=get_objective(prob),
+    constraints::AbstractVector{<:AbstractConstraint}=get_constraints(prob),
+    ipopt_options::IpoptOptions=deepcopy(prob.ipopt_options),
+    piccolo_options::PiccoloOptions=deepcopy(prob.piccolo_options),
+    build_trajectory_constraints=false,
     kwargs...
 )
-    params = deepcopy(prob.params)
-    trajectory = copy(prob.trajectory)
-    system = prob.system
-    objective = Objective(params[:objective_terms])
-    integrators = prob.integrators
-    constraints = [
-        params[:linear_constraints]...,
-        NonlinearConstraint.(params[:nonlinear_constraints])...
-    ]
+    piccolo_options.build_trajectory_constraints = build_trajectory_constraints
+    
     return UnitaryMinimumTimeProblem(
-        trajectory,
-        system,
+        copy(prob.trajectory),
+        prob.system,
         objective,
-        integrators,
+        prob.integrators,
         constraints;
-        build_trajectory_constraints=false,
-        kwargs...
-    )
-end
-
-function UnitaryMinimumTimeProblem(
-    data_path::String;
-    kwargs...
-)
-    data = load(data_path)
-    system = data["system"]
-    trajectory = data["trajectory"]
-    objective = Objective(data["params"][:objective_terms])
-    integrators = data["integrators"]
-    constraints = AbstractConstraint[
-        data["params"][:linear_constraints]...,
-        NonlinearConstraint.(data["params"][:nonlinear_constraints])...
-    ]
-    return UnitaryMinimumTimeProblem(
-        trajectory,
-        system,
-        objective,
-        integrators,
-        constraints;
-        build_trajectory_constraints=false,
+        ipopt_options=ipopt_options,
+        piccolo_options=piccolo_options,
         kwargs...
     )
 end
@@ -137,6 +114,8 @@ end
 # *************************************************************************** #
 
 @testitem "Minimum time Hadamard gate" begin
+    using NamedTrajectories
+
     H_drift = GATES[:Z]
     H_drives = [GATES[:X], GATES[:Y]]
     U_goal = GATES[:H]
@@ -145,24 +124,24 @@ end
 
     prob = UnitarySmoothPulseProblem(
         H_drift, H_drives, U_goal, T, Δt,
-        ipopt_options=Options(print_level=1)
+        ipopt_options=IpoptOptions(print_level=1),
+        piccolo_options=PiccoloOptions(verbose=false)
     )
 
-    solve!(prob, max_iter=100)
+    before = unitary_fidelity(prob)
+    solve!(prob, max_iter=20)
+    after = unitary_fidelity(prob)
+    @test after > before
 
-    @test unitary_fidelity(prob) > 0.99
+    # Soft fidelity constraint
+    final_fidelity = minimum([0.99, after])
+    mintime_prob = UnitaryMinimumTimeProblem(prob, final_fidelity=final_fidelity)
+    solve!(mintime_prob; max_iter=40)
 
-    final_fidelity = 0.99
+    @test unitary_fidelity(mintime_prob) ≥ after
+    @test sum(get_timesteps(mintime_prob.trajectory)) < sum(get_timesteps(prob.trajectory))
 
-    mintime_prob = UnitaryMinimumTimeProblem(
-        prob,
-        final_fidelity=final_fidelity,
-        ipopt_options=Options(print_level=1)
-    )
+    # Test without final fidelity
+    UnitaryMinimumTimeProblem(prob)
 
-    solve!(mintime_prob; max_iter=100)
-
-    @test unitary_fidelity(mintime_prob) > final_fidelity
-
-    @test sum(mintime_prob.trajectory[:Δt]) < sum(prob.trajectory[:Δt])
 end

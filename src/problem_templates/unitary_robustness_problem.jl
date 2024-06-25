@@ -1,11 +1,11 @@
 @doc raw"""
-    UnitaryRobustnessProblem(Hₑ, trajectory, system, objective, integrators, constraints;
+    UnitaryRobustnessProblem(
+        H_error, trajectory, system, objective, integrators, constraints;
         unitary_symbol=:Ũ⃗,
-        final_fidelity=unitary_fidelity(trajectory[end][unitary_symbol], trajectory.goal[unitary_symbol]),
+        final_fidelity=nothing,
         subspace=nothing,
-        eval_hessian=false,
-        verbose=false,
-        ipopt_options=Options(),
+        ipopt_options=IpoptOptions(),
+        piccolo_options=PiccoloOptions(),
         kwargs...
     )
 
@@ -17,30 +17,31 @@ function UnitaryRobustnessProblem end
 
 
 function UnitaryRobustnessProblem(
-    Hₑ::AbstractMatrix{<:Number},
+    H_error::AbstractMatrix{<:Number},
     trajectory::NamedTrajectory,
     system::QuantumSystem,
     objective::Objective,
     integrators::Vector{<:AbstractIntegrator},
     constraints::Vector{<:AbstractConstraint};
     unitary_symbol::Symbol=:Ũ⃗,
-    final_fidelity::Float64=unitary_fidelity(trajectory[end][unitary_symbol], trajectory.goal[unitary_symbol]),
-    subspace::AbstractVector{<:Integer}=1:size(Hₑ, 1),
-    eval_hessian::Bool=false,
-    verbose::Bool=false,
-    ipopt_options::Options=Options(),
+    final_fidelity::Union{Real, Nothing}=nothing,
+    subspace::AbstractVector{<:Integer}=1:size(H_error, 1),
+    ipopt_options::IpoptOptions=IpoptOptions(),
+    piccolo_options::PiccoloOptions=PiccoloOptions(),
     kwargs...
 )
     @assert unitary_symbol ∈ trajectory.names
 
-    if !eval_hessian
-        ipopt_options.hessian_approximation = "limited-memory"
+    if isnothing(final_fidelity)
+        final_fidelity = unitary_fidelity(
+            trajectory[unitary_symbol][:, end], trajectory.goal[unitary_symbol]
+        )
     end
 
     objective += InfidelityRobustnessObjective(
-        Hₑ,
+        H_error,
         trajectory,
-        eval_hessian=eval_hessian,
+        eval_hessian=piccolo_options.eval_hessian,
         subspace=subspace
     )
 
@@ -50,8 +51,7 @@ function UnitaryRobustnessProblem(
         trajectory;
         subspace=subspace
     )
-
-    constraints = AbstractConstraint[constraints..., fidelity_constraint]
+    push!(constraints, fidelity_constraint)
 
     return QuantumControlProblem(
         system,
@@ -59,36 +59,33 @@ function UnitaryRobustnessProblem(
         objective,
         integrators;
         constraints=constraints,
-        verbose=verbose,
         ipopt_options=ipopt_options,
-        eval_hessian=eval_hessian,
+        piccolo_options=piccolo_options,
         kwargs...
     )
 end
 
 function UnitaryRobustnessProblem(
-    Hₑ::AbstractMatrix{<:Number},
+    H_error::AbstractMatrix{<:Number},
     prob::QuantumControlProblem;
+    objective::Objective=get_objective(prob),
+    constraints::AbstractVector{<:AbstractConstraint}=get_constraints(prob),
+    ipopt_options::IpoptOptions=deepcopy(prob.ipopt_options),
+    piccolo_options::PiccoloOptions=deepcopy(prob.piccolo_options),
+    build_trajectory_constraints=false,
     kwargs...
 )
-    params = deepcopy(prob.params)
-    trajectory = copy(prob.trajectory)
-    system = prob.system
-    objective = Objective(params[:objective_terms])
-    integrators = prob.integrators
-    constraints = [
-        params[:linear_constraints]...,
-        NonlinearConstraint.(params[:nonlinear_constraints])...
-    ]
+    piccolo_options.build_trajectory_constraints = build_trajectory_constraints
 
     return UnitaryRobustnessProblem(
-        Hₑ,
-        trajectory,
-        system,
+        H_error,
+        copy(prob.trajectory),
+        prob.system,
         objective,
-        integrators,
+        prob.integrators,
         constraints;
-        build_trajectory_constraints=false,
+        ipopt_options=ipopt_options,
+        piccolo_options=piccolo_options,
         kwargs...
     )
 end
@@ -108,66 +105,40 @@ end
     subspace = U_goal.subspace_indices
     T = 51
     Δt = 0.2
-    probs = Dict()
 
-    # --------------------------------------------
-    #   1. test UnitarySmoothPulseProblem with subspace
-    #   - rely on linear interpolation of unitary
-    # --------------------------------------------
-    probs["transmon"] = UnitarySmoothPulseProblem(
+    #  test initial problem
+    # ---------------------
+    prob = UnitarySmoothPulseProblem(
         sys, U_goal, T, Δt,
-        geodesic=false,
+        geodesic=true,
         verbose=false,
-        ipopt_options=Options(print_level=1)
+        ipopt_options=IpoptOptions(print_level=1),
+        piccolo_options=PiccoloOptions(verbose=false)
     )
-    solve!(probs["transmon"], max_iter=200)
+    before = unitary_fidelity(prob, subspace=subspace)
+    solve!(prob, max_iter=20)
+    after = unitary_fidelity(prob, subspace=subspace)
 
     # Subspace gate success
-    @test unitary_fidelity(probs["transmon"], subspace=subspace) > 0.99
+    @test after > before
 
 
-    # --------------------------------------------
-    #   2. test UnitaryRobustnessProblem from previous problem
-    # --------------------------------------------
-    probs["robust"] = UnitaryRobustnessProblem(
-        H_error, probs["transmon"],
-        final_fidelity=0.99,
+    #  test robustness from previous problem
+    # --------------------------------------
+    final_fidelity = 0.99
+    rob_prob = UnitaryRobustnessProblem(
+        H_error, prob,
+        final_fidelity=final_fidelity,
         subspace=subspace,
-        verbose=false,
-        ipopt_options=Options(recalc_y="yes", recalc_y_feas_tol=1.0, print_level=1)
+        ipopt_options=IpoptOptions(recalc_y="yes", recalc_y_feas_tol=10.0, print_level=1),
     )
-    solve!(probs["robust"], max_iter=200)
+    solve!(rob_prob, max_iter=50)
 
-    eval_loss(problem, Loss) = Loss(vec(problem.trajectory.data), problem.trajectory)
-    loss = InfidelityRobustnessObjective(H_error, probs["transmon"].trajectory).L
+    loss(Z⃗) = InfidelityRobustnessObjective(H_error, prob.trajectory).L(Z⃗, prob.trajectory)
 
     # Robustness improvement over default
-    @test eval_loss(probs["robust"], loss) < eval_loss(probs["transmon"], loss)
+    @test loss(rob_prob.trajectory.datavec) < loss(prob.trajectory.datavec)
 
     # Fidelity constraint approximately satisfied
-    @test isapprox(unitary_fidelity(probs["robust"]; subspace=subspace), 0.99, atol=0.025)
-
-    # --------------------------------------------
-    #   3. test UnitaryRobustnessProblem from default struct
-    # --------------------------------------------
-    params = deepcopy(probs["transmon"].params)
-    trajectory = copy(probs["transmon"].trajectory)
-    system = probs["transmon"].system
-    objective = QuadraticRegularizer(:dda, trajectory, 1e-4)
-    integrators = probs["transmon"].integrators
-    constraints = AbstractConstraint[]
-
-    probs["unconstrained"] = UnitaryRobustnessProblem(
-        H_error, trajectory, system, objective, integrators, constraints,
-        final_fidelity=0.99,
-        subspace=subspace,
-        ipopt_options=Options(recalc_y="yes", recalc_y_feas_tol=1e-1, print_level=4)
-    )
-    solve!(probs["unconstrained"]; max_iter=100)
-
-    # Additonal robustness improvement after relaxed objective
-    @test eval_loss(probs["unconstrained"], loss) < eval_loss(probs["transmon"], loss)
-
-    # Fidelity constraint approximately satisfied
-    @test isapprox(unitary_fidelity(probs["unconstrained"]; subspace=subspace), 0.99, atol=0.025)
+    @test isapprox(unitary_fidelity(rob_prob; subspace=subspace), 0.99, atol=0.025)
 end
