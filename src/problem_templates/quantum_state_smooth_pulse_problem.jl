@@ -136,6 +136,14 @@ function QuantumStateSmoothPulseProblem(
         end
     end
 
+
+
+    integrators = [
+        ψ̃_integrators...,
+        DerivativeIntegrator(:a, :da, traj),
+        DerivativeIntegrator(:da, :dda, traj)
+    ]
+
     if free_time
         if timesteps_all_equal
             push!(constraints, TimeStepsAllEqualConstraint(:Δt, traj))
