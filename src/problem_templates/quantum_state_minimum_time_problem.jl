@@ -56,11 +56,12 @@ function QuantumStateMinimumTimeProblem(
     prob::QuantumControlProblem;
     obj::Objective=get_objective(prob),
     constraints::AbstractVector{<:AbstractConstraint}=get_constraints(prob),
+    ipopt_options::IpoptOptions=deepcopy(prob.ipopt_options),
+    piccolo_options::PiccoloOptions=deepcopy(prob.piccolo_options),
     build_trajectory_constraints=false,
     kwargs...
 )
-    new_piccolo_options = deepcopy(prob.piccolo_options)
-    new_piccolo_options.build_trajectory_constraints = build_trajectory_constraints
+    piccolo_options.build_trajectory_constraints = build_trajectory_constraints
 
     return QuantumStateMinimumTimeProblem(
         copy(prob.trajectory),
@@ -68,8 +69,8 @@ function QuantumStateMinimumTimeProblem(
         obj,
         prob.integrators,
         constraints;
-        ipopt_options=deepcopy(prob.ipopt_options),
-        piccolo_options=new_piccolo_options,
+        ipopt_options=ipopt_options,
+        piccolo_options=piccolo_options,
         kwargs...
     )
 end
@@ -96,4 +97,7 @@ end
         solve!(mintime_prob, max_iter=20)
         final = sum(get_timesteps(mintime_prob.trajectory))
         @test final < initial
+
+        # Test with final fidelity
+        QuantumStateMinimumTimeProblem(prob, final_fidelity=0.99)
 end

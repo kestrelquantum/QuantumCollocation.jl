@@ -13,11 +13,6 @@
         kwargs...
     )
 
-    UnitaryMinimumTimeProblem(
-        data_path::String;
-        kwargs...
-    )
-
 Create a minimum-time problem for unitary control.
 
 ```math
@@ -54,7 +49,7 @@ function UnitaryMinimumTimeProblem(
     integrators::Vector{<:AbstractIntegrator},
     constraints::Vector{<:AbstractConstraint};
     unitary_symbol::Symbol=:Ũ⃗,
-    final_fidelity::Float64=0.99,
+    final_fidelity::Union{Real, Nothing}=nothing,
     D=1.0,
     ipopt_options::IpoptOptions=IpoptOptions(),
     piccolo_options::PiccoloOptions=PiccoloOptions(),
@@ -62,6 +57,12 @@ function UnitaryMinimumTimeProblem(
     kwargs...
 )
     @assert unitary_symbol ∈ trajectory.names
+
+    if isnothing(final_fidelity)
+        final_fidelity = unitary_fidelity(
+            trajectory[unitary_symbol][:, end], trajectory.goal[unitary_symbol]
+        )
+    end
 
     objective += MinimumTimeObjective(trajectory; D=D, eval_hessian=piccolo_options.eval_hessian)
 
@@ -91,11 +92,12 @@ function UnitaryMinimumTimeProblem(
     prob::QuantumControlProblem;
     objective::Objective=get_objective(prob),
     constraints::AbstractVector{<:AbstractConstraint}=get_constraints(prob),
+    ipopt_options::IpoptOptions=deepcopy(prob.ipopt_options),
+    piccolo_options::PiccoloOptions=deepcopy(prob.piccolo_options),
     build_trajectory_constraints=false,
     kwargs...
 )
-    new_piccolo_options = deepcopy(prob.piccolo_options)
-    new_piccolo_options.build_trajectory_constraints = build_trajectory_constraints
+    piccolo_options.build_trajectory_constraints = build_trajectory_constraints
     
     return UnitaryMinimumTimeProblem(
         copy(prob.trajectory),
@@ -103,8 +105,8 @@ function UnitaryMinimumTimeProblem(
         objective,
         prob.integrators,
         constraints;
-        ipopt_options=deepcopy(prob.ipopt_options),
-        piccolo_options=new_piccolo_options,
+        ipopt_options=ipopt_options,
+        piccolo_options=piccolo_options,
         kwargs...
     )
 end
@@ -138,4 +140,8 @@ end
 
     @test unitary_fidelity(mintime_prob) ≥ after
     @test sum(get_timesteps(mintime_prob.trajectory)) < sum(get_timesteps(prob.trajectory))
+
+    # Test without final fidelity
+    UnitaryMinimumTimeProblem(prob)
+
 end

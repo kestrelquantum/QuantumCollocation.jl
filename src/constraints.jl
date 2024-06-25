@@ -195,7 +195,7 @@ function FinalFidelityConstraint(;
     end
 
     if eval_hessian
-        ∂²ℱ(x) = ForwardDiff.eval_hessian(fid, x)
+        ∂²ℱ(x) = ForwardDiff.hessian(fid, x)
 
         ∂²ℱ_structure = hessian_of_lagrangian_structure(∂²ℱ, statedim, 1)
 
