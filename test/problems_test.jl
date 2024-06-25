@@ -1,13 +1,14 @@
 """
-    Testing problems
+    Testing problem features
 
+    TODO:     
     - test problem creation
-    - test problem solving
+    - test problem iterations
     - test problem saving
     - test problem loading
 """
 
-@testitem "Problems" begin
+@testitem "System creation" begin
     # initializing test system
     T = 5
     H_drift = GATES[:Z]
@@ -16,7 +17,7 @@
 
     system = QuantumSystem(H_drift, H_drives)
 
-    # test problem creation
+    # test system creation
 
 
 end

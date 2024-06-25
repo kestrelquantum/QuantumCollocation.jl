@@ -167,7 +167,8 @@ end
     # --------------------------------
     prob = QuantumStateSmoothPulseProblem(
         sys, ψ_init, ψ_target, T, Δt;
-        ipopt_options=IpoptOptions(print_level=1), verbose=false
+        ipopt_options=IpoptOptions(print_level=1), 
+        piccolo_options=PiccoloOptions(verbose=false)
     )
     initial = fidelity(prob)
     solve!(prob, max_iter=20)
@@ -180,7 +181,8 @@ end
     ψ_targets = [[0.0, 1.0], [1.0, 0.0]]
     prob = QuantumStateSmoothPulseProblem(
         sys, ψ_inits, ψ_targets, T, Δt;
-        ipopt_options=IpoptOptions(print_level=1), verbose=false
+        ipopt_options=IpoptOptions(print_level=1), 
+        piccolo_options=PiccoloOptions(verbose=false)
     )
     initial = fidelity(prob)
     solve!(prob, max_iter=20)

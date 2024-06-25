@@ -2,61 +2,45 @@
     Testing objective struct functionality
 """
 
-#TODO: Depends on TestUtils
+@testitem "Quantum State Objective" begin
+    using LinearAlgebra
+    using NamedTrajectories
+    using ForwardDiff
+    include("test_utils.jl")
+    
+    T = 10
 
+    Z = NamedTrajectory(
+        (ψ̃ = randn(4, T), u = randn(2, T)),
+        controls=:u,
+        timestep=0.1,
+        goal=(ψ̃ = [1., 0., 0., 0.],)
+    )
 
-#  @testset "Objectives" begin
+    loss = :InfidelityLoss
+    Q = 100.0
 
-# initializing test trajectory
-# T = 10
-# H_drift = GATES[:Z]
-# H_drives = [GATES[:X], GATES[:Y]]
+    J = QuantumObjective(:ψ̃, Z, loss, Q)
 
-# system = QuantumSystem(H_drift, H_drives)
+    L = Z⃗ -> J.L(Z⃗, Z)
+    ∇L = Z⃗ -> J.∇L(Z⃗, Z)
+    ∂²L = Z⃗ -> J.∂²L(Z⃗, Z)
+    ∂²L_structure = J.∂²L_structure(Z)
 
-# P = FourthOrderPade(system)
+    # test objective function gradient
+    @test ForwardDiff.gradient(L, Z.datavec) ≈ ∇L(Z.datavec)
 
-# function f(zₜ, zₜ₊₁)
-#     ψ̃ₜ₊₁ = zₜ₊₁[Z.components.ψ̃]
-#     ψ̃ₜ = zₜ[Z.components.ψ̃]
-#     uₜ = zₜ[Z.components.u]
-#     δψ̃ = P(ψ̃ₜ₊₁, ψ̃ₜ, uₜ, Z.timestep)
-#     return δψ̃
-# end
+    # test objective function hessian
+    shape = (Z.dim * Z.T, Z.dim * Z.T)
+    @test ForwardDiff.hessian(L, Z.datavec) ≈ dense(∂²L(Z.datavec), ∂²L_structure, shape)
+end
 
-# dynamics = QuantumDynamics(f, Z)
-# evaluator = PicoEvaluator(Z, J, dynamics, true)
+@testitem "Quadratic Regularizer Objective" begin
+    using LinearAlgebra
+    using NamedTrajectories
+    using ForwardDiff
+    include("test_utils.jl")
 
-#     @testset "Quantum State Objective" begin
-
-#         Z = NamedTrajectory(
-#             (ψ̃ = randn(4, T), u = randn(2, T)),
-#             controls=:u,
-#             dt=0.1,
-#             goal=(ψ̃ = [1, 0, 0, 0],)
-#         )
-
-
-
-#         loss = :InfidelityLoss
-#         Q = 100.0
-
-#         J = QuantumObjective(:ψ̃, Z, loss, Q)
-
-#         L = Z⃗ -> J.L(Z⃗, Z)
-#         ∇L = Z⃗ -> J.∇L(Z⃗, Z)
-#         ∂²L = Z⃗ -> J.∂²L(Z⃗, Z)
-#         ∂²L_structure = J.∂²L_structure(Z)
-
-#         # test objective function gradient
-#         @test ForwardDiff.gradient(L, Z.datavec) ≈ ∇L(Z.datavec)
-
-#         # test objective function hessian
-#         shape = (Z.dim * Z.T, Z.dim * Z.T)
-#         @test ForwardDiff.hessian(L, Z.datavec) ≈ dense(∂²L(Z.datavec), ∂²L_structure, shape)
-#     end
-
-@testset "Quadratic Regularizer Objective" begin
     T = 10
     
     Z = NamedTrajectory(
@@ -87,7 +71,12 @@
     ))
 end
 
-@testset "Quadratic Smoothness Regularizer Objective" begin
+@testitem "Quadratic Smoothness Regularizer Objective" begin
+    using LinearAlgebra
+    using NamedTrajectories
+    using ForwardDiff
+    include("test_utils.jl")
+
     T = 10
 
     Z = NamedTrajectory(
@@ -118,7 +107,12 @@ end
     ))
 end
 
-@testset "Unitary Objective" begin
+@testitem "Unitary Objective" begin
+    using LinearAlgebra
+    using NamedTrajectories
+    using ForwardDiff
+    include("test_utils.jl")
+
     T = 10
 
     U_init = GATES[:I]

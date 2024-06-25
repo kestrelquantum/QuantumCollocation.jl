@@ -12,6 +12,7 @@ using ..QuantumSystems
 using ..EmbeddedOperators
 using ..Integrators
 using ..Problems
+using ..DirectSums
 
 using LinearAlgebra
 using NamedTrajectories
@@ -89,10 +90,10 @@ function QuantumUtils.fidelity(
     kwargs...
 )
     fids = []
-    for name in trajectory.names
-        if startswith(string(name), string(state_symb))
-            init = trajectory.initial[name]
-            goal = trajectory.goal[name]
+    for symb in trajectory.names
+        if startswith(symb, state_symb)
+            init = trajectory.initial[symb]
+            goal = trajectory.goal[symb]
             push!(
                 fids, 
                 fidelity(init, goal, trajectory[control_symb], get_timesteps(trajectory), system; kwargs...)
