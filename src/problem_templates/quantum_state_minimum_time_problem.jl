@@ -14,7 +14,7 @@ function QuantumStateMinimumTimeProblem(
     state_symbol::Symbol=:ψ̃,
     D=1.0,
     verbose::Bool=false,
-    ipopt_options::Options=Options(),
+    ipopt_options::IpoptOptions=IpoptOptions(),
     kwargs...
 )
     @assert state_symbol ∈ trajectory.names

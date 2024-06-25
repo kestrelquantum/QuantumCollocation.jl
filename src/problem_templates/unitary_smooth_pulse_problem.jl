@@ -56,7 +56,7 @@ with
 - `R_leakage=1e-1`: the weight on the leakage suppression term
 - `max_iter::Int=1000`: the maximum number of iterations for the solver
 - `linear_solver::String="mumps"`: the linear solver to use
-- `ipopt_options::Options=Options()`: the options for the Ipopt solver
+- `ipopt_options::IpoptOptions=IpoptOptions()`: the options for the Ipopt solver
 - `constraints::Vector{<:AbstractConstraint}=AbstractConstraint[]`: additional constraints to add to the problem
 - `timesteps_all_equal::Bool=true`: whether or not to enforce that all time steps are equal
 - `verbose::Bool=false`: whether or not to print constructor output
@@ -72,14 +72,20 @@ with
 - `subspace=nothing`: the subspace to use for the unitary integrator
 - `jacobian_structure=true`: whether or not to use the jacobian structure
 - `hessian_approximation=false`: whether or not to use L-BFGS hessian approximation in Ipopt
-- `blas_multithreading=true`: whether or not to use multithreading in BLAS
+- `blas_multithreading=true`: whether or not to use multithreading in BLAS\\
+
+
+TODO: control modulus norm, advanced feature, needs documentation
+
 """
 function UnitarySmoothPulseProblem(
     system::AbstractQuantumSystem,
     operator::Union{EmbeddedOperator, AbstractMatrix{<:Number}},
     T::Int,
     Δt::Union{Float64, Vector{Float64}};
-    free_time=true,
+    ipopt_options::IpoptOptions=IpoptOptions(),
+    piccolo_options::PiccoloOptions=PiccoloOptions(),
+    constraints::Vector{<:AbstractConstraint}=AbstractConstraint[],
     init_trajectory::Union{NamedTrajectory, Nothing}=nothing,
     a_bound::Float64=1.0,
     a_bounds=fill(a_bound, length(system.G_drives)),
@@ -96,35 +102,12 @@ function UnitarySmoothPulseProblem(
     R_dda::Union{Float64, Vector{Float64}}=R,
     leakage_suppression=false,
     R_leakage=1e-1,
-    max_iter::Int=1000,
-    linear_solver::String="mumps",
-    ipopt_options::Options=Options(),
-    constraints::Vector{<:AbstractConstraint}=AbstractConstraint[],
-    timesteps_all_equal::Bool=true,
-    verbose::Bool=false,
-    integrator::Symbol=:pade,
-    rollout_integrator=exp,
-    bound_unitary=integrator == :exponential,
-    # TODO: control modulus norm, advanced feature, needs documentation
     control_norm_constraint=false,
     control_norm_constraint_components=nothing,
     control_norm_R=nothing,
-    geodesic=true,
-    pade_order=4,
-    autodiff=pade_order != 4,
-    jacobian_structure=true,
-    hessian_approximation=false,
-    blas_multithreading=true,
+    bound_unitary=piccolo_options.integrator == :exponential,
     kwargs...
 )
-    if !blas_multithreading
-        BLAS.set_num_threads(1)
-    end
-
-    if hessian_approximation
-        ipopt_options.hessian_approximation = "limited-memory"
-    end
-
     # Trajectory
     if !isnothing(init_trajectory)
         traj = init_trajectory
@@ -137,14 +120,14 @@ function UnitarySmoothPulseProblem(
             n_drives,
             a_bounds,
             dda_bounds;
-            free_time=free_time,
+            free_time=piccolo_options.free_time,
             Δt_bounds=(Δt_min, Δt_max),
-            geodesic=geodesic,
+            geodesic=piccolo_options.geodesic,
             bound_unitary=bound_unitary,
             drive_derivative_σ=drive_derivative_σ,
             a_guess=a_guess,
             system=system,
-            rollout_integrator=rollout_integrator,
+            rollout_integrator=piccolo_options.rollout_integrator,
         )
     end
 
@@ -164,15 +147,15 @@ function UnitarySmoothPulseProblem(
                 constraints, :Ũ⃗, traj, 
                 R_value=R_leakage, 
                 indices=leakage_indices,
-                eval_hessian=!hessian_approximation
+                eval_hessian=piccolo_options.eval_hessian
             )
         else
             @warn "leakage_suppression is not supported for non-embedded operators, ignoring."
         end
     end
 
-    if free_time
-        if timesteps_all_equal
+    if piccolo_options.free_time
+        if piccolo_options.timesteps_all_equal
             push!(constraints, TimeStepsAllEqualConstraint(:Δt, traj))
         end
     end
@@ -190,10 +173,10 @@ function UnitarySmoothPulseProblem(
     end
 
     # Integrators
-    if integrator == :pade
+    if piccolo_options.integrator == :pade
         unitary_integrator =
-            UnitaryPadeIntegrator(system, :Ũ⃗, :a; order=pade_order, autodiff=autodiff)
-    elseif integrator == :exponential
+            UnitaryPadeIntegrator(system, :Ũ⃗, :a; order=piccolo_options.pade_order)
+    elseif piccolo_options.integrator == :exponential
         unitary_integrator =
             UnitaryExponentialIntegrator(system, :Ũ⃗, :a)
     else
@@ -212,13 +195,8 @@ function UnitarySmoothPulseProblem(
         J,
         integrators;
         constraints=constraints,
-        max_iter=max_iter,
-        linear_solver=linear_solver,
-        verbose=verbose,
         ipopt_options=ipopt_options,
-        jacobian_structure=jacobian_structure,
-        hessian_approximation=hessian_approximation,
-        eval_hessian=!hessian_approximation,
+        piccolo_options=piccolo_options,
         kwargs...
     )
 end
@@ -256,7 +234,8 @@ end
     
     prob = UnitarySmoothPulseProblem(
         sys, U_goal, T, Δt,
-        ipopt_options=Options(print_level=1), verbose=false
+        ipopt_options=IpoptOptions(print_level=1),
+        piccolo_options=PiccoloOptions(verbose=false)
     )
     
     initial = unitary_fidelity(prob)
@@ -272,17 +251,21 @@ end
     T = 51
     Δt = 0.2
 
+    # Test embedded operator
+    # ----------------------
     prob = UnitarySmoothPulseProblem(
         sys, U_goal, T, Δt,
-        ipopt_options=Options(print_level=1), verbose=false
+        ipopt_options=IpoptOptions(print_level=1),
+        piccolo_options=PiccoloOptions(verbose=false)
     )
 
     initial = unitary_fidelity(prob, subspace=U_goal.subspace_indices)
     solve!(prob, max_iter=20)
     final = unitary_fidelity(prob, subspace=U_goal.subspace_indices)
     @test final > initial
-
+    
     # Test leakage suppression
+    # ------------------------
     a = annihilate(4)
     sys = QuantumSystem([(a + a')/2, (a - a')/(2im)])
     U_goal = EmbeddedOperator(GATES[:H], sys)
@@ -292,7 +275,8 @@ end
     prob = UnitarySmoothPulseProblem(
         sys, U_goal, T, Δt,
         leakage_suppression=true, R_leakage=1e-1,
-        ipopt_options=Options(print_level=1), verbose=false
+        ipopt_options=IpoptOptions(print_level=1),
+        piccolo_options=PiccoloOptions(verbose=false)
     )
 
     initial = unitary_fidelity(prob, subspace=U_goal.subspace_indices)

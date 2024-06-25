@@ -40,7 +40,7 @@ between each neighbor of the provided `probs`.
 - `hessian_approximation=true`: whether or not to use L-BFGS hessian approximation in Ipopt
 - `jacobian_structure=true`: whether or not to use the jacobian structure in Ipopt
 - `blas_multithreading=true`: whether or not to use multithreading in BLAS
-- `ipopt_options::Options=Options()`: the options for the Ipopt solver
+- `ipopt_options::IpoptOptions=IpoptOptions()`: the options for the Ipopt solver
 
 """
 function UnitaryDirectSumProblem(
@@ -66,7 +66,7 @@ function UnitaryDirectSumProblem(
     hessian_approximation=true,
     jacobian_structure=true,
     blas_multithreading=true,
-    ipopt_options=Options(),
+    ipopt_options::IpoptOptions=IpoptOptions(),
     kwargs...
 )
     N = length(probs)

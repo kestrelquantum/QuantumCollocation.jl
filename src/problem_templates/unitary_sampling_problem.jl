@@ -76,7 +76,7 @@ function UnitarySamplingProblem(
     R_leakage=1e-1,
     max_iter::Int=1000,
     linear_solver::String="mumps",
-    ipopt_options::Options=Options(),
+    ipopt_options::IpoptOptions=IpoptOptions(),
     constraints::Vector{<:AbstractConstraint}=AbstractConstraint[],
     timesteps_all_equal::Bool=true,
     verbose::Bool=false,
@@ -258,7 +258,7 @@ end
         T,
         Δt;
         verbose=false,
-        ipopt_options=Options(print_level=1, recalc_y = "yes", recalc_y_feas_tol = 1e1)
+        ipopt_options=IpoptOptions(print_level=1, recalc_y = "yes", recalc_y_feas_tol = 1e1)
     )
 
     solve!(prob, max_iter=20)
@@ -269,7 +269,7 @@ end
         T,
         Δt;
         verbose=false,
-        ipopt_options=Options(print_level=1, recalc_y = "yes", recalc_y_feas_tol = 1e1)
+        ipopt_options=IpoptOptions(print_level=1, recalc_y = "yes", recalc_y_feas_tol = 1e1)
     )
     solve!(prob, max_iter=20)
 

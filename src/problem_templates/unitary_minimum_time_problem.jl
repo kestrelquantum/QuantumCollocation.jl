@@ -42,7 +42,7 @@ J(\vec{\tilde{U}}, a, \dot{a}, \ddot{a}) + D \sum_t \Delta t_t \\
 - `final_fidelity::Float64=0.99`: The final fidelity.
 - `D=1.0`: The weight for the minimum-time objective.
 - `verbose::Bool=false`: Whether to print additional information.
-- `ipopt_options::Options=Options()`: The options for the Ipopt solver.
+- `ipopt_options::IpoptOptions=IpoptOptions()`: The options for the Ipopt solver.
 - `kwargs...`: Additional keyword arguments to pass to `QuantumControlProblem`.
 """
 function UnitaryMinimumTimeProblem end
@@ -57,7 +57,7 @@ function UnitaryMinimumTimeProblem(
     final_fidelity::Float64=0.99,
     D=1.0,
     verbose::Bool=false,
-    ipopt_options::Options=Options(),
+    ipopt_options::IpoptOptions=IpoptOptions(),
     subspace=nothing,
     kwargs...
 )
@@ -145,7 +145,7 @@ end
 
     prob = UnitarySmoothPulseProblem(
         H_drift, H_drives, U_goal, T, Δt,
-        ipopt_options=Options(print_level=1)
+        ipopt_options=IpoptOptions(print_level=1)
     )
 
     solve!(prob, max_iter=100)
@@ -157,7 +157,7 @@ end
     mintime_prob = UnitaryMinimumTimeProblem(
         prob,
         final_fidelity=final_fidelity,
-        ipopt_options=Options(print_level=1)
+        ipopt_options=IpoptOptions(print_level=1)
     )
 
     solve!(mintime_prob; max_iter=100)

@@ -5,7 +5,7 @@
         subspace=nothing,
         eval_hessian=false,
         verbose=false,
-        ipopt_options=Options(),
+        ipopt_options=IpoptOptions(),
         kwargs...
     )
 
@@ -28,7 +28,7 @@ function UnitaryRobustnessProblem(
     subspace::AbstractVector{<:Integer}=1:size(Hₑ, 1),
     eval_hessian::Bool=false,
     verbose::Bool=false,
-    ipopt_options::Options=Options(),
+    ipopt_options::IpoptOptions=IpoptOptions(),
     kwargs...
 )
     @assert unitary_symbol ∈ trajectory.names
@@ -118,7 +118,7 @@ end
         sys, U_goal, T, Δt,
         geodesic=false,
         verbose=false,
-        ipopt_options=Options(print_level=1)
+        ipopt_options=IpoptOptions(print_level=1)
     )
     solve!(probs["transmon"], max_iter=200)
 
@@ -134,7 +134,7 @@ end
         final_fidelity=0.99,
         subspace=subspace,
         verbose=false,
-        ipopt_options=Options(recalc_y="yes", recalc_y_feas_tol=1.0, print_level=1)
+        ipopt_options=IpoptOptions(recalc_y="yes", recalc_y_feas_tol=1.0, print_level=1)
     )
     solve!(probs["robust"], max_iter=200)
 
@@ -161,7 +161,7 @@ end
         H_error, trajectory, system, objective, integrators, constraints,
         final_fidelity=0.99,
         subspace=subspace,
-        ipopt_options=Options(recalc_y="yes", recalc_y_feas_tol=1e-1, print_level=4)
+        ipopt_options=IpoptOptions(recalc_y="yes", recalc_y_feas_tol=1e-1, print_level=4)
     )
     solve!(probs["unconstrained"]; max_iter=100)
 

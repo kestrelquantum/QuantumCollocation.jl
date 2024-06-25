@@ -49,7 +49,7 @@ function QuantumStateSmoothPulseProblem(
     R_L1::Float64=20.0,
     max_iter::Int=1000,
     linear_solver::String="mumps",
-    ipopt_options::Options=Options(),
+    ipopt_options::IpoptOptions=IpoptOptions(),
     constraints::Vector{<:AbstractConstraint}=AbstractConstraint[],
     timesteps_all_equal::Bool=true,
     L1_regularized_names=Symbol[],
@@ -175,7 +175,7 @@ end
 
     prob = QuantumStateSmoothPulseProblem(
         sys, ψ_init, ψ_target, T, Δt;
-        ipopt_options=Options(print_level=1), verbose=false
+        ipopt_options=IpoptOptions(print_level=1), verbose=false
     )
     initial = fidelity(prob)
     solve!(prob, max_iter=20)
@@ -187,7 +187,7 @@ end
     ψ_targets = [[0.0, 1.0], [1.0, 0.0]]
     prob = QuantumStateSmoothPulseProblem(
         sys, ψ_inits, ψ_targets, T, Δt;
-        ipopt_options=Options(print_level=1), verbose=false
+        ipopt_options=IpoptOptions(print_level=1), verbose=false
     )
     initial = fidelity(prob)
     solve!(prob, max_iter=20)

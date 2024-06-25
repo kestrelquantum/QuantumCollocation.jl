@@ -30,14 +30,14 @@ end
 
     prob_vanilla = UnitarySmoothPulseProblem(
         H_drift, H_drives, U_goal, T, Δt,
-        ipopt_options=Options(print_level=4)
+        ipopt_options=IpoptOptions(print_level=4)
     )
 
     J_extra = QuadraticSmoothnessRegularizer(:dda, prob_vanilla.trajectory, 10.0)
 
     prob_additional = UnitarySmoothPulseProblem(
         H_drift, H_drives, U_goal, T, Δt,
-        ipopt_options=Options(print_level=4),
+        ipopt_options=IpoptOptions(print_level=4),
         additional_objective=J_extra,
     )
 

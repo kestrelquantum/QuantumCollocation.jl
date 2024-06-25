@@ -19,7 +19,7 @@ using ..Objectives
 using ..Constraints
 using ..Integrators
 using ..Problems
-using ..IpoptOptions
+using ..Options
 
 using Distributions
 using NamedTrajectories
