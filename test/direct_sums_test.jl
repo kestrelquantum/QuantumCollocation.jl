@@ -106,13 +106,14 @@ end
     sys = QuantumSystem(0.01 * GATES[:Z], [GATES[:X], GATES[:Y]])
     T = 50
     Δt = 0.2
-    ops = Options(print_level=1)
-    prob1 = UnitarySmoothPulseProblem(sys, GATES[:X], T, Δt, free_time=false, ipopt_options=ops)
-    prob2 = UnitarySmoothPulseProblem(sys, GATES[:Y], T, Δt, free_time=false, ipopt_options=ops)
+    ip_ops = IpoptOptions(print_level=1)
+    pi_ops = PiccoloOptions(verbose=false, free_time=false)
+    prob1 = UnitarySmoothPulseProblem(sys, GATES[:X], T, Δt, piccolo_options=pi_ops, ipopt_options=ip_ops)
+    prob2 = UnitarySmoothPulseProblem(sys, GATES[:Y], T, Δt, piccolo_options=pi_ops, ipopt_options=ip_ops)
     
     # Direct sum problem with suffix extraction
     # Note: Turn off control reset
-    direct_sum_prob = UnitaryDirectSumProblem([prob1, prob2], 0.99, drive_reset_ratio=0.0, ipopt_options=ops)
+    direct_sum_prob = UnitaryDirectSumProblem([prob1, prob2], 0.99, drive_reset_ratio=0.0, ipopt_options=ip_ops)
     prob1_got = get_suffix(direct_sum_prob, "1")
     @test prob1_got.trajectory == add_suffix(prob1.trajectory, "1")
 
@@ -129,9 +130,11 @@ end
     sys = QuantumSystem(0.01 * GATES[:Z], [GATES[:Y]])
     T = 50
     Δt = 0.2
-    ops = Options(print_level=1)
-    prob1 = UnitarySmoothPulseProblem(sys, GATES[:Y], T, Δt, free_time=false, ipopt_options=ops)
-    prob2 = UnitarySmoothPulseProblem(sys, GATES[:Y], T, Δt, free_time=true, ipopt_options=ops)
+    ip_ops = IpoptOptions(print_level=1)
+    pi_false_ops = PiccoloOptions(verbose=false, free_time=false)
+    pi_true_ops = PiccoloOptions(verbose=false, free_time=true)
+    prob1 = UnitarySmoothPulseProblem(sys, GATES[:Y], T, Δt, piccolo_options=pi_false_ops, ipopt_options=ip_ops)
+    prob2 = UnitarySmoothPulseProblem(sys, GATES[:Y], T, Δt, piccolo_options=pi_true_ops, ipopt_options=ip_ops)
 
     suffix = "_new"
     # UnitaryPadeIntegrator
@@ -157,18 +160,20 @@ end
     sys = QuantumSystem(0.01 * GATES[:Z], [GATES[:Y]])
     T = 50
     Δt = 0.2
-    ops = Options(print_level=1)
+    ops = IpoptOptions(print_level=1)
+    pi_false_ops = PiccoloOptions(verbose=false, free_time=false)
+    pi_true_ops = PiccoloOptions(verbose=false, free_time=true)
     suffix = "_new"
     timestep_symbol = :Δt
 
-    prob1 = UnitarySmoothPulseProblem(sys, GATES[:Y], T, Δt, free_time=false, ipopt_options=ops)
+    prob1 = UnitarySmoothPulseProblem(sys, GATES[:Y], T, Δt, piccolo_options=pi_false_ops, ipopt_options=ops)
     traj1 = direct_sum(prob1.trajectory, add_suffix(prob1.trajectory, suffix), free_time=true)
 
     # Direct sum (shared timestep name)
     @test get_suffix(traj1, suffix).timestep == timestep_symbol
     @test get_suffix(traj1, suffix, remove=true).timestep == timestep_symbol
 
-    prob2 = UnitarySmoothPulseProblem(sys, GATES[:Y], T, Δt, free_time=true, ipopt_options=ops)
+    prob2 = UnitarySmoothPulseProblem(sys, GATES[:Y], T, Δt, ipopt_options=ops, piccolo_options=pi_true_ops)
     traj2 = add_suffix(prob2.trajectory, suffix)
    
     # Trajectory (unique timestep name)
