@@ -104,8 +104,9 @@ function QuantumControlProblem(
     variables = reshape(variables, traj.dim, traj.T)
 
     params = merge(kwargs, params)
-
-    params[:eval_hessian] = eval_hessian
+    if !eval_hessian
+        options.hessian_approximation = "limited-memory"
+    end
     params[:options] = options
     params[:linear_constraints] = linear_constraints
     params[:nonlinear_constraints] = [
@@ -152,6 +153,7 @@ function QuantumControlProblem(
         options=ipopt_options,
         params=params,
         verbose=verbose,
+        eval_hessian=!hessian_approximation,
         kwargs...
     )
 end
@@ -185,6 +187,7 @@ function QuantumControlProblem(
         options=ipopt_options,
         params=params,
         verbose=verbose,
+        eval_hessian=!hessian_approximation,
         kwargs...
     )
 end

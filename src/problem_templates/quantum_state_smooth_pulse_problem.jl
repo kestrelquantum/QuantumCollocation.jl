@@ -53,10 +53,23 @@ function QuantumStateSmoothPulseProblem(
     timesteps_all_equal::Bool=true,
     L1_regularized_names=Symbol[],
     L1_regularized_indices::NamedTuple=NamedTuple(),
+    leakage_indcies=nothing,
+    integrator::Symbol=:pade,
+    pade_order::Int=4,
+    autodiff::Bool=pade_order != 4,
+    rollout_integrator=exp,
+    bound_state=integrator == :exponential,
+    # TODO: control modulus norm, advanced feature, needs documentation
+    control_norm_constraint=false,
+    control_norm_constraint_components=nothing,
+    control_norm_R=nothing,
     verbose=false,
     kwargs...
 )
     @assert all(name ∈ L1_regularized_names for name in keys(L1_regularized_indices) if !isempty(L1_regularized_indices[name]))
+    if !isnothing(a_guess)
+        @assert size(a_guess) == (length(system.G_drives), T) "a_guess (size = $(size(a_guess))) must have size (length(system.G_drives), T)"
+    end
 
     if ψ_init isa AbstractVector{<:Number} && ψ_goal isa AbstractVector{<:Number}
         ψ_inits = [ψ_init]
@@ -67,11 +80,11 @@ function QuantumStateSmoothPulseProblem(
         ψ_goals = ψ_goal
     end
 
-    ψ_inits = Vector{ComplexF64}.(ψ_init)
-    ψ̃_inits = ket_to_iso.(ψ_init)
+    ψ_inits = Vector{ComplexF64}.(ψ_inits)
+    ψ̃_inits = ket_to_iso.(ψ_inits)
 
-    ψ_goals = Vector{ComplexF64}.(ψ_goal)
-    ψ̃_goals = ket_to_iso.(ψ_goal)
+    ψ_goals = Vector{ComplexF64}.(ψ_goals)
+    ψ̃_goals = ket_to_iso.(ψ_goals)
 
     n_drives = length(system.G_drives)
 
@@ -97,7 +110,7 @@ function QuantumStateSmoothPulseProblem(
             dda = randn(n_drives, T) * drive_derivative_σ
         else
             ψ̃s = NamedTuple([
-                Symbol("ψ̃$i") => rollout(ψ̃_init, a_guess, Δt, system)
+                Symbol("ψ̃$i") => rollout(ψ̃_init, a_guess, Δt, system; integrator=rollout_integrator)
                     for (i, ψ̃_init) in enumerate(ψ̃_inits)
             ])
             a = a_guess
@@ -125,6 +138,14 @@ function QuantumStateSmoothPulseProblem(
                 for (i, ψ̃_goal) in enumerate(ψ̃_goals)
         ])
 
+        if bound_state
+            ψ̃_dim = size(ψ̃_inits[1], 1)
+            ψ̃_bounds = NamedTuple([
+                Symbol("ψ̃$i") => (-ones(ψ̃_dim), ones(ψ̃_dim))
+                    for i = 1:length(ψ_inits)
+            ])
+        end
+
         if free_time
 
             control_components = (
@@ -136,21 +157,14 @@ function QuantumStateSmoothPulseProblem(
 
             components = merge(ψ̃s, control_components)
 
+            controls = (:dda, :Δt)
+
             bounds = (
                 a = a_bounds,
                 dda = dda_bounds,
                 Δt = (Δt_min, Δt_max),
             )
 
-            traj = NamedTrajectory(
-                components;
-                controls=(:dda, :Δt),
-                timestep=:Δt,
-                bounds=bounds,
-                initial=initial,
-                final=final,
-                goal=goal
-            )
         else
             control_components = (
                 a = a,
@@ -160,21 +174,26 @@ function QuantumStateSmoothPulseProblem(
 
             components = merge(ψ̃s, control_components)
 
+            controls = (:dda,)
+
             bounds = (
                 a = a_bounds,
                 dda = dda_bounds,
             )
 
-            traj = NamedTrajectory(
-                components;
-                controls=(:dda,),
-                timestep=Δt,
-                bounds=bounds,
-                initial=initial,
-                final=final,
-                goal=goal
-            )
         end
+
+        bounds = merge(bounds, ψ̃_bounds)
+
+        traj = NamedTrajectory(
+            components;
+            controls=controls,
+            timestep=free_time ? :Δt : Δt,
+            bounds=bounds,
+            initial=initial,
+            final=final,
+            goal=goal
+        )
     end
 
     J = QuadraticRegularizer(:a, traj, R_a)
@@ -189,7 +208,12 @@ function QuantumStateSmoothPulseProblem(
 
     for name in L1_regularized_names
         if name in keys(L1_regularized_indices)
-            J_L1, slack_con = L1Regularizer(name, traj; R_value=R_L1, indices=L1_regularized_indices[name])
+            J_L1, slack_con = L1Regularizer(
+                name,
+                traj;
+                R_value=R_L1,
+                indices=L1_regularized_indices[name]
+            )
         else
             J_L1, slack_con = L1Regularizer(name, traj; R_value=R_L1)
         end
@@ -197,32 +221,45 @@ function QuantumStateSmoothPulseProblem(
         push!(L1_slack_constraints, slack_con)
     end
 
+    if !isnothing(leakage_indcies)
+        for i = 1:length(ψ_inits)
+            J_L1_ψ̃_i, slack_con_ψ̃_i = L1Regularizer(
+                Symbol("ψ̃$i"),
+                traj;
+                R_value=R_L1,
+                indices=leakage_indcies
+            )
+            J += J_L1_ψ̃_i
+            push!(L1_slack_constraints, slack_con_ψ̃_i)
+        end
+    end
+
     append!(constraints, L1_slack_constraints)
 
-    if free_time
-
+    if integrator == :pade
         ψ̃_integrators = [
-            QuantumStatePadeIntegrator(system, Symbol("ψ̃$i"), :a)
+            QuantumStatePadeIntegrator(system, Symbol("ψ̃$i"), :a;
+                order=pade_order,
+                autodiff=autodiff,
+            )
                 for i = 1:length(ψ_inits)
         ]
-
-        integrators = [
-            ψ̃_integrators...,
-            DerivativeIntegrator(:a, :da, traj),
-            DerivativeIntegrator(:da, :dda, traj)
+    elseif integrator == :exponential
+        ψ̃_integrators = [
+            QuantumStateExponentialIntegrator(system, Symbol("ψ̃$i"), :a)
+                for i = 1:length(ψ_inits)
         ]
     else
-        ψ̃_integrators = [
-            QuantumStatePadeIntegrator(system, Symbol("ψ̃$i"), :a)
-                for i = 1:length(ψ_inits)
-        ]
-
-        integrators = [
-            ψ̃_integrators...,
-            DerivativeIntegrator(:a, :da, traj),
-            DerivativeIntegrator(:da, :dda, traj)
-        ]
+        error("integrator must be one of (:pade, :exponential)")
     end
+
+
+
+    integrators = [
+        ψ̃_integrators...,
+        DerivativeIntegrator(:a, :da, traj),
+        DerivativeIntegrator(:da, :dda, traj)
+    ]
 
     if free_time
         if timesteps_all_equal

@@ -84,6 +84,26 @@ function QuantumUtils.fidelity(
     return fidelity(ket_to_iso(ψ₁), ket_to_iso(ψ_goal), args...; kwargs...)
 end
 
+function QuantumUtils.fidelity(
+    traj::NamedTrajectory,
+    system::AbstractQuantumSystem;
+    control_name::Symbol=:a,
+    state_name::Symbol=:ψ̃,
+    kwargs...
+)
+    return fidelity(
+        traj.initial[state_name],
+        traj.goal[state_name],
+        traj[control_name],
+        get_timesteps(traj),
+        system;
+        kwargs...
+    )
+end
+
+QuantumUtils.fidelity(prob::QuantumControlProblem; kwargs...) =
+    fidelity(prob.trajectory, prob.system; kwargs...)
+
 
 function unitary_rollout(
     Ũ⃗₁::AbstractVector{<:Real},
