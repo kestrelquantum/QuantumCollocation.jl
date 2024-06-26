@@ -12,8 +12,10 @@ robust solution by including multiple systems reflecting the problem uncertainty
 - `Δt::Union{Float64, Vector{Float64}}`: The time step size.
 - `system_labels::Vector{String}`: The labels for each system.
 - `system_weights::Vector{Float64}`: The weights for each system.
-- `free_time::Bool`: Whether to optimize the time steps.
 - `init_trajectory::Union{NamedTrajectory, Nothing}`: The initial trajectory.
+- `ipopt_options::IpoptOptions`: The IPOPT options.
+- `piccolo_options::PiccoloOptions`: The Piccolo options.
+- `constraints::Vector{<:AbstractConstraint}`: The constraints.
 - `a_bound::Float64`: The bound for the control amplitudes.
 - `a_bounds::Vector{Float64}`: The bounds for the control amplitudes.
 - `a_guess::Union{Matrix{Float64}, Nothing}`: The initial guess for the control amplitudes.
@@ -29,24 +31,10 @@ robust solution by including multiple systems reflecting the problem uncertainty
 - `R_dda::Union{Float64, Vector{Float64}}`: The regularization weight for the control second derivatives.
 - `leakage_suppression::Bool`: Whether to suppress leakage.
 - `R_leakage::Float64`: The regularization weight for the leakage.
-- `max_iter::Int`: The maximum number of iterations.
-- `linear_solver::String`: The linear solver.
-- `ipopt_options::Options`: The IPOPT options.
-- `constraints::Vector{<:AbstractConstraint}`: The constraints.
-- `timesteps_all_equal::Bool`: Whether to enforce equal time steps.
-- `verbose::Bool`: Whether to print verbose output.
-- `integrator::Symbol`: The integrator to use.
-- `rollout_integrator`: The integrator for the rollout.
 - `bound_unitary::Bool`: Whether to bound the unitary.
 - `control_norm_constraint::Bool`: Whether to enforce a control norm constraint.
 - `control_norm_constraint_components`: The components for the control norm constraint.
 - `control_norm_R`: The regularization weight for the control norm constraint.
-- `geodesic::Bool`: Whether to use the geodesic.
-- `pade_order::Int`: The order of the Pade approximation.
-- `autodiff::Bool`: Whether to use automatic differentiation.
-- `jacobian_structure::Bool`: Whether to evaluate the Jacobian structure.
-- `hessian_approximation::Bool`: Whether to approximate the Hessian.
-- `blas_multithreading::Bool`: Whether to use BLAS multithreading.
 - `kwargs...`: Additional keyword arguments.
 
 """
@@ -58,6 +46,8 @@ function UnitarySamplingProblem(
     system_labels=string.(1:length(systems)),
     system_weights=fill(1.0, length(systems)),
     init_trajectory::Union{NamedTrajectory, Nothing}=nothing,
+    ipopt_options::IpoptOptions=IpoptOptions(),
+    piccolo_options::PiccoloOptions=PiccoloOptions(),
     constraints::Vector{<:AbstractConstraint}=AbstractConstraint[],
     a_bound::Float64=1.0,
     a_bounds=fill(a_bound, length(systems[1].G_drives)),
@@ -74,12 +64,10 @@ function UnitarySamplingProblem(
     R_dda::Union{Float64, Vector{Float64}}=R,
     leakage_suppression=false,
     R_leakage=1e-1,
+    bound_unitary=piccolo_options.integrator == :exponential,
     control_norm_constraint=false,
     control_norm_constraint_components=nothing,
     control_norm_R=nothing,
-    ipopt_options::IpoptOptions=IpoptOptions(),
-    piccolo_options::PiccoloOptions=PiccoloOptions(),
-    bound_unitary=piccolo_options.integrator == :exponential,
     kwargs...
 )
     # Create keys for multiple systems
@@ -130,7 +118,7 @@ function UnitarySamplingProblem(
                     constraints, Ũ⃗_key, traj, 
                     R_value=R_leakage, 
                     indices=leakage_indices,
-                    eval_hessian=!hessian_approximation
+                    eval_hessian=piccolo_options.eval_hessian
                 )
             end
         else

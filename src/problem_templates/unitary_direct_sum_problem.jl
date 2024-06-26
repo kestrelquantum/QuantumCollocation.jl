@@ -35,12 +35,8 @@ between each neighbor of the provided `probs`.
 - `drive_reset_ratio::Float64=0.1`: amount of random noise to add to the control data (can help avoid hitting restoration if provided problems are converged)
 - `fidelity_cost::Bool=false`: whether or not to include a fidelity cost in the objective
 - `subspace::Union{AbstractVector{<:Integer}, Nothing}=nothing`: the subspace to use for the fidelity of each problem
-- `max_iter::Int=1000`: the maximum number of iterations for the Ipopt solver
-- `linear_solver::String="mumps"`: the linear solver to use in Ipopt
-- `hessian_approximation=true`: whether or not to use L-BFGS hessian approximation in Ipopt
-- `jacobian_structure=true`: whether or not to use the jacobian structure in Ipopt
-- `blas_multithreading=true`: whether or not to use multithreading in BLAS
 - `ipopt_options::IpoptOptions=IpoptOptions()`: the options for the Ipopt solver
+- `piccolo_options::PiccoloOptions=PiccoloOptions()`: the options for the Piccolo solver
 
 """
 function UnitaryDirectSumProblem(

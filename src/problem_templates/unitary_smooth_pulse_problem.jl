@@ -37,7 +37,9 @@ with
 - `Δt::Float64`: the (initial) time step size
 
 # Keyword Arguments
-- `free_time::Bool=true`: whether or not to allow the time steps to vary
+- `ipopt_options::IpoptOptions=IpoptOptions()`: the options for the Ipopt solver
+- `piccolo_options::PiccoloOptions=PiccoloOptions()`: the options for the Piccolo solver
+- `constraints::Vector{<:AbstractConstraint}=AbstractConstraint[]`: the constraints to enforce
 - `init_trajectory::Union{NamedTrajectory, Nothing}=nothing`: an initial trajectory to use
 - `a_bound::Float64=1.0`: the bound on the control pulse
 - `a_bounds::Vector{Float64}=fill(a_bound, length(system.G_drives))`: the bounds on the control pulses, one for each drive
@@ -54,25 +56,10 @@ with
 - `R_dda::Union{Float64, Vector{Float64}}=R`: the weight on the regularization term for the control pulse second derivatives
 - `leakage_suppression::Bool=false`: whether or not to suppress leakage to higher energy states
 - `R_leakage=1e-1`: the weight on the leakage suppression term
-- `max_iter::Int=1000`: the maximum number of iterations for the solver
-- `linear_solver::String="mumps"`: the linear solver to use
-- `ipopt_options::IpoptOptions=IpoptOptions()`: the options for the Ipopt solver
-- `constraints::Vector{<:AbstractConstraint}=AbstractConstraint[]`: additional constraints to add to the problem
-- `timesteps_all_equal::Bool=true`: whether or not to enforce that all time steps are equal
-- `verbose::Bool=false`: whether or not to print constructor output
-- `integrator=:pade`: the integrator to use for the unitary, either `:pade` or `:exponential`
-- `rollout_integrator=exp`: the integrator to use for the rollout
 - `bound_unitary=integrator == :exponential`: whether or not to bound the unitary
 - `control_norm_constraint=false`: whether or not to enforce a constraint on the control pulse norm
 - `control_norm_constraint_components=nothing`: the components of the control pulse to use for the norm constraint
 - `control_norm_R=nothing`: the weight on the control pulse norm constraint
-- `geodesic=true`: whether or not to use the geodesic as the initial guess for the unitary
-- `pade_order=4`: the order of the Pade approximation to use for the unitary integrator
-- `autodiff=pade_order != 4`: whether or not to use automatic differentiation for the unitary integrator
-- `subspace=nothing`: the subspace to use for the unitary integrator
-- `jacobian_structure=true`: whether or not to use the jacobian structure
-- `hessian_approximation=false`: whether or not to use L-BFGS hessian approximation in Ipopt
-- `blas_multithreading=true`: whether or not to use multithreading in BLAS\\
 
 
 TODO: control modulus norm, advanced feature, needs documentation
