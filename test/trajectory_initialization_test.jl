@@ -71,3 +71,24 @@ end
     @test Us_wrap[:, end] ≈ operator_to_iso_vec(U_ω)
 
 end
+
+@testitem "Free and fixed time conversion" begin
+    using NamedTrajectories
+    include("test_utils.jl")
+
+    free_traj = named_trajectory_type_1(free_time=true)
+    fixed_traj = named_trajectory_type_1(free_time=false)
+    Δt_bounds = free_traj.bounds[:Δt]
+
+    println(convert_free_time(fixed_traj, Δt_bounds).control_names)
+
+    # Test free to fixed time
+    @test :Δt ∉ convert_fixed_time(free_traj).control_names
+
+    # Test fixed to free time
+    @test :Δt ∈ convert_free_time(fixed_traj, Δt_bounds).control_names
+
+    # Test inverses
+    @test convert_free_time(convert_fixed_time(free_traj), Δt_bounds) == free_traj
+    @test convert_fixed_time(convert_free_time(fixed_traj, Δt_bounds)) == fixed_traj
+end

@@ -3,6 +3,7 @@ module DirectSums
 export add_suffix
 export get_suffix
 export direct_sum
+export merge_outer
 
 using ..Integrators
 using ..Problems
@@ -130,13 +131,6 @@ function direct_sum(
         final=merge_outer([traj.final for traj in trajs]),
         goal=merge_outer([traj.goal for traj in trajs])
     )
-end
-
-
-function get_components(components::Union{Tuple, AbstractVector}, traj::NamedTrajectory)
-    symbs = Tuple(c for c in components)
-    vals = [traj[name] for name ∈ components]
-    return NamedTuple{symbs}(vals)
 end
 
 Base.endswith(symb::Symbol, suffix::AbstractString) = endswith(String(symb), suffix)

@@ -5,6 +5,8 @@ export linear_interpolation
 export unitary_linear_interpolation
 export initialize_unitary_trajectory
 export initialize_quantum_state_trajectory
+export convert_fixed_time
+export convert_free_time
 
 using NamedTrajectories
 using LinearAlgebra
@@ -14,6 +16,7 @@ using ..QuantumUtils
 using ..QuantumSystems
 using ..Rollouts
 using ..EmbeddedOperators
+using ..DirectSums
 
 """
     unitary_linear_interpolation(
@@ -142,10 +145,10 @@ end
 linear_interpolation(x::AbstractVector, y::AbstractVector, n::Int) =
     hcat(range(x, y, n)...)
 
-# =============================================================================
+# ============================================================================= #
 
-VectorBound = Union{AbstractVector{R}, Tuple{AbstractVector{R}, AbstractVector{R}}} where R <: Real
-ScalarBound = Union{R, Tuple{R, R}} where R <: Real
+const VectorBound = Union{AbstractVector{R}, Tuple{AbstractVector{R}, AbstractVector{R}}} where R <: Real
+const ScalarBound = Union{R, Tuple{R, R}} where R <: Real
 
 function initialize_unitaries(
     U_init::AbstractMatrix{<:Number},
@@ -370,6 +373,68 @@ function initialize_quantum_state_trajectory(
         initial=initial,
         final=final,
         goal=goal
+    )
+end
+
+# ============================================================================= #
+
+remove_component(
+    names::NTuple{N, Symbol} where N,
+    remove_name::Symbol
+) = ([n for n in names if n != remove_name]...,)
+
+function remove_component(
+    container,
+    names::NTuple{N, Symbol} where N,
+    remove_name::Symbol,
+)
+    keys = Symbol[]
+    vals = []
+    for symb in names
+        if symb != remove_name
+            push!(keys, symb)
+            push!(vals, container[symb])
+        end
+    end
+    return (; (keys .=> vals)...)
+end
+
+function convert_fixed_time(
+    traj::NamedTrajectory; 
+    Δt_symb=:Δt,
+    timestep = sum(get_timesteps(traj)) / traj.T
+)
+    @assert Δt_symb ∈ traj.control_names "Problem must be free time"
+    return NamedTrajectory(
+        remove_component(traj, traj.names, Δt_symb);
+        controls=remove_component(traj.control_names, Δt_symb),
+        timestep=timestep,
+        bounds=remove_component(traj.bounds, keys(traj.bounds), Δt_symb),
+        initial=remove_component(traj.initial, keys(traj.initial), Δt_symb),
+        final=remove_component(traj.final, keys(traj.final), Δt_symb),
+        goal=remove_component(traj.goal, keys(traj.goal), Δt_symb)
+    )
+end
+
+function convert_free_time(
+    traj::NamedTrajectory,
+    Δt_bounds::Union{ScalarBound, BoundType}; 
+    Δt_symb=:Δt,
+)
+    @assert Δt_symb ∉ traj.control_names "Problem must not be free time"
+
+    Δt_bound = (; Δt_symb => Δt_bounds,)
+    time_data = (; Δt_symb => get_timesteps(traj))
+    comp_data = get_components(traj)
+
+    return NamedTrajectory(
+        merge_outer(comp_data, time_data);
+        controls=merge_outer(traj.control_names, (Δt_symb,)),
+        timestep=Δt_symb,
+        bounds=merge_outer(traj.bounds, Δt_bound),
+        initial=traj.initial,
+        final=traj.final,
+        goal=traj.goal
     )
 end
 
