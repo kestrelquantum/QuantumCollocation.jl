@@ -199,6 +199,8 @@ function initialize_controls(a::AbstractMatrix, Δt::AbstractVecOrMat)
     return a, da, dda
 end
 
+initialize_controls(a::AbstractMatrix, Δt::Real) = initialize_controls(a, fill(Δt, size(a, 2)))
+
 function initialize_unitary_trajectory(
     U_goal::Union{EmbeddedOperator, AbstractMatrix{<:Number}},
     T::Int,
@@ -216,13 +218,8 @@ function initialize_unitary_trajectory(
     system::Union{AbstractQuantumSystem, AbstractVector{<:AbstractQuantumSystem}, Nothing}=nothing,
     rollout_integrator::Function=exp,
     Ũ⃗_keys::AbstractVector{<:Symbol}=[:Ũ⃗],
-)
-    if free_time
-        if Δt isa Float64
-            Δt = fill(Δt, 1, T)
-        end
-    end
-
+)   
+    # Init and goal
     Ũ⃗_init = operator_to_iso_vec(U_init)
     if U_goal isa EmbeddedOperator
         Ũ⃗_goal = operator_to_iso_vec(U_goal.operator)
@@ -266,7 +263,7 @@ function initialize_unitary_trajectory(
                 unitary_rollout(Ũ⃗_init, a_guess, Δt, sys; integrator=rollout_integrator)
             end
         else
-            unitary_rollout(Ũ⃗_init, a_guess, Δt, system; integrator=rollout_integrator)
+            Ũ⃗ = unitary_rollout(Ũ⃗_init, a_guess, Δt, system; integrator=rollout_integrator)
             Ũ⃗_values = repeat([Ũ⃗], length(Ũ⃗_keys))
         end
         a, da, dda = initialize_controls(a_guess, Δt)
