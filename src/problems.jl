@@ -140,8 +140,6 @@ function QuantumControlProblem(
     traj::NamedTrajectory,
     obj::Objective,
     integrators::Vector{<:AbstractIntegrator};
-    params::Dict{Symbol,Any}=Dict{Symbol, Any}(),
-    ipopt_options::IpoptOptions=IpoptOptions(),
     piccolo_options::PiccoloOptions=PiccoloOptions(),
     kwargs...
 )
@@ -158,9 +156,7 @@ function QuantumControlProblem(
         traj,
         obj,
         dynamics;
-        ipopt_options=ipopt_options,
         piccolo_options=piccolo_options,
-        params=params,
         kwargs...
     )
 end
@@ -171,8 +167,6 @@ function QuantumControlProblem(
     traj::NamedTrajectory,
     obj::Objective,
     integrator::AbstractIntegrator;
-    params::Dict{Symbol,Any}=Dict{Symbol, Any}(),
-    ipopt_options::IpoptOptions=IpoptOptions(),
     piccolo_options::PiccoloOptions=PiccoloOptions(),
     kwargs...
 )
@@ -189,9 +183,7 @@ function QuantumControlProblem(
         traj,
         obj,
         dynamics;
-        ipopt_options=ipopt_options,
         piccolo_options=piccolo_options,
-        params=params,
         kwargs...
     )
 end
@@ -201,8 +193,6 @@ function QuantumControlProblem(
     traj::NamedTrajectory,
     obj::Objective,
     f::Function;
-    params::Dict{Symbol,Any}=Dict{Symbol, Any}(),
-    ipopt_options::IpoptOptions=IpoptOptions(),
     piccolo_options::PiccoloOptions=PiccoloOptions(),
     kwargs...
 )
@@ -219,9 +209,7 @@ function QuantumControlProblem(
         traj,
         obj,
         dynamics;
-        ipopt_options=ipopt_options,
         piccolo_options=piccolo_options,
-        params=params,
         kwargs...
     )
 end
@@ -305,9 +293,21 @@ Return the objective function of the `prob::QuantumControlProblem`.
 
 TODO: Is deepcopy necessary?
 """
-function get_objective(prob::QuantumControlProblem)
-    params = deepcopy(prob.params)
-    return Objective(params[:objective_terms])
+function get_objective(
+    prob::QuantumControlProblem; 
+    match::Union{Nothing, AbstractVector{<:Symbol}}=nothing,
+    invert::Bool=false
+)
+    objs = deepcopy(prob.params[:objective_terms])
+    if isnothing(match)
+        return Objective(objs)
+    else
+        if invert
+            return Objective([term for term ∈ objs if term[:type] ∉ match])
+        else
+            return Objective([term for term ∈ objs if term[:type] ∈ match])
+        end
+    end
 end
 
 """
@@ -318,10 +318,11 @@ Return the constraints of the `prob::QuantumControlProblem`.
 TODO: Is deepcopy necessary?
 """
 function get_constraints(prob::QuantumControlProblem)
-    params = deepcopy(prob.params)
+    linear_constraints = deepcopy(prob.params[:linear_constraints])
+    nonlinear_constraints = deepcopy(prob.params[:nonlinear_constraints])
     return AbstractConstraint[
-        params[:linear_constraints]...,
-        NonlinearConstraint.(params[:nonlinear_constraints])...
+        linear_constraints...,
+        NonlinearConstraint.(nonlinear_constraints)...
     ]
 end
 
