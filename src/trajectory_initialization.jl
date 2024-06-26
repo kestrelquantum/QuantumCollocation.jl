@@ -275,7 +275,7 @@ function initialize_unitary_trajectory(
 
     if free_time
         push!(keys, :Δt)
-        push!(values, Δt)
+        push!(values, fill(Δt, 1, T))
         controls = (:dda, :Δt)
         timestep = :Δt
         bounds = merge(bounds, (Δt = Δt_bounds,))
