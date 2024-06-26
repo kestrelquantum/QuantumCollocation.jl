@@ -10,7 +10,7 @@ export UnitaryInfidelityObjective
 
 export MinimumTimeObjective
 export InfidelityRobustnessObjective
-
+export PairwiseInfidelityRobustnessObjective
 export QuadraticRegularizer
 export PairwiseQuadraticRegularizer
 export QuadraticSmoothnessRegularizer
@@ -946,22 +946,22 @@ R_{Robust}(a) = \frac{1}{N} \norm{R}^2_F
 ```
 where N is the dimension of the Hilbert space.
 """
-function InfidelityRobustnessObjective(
-    H_error::AbstractMatrix{<:Number},
-    Z::NamedTrajectory;
+function InfidelityRobustnessObjective(;
+    H_error::Union{AbstractMatrix{<:Number}, Nothing}=nothing,
     eval_hessian::Bool=false,
     subspace::AbstractVector{<:Integer}=collect(1:size(H_error, 1)),
-    state_symb::Symbol=:Ũ⃗
-)
+    symb::Symbol=:Ũ⃗
+)   
+    @assert !isnothing(H_error) "H_error must be specified"
+
     # Indices of all non-zero subspace components for iso_vec_operators
     function iso_vec_subspace(subspace::AbstractVector{<:Integer}, Z::NamedTrajectory)
-        d = isqrt(Z.dims[state_symb] ÷ 2)
+        d = isqrt(Z.dims[symb] ÷ 2)
         A = zeros(Complex, d, d)
         A[subspace, subspace] .= 1 + im
         # Return any index where there is a 1.
-        return [j for (s, j) ∈ zip(operator_to_iso_vec(A), Z.components[state_symb]) if convert(Bool, s)]
+        return [j for (s, j) ∈ zip(operator_to_iso_vec(A), Z.components[symb]) if convert(Bool, s)]
     end
-    ivs = iso_vec_subspace(subspace, Z)
 
     @views function get_timesteps(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory)
         return map(1:Z.T) do t
@@ -975,6 +975,7 @@ function InfidelityRobustnessObjective(
 
     # Control frame
     @views function rotate(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory)
+        ivs = iso_vec_subspace(subspace, Z)
         Δts = get_timesteps(Z⃗, Z)
         T = sum(Δts)
         R = sum(
@@ -992,6 +993,7 @@ function InfidelityRobustnessObjective(
     end
 
     @views function ∇L(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory)
+        ivs = iso_vec_subspace(subspace, Z)
         ∇ = zeros(Z.dim * Z.T)
         R = rotate(Z⃗, Z)
         Δts = get_timesteps(Z⃗, Z)
@@ -1025,22 +1027,27 @@ function InfidelityRobustnessObjective(
 	end
 
     params = Dict(
-        :type => :QuantumRobustnessObjective,
-        :error => H_error,
-        :eval_hessian => eval_hessian
+        :type => :InfidelityRobustnessObjective,
+        :H_error => H_error,
+        :eval_hessian => eval_hessian,
+        :subspace => subspace,
+        :symb => symb
     )
 
     return Objective(L, ∇L, ∂²L, ∂²L_structure, Dict[params])
 end
 
-function InfidelityRobustnessObjective(
-    H1_error::AbstractMatrix{<:Number},
-    H2_error::AbstractMatrix{<:Number},
-    state1_symb::Symbol=:Ũ⃗1,
-    state2_symb::Symbol=:Ũ⃗2;
+function PairwiseInfidelityRobustnessObjective(;
+    H1_error::Union{AbstractMatrix{<:Number}, Nothing}=nothing,
+    H2_error::Union{AbstractMatrix{<:Number}, Nothing}=nothing,
+    symb1::Symbol=:Ũ⃗1,
+    symb2::Symbol=:Ũ⃗2,
     eval_hessian::Bool=false,
     # subspace::Union{AbstractVector{<:Integer}, Nothing}=nothing
 )
+    @assert !isnothing(H1_error) "H1_error must be specified"
+    @assert !isnothing(H2_error) "H2_error must be specified"
+
     @views function get_timesteps(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory)
         return map(1:Z.T) do t
             if Z.timestep isa Symbol
@@ -1058,10 +1065,10 @@ function InfidelityRobustnessObjective(
         for (i₁, Δt₁) ∈ enumerate(Δts)
             for (i₂, Δt₂) ∈ enumerate(Δts)
                 # States
-                U1ₜ₁ = iso_vec_to_operator(Z⃗[slice(i₁, Z.components[state1_symb], Z.dim)])
-                U1ₜ₂ = iso_vec_to_operator(Z⃗[slice(i₂, Z.components[state1_symb], Z.dim)])
-                U2ₜ₁ = iso_vec_to_operator(Z⃗[slice(i₁, Z.components[state2_symb], Z.dim)])
-                U2ₜ₂ = iso_vec_to_operator(Z⃗[slice(i₂, Z.components[state2_symb], Z.dim)])
+                U1ₜ₁ = iso_vec_to_operator(Z⃗[slice(i₁, Z.components[symb1], Z.dim)])
+                U1ₜ₂ = iso_vec_to_operator(Z⃗[slice(i₂, Z.components[symb1], Z.dim)])
+                U2ₜ₁ = iso_vec_to_operator(Z⃗[slice(i₁, Z.components[symb2], Z.dim)])
+                U2ₜ₂ = iso_vec_to_operator(Z⃗[slice(i₂, Z.components[symb2], Z.dim)])
 
                 # Rotating frame
                 rH1ₜ₁ = U1ₜ₁'H1_error*U1ₜ₁
@@ -1087,10 +1094,10 @@ function InfidelityRobustnessObjective(
             Δt₂ = Δts[i₂]
 
             # States
-            U1ₜ₁_slice = slice(i₁, Z.components[state1_symb], Z.dim)
-            U1ₜ₂_slice = slice(i₂, Z.components[state1_symb], Z.dim)
-            U2ₜ₁_slice = slice(i₁, Z.components[state2_symb], Z.dim)
-            U2ₜ₂_slice = slice(i₂, Z.components[state2_symb], Z.dim)
+            U1ₜ₁_slice = slice(i₁, Z.components[symb1], Z.dim)
+            U1ₜ₂_slice = slice(i₂, Z.components[symb1], Z.dim)
+            U2ₜ₁_slice = slice(i₁, Z.components[symb2], Z.dim)
+            U2ₜ₂_slice = slice(i₂, Z.components[symb2], Z.dim)
             U1ₜ₁ = iso_vec_to_operator(Z⃗[U1ₜ₁_slice])
             U1ₜ₂ = iso_vec_to_operator(Z⃗[U1ₜ₂_slice])
             U2ₜ₁ = iso_vec_to_operator(Z⃗[U2ₜ₁_slice])
@@ -1132,8 +1139,11 @@ function InfidelityRobustnessObjective(
 	end
 
     params = Dict(
-        :type => :QuantumRobustnessObjective,
-        :error => H1_error ⊗ H2_error,
+        :type => :PairwiseInfidelityRobustnessObjective,
+        :H1_error => H1_error,
+        :H2_error => H2_error,
+        :symb1 => symb1,
+        :symb2 => symb2,
         :eval_hessian => eval_hessian
     )
 

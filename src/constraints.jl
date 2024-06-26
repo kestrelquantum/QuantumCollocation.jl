@@ -122,7 +122,7 @@ minimum allowed fidelity.
 """
 
 function FinalFidelityConstraint(;
-    fidelity_function::Union{Function,Nothing}=nothing,
+    fidelity_function::Union{Symbol,Function,Nothing}=nothing,
     value::Union{Float64,Nothing}=nothing,
     comps::Union{AbstractVector{Int},Nothing}=nothing,
     goal::Union{AbstractVector{Float64},Nothing}=nothing,
@@ -140,7 +140,12 @@ function FinalFidelityConstraint(;
     @assert !isnothing(zdim) "must provide a z dimension"
     @assert !isnothing(T) "must provide a T"
 
-    fidelity_function_symbol = Symbol(fidelity_function)
+    if fidelity_function isa Symbol
+        fidelity_function_symbol = fidelity_function
+        fidelity_function = eval(fidelity_function)
+    else
+        fidelity_function_symbol = Symbol(fidelity_function)
+    end
 
     if isnothing(subspace)
         fid = x -> fidelity_function(x, goal)
@@ -153,7 +158,7 @@ function FinalFidelityConstraint(;
     params = Dict{Symbol, Any}()
 
     if fidelity_function_symbol ∉ names(QuantumUtils)
-        @warn "fidelity function is not exported by QuantumUtils: will not be able to save this constraint"
+        @warn "Fidelity function :$(string(fidelity_function_symbol)) is not exported by QuantumUtils. Unable to save this constraint."
         params[:type] = :FinalFidelityConstraint
         params[:fidelity_function] = :not_saveable
     else
@@ -161,10 +166,12 @@ function FinalFidelityConstraint(;
         params[:fidelity_function] = fidelity_function_symbol
         params[:value] = value
         params[:comps] = comps
+        params[:goal] = goal
         params[:statedim] = statedim
         params[:zdim] = zdim
         params[:T] = T
         params[:subspace] = subspace
+        params[:eval_hessian] = eval_hessian
     end
 
     state_slice = slice(T, comps, zdim)
