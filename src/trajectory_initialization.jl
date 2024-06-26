@@ -247,7 +247,7 @@ function initialize_unitary_trajectory(
     if bound_unitary
         Ũ⃗_dim = length(Ũ⃗_init)
         Ũ⃗_bounds = repeat([(-ones(Ũ⃗_dim), ones(Ũ⃗_dim))], length(Ũ⃗_keys))
-        merge!(bounds, (; (Ũ⃗_keys .=> Ũ⃗_bounds)...))
+        bounds = merge(bounds, (; (Ũ⃗_keys .=> Ũ⃗_bounds)...))
     end
 
     # Initial state and control values
