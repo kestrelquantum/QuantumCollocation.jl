@@ -85,8 +85,9 @@ function Base.:+(obj1::Objective, obj2::Objective)
 end
 
 Base.:+(obj::Objective, ::Nothing) = obj
+Base.:+(obj::Objective) = obj
 
-function Objective(terms::Vector{Dict})
+function Objective(terms::AbstractVector{<:Dict})
     return +(Objective.(terms)...)
 end
 
