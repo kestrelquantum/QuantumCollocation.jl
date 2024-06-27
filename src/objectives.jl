@@ -1025,9 +1025,8 @@ function InfidelityRobustnessObjective(;
 
     params = Dict(
         :type => :InfidelityRobustnessObjective,
-        :H => H_error,
+        :H_error => H_error,
         :eval_hessian => eval_hessian,
-        :subspace => subspace,
         :symb => symb
     )
 
@@ -1168,7 +1167,7 @@ function PairwiseInfidelityRobustnessObjective(;
 
     params = Dict(
         :type => :PairwiseInfidelityRobustnessObjective,
-        :H1 => H1_error,
+        :H1_error => H1_error,
         :H2_error => H2_error,
         :symb1 => symb1,
         :symb2 => symb2,
