@@ -15,12 +15,13 @@ function solve!(
     prob::QuantumControlProblem;
     init_traj=nothing,
     save_path=nothing,
-    controls_save_path=nothing,
     max_iter::Int=prob.ipopt_options.max_iter,
     linear_solver::String=prob.ipopt_options.linear_solver,
+    print_level::Int=prob.ipopt_options.print_level,
 )
     prob.ipopt_options.max_iter = max_iter
     prob.ipopt_options.linear_solver = linear_solver
+    prob.ipopt_options.print_level = print_level
 
     set!(prob.optimizer, prob.ipopt_options)
 
@@ -46,11 +47,6 @@ function solve!(
     if !isnothing(save_path)
         save_problem(save_path, prob)
     end
-
-    # TODO: sort this out
-    # if !isnothing(controls_save_path)
-    #     save_controls(prob, controls_save_path)
-    # end
 end
 
 end
