@@ -106,7 +106,7 @@ end
 end
 
 @testitem "Embedded operator from composite system" begin
-    @test_skip
+    @test_skip nothing
 end
 
 @testitem "Embedded operator kron" begin
