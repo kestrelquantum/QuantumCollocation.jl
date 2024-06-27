@@ -106,6 +106,12 @@ end
 end
 
 @testitem "Embedded operator from composite system" begin
+    @test_skip
+end
 
+@testitem "Embedded operator kron" begin
+    Z = GATES[:Z]
+    Ẑ = EmbeddedOperator(Z, 1:2, [4])
+    @test unembed(Ẑ ⊗ Ẑ) == Z ⊗ Z
 end
 
