@@ -2,7 +2,7 @@
 
 julia_version = "1.10.0"
 manifest_format = "2.0"
-project_hash = "0af13b9126caf21a7349df842fd536f87be35b2f"
+project_hash = "9419b1dd2f369832109faffc09e4c5a2ace40768"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "fc02d55798c1af91123d07915a990fbb9a10d146"
@@ -1467,7 +1467,9 @@ version = "1.0.2"
 
 [[deps.NamedTrajectories]]
 deps = ["CairoMakie", "JLD2", "LaTeXStrings", "Latexify", "OrderedCollections", "Random", "Reexport", "Revise", "Unidecode"]
-git-tree-sha1 = "a109d8dee4055adb47bb435fd479dd67a50776af"
+git-tree-sha1 = "2be818959933a47c511d4f4ce7df035a256386e0"
+repo-rev = "main"
+repo-url = "https://github.com/aarontrowbridge/NamedTrajectories.jl.git"
 uuid = "538bc3a1-5ab9-4fc3-b776-35ca1e893e08"
 version = "0.1.5"
 
