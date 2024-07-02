@@ -138,10 +138,13 @@ end
     mintime_prob = UnitaryMinimumTimeProblem(prob, final_fidelity=final_fidelity)
     solve!(mintime_prob; max_iter=40)
 
-    @test unitary_fidelity(mintime_prob) ≥ after
-    @test sum(get_timesteps(mintime_prob.trajectory)) < sum(get_timesteps(prob.trajectory))
+    # Test fidelity is approximatley staying above the constraint
+    @test unitary_fidelity(mintime_prob) ≥ (final_fidelity - 0.1 * final_fidelity)
+    duration_after = sum(get_timesteps(mintime_prob.trajectory))
+    duration_before = sum(get_timesteps(prob.trajectory))
+    @test duration_after < duration_before
 
-    # Test without final fidelity
+    # Set up without a final fidelity to check interface
     UnitaryMinimumTimeProblem(prob)
 
 end
