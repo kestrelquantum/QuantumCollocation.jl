@@ -1,5 +1,5 @@
 @doc raw"""
-    UnitarySmoothPulseProblem(system::QuantumSystem, operator, T, Δt; kwargs...)
+    UnitaryBangBangProblem(system::QuantumSystem, operator, T, Δt; kwargs...)
 
 Construct a `QuantumControlProblem` for a free-time unitary gate problem with bang-bang control pulses.
 
@@ -54,6 +54,7 @@ with
 - `R=1e-2`: the weight on the regularization terms
 - `R_a::Union{Float64, Vector{Float64}}=R`: the weight on the regularization term for the control pulses
 - `R_da::Union{Float64, Vector{Float64}}=R`: the weight on the regularization term for the control pulse derivatives
+- `R_bang_bang::Union{Float64, Vector{Float64}}=1.0`: the weight on the bang-bang regularization term
 - `leakage_suppression::Bool=false`: whether or not to suppress leakage to higher energy states
 - `R_leakage=1e-1`: the weight on the leakage suppression term
 - `bound_unitary=integrator == :exponential`: whether or not to bound the unitary
@@ -219,20 +220,34 @@ end
 
 # *************************************************************************** #
 
-@testitem "Hadamard gate" begin
-    sys = QuantumSystem(GATES[:Z], [GATES[:X], GATES[:Y]])
+@testitem "Bang-bang hadamard gate" begin
+    sys = QuantumSystem(0.01 * GATES[:Z], [GATES[:X], GATES[:Y]])
     U_goal = GATES[:H]
     T = 51
     Δt = 0.2
     
+    ipopt_options = IpoptOptions(print_level=1, max_iter=25)
+    piccolo_options = PiccoloOptions(verbose=false)
+    
     prob = UnitaryBangBangProblem(
         sys, U_goal, T, Δt,
-        ipopt_options=IpoptOptions(print_level=1),
-        piccolo_options=PiccoloOptions(verbose=false)
+        R_bang_bang=10.,
+        ipopt_options=ipopt_options, piccolo_options=piccolo_options 
+    )
+    
+    smooth_prob = UnitarySmoothPulseProblem(
+        sys, U_goal, T, Δt,
+        ipopt_options=ipopt_options, piccolo_options=piccolo_options
     )
     
     initial = unitary_fidelity(prob)
-    solve!(prob, max_iter=20)
+    solve!(prob)
     final = unitary_fidelity(prob)
     @test final > initial
+    
+    solve!(smooth_prob)
+    threshold = 1e-3
+    a_sparse = sum(prob.trajectory.da .> 5e-2)
+    a_dense = sum(smooth_prob.trajectory.da .> 5e-2)
+    @test a_sparse < a_dense
 end
