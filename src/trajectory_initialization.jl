@@ -163,49 +163,37 @@ end
 
 function initialize_controls(
     n_drives::Int,
-    n_derivatives::Int,
     T::Int,
-    bounds::VectorBound,
-    drive_derivative_σ::Float64,
+    a_bounds::VectorBound,
+    drive_derivative_σ::Float64
 )
-    if bounds isa AbstractVector
-        a_dists = [Uniform(-bounds[i], bounds[i]) for i = 1:n_drives]
-    elseif bounds isa Tuple
-        a_dists = [Uniform(aᵢ_lb, aᵢ_ub) for (aᵢ_lb, aᵢ_ub) ∈ zip(bounds...)]
+    if a_bounds isa AbstractVector
+        a_dists = [Uniform(-a_bounds[i], a_bounds[i]) for i = 1:n_drives]
+    elseif a_bounds isa Tuple
+        a_dists = [Uniform(aᵢ_lb, aᵢ_ub) for (aᵢ_lb, aᵢ_ub) ∈ zip(a_bounds...)]
     else
-        error("bounds must be a Vector or Tuple")
+        error("a_bounds must be a Vector or Tuple")
     end
-
-    controls = Matrix{Float64}[]
 
     a = hcat([
         zeros(n_drives),
         vcat([rand(a_dists[i], 1, T - 2) for i = 1:n_drives]...),
         zeros(n_drives)
     ]...)
-    push!(controls, a)
 
-    for _ in 1:n_derivatives
-        push!(controls, randn(n_drives, T) * drive_derivative_σ)
-    end
-
-    return controls
+    da = randn(n_drives, T) * drive_derivative_σ
+    dda = randn(n_drives, T) * drive_derivative_σ
+    return a, da, dda
 end
 
-function initialize_controls(a::AbstractMatrix, Δt::AbstractVecOrMat, n_derivatives::Int)
-    controls = Matrix{Float64}[a]
-    push!(controls, a)
+function initialize_controls(a::AbstractMatrix, Δt::AbstractVecOrMat)
+    da = derivative(a, Δt)
+    dda = derivative(da, Δt)
 
-    for n in 1:n_derivatives
-        # next derivative
-        push!(controls,  derivative(controls[end], Δt))
+    # to avoid constraint violation error at initial iteration
+    da[:, end] = da[:, end-1] + Δt[end-1] * dda[:, end-1]
 
-        # to avoid constraint violation error at initial iteration for da, dda, ...
-        if n > 1
-            controls[end-1][:, end] = controls[end-1][:, end-1] + Δt[end-1] * controls[end][:, end-1]
-        end
-    end
-    return controls
+    return a, da, dda
 end
 
 function initialize_unitary_trajectory(
@@ -213,9 +201,9 @@ function initialize_unitary_trajectory(
     T::Int,
     Δt::Real,
     n_drives::Int,
-    all_a_bounds::NamedTuple{anames, <:Tuple{Vararg{VectorBound}}} where anames;
+    a_bounds::VectorBound,
+    dda_bounds::VectorBound;
     U_init::AbstractMatrix{<:Number}=Matrix{ComplexF64}(I(size(U_goal, 1))),
-    n_derivatives::Int=2,
     geodesic=true,
     bound_unitary=false,
     free_time=false,
@@ -225,10 +213,7 @@ function initialize_unitary_trajectory(
     system::Union{AbstractQuantumSystem, AbstractVector{<:AbstractQuantumSystem}, Nothing}=nothing,
     rollout_integrator::Function=exp,
     Ũ⃗_keys::AbstractVector{<:Symbol}=[:Ũ⃗],
-    a_keys::AbstractVector{<:Symbol}=[Symbol("d"^i * "a") for i in 0:n_derivatives]
 )
-    @assert length(a_keys) == n_derivatives + 1 "a_keys must have the same length as n_derivatives + 1"
-
     if free_time
         if Δt isa Float64
             Δt = fill(Δt, 1, T)
@@ -257,25 +242,19 @@ function initialize_unitary_trajectory(
     goal = (; (Ũ⃗_keys .=> Ũ⃗_goals)...)
 
     # Bounds
-    bounds = all_a_bounds
+    bounds = (a = a_bounds, dda = dda_bounds,)
 
     if bound_unitary
         Ũ⃗_dim = length(Ũ⃗_init)
         Ũ⃗_bounds = repeat([(-ones(Ũ⃗_dim), ones(Ũ⃗_dim))], length(Ũ⃗_keys))
-        bounds = merge(bounds, (; (Ũ⃗_keys .=> Ũ⃗_bounds)...))
+        merge!(bounds, (; (Ũ⃗_keys .=> Ũ⃗_bounds)...))
     end
 
     # Initial state and control values
     if isnothing(a_guess)
         Ũ⃗ = initialize_unitaries(U_init, U_goal, T, geodesic=geodesic)
         Ũ⃗_values = repeat([Ũ⃗], length(Ũ⃗_keys))
-        a_values = initialize_controls(
-            n_drives,
-            n_derivatives, 
-            T, 
-            bounds[a_keys[1]], 
-            drive_derivative_σ
-        )
+        a, da, dda = initialize_controls(n_drives, T, a_bounds, drive_derivative_σ)
     else
         @assert !isnothing(system) "system must be provided if a_guess is provided"
         if system isa AbstractVector
@@ -287,21 +266,21 @@ function initialize_unitary_trajectory(
             unitary_rollout(Ũ⃗_init, a_guess, Δt, system; integrator=rollout_integrator)
             Ũ⃗_values = repeat([Ũ⃗], length(Ũ⃗_keys))
         end
-        a_values = initialize_controls(a_guess, Δt, n_derivatives)
+        a, da, dda = initialize_controls(a_guess, Δt)
     end
 
     # Trajectory
-    keys = [Ũ⃗_keys..., a_keys...]
-    values = [Ũ⃗_values..., a_values...]
+    keys = [Ũ⃗_keys..., :a, :da, :dda]
+    values = [Ũ⃗_values..., a, da, dda]
 
     if free_time
         push!(keys, :Δt)
         push!(values, Δt)
-        controls = (a_keys[end], :Δt)
+        controls = (:dda, :Δt)
         timestep = :Δt
         bounds = merge(bounds, (Δt = Δt_bounds,))
     else
-        controls = (a_keys[end],)
+        controls = (:dda,)
         timestep = Δt
     end
 
@@ -322,16 +301,15 @@ function initialize_state_trajectory(
     T::Int,
     Δt::Real,
     n_drives::Int,
-    all_a_bounds::NamedTuple{anames, <:Tuple{Vararg{VectorBound}}} where anames;
-    n_derivatives::Int=2,
+    a_bounds::VectorBound,
+    dda_bounds::VectorBound;
     free_time=false,
     Δt_bounds::ScalarBound=(0.5 * Δt, 1.5 * Δt),
     drive_derivative_σ::Float64=0.1,
     a_guess::Union{AbstractMatrix{<:Float64}, Nothing}=nothing,
     system::Union{AbstractQuantumSystem, AbstractVector{<:AbstractQuantumSystem}, Nothing}=nothing,
     rollout_integrator::Function=exp,    
-    ψ̃_keys::AbstractVector{<:Symbol}=[Symbol("ψ̃$i") for i = 1:length(ψ̃_goals)],
-    a_keys::AbstractVector{<:Symbol}=[Symbol("d"^i * "a") for i in 0:n_derivatives]
+    ψ̃_keys::AbstractVector{<:Symbol}=[Symbol("ψ̃$i") for i = 1:length(ψ̃_goals)]
 )
     @assert length(ψ̃_inits) == length(ψ̃_goals) "ψ̃_inits and ψ̃_goals must have the same length"
     @assert length(ψ̃_keys) == length(ψ̃_goals) "ψ̃_keys and ψ̃_goals must have the same length"
@@ -352,41 +330,35 @@ function initialize_state_trajectory(
     goal = (; (ψ̃_keys .=> ψ̃_goals)...)
 
     # Bounds
-    bounds = all_a_bounds
+    bounds = (a = a_bounds, dda = dda_bounds,)
 
     # Initial state and control values
     if isnothing(a_guess)
-        ψ̃_values = NamedTuple([
+        ψ̃s = NamedTuple([
             k => linear_interpolation(ψ̃_init, ψ̃_goal, T)
                 for (k, ψ̃_init, ψ̃_goal) in zip(ψ̃_keys, ψ̃_inits, ψ̃_goals)
         ])
-        a_values = initialize_controls(
-            n_drives, 
-            n_derivatives, 
-            T, 
-            bounds[a_keys[1]], 
-            drive_derivative_σ
-        )
+        a, da, dda = initialize_controls(n_drives, T, a_bounds, drive_derivative_σ)
     else
-        ψ̃_values = NamedTuple([
+        ψ̃s = NamedTuple([
             k => rollout(ψ̃_init, a_guess, Δt, system, integrator=rollout_integrator)
                 for (i, ψ̃_init) in zip(ψ̃_keys, ψ̃_inits)
         ])
-        a_values = initialize_controls(a_guess, Δt, n_derivatives)
+        a, da, dda = initialize_controls(a_guess, Δt)
     end
 
     # Trajectory
-    keys = [ψ̃_keys..., a_keys...]
-    values = [ψ̃_values..., a_values...]
+    keys = [ψ̃_keys..., :a, :da, :dda]
+    values = [ψ̃s..., a, da, dda]
 
     if free_time
         push!(keys, :Δt)
         push!(values, Δt)
-        controls = (a_keys[end], :Δt)
+        controls = (:dda, :Δt)
         timestep = :Δt
         bounds = merge(bounds, (Δt = Δt_bounds,))
     else
-        controls = (a_keys[end],)
+        controls = (:dda,)
         timestep = Δt
     end
 
