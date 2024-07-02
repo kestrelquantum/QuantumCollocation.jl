@@ -105,8 +105,7 @@ function UnitarySmoothPulseProblem(
             T,
             Δt,
             n_drives,
-            a_bounds,
-            dda_bounds;
+            (a = a_bounds, dda = dda_bounds);
             free_time=piccolo_options.free_time,
             Δt_bounds=(Δt_min, Δt_max),
             geodesic=piccolo_options.geodesic,

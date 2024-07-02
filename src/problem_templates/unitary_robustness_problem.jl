@@ -130,7 +130,7 @@ end
     # Robustness improvement over default (or small initial)
     after = loss(rob_prob.trajectory.datavec)
     before = loss(prob.trajectory.datavec)
-    @test after < before || before < 0.01
+    @test (after < before) || (before < 0.01)
 
     # TODO: Fidelity constraint approximately satisfied
     @test_skip isapprox(unitary_fidelity(rob_prob; subspace=U_goal.subspace_indices), 0.99, atol=0.05)
