@@ -5,10 +5,11 @@
 @testitem "Random drive initialization" begin
     T = 10
     n_drives = 2
+    n_derivates = 2
     drive_bounds = [1.0, 2.0]
     drive_derivative_σ = 0.01
     
-    a, da, dda = TrajectoryInitialization.initialize_controls(n_drives, T, drive_bounds, drive_derivative_σ)
+    a, da, dda = TrajectoryInitialization.initialize_controls(n_drives, n_derivates, T, drive_bounds, drive_derivative_σ)
 
     @test size(a) == (n_drives, T)
     @test size(da) == (n_drives, T)

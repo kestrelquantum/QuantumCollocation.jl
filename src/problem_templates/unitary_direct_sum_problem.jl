@@ -65,6 +65,8 @@ function UnitaryDirectSumProblem(
     @assert N ≥ 2 "At least two problems are required"
     @assert 0 ≤ drive_reset_ratio ≤ 1 "drive_reset_ratio must be in [0, 1]"
     @assert isempty(intersect(keys(boundary_values), prob_labels)) "Boundary value keys cannot be in prob_labels"
+    @assert all([:dda ∈ p.trajectory.names for p in probs]) "Only smooth pulse problems are supported."
+    n_derivatives = 2
 
     # Default chain graph and boundary
     boundary = Tuple{Symbol, Array}[]
@@ -102,7 +104,11 @@ function UnitaryDirectSumProblem(
         for ℓ in prob_labels
             a_symb, da_symb, dda_symb = add_suffix(:a, ℓ), add_suffix(:da, ℓ), add_suffix(:dda, ℓ)
             a, da, dda = TrajectoryInitialization.initialize_controls(
-                length(traj.components[a_symb]), traj.T, traj.bounds[a_symb], drive_derivative_σ
+                length(traj.components[a_symb]),
+                n_derivatives,
+                traj.T, 
+                traj.bounds[a_symb], 
+                drive_derivative_σ
             )
             update!(traj, a_symb, (1 - drive_reset_ratio) * traj[a_symb] + drive_reset_ratio * a)
             update!(traj, da_symb, (1 - drive_reset_ratio) * traj[da_symb] + drive_reset_ratio * da)
