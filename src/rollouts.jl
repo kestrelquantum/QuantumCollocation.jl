@@ -12,6 +12,7 @@ using ..QuantumSystems
 using ..EmbeddedOperators
 using ..Integrators
 using ..Problems
+using ..DirectSums
 
 using LinearAlgebra
 using NamedTrajectories
@@ -89,10 +90,10 @@ function QuantumUtils.fidelity(
     kwargs...
 )
     fids = []
-    for name in trajectory.names
-        if startswith(string(name), string(state_symb))
-            init = trajectory.initial[name]
-            goal = trajectory.goal[name]
+    for symb in trajectory.names
+        if startswith(symb, state_symb)
+            init = trajectory.initial[symb]
+            goal = trajectory.goal[symb]
             push!(
                 fids, 
                 fidelity(init, goal, trajectory[control_symb], get_timesteps(trajectory), system; kwargs...)
@@ -189,46 +190,39 @@ end
 
 function QuantumUtils.unitary_fidelity(
     traj::NamedTrajectory,
-    system::AbstractQuantumSystem;
+    sys::AbstractQuantumSystem;
     unitary_name::Symbol=:Ũ⃗,
     subspace=nothing,
     kwargs...
 )
-    Ũ⃗_final = unitary_rollout(
-        traj,
-        system;
-        unitary_name=unitary_name,
-        kwargs...
-    )[:, end]
-    return unitary_fidelity(
-        Ũ⃗_final,
-        traj.goal[unitary_name];
-        subspace=subspace
-    )
+    Ũ⃗_final = unitary_rollout(traj, sys; unitary_name=unitary_name, kwargs...)[:, end]
+    return unitary_fidelity( Ũ⃗_final, traj.goal[unitary_name]; subspace=subspace)
 end
 
-function QuantumUtils.unitary_fidelity(
-    prob::QuantumControlProblem;
-    kwargs...
-)
-    return unitary_fidelity(prob.trajectory, prob.system; kwargs...)
-end
+QuantumUtils.unitary_fidelity(prob::QuantumControlProblem; kwargs...) =
+    unitary_fidelity(prob.trajectory, prob.system; kwargs...)
 
 function QuantumUtils.unitary_fidelity(
     U_goal::AbstractMatrix{ComplexF64},
     controls::AbstractMatrix{Float64},
     Δt::Union{AbstractVector{Float64}, AbstractMatrix{Float64}, Float64},
-    system::AbstractQuantumSystem;
+    sys::AbstractQuantumSystem;
     subspace=nothing,
     integrator=exp
 )
-    Ũ⃗_final = unitary_rollout(controls, Δt, system; integrator=integrator)[:, end]
-    return unitary_fidelity(
-        Ũ⃗_final,
-        operator_to_iso_vec(U_goal);
-        subspace=subspace
-    )
+    Ũ⃗_final = unitary_rollout(controls, Δt, sys; integrator=integrator)[:, end]
+    Ũ⃗_goal = operator_to_iso_vec(U_goal)
+    return unitary_fidelity(Ũ⃗_final, Ũ⃗_goal; subspace=subspace)
 end
+
+QuantumUtils.unitary_fidelity(
+    U_goal::EmbeddedOperator,
+    controls::AbstractMatrix{Float64},
+    Δt::Union{AbstractVector{Float64}, AbstractMatrix{Float64}, Float64},
+    sys::AbstractQuantumSystem;
+    subspace=U_goal.subspace_indices,
+    kwargs...
+) = unitary_fidelity(U_goal.operator, controls, Δt, sys; subspace=subspace, kwargs...)
 
 """
     lab_frame_unitary_rollout(

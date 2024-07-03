@@ -1,13 +1,14 @@
 """
-    Testing problems
+    Testing problem features
 
+    TODO:     
     - test problem creation
-    - test problem solving
+    - test problem iterations
     - test problem saving
     - test problem loading
 """
 
-@testitem "Problems" begin
+@testitem "System creation" begin
     # initializing test system
     T = 5
     H_drift = GATES[:Z]
@@ -16,7 +17,7 @@
 
     system = QuantumSystem(H_drift, H_drives)
 
-    # test problem creation
+    # test system creation
 
 
 end
@@ -30,14 +31,16 @@ end
 
     prob_vanilla = UnitarySmoothPulseProblem(
         H_drift, H_drives, U_goal, T, Δt,
-        ipopt_options=Options(print_level=4)
+        ipopt_options=IpoptOptions(print_level=1),
+        piccolo_options=PiccoloOptions(verbose=false),
     )
 
     J_extra = QuadraticSmoothnessRegularizer(:dda, prob_vanilla.trajectory, 10.0)
 
     prob_additional = UnitarySmoothPulseProblem(
         H_drift, H_drives, U_goal, T, Δt,
-        ipopt_options=Options(print_level=4),
+        ipopt_options=IpoptOptions(print_level=1),
+        piccolo_options=PiccoloOptions(verbose=false),
         additional_objective=J_extra,
     )
 

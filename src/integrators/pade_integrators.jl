@@ -96,8 +96,8 @@ struct UnitaryPadeIntegrator <: QuantumPadeIntegrator
         unitary_symb::Union{Symbol,Nothing}=nothing,
         drive_symb::Union{Symbol,Tuple{Vararg{Symbol}},Nothing}=nothing;
         order::Int=4,
-        autodiff::Bool=false,
-        G::Union{Function, Nothing}=nothing,
+        autodiff::Bool=order != 4,
+        G::Function=G_bilinear,
     )
         @assert order ∈ [4, 6, 8, 10] "order must be in [4, 6, 8, 10]"
         @assert !isnothing(unitary_symb) "must specify unitary symbol"
@@ -111,7 +111,6 @@ struct UnitaryPadeIntegrator <: QuantumPadeIntegrator
 
         G_drift = sys.G_drift
         G_drives = sys.G_drives
-        G = isnothing(G) ? G_bilinear : G
 
         drive_anticomms, drift_anticomms =
             order == 4 ? build_anticomms(G_drift, G_drives, n_drives) : (nothing, nothing)
@@ -189,7 +188,7 @@ struct QuantumStatePadeIntegrator <: QuantumPadeIntegrator
         drive_symb::Union{Symbol,Tuple{Vararg{Symbol}},Nothing}=nothing;
         order::Int=4,
         autodiff::Bool=order != 4,
-        G::Union{Function, Nothing}=nothing,
+        G::Function=G_bilinear,
     )
         @assert order ∈ [4, 6, 8, 10] "order must be in [4, 6, 8, 10]"
         @assert !isnothing(state_symb) "state_symb must be specified"
@@ -201,7 +200,6 @@ struct QuantumStatePadeIntegrator <: QuantumPadeIntegrator
 
         G_drift = sys.G_drift
         G_drives = sys.G_drives
-        G = isnothing(G) ? G_bilinear : G
 
         drive_anticomms, drift_anticomms =
             order == 4 ? build_anticomms(G_drift, G_drives, n_drives) : (nothing, nothing)

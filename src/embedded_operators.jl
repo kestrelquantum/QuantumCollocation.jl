@@ -83,6 +83,16 @@ function Base.:*(
     )
 end
 
+function Base.kron(op1::EmbeddedOperator, op2::EmbeddedOperator)
+    levels = [size(op1, 1), size(op2, 2)]
+    indices = get_subspace_indices(
+        [op1.subspace_indices, op2.subspace_indices], levels
+    )
+    return EmbeddedOperator(unembed(op1) ⊗ unembed(op2), indices, levels)
+end
+
+QuantumUtils.:⊗(A::EmbeddedOperator, B::EmbeddedOperator) = kron(A, B)
+
 function EmbeddedOperator(
     op::AbstractMatrix{<:Number},
     system::QuantumSystem;
@@ -156,6 +166,8 @@ function EmbeddedOperator(
     ]
     return *(ops_embedded...)
 end
+
+# function LinearAlgebra
 
 # ====================
 

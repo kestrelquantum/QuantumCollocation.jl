@@ -12,8 +12,10 @@ robust solution by including multiple systems reflecting the problem uncertainty
 - `Δt::Union{Float64, Vector{Float64}}`: The time step size.
 - `system_labels::Vector{String}`: The labels for each system.
 - `system_weights::Vector{Float64}`: The weights for each system.
-- `free_time::Bool`: Whether to optimize the time steps.
 - `init_trajectory::Union{NamedTrajectory, Nothing}`: The initial trajectory.
+- `ipopt_options::IpoptOptions`: The IPOPT options.
+- `piccolo_options::PiccoloOptions`: The Piccolo options.
+- `constraints::Vector{<:AbstractConstraint}`: The constraints.
 - `a_bound::Float64`: The bound for the control amplitudes.
 - `a_bounds::Vector{Float64}`: The bounds for the control amplitudes.
 - `a_guess::Union{Matrix{Float64}, Nothing}`: The initial guess for the control amplitudes.
@@ -29,24 +31,10 @@ robust solution by including multiple systems reflecting the problem uncertainty
 - `R_dda::Union{Float64, Vector{Float64}}`: The regularization weight for the control second derivatives.
 - `leakage_suppression::Bool`: Whether to suppress leakage.
 - `R_leakage::Float64`: The regularization weight for the leakage.
-- `max_iter::Int`: The maximum number of iterations.
-- `linear_solver::String`: The linear solver.
-- `ipopt_options::Options`: The IPOPT options.
-- `constraints::Vector{<:AbstractConstraint}`: The constraints.
-- `timesteps_all_equal::Bool`: Whether to enforce equal time steps.
-- `verbose::Bool`: Whether to print verbose output.
-- `integrator::Symbol`: The integrator to use.
-- `rollout_integrator`: The integrator for the rollout.
 - `bound_unitary::Bool`: Whether to bound the unitary.
 - `control_norm_constraint::Bool`: Whether to enforce a control norm constraint.
 - `control_norm_constraint_components`: The components for the control norm constraint.
 - `control_norm_R`: The regularization weight for the control norm constraint.
-- `geodesic::Bool`: Whether to use the geodesic.
-- `pade_order::Int`: The order of the Pade approximation.
-- `autodiff::Bool`: Whether to use automatic differentiation.
-- `jacobian_structure::Bool`: Whether to evaluate the Jacobian structure.
-- `hessian_approximation::Bool`: Whether to approximate the Hessian.
-- `blas_multithreading::Bool`: Whether to use BLAS multithreading.
 - `kwargs...`: Additional keyword arguments.
 
 """
@@ -57,8 +45,10 @@ function UnitarySamplingProblem(
     Δt::Union{Float64, Vector{Float64}};
     system_labels=string.(1:length(systems)),
     system_weights=fill(1.0, length(systems)),
-    free_time=true,
     init_trajectory::Union{NamedTrajectory, Nothing}=nothing,
+    ipopt_options::IpoptOptions=IpoptOptions(),
+    piccolo_options::PiccoloOptions=PiccoloOptions(),
+    constraints::Vector{<:AbstractConstraint}=AbstractConstraint[],
     a_bound::Float64=1.0,
     a_bounds=fill(a_bound, length(systems[1].G_drives)),
     a_guess::Union{Matrix{Float64}, Nothing}=nothing,
@@ -74,34 +64,12 @@ function UnitarySamplingProblem(
     R_dda::Union{Float64, Vector{Float64}}=R,
     leakage_suppression=false,
     R_leakage=1e-1,
-    max_iter::Int=1000,
-    linear_solver::String="mumps",
-    ipopt_options::Options=Options(),
-    constraints::Vector{<:AbstractConstraint}=AbstractConstraint[],
-    timesteps_all_equal::Bool=true,
-    verbose::Bool=false,
-    integrator::Symbol=:pade,
-    rollout_integrator=exp,
-    bound_unitary=integrator == :exponential,
+    bound_unitary=piccolo_options.integrator == :exponential,
     control_norm_constraint=false,
     control_norm_constraint_components=nothing,
     control_norm_R=nothing,
-    geodesic=true,
-    pade_order=4,
-    autodiff=pade_order != 4,
-    jacobian_structure=true,
-    hessian_approximation=false,
-    blas_multithreading=true,
     kwargs...
 )
-    if !blas_multithreading
-        BLAS.set_num_threads(1)
-    end
-
-    if hessian_approximation
-        ipopt_options.hessian_approximation = "limited-memory"
-    end
-
     # Create keys for multiple systems
     Ũ⃗_keys = [add_suffix(:Ũ⃗, ℓ) for ℓ ∈ system_labels]
 
@@ -110,22 +78,20 @@ function UnitarySamplingProblem(
         traj = init_trajectory
     else
         n_drives = length(systems[1].G_drives)
-        # TODO: Initial system?
         traj = initialize_unitary_trajectory(
             operator,
             T,
             Δt,
             n_drives,
-            a_bounds,
-            dda_bounds;
-            free_time=free_time,
+            (a = a_bounds, dda = dda_bounds);
+            free_time=piccolo_options.free_time,
             Δt_bounds=(Δt_min, Δt_max),
-            geodesic=geodesic,
+            geodesic=piccolo_options.geodesic,
             bound_unitary=bound_unitary,
             drive_derivative_σ=drive_derivative_σ,
             a_guess=a_guess,
             system=systems,
-            rollout_integrator=rollout_integrator,
+            rollout_integrator=piccolo_options.rollout_integrator,
             Ũ⃗_keys=Ũ⃗_keys
         )
     end
@@ -151,7 +117,7 @@ function UnitarySamplingProblem(
                     constraints, Ũ⃗_key, traj, 
                     R_value=R_leakage, 
                     indices=leakage_indices,
-                    eval_hessian=!hessian_approximation
+                    eval_hessian=piccolo_options.eval_hessian
                 )
             end
         else
@@ -159,8 +125,8 @@ function UnitarySamplingProblem(
         end
     end
 
-    if free_time
-        if timesteps_all_equal
+    if piccolo_options.free_time
+        if piccolo_options.timesteps_all_equal
             push!(constraints, TimeStepsAllEqualConstraint(:Δt, traj))
         end
     end
@@ -180,12 +146,12 @@ function UnitarySamplingProblem(
     # Integrators
     unitary_integrators = AbstractIntegrator[]
     for (sys, Ũ⃗_key) in zip(systems, Ũ⃗_keys)
-        if integrator == :pade
+        if piccolo_options.integrator == :pade
             push!(
                 unitary_integrators,
-                UnitaryPadeIntegrator(sys, Ũ⃗_key, :a; order=pade_order, autodiff=autodiff)
+                UnitaryPadeIntegrator(sys, Ũ⃗_key, :a; order=piccolo_options.pade_order)
             )
-        elseif integrator == :exponential
+        elseif piccolo_options.integrator == :exponential
             push!(
                 unitary_integrators,
                 UnitaryExponentialIntegrator(sys, Ũ⃗_key, :a)
@@ -207,13 +173,8 @@ function UnitarySamplingProblem(
         J,
         integrators;
         constraints=constraints,
-        max_iter=max_iter,
-        linear_solver=linear_solver,
-        verbose=verbose,
         ipopt_options=ipopt_options,
-        jacobian_structure=jacobian_structure,
-        hessian_approximation=hessian_approximation,
-        eval_hessian=!hessian_approximation,
+        piccolo_options=piccolo_options,
         kwargs...
     )
 end
@@ -242,70 +203,62 @@ end
 
 @testitem "Sample robustness test" begin
     using Distributions
+    using Random
+    Random.seed!(1234)
 
-    n_samples = 3
+    n_samples = 5
     T = 50
     Δt = 0.2
     timesteps = fill(Δt, T)
     operator = GATES[:H]
     systems(ζ) = QuantumSystem(ζ * GATES[:Z], [GATES[:X], GATES[:Y]])
 
-    prob = UnitarySamplingProblem(
-        systems,
-        Normal(0, 0.1),
-        n_samples,
-        operator,
-        T,
-        Δt;
-        verbose=false,
-        ipopt_options=Options(print_level=1, recalc_y = "yes", recalc_y_feas_tol = 1e1)
-    )
+    ip_ops = IpoptOptions(print_level=1, recalc_y = "yes", recalc_y_feas_tol = 1e1)
+    pi_ops = PiccoloOptions(verbose=false)
 
+    prob = UnitarySamplingProblem(
+        systems, Normal(0, 0.05), n_samples, operator, T, Δt,
+        ipopt_options=ip_ops, piccolo_options=pi_ops
+    )
     solve!(prob, max_iter=20)
 
     d_prob = UnitarySmoothPulseProblem(
-        systems(0),
-        operator,
-        T,
-        Δt;
-        verbose=false,
-        ipopt_options=Options(print_level=1, recalc_y = "yes", recalc_y_feas_tol = 1e1)
+        systems(0), operator, T, Δt,
+        ipopt_options=ip_ops, piccolo_options=pi_ops
     )
     solve!(prob, max_iter=20)
 
     # Check that the solution improves over the default
-    ζ_test = 0.02
+    # -------------------------------------------------
+    ζ_tests = -0.05:0.01:0.05
     Ũ⃗_goal = operator_to_iso_vec(operator)
-
-    Ũ⃗_end = unitary_rollout(prob.trajectory.a, timesteps, systems(ζ_test))[:, end]
-    fid = unitary_fidelity(Ũ⃗_end, Ũ⃗_goal)
-    
-    d_Ũ⃗_end = unitary_rollout(d_prob.trajectory.a, timesteps, systems(ζ_test))[:, end]
-    default_fid = unitary_fidelity(d_Ũ⃗_end, Ũ⃗_goal)
-
-    @test fid > default_fid
+    fids = []
+    default_fids = []
+    for ζ in ζ_tests
+        Ũ⃗_end = unitary_rollout(prob.trajectory.a, timesteps, systems(ζ))[:, end]
+        push!(fids, unitary_fidelity(Ũ⃗_end, Ũ⃗_goal))
+        
+        d_Ũ⃗_end = unitary_rollout(d_prob.trajectory.a, timesteps, systems(ζ))[:, end]
+        push!(default_fids, unitary_fidelity(d_Ũ⃗_end, Ũ⃗_goal))
+    end
+    @test sum(fids) > sum(default_fids)
 
     # Check initial guess initialization
+    # ----------------------------------
     a_guess = prob.trajectory.a
     
     g1_prob = UnitarySamplingProblem(
-        [systems(0), systems(0)],
-        operator,
-        T,
-        Δt;
-        verbose=false,
+        [systems(0), systems(0)], operator, T, Δt,
         a_guess=a_guess,
+        piccolo_options=pi_ops
     )
 
     @test g1_prob.trajectory.Ũ⃗1 ≈ g1_prob.trajectory.Ũ⃗2
 
     g2_prob = UnitarySamplingProblem(
-        [systems(0), systems(0.1)],
-        operator,
-        T,
-        Δt;
-        verbose=false,
+        [systems(0), systems(0.05)], operator, T, Δt;
         a_guess=a_guess,
+        piccolo_options=pi_ops
     )
 
     @test ~(g2_prob.trajectory.Ũ⃗1 ≈ g2_prob.trajectory.Ũ⃗2)
