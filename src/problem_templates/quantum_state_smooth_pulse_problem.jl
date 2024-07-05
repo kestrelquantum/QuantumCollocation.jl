@@ -33,6 +33,8 @@ function QuantumStateSmoothPulseProblem(
     a_bound::Float64=1.0,
     a_bounds::Vector{Float64}=fill(a_bound, length(system.G_drives)),
     a_guess::Union{Matrix{Float64}, Nothing}=nothing,
+    da_bound::Float64=Inf,
+    da_bounds::Vector{Float64}=fill(da_bound, length(system.G_drives)),
     dda_bound::Float64=1.0,
     dda_bounds::Vector{Float64}=fill(dda_bound, length(system.G_drives)),
     Δt_min::Float64=0.5 * Δt,
@@ -75,7 +77,7 @@ function QuantumStateSmoothPulseProblem(
             T,
             Δt,
             n_drives,
-            (a = a_bounds, dda = dda_bounds);
+            (a = a_bounds, da = da_bounds, dda = dda_bounds);
             free_time=piccolo_options.free_time,
             Δt_bounds=(Δt_min, Δt_max),
             drive_derivative_σ=drive_derivative_σ,
@@ -98,14 +100,14 @@ function QuantumStateSmoothPulseProblem(
     for name in L1_regularized_names
         if name in keys(L1_regularized_indices)
             J += L1Regularizer!(
-                constraints, name, traj, 
-                R_value=R_L1, 
+                constraints, name, traj,
+                R_value=R_L1,
                 indices=L1_regularized_indices[name],
                 eval_hessian=piccolo_options.eval_hessian
             )
         else
             J += L1Regularizer!(
-                constraints, name, traj; 
+                constraints, name, traj;
                 R_value=R_L1,
                 eval_hessian=piccolo_options.eval_hessian
             )
@@ -166,7 +168,7 @@ end
     # --------------------------------
     prob = QuantumStateSmoothPulseProblem(
         sys, ψ_init, ψ_target, T, Δt;
-        ipopt_options=IpoptOptions(print_level=1), 
+        ipopt_options=IpoptOptions(print_level=1),
         piccolo_options=PiccoloOptions(verbose=false)
     )
     initial = fidelity(prob)
@@ -180,7 +182,7 @@ end
     ψ_targets = [[0.0, 1.0], [1.0, 0.0]]
     prob = QuantumStateSmoothPulseProblem(
         sys, ψ_inits, ψ_targets, T, Δt;
-        ipopt_options=IpoptOptions(print_level=1), 
+        ipopt_options=IpoptOptions(print_level=1),
         piccolo_options=PiccoloOptions(verbose=false)
     )
     initial = fidelity(prob)

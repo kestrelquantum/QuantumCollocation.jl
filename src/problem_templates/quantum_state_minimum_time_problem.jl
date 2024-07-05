@@ -86,7 +86,7 @@ end
         sys = QuantumSystem(0.1 * GATES[:Z], [GATES[:X], GATES[:Y]])
         ψ_init = [1.0, 0.0]
         ψ_target = [0.0, 1.0]
-        
+
         prob = QuantumStateSmoothPulseProblem(
             sys, ψ_init, ψ_target, T, Δt;
             ipopt_options=IpoptOptions(print_level=1),

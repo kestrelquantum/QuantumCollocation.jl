@@ -44,6 +44,8 @@ with
 - `a_bound::Float64=1.0`: the bound on the control pulse
 - `a_bounds::Vector{Float64}=fill(a_bound, length(system.G_drives))`: the bounds on the control pulses, one for each drive
 - `a_guess::Union{Matrix{Float64}, Nothing}=nothing`: an initial guess for the control pulses
+- `da_bound::Float64=Inf`: the bound on the control pulse derivative
+- `da_bounds::Vector{Float64}=fill(da_bound, length(system.G_drives))`: the bounds on the control pulse derivatives, one for each drive
 - `dda_bound::Float64=1.0`: the bound on the control pulse derivative
 - `dda_bounds::Vector{Float64}=fill(dda_bound, length(system.G_drives))`: the bounds on the control pulse derivatives, one for each drive
 - `Δt_min::Float64=0.5 * Δt`: the minimum time step size
@@ -77,8 +79,10 @@ function UnitarySmoothPulseProblem(
     a_bound::Float64=1.0,
     a_bounds=fill(a_bound, length(system.G_drives)),
     a_guess::Union{Matrix{Float64}, Nothing}=nothing,
+    da_bound::Float64=Inf,
+    da_bounds::Vector{Float64}=fill(da_bound, length(system.G_drives)),
     dda_bound::Float64=1.0,
-    dda_bounds=fill(dda_bound, length(system.G_drives)),
+    dda_bounds::Vector{Float64}=fill(dda_bound, length(system.G_drives)),
     Δt_min::Float64=Δt isa Float64 ? 0.5 * Δt : 0.5 * mean(Δt),
     Δt_max::Float64=Δt isa Float64 ? 1.5 * Δt : 1.5 * mean(Δt),
     drive_derivative_σ::Float64=0.01,
@@ -105,7 +109,7 @@ function UnitarySmoothPulseProblem(
             T,
             Δt,
             n_drives,
-            (a = a_bounds, dda = dda_bounds);
+            (a = a_bounds, da = da_bounds, dda = dda_bounds);
             free_time=piccolo_options.free_time,
             Δt_bounds=(Δt_min, Δt_max),
             geodesic=piccolo_options.geodesic,
@@ -130,8 +134,8 @@ function UnitarySmoothPulseProblem(
         if operator isa EmbeddedOperator
             leakage_indices = get_unitary_isomorphism_leakage_indices(operator)
             J += L1Regularizer!(
-                constraints, :Ũ⃗, traj, 
-                R_value=R_leakage, 
+                constraints, :Ũ⃗, traj,
+                R_value=R_leakage,
                 indices=leakage_indices,
                 eval_hessian=piccolo_options.eval_hessian
             )
@@ -217,13 +221,14 @@ end
     U_goal = GATES[:H]
     T = 51
     Δt = 0.2
-    
+
     prob = UnitarySmoothPulseProblem(
-        sys, U_goal, T, Δt,
+        sys, U_goal, T, Δt;
+        da_bound=1.0,
         ipopt_options=IpoptOptions(print_level=1),
         piccolo_options=PiccoloOptions(verbose=false)
     )
-    
+
     initial = unitary_fidelity(prob)
     solve!(prob, max_iter=20)
     final = unitary_fidelity(prob)
@@ -249,7 +254,7 @@ end
     solve!(prob, max_iter=20)
     final = unitary_fidelity(prob, subspace=U_goal.subspace_indices)
     @test final > initial
-    
+
     # Test leakage suppression
     # ------------------------
     a = annihilate(4)
