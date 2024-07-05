@@ -670,16 +670,20 @@ function (con::BoundsConstraint)(
 )
     for t in con.ts
         for (j, (lb, ub)) in zip(con.js, con.vals)
-            MOI.add_constraints(
-                opt,
-                vars[index(t, j, con.vardim)],
-                MOI.GreaterThan(lb)
-            )
-            MOI.add_constraints(
-                opt,
-                vars[index(t, j, con.vardim)],
-                MOI.LessThan(ub)
-            )
+            if !isinf(lb)
+                MOI.add_constraints(
+                    opt,
+                    vars[index(t, j, con.vardim)],
+                    MOI.GreaterThan(lb)
+                )
+            end
+            if !isinf(ub)
+                MOI.add_constraints(
+                    opt,
+                    vars[index(t, j, con.vardim)],
+                    MOI.LessThan(ub)
+                )
+            end
         end
     end
 end

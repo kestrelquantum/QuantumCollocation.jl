@@ -24,6 +24,7 @@ using NamedTrajectories
 using JLD2
 using Ipopt
 using MathOptInterface
+using LinearAlgebra
 const MOI = MathOptInterface
 
 abstract type AbstractProblem end
@@ -82,7 +83,7 @@ function QuantumControlProblem(
     if piccolo_options.verbose
         println("    building evaluator...")
     end
-    
+
     evaluator = PicoEvaluator(
         traj, obj, dynamics, nonlinear_constraints, eval_hessian=piccolo_options.eval_hessian
     )
@@ -294,7 +295,7 @@ Return the objective function of the `prob::QuantumControlProblem`.
 TODO: Is deepcopy necessary?
 """
 function get_objective(
-    prob::QuantumControlProblem; 
+    prob::QuantumControlProblem;
     match::Union{Nothing, AbstractVector{<:Symbol}}=nothing,
     invert::Bool=false
 )

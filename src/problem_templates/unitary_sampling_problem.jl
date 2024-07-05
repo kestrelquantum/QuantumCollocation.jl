@@ -1,8 +1,8 @@
 @doc raw"""
     UnitarySamplingProblem
 
-A `UnitarySamplingProblem` is a quantum control problem where the goal is to find a control pulse that generates a target unitary operator for a set of quantum systems. 
-The controls are shared among all systems, and the optimization seeks to find the control pulse that achieves the operator for each system. The idea is to enforce a 
+A `UnitarySamplingProblem` is a quantum control problem where the goal is to find a control pulse that generates a target unitary operator for a set of quantum systems.
+The controls are shared among all systems, and the optimization seeks to find the control pulse that achieves the operator for each system. The idea is to enforce a
 robust solution by including multiple systems reflecting the problem uncertainty.
 
 # Arguments
@@ -19,6 +19,8 @@ robust solution by including multiple systems reflecting the problem uncertainty
 - `a_bound::Float64`: The bound for the control amplitudes.
 - `a_bounds::Vector{Float64}`: The bounds for the control amplitudes.
 - `a_guess::Union{Matrix{Float64}, Nothing}`: The initial guess for the control amplitudes.
+- `da_bound::Float64`: The bound for the control first derivatives.
+- `da_bounds::Vector{Float64}`: The bounds for the control first derivatives.
 - `dda_bound::Float64`: The bound for the control second derivatives.
 - `dda_bounds::Vector{Float64}`: The bounds for the control second derivatives.
 - `Δt_min::Float64`: The minimum time step size.
@@ -52,8 +54,10 @@ function UnitarySamplingProblem(
     a_bound::Float64=1.0,
     a_bounds=fill(a_bound, length(systems[1].G_drives)),
     a_guess::Union{Matrix{Float64}, Nothing}=nothing,
+    da_bound::Float64=Inf,
+    da_bounds::Vector{Float64}=fill(da_bound, length(systems[1].G_drives)),
     dda_bound::Float64=1.0,
-    dda_bounds=fill(dda_bound, length(systems[1].G_drives)),
+    dda_bounds::Vector{Float64}=fill(dda_bound, length(systems[1].G_drives)),
     Δt_min::Float64=0.5 * Δt,
     Δt_max::Float64=1.5 * Δt,
     drive_derivative_σ::Float64=0.01,
@@ -83,7 +87,7 @@ function UnitarySamplingProblem(
             T,
             Δt,
             n_drives,
-            (a = a_bounds, dda = dda_bounds);
+            (a = a_bounds, da = da_bounds, dda = dda_bounds);
             free_time=piccolo_options.free_time,
             Δt_bounds=(Δt_min, Δt_max),
             geodesic=piccolo_options.geodesic,
@@ -100,7 +104,7 @@ function UnitarySamplingProblem(
     J = NullObjective()
     for (wᵢ, Ũ⃗_key) in zip(system_weights, Ũ⃗_keys)
         J += wᵢ * UnitaryInfidelityObjective(
-            Ũ⃗_key, traj, Q; 
+            Ũ⃗_key, traj, Q;
             subspace=operator isa EmbeddedOperator ? operator.subspace_indices : nothing
         )
     end
@@ -108,14 +112,14 @@ function UnitarySamplingProblem(
     J += QuadraticRegularizer(:da, traj, R_da)
     J += QuadraticRegularizer(:dda, traj, R_dda)
 
-    # Constraints 
+    # Constraints
     if leakage_suppression
         if operator isa EmbeddedOperator
             leakage_indices = get_unitary_isomorphism_leakage_indices(operator)
             for Ũ⃗_key in Ũ⃗_keys
                 J += L1Regularizer!(
-                    constraints, Ũ⃗_key, traj, 
-                    R_value=R_leakage, 
+                    constraints, Ũ⃗_key, traj,
+                    R_value=R_leakage,
                     indices=leakage_indices,
                     eval_hessian=piccolo_options.eval_hessian
                 )
@@ -187,7 +191,7 @@ function UnitarySamplingProblem(
     T::Int,
     Δt::Union{Float64, Vector{Float64}};
     kwargs...
-)   
+)
     samples = rand(distribution, num_samples)
     systems = [system(x) for x in samples]
     return UnitarySamplingProblem(
@@ -237,7 +241,7 @@ end
     for ζ in ζ_tests
         Ũ⃗_end = unitary_rollout(prob.trajectory.a, timesteps, systems(ζ))[:, end]
         push!(fids, unitary_fidelity(Ũ⃗_end, Ũ⃗_goal))
-        
+
         d_Ũ⃗_end = unitary_rollout(d_prob.trajectory.a, timesteps, systems(ζ))[:, end]
         push!(default_fids, unitary_fidelity(d_Ũ⃗_end, Ũ⃗_goal))
     end
@@ -246,7 +250,7 @@ end
     # Check initial guess initialization
     # ----------------------------------
     a_guess = prob.trajectory.a
-    
+
     g1_prob = UnitarySamplingProblem(
         [systems(0), systems(0)], operator, T, Δt,
         a_guess=a_guess,
