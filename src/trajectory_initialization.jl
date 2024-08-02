@@ -43,7 +43,7 @@ function unitary_linear_interpolation(
     U_init::AbstractMatrix{<:Number},
     U_goal::EmbeddedOperator,
     samples::Int
-) 
+)
     return unitary_linear_interpolation(U_init, U_goal.operator, samples)
 end
 
@@ -83,7 +83,7 @@ function unitary_geodesic(
     U_goal::EmbeddedOperator,
     samples::Int;
     kwargs...
-)   
+)
     U1 = unembed(U_init, U_goal)
     U2 = unembed(U_goal)
     Ũ⃗ = unitary_geodesic(U1, U2, samples; kwargs...)
@@ -269,9 +269,9 @@ function initialize_unitary_trajectory(
         Ũ⃗_values = repeat([Ũ⃗], length(Ũ⃗_keys))
         a_values = initialize_controls(
             n_drives,
-            n_derivatives, 
-            T, 
-            bounds[a_keys[1]], 
+            n_derivatives,
+            T,
+            bounds[a_keys[1]],
             drive_derivative_σ
         )
     else
@@ -327,7 +327,7 @@ function initialize_quantum_state_trajectory(
     drive_derivative_σ::Float64=0.1,
     a_guess::Union{AbstractMatrix{<:Float64}, Nothing}=nothing,
     system::Union{AbstractQuantumSystem, AbstractVector{<:AbstractQuantumSystem}, Nothing}=nothing,
-    rollout_integrator::Function=exp,    
+    rollout_integrator::Function=exp,
     ψ̃_keys::AbstractVector{<:Symbol}=[Symbol("ψ̃$i") for i = 1:length(ψ̃_goals)],
     a_keys::AbstractVector{<:Symbol}=[Symbol("d"^i * "a") for i in 0:n_derivatives]
 )
@@ -353,16 +353,16 @@ function initialize_quantum_state_trajectory(
                 for (k, ψ̃_init, ψ̃_goal) in zip(ψ̃_keys, ψ̃_inits, ψ̃_goals)
         ])
         a_values = initialize_controls(
-            n_drives, 
-            n_derivatives, 
-            T, 
-            bounds[a_keys[1]], 
+            n_drives,
+            n_derivatives,
+            T,
+            bounds[a_keys[1]],
             drive_derivative_σ
         )
     else
         ψ̃_values = NamedTuple([
             k => rollout(ψ̃_init, a_guess, Δt, system, integrator=rollout_integrator)
-                for (i, ψ̃_init) in zip(ψ̃_keys, ψ̃_inits)
+                for (k, ψ̃_init) in zip(ψ̃_keys, ψ̃_inits)
         ])
         a_values = initialize_controls(a_guess, Δt, n_derivatives)
     end
@@ -417,7 +417,7 @@ function remove_component(
 end
 
 function convert_fixed_time(
-    traj::NamedTrajectory; 
+    traj::NamedTrajectory;
     Δt_symb=:Δt,
     timestep = sum(get_timesteps(traj)) / traj.T
 )
@@ -435,7 +435,7 @@ end
 
 function convert_free_time(
     traj::NamedTrajectory,
-    Δt_bounds::Union{ScalarBound, BoundType}; 
+    Δt_bounds::Union{ScalarBound, BoundType};
     Δt_symb=:Δt,
 )
     @assert Δt_symb ∉ traj.control_names "Problem must not be free time"
