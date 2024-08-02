@@ -93,7 +93,7 @@ function QuantumStateSmoothPulseProblem(
     J += QuadraticRegularizer(:dda, traj, R_dda)
 
     for i = 1:length(ψ_inits)
-        J += QuantumStateObjective(Symbol("ψ̃$i"), traj, Q)
+        J += QuantumStateObjective(Symbol("ψ̃$i"), traj, Q; eval_hessian=piccolo_options.eval_hessian)
     end
 
     # Constraints

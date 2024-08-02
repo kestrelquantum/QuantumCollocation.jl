@@ -284,10 +284,11 @@ function QuantumObjective(
     name::Symbol,
     traj::NamedTrajectory,
     loss::Symbol,
-    Q::Float64
+    Q::Float64;
+    kwargs...
 )
     goal = traj.goal[name]
-    return QuantumObjective(name=name, goals=goal, loss=loss, Q=Q)
+    return QuantumObjective(name=name, goals=goal, loss=loss, Q=Q, kwargs...)
 end
 
 function UnitaryInfidelityObjective(
@@ -304,26 +305,29 @@ function QuantumObjective(
     names::Tuple{Vararg{Symbol}},
     traj::NamedTrajectory,
     loss::Symbol,
-    Q::Float64
+    Q::Float64;
+    kwargs...
 )
     goals = Tuple(traj.goal[name] for name in names)
-    return QuantumObjective(names=names, goals=goals, loss=loss, Q=Q)
+    return QuantumObjective(names=names, goals=goals, loss=loss, Q=Q, kwargs...)
 end
 
 function QuantumUnitaryObjective(
     name::Symbol,
     traj::NamedTrajectory,
-    Q::Float64
+    Q::Float64;
+    kwargs...
 )
-    return QuantumObjective(name, traj, :UnitaryInfidelityLoss, Q)
+    return QuantumObjective(name, traj, :UnitaryInfidelityLoss, Q; kwargs...)
 end
 
 function QuantumStateObjective(
     name::Symbol,
     traj::NamedTrajectory,
-    Q::Float64
+    Q::Float64;
+    kwargs...
 )
-    return QuantumObjective(name, traj, :InfidelityLoss, Q)
+    return QuantumObjective(name, traj, :InfidelityLoss, Q; kwargs...)
 end
 
 function QuadraticRegularizer(;
@@ -347,7 +351,7 @@ function QuadraticRegularizer(;
             throw(ArgumentError("size(baseline)=$(size(baseline)) must match $(length(R)) x $(length(times))"))
         end
     end
-    
+
     params = Dict(
         :type => :QuadraticRegularizer,
         :name => name,
@@ -366,7 +370,7 @@ function QuadraticRegularizer(;
             else
                 Δt = Z.timestep
             end
-            
+
             vₜ = Z⃗[slice(t, Z.components[name], Z.dim)]
             Δv = vₜ .- baseline[:, t]
 
@@ -377,7 +381,7 @@ function QuadraticRegularizer(;
     end
 
     @views function ∇L(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory)
-        ∇ = zeros(Z.dim * Z.T)        
+        ∇ = zeros(Z.dim * Z.T)
         Threads.@threads for t ∈ times
             vₜ_slice = slice(t, Z.components[name], Z.dim)
             Δv = Z⃗[vₜ_slice] .- baseline[:, t]
@@ -498,7 +502,7 @@ regularization strength `Q`. The regularizer is defined as
 ```
 
 where $Ũ⃗_{1}$ and $Ũ⃗_{2}$ are selected by `name1` and `name2`. The
-indices specify the appropriate block diagonal components of the direct sum 
+indices specify the appropriate block diagonal components of the direct sum
 unitary vector `Ũ⃗`.
 
 TODO: Hessian not implemented
@@ -536,13 +540,13 @@ function PairwiseQuadraticRegularizer(
     end
 
     @views function ∇L(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory)
-        ∇ = zeros(Z.dim * Z.T)        
+        ∇ = zeros(Z.dim * Z.T)
         Threads.@threads for t ∈ times
             z1_t_slice = slice(t, Z.components[name1], Z.dim)
             z2_t_slice = slice(t, Z.components[name2], Z.dim)
             z1_t = Z⃗[z1_t_slice]
             z2_t = Z⃗[z2_t_slice]
-            
+
             if Z.timestep isa Symbol
                 Δt_slice = slice(t, Z.components[timestep_symbol], Z.dim)
                 Δt = Z⃗[Δt_slice]
@@ -556,7 +560,7 @@ function PairwiseQuadraticRegularizer(
         end
         return ∇
     end
-    
+
     # TODO: Hessian not implemented
     ∂²L = nothing
     ∂²L_structure = nothing
@@ -579,7 +583,7 @@ PairwiseQuadraticRegularizer(
 
 A convenience constructor for creating a PairwiseQuadraticRegularizer
 for the trajectory component `name` with regularization strength `Qs` over the
-graph `graph`. 
+graph `graph`.
 
 The regularizer is defined as
 
@@ -587,7 +591,7 @@ The regularizer is defined as
 J_{Ũ⃗}(u) = \sum_{(i,j) \in E} \frac{1}{2} d(Ũ⃗_{i}, Ũ⃗_{j}; Q_{ij})
 ```
 
-where $d(Ũ⃗_{i}, Ũ⃗_{j}; Q_{ij})$ is the pairwise distance between the unitaries with 
+where $d(Ũ⃗_{i}, Ũ⃗_{j}; Q_{ij})$ is the pairwise distance between the unitaries with
 weight $Q_{ij}$.
 """
 function PairwiseQuadraticRegularizer(
@@ -595,7 +599,7 @@ function PairwiseQuadraticRegularizer(
     Qs::Union{Float64, AbstractVector{<:Float64}},
     graph::AbstractVector{<:Tuple{Symbol, Symbol}};
     kwargs...
-)       
+)
     if isa(Qs, Float64)
         Qs = Qs * ones(length(graph))
     end
@@ -606,12 +610,12 @@ function PairwiseQuadraticRegularizer(
         # Symbols should be the same size
         dim = size(traj[symb1], 1)
         J += PairwiseQuadraticRegularizer(
-            Qᵢⱼ * ones(dim), 
+            Qᵢⱼ * ones(dim),
             1:traj.T,
             symb1,
             symb2,
             kwargs...
-        )  
+        )
     end
 
     return J
@@ -627,7 +631,7 @@ function PairwiseQuadraticRegularizer(
     return PairwiseQuadraticRegularizer(
         traj, Q, [(name1, name2)];
         kwargs...
-    )   
+    )
 end
 
 function QuadraticSmoothnessRegularizer(;
@@ -924,7 +928,7 @@ InfidelityRobustnessObjective(;
     symb::Symbol=:Ũ⃗
 )
 
-Create a control objective which penalizes the sensitivity of the infidelity to the provided 
+Create a control objective which penalizes the sensitivity of the infidelity to the provided
 operator defined in the subspace of the control dynamics, thereby realizing robust control.
 
 The control dynamics are
@@ -948,7 +952,7 @@ function InfidelityRobustnessObjective(;
     H_error::Union{EmbeddedOperator, AbstractMatrix{<:Number}, Nothing}=nothing,
     eval_hessian::Bool=false,
     symb::Symbol=:Ũ⃗
-)   
+)
     @assert !isnothing(H_error) "H_error must be specified"
 
     # Indices of all non-zero subspace components for iso_vec_operators
@@ -1135,14 +1139,14 @@ function PairwiseInfidelityRobustnessObjective(;
             rH1ₜ₂ = U1ₜ₂'H1*U1ₜ₂
             rH2ₜ₁ = U2ₜ₁'H2*U2ₜ₁
             rH2ₜ₂ = U2ₜ₂'H2*U2ₜ₂
-            
+
             # ∇Uiₜⱼ (assume H's are Hermitian)
             units = 1 / T^2 / norm(H1)^2 / norm(H2)^2
             R1 = tr(rH1ₜ₁'rH1ₜ₂) * Δt₁ * Δt₂ * units
             R2 = tr(rH2ₜ₁'rH2ₜ₂) * Δt₁ * Δt₂ * units
-            ∇[U1ₜ₁_slice] += operator_to_iso_vec(2 * H1 * U1ₜ₁ * rH1ₜ₂) * R2 
-            ∇[U1ₜ₂_slice] += operator_to_iso_vec(2 * H1 * U1ₜ₂ * rH1ₜ₁) * R2 
-            ∇[U2ₜ₁_slice] += operator_to_iso_vec(2 * H2 * U2ₜ₁ * rH2ₜ₂) * R1 
+            ∇[U1ₜ₁_slice] += operator_to_iso_vec(2 * H1 * U1ₜ₁ * rH1ₜ₂) * R2
+            ∇[U1ₜ₂_slice] += operator_to_iso_vec(2 * H1 * U1ₜ₂ * rH1ₜ₁) * R2
+            ∇[U2ₜ₁_slice] += operator_to_iso_vec(2 * H2 * U2ₜ₁ * rH2ₜ₂) * R1
             ∇[U2ₜ₂_slice] += operator_to_iso_vec(2 * H2 * U2ₜ₂ * rH2ₜ₁) * R1
 
             # Time gradients
