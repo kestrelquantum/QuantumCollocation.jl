@@ -288,7 +288,7 @@ function QuantumObjective(
     kwargs...
 )
     goal = traj.goal[name]
-    return QuantumObjective(name=name, goals=goal, loss=loss, Q=Q, kwargs...)
+    return QuantumObjective(; name=name, goals=goal, loss=loss, Q=Q, kwargs...)
 end
 
 function UnitaryInfidelityObjective(
@@ -309,7 +309,7 @@ function QuantumObjective(
     kwargs...
 )
     goals = Tuple(traj.goal[name] for name in names)
-    return QuantumObjective(names=names, goals=goals, loss=loss, Q=Q, kwargs...)
+    return QuantumObjective(; names=names, goals=goals, loss=loss, Q=Q, kwargs...)
 end
 
 function QuantumUnitaryObjective(

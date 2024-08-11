@@ -56,7 +56,7 @@ EmbeddedOperator(op::Matrix{<:Number}, subspace_indices::AbstractVector{Int}, le
 
 function embed(matrix::Matrix{ComplexF64}, op::EmbeddedOperator)
     return embed(matrix, op.subspace_indices, prod(op.subsystem_levels))
-end  
+end
 
 function unembed(op::EmbeddedOperator)::Matrix{ComplexF64}
     return op.operator[op.subspace_indices, op.subspace_indices]
@@ -206,13 +206,13 @@ function get_subspace_leakage_indices(
     subsystem_levels::AbstractVector{Int};
 )
     subspace_indices = get_subspace_indices(subspaces, subsystem_levels)
-    return get_subspace_leakage_indices(subspace_indices)
+    return get_subspace_leakage_indices(subspace_indices, prod(subsystem_levels))
 end
 
 get_subspace_leakage_indices(subspace_indices::AbstractVector{Int}, levels::Int) =
     setdiff(1:levels, subspace_indices)
 
-get_subspace_leakage_indices(op::EmbeddedOperator) = 
+get_subspace_leakage_indices(op::EmbeddedOperator) =
     get_subspace_leakage_indices(op.subspace_indices, size(op)[1])
 
 get_unitary_isomorphism_subspace_indices(op::EmbeddedOperator) =

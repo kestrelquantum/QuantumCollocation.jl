@@ -85,18 +85,18 @@ end
 function QuantumUtils.fidelity(
     trajectory::NamedTrajectory,
     system::AbstractQuantumSystem;
-    state_symb::Symbol=:ψ̃,
-    control_symb=:a,
+    state_name::Symbol=:ψ̃,
+    control_name=:a,
     kwargs...
 )
     fids = []
-    for symb in trajectory.names
-        if startswith(symb, state_symb)
-            init = trajectory.initial[symb]
-            goal = trajectory.goal[symb]
+    for name in trajectory.names
+        if startswith(name, state_name)
+            init = trajectory.initial[name]
+            goal = trajectory.goal[name]
             push!(
-                fids, 
-                fidelity(init, goal, trajectory[control_symb], get_timesteps(trajectory), system; kwargs...)
+                fids,
+                fidelity(init, goal, trajectory[control_name], get_timesteps(trajectory), system; kwargs...)
             )
         end
     end
