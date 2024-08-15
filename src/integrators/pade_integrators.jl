@@ -15,6 +15,11 @@ fourth_order_pade(Gₜ::Matrix) = nth_order_pade(Gₜ, 4)
 sixth_order_pade(Gₜ::Matrix) = nth_order_pade(Gₜ, 6)
 eighth_order_pade(Gₜ::Matrix) = nth_order_pade(Gₜ, 8)
 tenth_order_pade(Gₜ::Matrix) = nth_order_pade(Gₜ, 10)
+twelth_order_pade(Gₜ::Matrix) = nth_order_pade(Gₜ, 12)
+fourteenth_order_pade(Gₜ::Matrix) = nth_order_pade(Gₜ, 14)
+sixteenth_order_pade(Gₜ::Matrix) = nth_order_pade(Gₜ, 16)
+eighteenth_order_pade(Gₜ::Matrix) = nth_order_pade(Gₜ, 18)
+twentieth_order_pade(Gₜ::Matrix) = nth_order_pade(Gₜ, 20)
 
 function compute_powers(G::AbstractMatrix{T}, order::Int) where T <: Number
     powers = Array{typeof(G)}(undef, order)
@@ -28,38 +33,200 @@ end
 # key is the order of the integrator
 # and the value are the Pade coefficients
 # for each term
-const PADE_COEFFICIENTS = Dict{Int,Vector{Float64}}(
+const PADE_COEFFICIENTS = OrderedDict{Int,Vector{Float64}}(
     4 => [1/2, 1/12],
     6 => [1/2, 1/10, 1/120],
     8 => [1/2, 3/28, 1/84, 1/1680],
-    10 => [1/2, 1/9, 1/72, 1/1008, 1/30240]
+    10 => [1/2, 1/9, 1/72, 1/1008, 1/30240],
+    12 => [1/2, 5/44, 1/66, 1/792, 1/15840, 1/665280],
+    14 => [1/2, 3/26, 5/312, 5/3432, 1/11440, 1/308880, 1/17297280],
+    16 => [1/2, 7/60, 1/60, 1/624, 1/9360, 1/205920, 1/7207200, 1/518918400],
+    18 => [1/2, 2/17, 7/408, 7/4080, 1/8160, 1/159120, 1/4455360, 1/196035840, 1/17643225600],
+    20 => [1/2, 9/76, 1/57, 7/3876, 7/51680, 7/930240, 1/3255840, 1/112869120, 1/6094932480, 1/670442572800]
 )
+
+function pade_operator(
+    Id::AbstractMatrix,
+    G_powers::Vector{<:AbstractMatrix},
+    coeffs::Vector{<:Real}
+)
+    return Id + sum(coeffs .* G_powers)
+end
+
+function forward_pade_coefficients(Δt::Real, pade_order::Int; timestep_derivative=false)
+    n = pade_order ÷ 2
+    if !timestep_derivative
+        return PADE_COEFFICIENTS[2n] .* (Δt .^ (1:n))
+    else
+        return PADE_COEFFICIENTS[2n] .* (Δt .^ (0:n-1)) .* (1:n)
+    end
+end
+
+function backward_pade_coefficients(Δt::Real, pade_order::Int; timestep_derivative=false)
+    n = pade_order ÷ 2
+    if !timestep_derivative
+        return PADE_COEFFICIENTS[2n] .* ((-Δt) .^ (1:n))
+    else
+        return PADE_COEFFICIENTS[2n] .* ((-1) .^ (1:n)) .* (Δt .^ (0:n-1)) .* (1:n)
+    end
+end
+
+function pade_coefficients(Δt::Real, pade_order::Int; timestep_derivative=false)
+    F_coeffs = forward_pade_coefficients(Δt, pade_order;
+        timestep_derivative=timestep_derivative
+    )
+    B_coeffs = backward_pade_coefficients(Δt, pade_order;
+        timestep_derivative=timestep_derivative
+    )
+    return F_coeffs, B_coeffs
+end
+
+function backward_operator(
+    G_powers::Vector{<:AbstractMatrix},
+    Id::AbstractMatrix,
+    Δt::Real;
+    timestep_derivative=false
+)
+    pade_order = 2 * length(G_powers)
+    coeffs = backward_pade_coefficients(Δt, pade_order; timestep_derivative=timestep_derivative)
+    return pade_operator(Id, G_powers, coeffs)
+end
+
+backward_operator(G::AbstractMatrix, pade_order::Int, args...; kwargs...) =
+    backward_operator(compute_powers(G, pade_order ÷ 2), args...; kwargs...)
+
+function forward_operator(
+    G_powers::Vector{<:AbstractMatrix},
+    Id::AbstractMatrix,
+    Δt::Real;
+    timestep_derivative=false
+)
+    pade_order = 2 * length(G_powers)
+    coeffs = forward_pade_coefficients(Δt, pade_order; timestep_derivative=timestep_derivative)
+    return pade_operator(Id, G_powers, coeffs)
+end
+
+forward_operator(G::AbstractMatrix, pade_order::Int, args...; kwargs...) =
+    forward_operator(compute_powers(G, pade_order ÷ 2), args...; kwargs...)
+
+function pade_operators(
+    G_powers::Vector{<:AbstractMatrix},
+    Id::AbstractMatrix,
+    Δt::Real;
+    kwargs...
+)
+    F = forward_operator(G_powers, Id, Δt; kwargs...)
+    B = backward_operator(G_powers, Id, Δt; kwargs...)
+    return F, B
+end
+
+function pade_operators(
+    G_powers::Vector{<:SparseMatrixCSC},
+    Id::SparseMatrixCSC,
+    Δt::Real;
+    kwargs...
+)
+    F = forward_operator(G_powers, Id, Δt; kwargs...)
+    B = backward_operator(G_powers, Id, Δt; kwargs...)
+    droptol!(F, 1e-12)
+    droptol!(B, 1e-12)
+    return F, B
+end
+
+pade_operators(G::AbstractMatrix, pade_order::Int, args...; kwargs...) =
+    pade_operators(compute_powers(G, pade_order ÷ 2), args...; kwargs...)
+
+@views function ∂aʲF(
+    P::QuantumIntegrator,
+    G_powers::Vector{<:AbstractMatrix},
+    Δt::Real,
+    ∂G_∂aʲ::AbstractMatrix
+)
+    F_coeffs = forward_pade_coefficients(Δt, P.order)
+    ∂F_∂aʲ = zeros(size(G_powers[1]))
+    n = length(G_powers)
+    for p = 1:n
+        if p == 1
+            ∂F_∂aʲ += F_coeffs[p] * ∂G_∂aʲ
+        else
+            for k = 1:p
+                if k == 1
+                    ∂F_∂aʲ += F_coeffs[p] * ∂G_∂aʲ * G_powers[p-1]
+                elseif k == p
+                    ∂F_∂aʲ += F_coeffs[p] * G_powers[p-1] * ∂G_∂aʲ
+                else
+                    ∂F_∂aʲ += F_coeffs[p] * G_powers[k-1] * ∂G_∂aʲ * G_powers[p-k]
+                end
+            end
+        end
+    end
+    return ∂F_∂aʲ
+end
+
+@views function ∂aʲB(
+    P::QuantumIntegrator,
+    G_powers::Vector{<:AbstractMatrix},
+    Δt::Real,
+    ∂G_∂aʲ::AbstractMatrix
+)
+    B_coeffs = backward_pade_coefficients(Δt, P.order)
+    ∂B_∂aʲ = zeros(size(G_powers[1]))
+    for p = 1:(P.order ÷ 2)
+        if p == 1
+            ∂B_∂aʲ += B_coeffs[p] * ∂G_∂aʲ
+        else
+            for k = 1:p
+                if k == 1
+                    ∂B_∂aʲ += B_coeffs[p] * ∂G_∂aʲ * G_powers[p-1]
+                elseif k == p
+                    ∂B_∂aʲ += B_coeffs[p] * G_powers[p-1] * ∂G_∂aʲ
+                else
+                    ∂B_∂aʲ += B_coeffs[p] * G_powers[k-1] * ∂G_∂aʲ * G_powers[p-k]
+                end
+            end
+        end
+    end
+    return ∂B_∂aʲ
+end
+
+
+
+# ----------------------------------------------------------------
+#                       Quantum Pade Integrator
+# ----------------------------------------------------------------
+
 
 
 abstract type QuantumPadeIntegrator <: QuantumIntegrator end
 
+
+
+# ----------------------------------------------------------------
+#                       Unitary Pade Integrator
+# ----------------------------------------------------------------
+
+
 """
 """
 struct UnitaryPadeIntegrator <: QuantumPadeIntegrator
-    I_2N::SparseMatrixCSC{Float64, Int}
-    G_drift::Matrix{Float64}
-    G_drives::Vector{Matrix{Float64}}
-    G_drive_anticomms::Union{Nothing, Symmetric}
-    G_drift_anticomms::Union{Nothing, Vector{Matrix{Float64}}}
-    unitary_symb::Union{Symbol, Nothing}
-    drive_symb::Union{Symbol, Tuple{Vararg{Symbol}}, Nothing}
+    unitary_components::Vector{Int}
+    drive_components::Vector{Int}
+    timestep::Union{Real, Int} # either the timestep or the index of the timestep
+    freetime::Bool
     n_drives::Int
-    N::Int
+    ketdim::Int
     dim::Int
+    zdim::Int
     order::Int
     autodiff::Bool
     G::Function
+    ∂G::Function
 
     """
         UnitaryPadeIntegrator(
             sys::AbstractQuantumSystem,
-            unitary_symb::Symbol,
-            drive_symb::Union{Symbol,Tuple{Vararg{Symbol}}};
+            unitary_name::Symbol,
+            drive_name::Union{Symbol,Tuple{Vararg{Symbol}}};
             order::Int=4,
             autodiff::Bool=order != 4
         ) where R <: Real
@@ -85,78 +252,250 @@ struct UnitaryPadeIntegrator <: QuantumPadeIntegrator
 
     # Arguments
     - `sys::AbstractQuantumSystem`: the quantum system
-    - `unitary_symb::Union{Symbol,Nothing}=nothing`: the symbol for the unitary
-    - `drive_symb::Union{Symbol,Tuple{Vararg{Symbol}},Nothing}=nothing`: the symbol(s) for the drives
+    - `unitary_name::Union{Symbol,Nothing}=nothing`: the nameol for the unitary
+    - `drive_name::Union{Symbol,Tuple{Vararg{Symbol}},Nothing}=nothing`: the nameol(s) for the drives
     - `order::Int=4`: the order of the Pade approximation. Must be in `[4, 6, 8, 10]`. If order is not `4` and `autodiff` is `false`, then the integrator will use the hand-coded fourth order derivatives.
     - `autodiff::Bool=order != 4`: whether to use automatic differentiation to compute the jacobian and hessian of the lagrangian
 
     """
     function UnitaryPadeIntegrator(
         sys::AbstractQuantumSystem,
-        unitary_symb::Union{Symbol,Nothing}=nothing,
-        drive_symb::Union{Symbol,Tuple{Vararg{Symbol}},Nothing}=nothing;
+        unitary_name::Symbol,
+        drive_name::Union{Symbol,Tuple{Vararg{Symbol}}},
+        traj::NamedTrajectory;
         order::Int=4,
-        autodiff::Bool=order != 4,
-        G::Function=G_bilinear,
+        G::Function=a -> G_bilinear(a, sys.G_drift, sys.G_drives),
+        ∂G::Function=a -> sys.G_drives,
+        calculate_pade_operators_structure::Bool=true,
+        autodiff::Bool=false
     )
-        @assert order ∈ [4, 6, 8, 10] "order must be in [4, 6, 8, 10]"
-        @assert !isnothing(unitary_symb) "must specify unitary symbol"
-        @assert !isnothing(drive_symb) "must specify drive symbol"
+        @assert order ∈ keys(PADE_COEFFICIENTS) "order ∉ $(keys(PADE_COEFFICIENTS))"
 
-        n_drives = length(sys.H_drives)
-        N = size(sys.H_drift, 1)
-        dim = 2N^2
+        ketdim = size(sys.H_drift, 1)
+        dim = 2ketdim^2
 
-        I_2N = sparse(I(2N))
+        I_2N = sparse(I(2ketdim))
 
-        G_drift = sys.G_drift
-        G_drives = sys.G_drives
+        unitary_components = traj.components[unitary_name]
 
-        drive_anticomms, drift_anticomms =
-            order == 4 ? build_anticomms(G_drift, G_drives, n_drives) : (nothing, nothing)
+        if drive_name isa Tuple
+            drive_components = vcat((traj.components[s] for s ∈ drive_name)...)
+        else
+            drive_components = traj.components[drive_name]
+        end
+
+        n_drives = length(drive_components)
+
+        @assert all(diff(drive_components) .== 1) "controls must be in order"
+
+        freetime = traj.timestep isa Symbol
+
+        if freetime
+            timestep = traj.components[traj.timestep][1]
+        else
+            timestep = traj.timestep
+        end
 
         return new(
-            I_2N,
-            G_drift,
-            G_drives,
-            drive_anticomms,
-            drift_anticomms,
-            unitary_symb,
-            drive_symb,
+            unitary_components,
+            drive_components,
+            timestep,
+            freetime,
             n_drives,
-            N,
+            ketdim,
             dim,
+            traj.dim,
             order,
             autodiff,
             G,
+            ∂G
         )
     end
 end
 
-state(P::UnitaryPadeIntegrator) = P.unitary_symb
-controls(P::UnitaryPadeIntegrator) = P.drive_symb
+function get_comps(P::UnitaryPadeIntegrator, traj::NamedTrajectory)
+    if P.freetime
+        return P.unitary_components, P.drive_components, traj.components[traj.timestep]
+    else
+        return P.unitary_components, P.drive_components
+    end
+end
+
+function (integrator::UnitaryPadeIntegrator)(
+    sys::AbstractQuantumSystem,
+    traj::NamedTrajectory;
+    unitary_name::Union{Symbol, Nothing}=nothing,
+    drive_name::Union{Symbol, Tuple{Vararg{Symbol}}, Nothing}=nothing,
+    order::Int=integrator.order,
+    G::Function=integrator.G,
+    ∂G::Function=integrator.∂G,
+    autodiff::Bool=integrator.autodiff
+)
+    @assert !isnothing(unitary_name) "unitary_name must be provided"
+    @assert !isnothing(drive_name) "drive_name must be provided"
+    return UnitaryPadeIntegrator(
+        sys,
+        unitary_name,
+        drive_name,
+        traj;
+        order=order,
+        G=G,
+        ∂G=∂G,
+        autodiff=autodiff
+    )
+end
+
+# ------------------- Integrator -------------------
+
+
+
+function nth_order_pade(
+    P::UnitaryPadeIntegrator,
+    Ũ⃗ₜ₊₁::AbstractVector,
+    Ũ⃗ₜ::AbstractVector,
+    aₜ::AbstractVector,
+    Δt::Real
+)
+    Gₜ = P.G(aₜ)
+
+    F, B = pade_operators(Gₜ, P.order, I(2P.ketdim), Δt)
+
+    I_N = sparse(I, P.ketdim, P.ketdim)
+
+    return (I_N ⊗ B) * Ũ⃗ₜ₊₁ - (I_N ⊗ F) * Ũ⃗ₜ
+end
+
+@views function(P::UnitaryPadeIntegrator)(
+    zₜ::AbstractVector,
+    zₜ₊₁::AbstractVector,
+    t::Int
+)
+    Ũ⃗ₜ₊₁ = zₜ₊₁[P.unitary_components]
+    Ũ⃗ₜ = zₜ[P.unitary_components]
+    aₜ = zₜ[P.drive_components]
+
+    if P.freetime
+        Δtₜ = zₜ[P.timestep]
+    else
+        Δtₜ = P.timestep
+    end
+
+
+    return nth_order_pade(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, aₜ, Δtₜ)
+end
+
+# ------------------- Jacobians -------------------
+
+# aₜ should be a vector with all the controls. concatenate all the named traj controls
+function ∂aₜ(
+    P::UnitaryPadeIntegrator,
+    G_powers::Vector{<:AbstractMatrix},
+    Ũ⃗ₜ₊₁::AbstractVector,
+    Ũ⃗ₜ::AbstractVector,
+    aₜ::AbstractVector,
+    Δtₜ::Real
+)
+    ∂aP = zeros(eltype(Ũ⃗ₜ), P.dim, P.n_drives)
+
+    ∂G_∂aₜ = P.∂G(aₜ)
+
+    I_N = sparse(I, P.ketdim, P.ketdim)
+
+    for j = 1:P.n_drives
+
+        # TODO: maybe rework for arbitrary drive indices eventually
+
+        ∂aₜʲF = ∂aʲF(P, G_powers, Δtₜ, ∂G_∂aₜ[j])
+        ∂aₜʲB = ∂aʲB(P, G_powers, Δtₜ, ∂G_∂aₜ[j])
+
+        ∂aP[:, j] = (I_N ⊗ ∂aₜʲB) * Ũ⃗ₜ₊₁ - (I_N ⊗ ∂aₜʲF) * Ũ⃗ₜ
+    end
+
+    return ∂aP
+end
+
+
+function ∂Δtₜ(
+    P::UnitaryPadeIntegrator,
+    Gₜ_powers::Vector{<:AbstractMatrix},
+    Ũ⃗ₜ₊₁::AbstractVector,
+    Ũ⃗ₜ::AbstractVector,
+    Δtₜ::Real
+)
+    ∂ΔtₜF_coeffs, ∂ΔtₜB_coeffs = pade_coefficients(Δtₜ, P.order;
+        timestep_derivative=true
+    )
+
+    ∂ΔtₜF = sum(∂ΔtₜF_coeffs .* Gₜ_powers)
+    ∂ΔtₜB = sum(∂ΔtₜB_coeffs .* Gₜ_powers)
+
+    I_N = sparse(I, P.ketdim, P.ketdim)
+
+    return (I_N ⊗ ∂ΔtₜB) * Ũ⃗ₜ₊₁ - (I_N ⊗ ∂ΔtₜF) * Ũ⃗ₜ
+end
+
+@views function jacobian(
+    P::UnitaryPadeIntegrator,
+    zₜ::AbstractVector,
+    zₜ₊₁::AbstractVector,
+    t::Int
+)
+    # obtain state and control vectors
+    Ũ⃗ₜ₊₁ = zₜ₊₁[P.unitary_components]
+    Ũ⃗ₜ = zₜ[P.unitary_components]
+    aₜ = zₜ[P.drive_components]
+
+    Gₜ = P.G(aₜ)
+
+    # obtain timestep
+    if P.freetime
+        Δtₜ = zₜ[P.timestep]
+    else
+        Δtₜ = P.timestep
+    end
+
+    Gₜ_powers = compute_powers(Gₜ, P.order ÷ 2)
+
+    ∂aₜP = ∂aₜ(P, Gₜ_powers, Ũ⃗ₜ₊₁, Ũ⃗ₜ, aₜ, Δtₜ)
+
+    Id = sparse(I, P.ketdim, P.ketdim)
+
+    Fₜ, Bₜ = pade_operators(Gₜ_powers, I(2P.ketdim), Δtₜ)
+
+    ∂Ũ⃗ₜP = -Id ⊗ Fₜ
+    ∂Ũ⃗ₜ₊₁P = Id ⊗ Bₜ
+
+    if P.freetime
+        ∂ΔtₜP = ∂Δtₜ(P, Gₜ_powers, Ũ⃗ₜ₊₁, Ũ⃗ₜ, Δtₜ)
+        return ∂Ũ⃗ₜP, ∂Ũ⃗ₜ₊₁P, ∂aₜP, ∂ΔtₜP
+    else
+        return ∂Ũ⃗ₜP, ∂Ũ⃗ₜ₊₁P, ∂aₜP
+    end
+end
+# ----------------------------------------------------------------
+#                  Quantum State Pade Integrator
+# ----------------------------------------------------------------
 
 struct QuantumStatePadeIntegrator <: QuantumPadeIntegrator
-    I_2N::SparseMatrixCSC{Float64, Int}
-    G_drift::Matrix{Float64}
-    G_drives::Vector{Matrix{Float64}}
-    G_drive_anticomms::Union{Symmetric, Nothing}
-    G_drift_anticomms::Union{Vector{Matrix{Float64}}, Nothing}
-    state_symb::Union{Symbol,Nothing}
-    drive_symb::Union{Symbol,Tuple{Vararg{Symbol}},Nothing}
+    state_components::Vector{Int}
+    drive_components::Vector{Int}
+    timestep::Union{Real, Int} # either the timestep or the index of the timestep
+    freetime::Bool
     n_drives::Int
-    N::Int
+    ketdim::Int
     dim::Int
+    zdim::Int
     order::Int
     autodiff::Bool
     G::Function
+    ∂G::Function
 
     """
         QuantumStatePadeIntegrator(
             sys::AbstractQuantumSystem,
-            state_symb::Union{Symbol,Nothing}=nothing,
-            drive_symb::Union{Symbol,Tuple{Vararg{Symbol}},Nothing}=nothing,
-            timestep_symb::Union{Symbol,Nothing}=nothing;
+            state_name::Union{Symbol,Nothing}=nothing,
+            drive_name::Union{Symbol,Tuple{Vararg{Symbol}},Nothing}=nothing,
+            timestep_name::Union{Symbol,Nothing}=nothing;
             order::Int=4,
             autodiff::Bool=false
         ) where R <: Real
@@ -177,99 +516,97 @@ struct QuantumStatePadeIntegrator <: QuantumPadeIntegrator
 
     # Arguments
     - `sys::AbstractQuantumSystem`: the quantum system
-    - `state_symb::Symbol`: the symbol for the quantum state
-    - `drive_symb::Union{Symbol,Tuple{Vararg{Symbol}}}`: the symbol(s) for the drives
+    - `state_name::Symbol`: the nameol for the quantum state
+    - `drive_name::Union{Symbol,Tuple{Vararg{Symbol}}}`: the nameol(s) for the drives
     - `order::Int=4`: the order of the Pade approximation. Must be in `[4, 6, 8, 10]`. If order is not `4` and `autodiff` is `false`, then the integrator will use the hand-coded fourth order derivatives.
     - `autodiff::Bool=false`: whether to use automatic differentiation to compute the jacobian and hessian of the lagrangian
     """
     function QuantumStatePadeIntegrator(
         sys::AbstractQuantumSystem,
-        state_symb::Union{Symbol,Nothing}=nothing,
-        drive_symb::Union{Symbol,Tuple{Vararg{Symbol}},Nothing}=nothing;
+        state_name::Symbol,
+        drive_name::Union{Symbol,Tuple{Vararg{Symbol}}},
+        traj::NamedTrajectory;
         order::Int=4,
-        autodiff::Bool=order != 4,
-        G::Function=G_bilinear,
+        G::Function=a -> G_bilinear(a, sys.G_drift, sys.G_drives),
+        ∂G::Function=a -> sys.G_drives,
+        autodiff::Bool=false,
     )
-        @assert order ∈ [4, 6, 8, 10] "order must be in [4, 6, 8, 10]"
-        @assert !isnothing(state_symb) "state_symb must be specified"
-        @assert !isnothing(drive_symb) "drive_symb must be specified"
-        n_drives = length(sys.H_drives)
-        N = size(sys.H_drift, 1)
-        dim = 2N
-        I_2N = sparse(I(2N))
+        @assert order ∈ keys(PADE_COEFFICIENTS) "order ∉ $(keys(PADE_COEFFICIENTS))"
 
-        G_drift = sys.G_drift
-        G_drives = sys.G_drives
+        ketdim = size(sys.H_drift, 1)
+        dim = 2ketdim
 
-        drive_anticomms, drift_anticomms =
-            order == 4 ? build_anticomms(G_drift, G_drives, n_drives) : (nothing, nothing)
+        state_components = traj.components[state_name]
+
+        if drive_name isa Tuple
+            drive_components = vcat((traj.components[s] for s ∈ drive_name)...)
+        else
+            drive_components = traj.components[drive_name]
+        end
+
+        n_drives = length(drive_components)
+
+        @assert all(diff(drive_components) .== 1) "controls must be in order"
+
+        freetime = traj.timestep isa Symbol
+
+        if freetime
+            timestep = traj.components[traj.timestep][1]
+        else
+            timestep = traj.timestep
+        end
+
 
         return new(
-            I_2N,
-            G_drift,
-            G_drives,
-            drive_anticomms,
-            drift_anticomms,
-            state_symb,
-            drive_symb,
+            state_components,
+            drive_components,
+            timestep,
+            freetime,
             n_drives,
-            N,
+            ketdim,
             dim,
+            traj.dim,
             order,
             autodiff,
-            G
+            G,
+            ∂G
         )
     end
 end
 
-state(P::QuantumStatePadeIntegrator) = P.state_symb
-controls(P::QuantumStatePadeIntegrator) = P.drive_symb
-
-function nth_order_pade(
-    P::UnitaryPadeIntegrator,
-    Ũ⃗ₜ₊₁::AbstractVector,
-    Ũ⃗ₜ::AbstractVector,
-    aₜ::AbstractVector,
-    Δt::Real
-)
-    Ũₜ₊₁ = iso_vec_to_iso_operator(Ũ⃗ₜ₊₁)
-    Ũₜ = iso_vec_to_iso_operator(Ũ⃗ₜ)
-    Gₜ = P.G(aₜ, P.G_drift, P.G_drives)
-    n = P.order ÷ 2
-    Gₜ_powers = compute_powers(Gₜ, n)
-    B = P.I_2N + sum([
-        (-1)^k * PADE_COEFFICIENTS[P.order][k] * Δt^k * Gₜ_powers[k]
-            for k = 1:n
-    ])
-    F = P.I_2N + sum([
-        PADE_COEFFICIENTS[P.order][k] * Δt^k * Gₜ_powers[k]
-            for k = 1:n
-    ])
-    δŨ = B * Ũₜ₊₁ - F * Ũₜ
-    return iso_operator_to_iso_vec(δŨ)
+function get_comps(P::QuantumStatePadeIntegrator, traj::NamedTrajectory)
+    if P.freetime
+        return P.state_components, P.drive_components, traj.components[traj.timestep]
+    else
+        return P.state_components, P.drive_components
+    end
 end
 
-@views function(P::UnitaryPadeIntegrator)(
-    zₜ::AbstractVector,
-    zₜ₊₁::AbstractVector,
-    traj::NamedTrajectory
+function (integrator::QuantumStatePadeIntegrator)(
+    sys::AbstractQuantumSystem,
+    traj::NamedTrajectory;
+    state_name::Union{Symbol, Nothing}=nothing,
+    drive_name::Union{Symbol, Tuple{Vararg{Symbol}}, Nothing}=nothing,
+    order::Int=integrator.order,
+    G::Function=integrator.G,
+    ∂G::Function=integrator.∂G,
+    autodiff::Bool=integrator.autodiff
 )
-    Ũ⃗ₜ₊₁ = zₜ₊₁[traj.components[P.unitary_symb]]
-    Ũ⃗ₜ = zₜ[traj.components[P.unitary_symb]]
-    if traj.timestep isa Symbol
-        Δtₜ = zₜ[traj.components[traj.timestep]][1]
-    else
-        Δtₜ = traj.timestep
-    end
-    if P.drive_symb isa Tuple
-        aₜ = vcat([zₜ[traj.components[s]] for s in P.drive_symb]...)
-    else
-        aₜ = zₜ[traj.components[P.drive_symb]]
-    end
-    return nth_order_pade(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, aₜ, Δtₜ)
+    @assert !isnothing(state_name) "state_name must be provided"
+    @assert !isnothing(drive_name) "drive_name must be provided"
+    return QuantumStatePadeIntegrator(
+        sys,
+        state_name,
+        drive_name,
+        traj;
+        order=order,
+        G=G,
+        ∂G=∂G,
+        autodiff=autodiff
+    )
 end
 
-
+# ------------------- Integrator -------------------
 
 function nth_order_pade(
     P::QuantumStatePadeIntegrator,
@@ -278,268 +615,106 @@ function nth_order_pade(
     aₜ::AbstractVector,
     Δt::Real
 )
-    Gₜ = P.G(aₜ, P.G_drift, P.G_drives)
-    n = P.order ÷ 2
-    Gₜ_powers = compute_powers(Gₜ, n)
-    B = P.I_2N + sum([
-        (-1)^k * PADE_COEFFICIENTS[P.order][k] * Δt^k * Gₜ_powers[k]
-            for k = 1:n
-    ])
-    F = P.I_2N + sum([
-        PADE_COEFFICIENTS[P.order][k] * Δt^k * Gₜ_powers[k]
-            for k = 1:n
-    ])
-    δψ̃ = B * ψ̃ₜ₊₁ - F * ψ̃ₜ
-    return δψ̃
+    Gₜ = P.G(aₜ)
+
+    F, B = pade_operators(Gₜ, P.order, I(2P.ketdim), Δt)
+
+    return B * ψ̃ₜ₊₁ - F * ψ̃ₜ
 end
 
 
 @views function(P::QuantumStatePadeIntegrator)(
     zₜ::AbstractVector,
     zₜ₊₁::AbstractVector,
-    traj::NamedTrajectory
+    t::Int
 )
-    ψ̃ₜ₊₁ = zₜ₊₁[traj.components[P.state_symb]]
-    ψ̃ₜ = zₜ[traj.components[P.state_symb]]
-    if P.drive_symb isa Tuple
-        aₜ = vcat([zₜ[traj.components[s]] for s in P.drive_symb]...)
+    ψ̃ₜ₊₁ = zₜ₊₁[P.state_components]
+    ψ̃ₜ = zₜ[P.state_components]
+    aₜ = zₜ[P.drive_components]
+
+    if P.freetime
+        Δtₜ = zₜ[P.timestep]
     else
-        aₜ = zₜ[traj.components[P.drive_symb]]
-    end
-    if traj.timestep isa Symbol
-        Δtₜ = zₜ[traj.components[traj.timestep]][1]
-    else
-        Δtₜ = traj.timestep
+        Δtₜ = P.timestep
     end
     return nth_order_pade(P, ψ̃ₜ₊₁, ψ̃ₜ, aₜ, Δtₜ)
 end
 
-# aₜ should be a vector with all the controls. concatenate all the named traj controls
-function ∂aₜ(
-    P::UnitaryPadeIntegrator,
-    Ũ⃗ₜ₊₁::AbstractVector{T},
-    Ũ⃗ₜ::AbstractVector{T},
-    aₜ::AbstractVector{T},
-    Δtₜ::Real,
-) where T <: Real
-
-    if P.autodiff || !isnothing(P.G)
-
-        # then we need to use the nth_order_pade function
-        # which handles nonlinear G and higher order Pade integrators
-
-        f(a) = nth_order_pade(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, a, Δtₜ)
-        ∂aP = ForwardDiff.jacobian(f, aₜ)
-
-    # otherwise we don't have a nonlinear G or are fine with using
-    # the fourth order derivatives
-
-    elseif P.order == 4
-        n_drives = length(aₜ)
-        ∂aP = Array{T}(undef, P.dim, n_drives)
-        isodim = 2*P.N
-        for j = 1:n_drives
-            Gʲ = P.G_drives[j]
-            Gʲ_anticomm_Gₜ =
-                P.G(aₜ, P.G_drift_anticomms[j], P.G_drive_anticomms[:, j])
-            for i = 0:P.N-1
-                ψ̃ⁱₜ₊₁ = @view Ũ⃗ₜ₊₁[i * isodim .+ (1:isodim)]
-                ψ̃ⁱₜ = @view Ũ⃗ₜ[i * isodim .+ (1:isodim)]
-                ∂aP[i*isodim .+ (1:isodim), j] =
-                    -Δtₜ / 2 * Gʲ * (ψ̃ⁱₜ₊₁ + ψ̃ⁱₜ) +
-                    Δtₜ^2 / 12 * Gʲ_anticomm_Gₜ * (ψ̃ⁱₜ₊₁ - ψ̃ⁱₜ)
-            end
-        end
-    else
-        ## higher order pade code goes here
-    end
-    return ∂aP
-end
-
 
 function ∂aₜ(
     P::QuantumStatePadeIntegrator,
-    ψ̃ₜ₊₁::AbstractVector{T},
-    ψ̃ₜ::AbstractVector{T},
-    aₜ::AbstractVector{T},
-    Δtₜ::Real,
-) where T <: Real
-    if P.autodiff || !isnothing(P.G)
-
-        # then we need to use the nth_order_pade function
-        # which handles nonlinear G and higher order Pade integrators
-
-        f(a) = nth_order_pade(P, ψ̃ₜ₊₁, ψ̃ₜ, a, Δtₜ)
-        ∂aP = ForwardDiff.jacobian(f, aₜ)
-
-    # otherwise we don't have a nonlinear G or are fine with using
-    # the fourth order derivatives
-
-    elseif P.order == 4
-        n_drives = length(aₜ)
-        ∂aP = zeros(P.dim, n_drives)
-        for j = 1:n_drives
-            Gʲ = P.G_drives[j]
-            Gʲ_anticomm_Gₜ =
-                P.G(aₜ, P.G_drift_anticomms[j], P.G_drive_anticomms[:, j])
-            ∂aP[:, j] =
-                -Δtₜ / 2 * Gʲ * (ψ̃ₜ₊₁ + ψ̃ₜ) +
-                Δtₜ^2 / 12 * Gʲ_anticomm_Gₜ * (ψ̃ₜ₊₁ - ψ̃ₜ)
-        end
-    else
-        ### code for arbitrary Pade goes here
-    end
-    return ∂aP
-end
-
-
-
-
-function ∂Δtₜ(
-    P::UnitaryPadeIntegrator,
-    Ũ⃗ₜ₊₁::AbstractVector,
-    Ũ⃗ₜ::AbstractVector,
-    aₜ::AbstractVector,
-    Δtₜ::Real
-)
-    Gₜ = P.G(aₜ, P.G_drift, P.G_drives)
-    Ũₜ₊₁ = iso_vec_to_iso_operator(Ũ⃗ₜ₊₁)
-    Ũₜ = iso_vec_to_iso_operator(Ũ⃗ₜ)
-    if P.order == 4
-        ∂ΔtₜP_operator = -1/2 * Gₜ * (Ũₜ₊₁ + Ũₜ) + 1/6 * Δtₜ * Gₜ^2 * (Ũₜ₊₁ - Ũₜ)
-        ∂ΔtₜP = iso_operator_to_iso_vec(∂ΔtₜP_operator)
-    else
-        n = P.order ÷ 2
-        Gₜ_powers = compute_powers(Gₜ, n)
-        B = sum([
-            (-1)^k * k * PADE_COEFFICIENTS[P.order][k] * Δtₜ^(k-1) * Gₜ_powers[k]
-                for k = 1:n
-        ])
-        F = sum([
-            k * PADE_COEFFICIENTS[P.order][k] * Δtₜ^(k-1) * Gₜ_powers[k]
-                for k = 1:n
-        ])
-        ∂ΔtₜP_operator = B * Ũₜ₊₁ - F * Ũₜ
-        ∂ΔtₜP = iso_operator_to_iso_vec(∂ΔtₜP_operator)
-    end
-
-    return ∂ΔtₜP
-end
-
-function ∂Δtₜ(
-    P::QuantumStatePadeIntegrator,
+    G_powers::Vector{<:AbstractMatrix},
     ψ̃ₜ₊₁::AbstractVector,
     ψ̃ₜ::AbstractVector,
     aₜ::AbstractVector,
     Δtₜ::Real
 )
+    ∂aP = zeros(eltype(ψ̃ₜ), P.dim, P.n_drives)
 
-    Gₜ = P.G(aₜ, P.G_drift, P.G_drives)
-    if P.order==4
-        ∂ΔtₜP = -1/2 * Gₜ * (ψ̃ₜ₊₁ + ψ̃ₜ) + 1/6 * Δtₜ * Gₜ^2 * (ψ̃ₜ₊₁ - ψ̃ₜ)
-    else
-        n = P.order ÷ 2
-        Gₜ_powers = [Gₜ^i for i in 1:n]
-        B = sum([(-1)^k * k * PADE_COEFFICIENTS[P.order][k] * Δtₜ^(k-1) * Gₜ_powers[k] for k = 1:n])
-        F = sum([k * PADE_COEFFICIENTS[P.order][k] * Δtₜ^(k-1) * Gₜ_powers[k] for k = 1:n])
-        ∂ΔtₜP = B*ψ̃ₜ₊₁ - F*ψ̃ₜ
+    ∂G_∂aₜ = P.∂G(aₜ)
+
+    for j = 1:P.n_drives
+
+        ∂aₜʲF = ∂aʲF(P, G_powers, Δtₜ, ∂G_∂aₜ[j])
+        ∂aₜʲB = ∂aʲB(P, G_powers, Δtₜ, ∂G_∂aₜ[j])
+
+        ∂aP[:, j] = ∂aₜʲB * ψ̃ₜ₊₁ - ∂aₜʲF * ψ̃ₜ
     end
-    return ∂ΔtₜP
+
+    return ∂aP
 end
 
 
-@views function jacobian(
-    P::UnitaryPadeIntegrator,
-    zₜ::AbstractVector{T},
-    zₜ₊₁::AbstractVector{T},
-    traj::NamedTrajectory
-) where T <: Number
-    free_time = traj.timestep isa Symbol
 
-    Ũ⃗ₜ₊₁ = zₜ₊₁[traj.components[P.unitary_symb]]
-    Ũ⃗ₜ = zₜ[traj.components[P.unitary_symb]]
+function ∂Δtₜ(
+    P::QuantumStatePadeIntegrator,
+    Gₜ_powers::Vector{<:AbstractMatrix},
+    ψ̃ₜ₊₁::AbstractVector,
+    ψ̃ₜ::AbstractVector,
+    Δtₜ::Real
+)
+    ∂ΔtₜF_coeffs, ∂ΔtₜB_coeffs = pade_coefficients(Δtₜ, P.order;
+        timestep_derivative=true
+    )
 
-    Δtₜ = free_time ? zₜ[traj.components[traj.timestep]][1] : traj.timestep
+    ∂ΔtₜF = sum(∂ΔtₜF_coeffs .* Gₜ_powers)
+    ∂ΔtₜB = sum(∂ΔtₜB_coeffs .* Gₜ_powers)
 
-    if P.drive_symb isa Tuple
-        inds = [traj.components[s] for s in P.drive_symb]
-        inds = vcat(collect.(inds)...)
-    else
-        inds = traj.components[P.drive_symb]
-    end
-
-    for i = 1:length(inds) - 1
-        @assert inds[i] + 1 == inds[i + 1] "Controls must be in order"
-    end
-
-    aₜ = zₜ[inds]
-    ∂aₜP = ∂aₜ(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, aₜ, Δtₜ)
-    if free_time
-        ∂ΔtₜP = ∂Δtₜ(P, Ũ⃗ₜ₊₁, Ũ⃗ₜ, aₜ, Δtₜ)
-    end
-
-    ∂Ũ⃗ₜP = spzeros(T, P.dim, P.dim)
-    ∂Ũ⃗ₜ₊₁P = spzeros(T, P.dim, P.dim)
-    Gₜ = P.G(aₜ, P.G_drift, P.G_drives)
-    n = P.order ÷ 2
-
-    # can memoize this chunk of code, prly memoize G powers
-    Gₜ_powers = compute_powers(Gₜ, n)
-    B = P.I_2N + sum([(-1)^k * PADE_COEFFICIENTS[P.order][k] * Δtₜ^k * Gₜ_powers[k] for k = 1:n])
-    F = P.I_2N + sum([PADE_COEFFICIENTS[P.order][k] * Δtₜ^k * Gₜ_powers[k] for k = 1:n])
-
-    ∂Ũ⃗ₜ₊₁P = blockdiag(fill(sparse(B), P.N)...)
-    ∂Ũ⃗ₜP = blockdiag(fill(sparse(-F), P.N)...)
-
-    if free_time
-        return ∂Ũ⃗ₜP, ∂Ũ⃗ₜ₊₁P, ∂aₜP, ∂ΔtₜP
-    else
-        return ∂Ũ⃗ₜP, ∂Ũ⃗ₜ₊₁P, ∂aₜP
-    end
+    return ∂ΔtₜB * ψ̃ₜ₊₁ - ∂ΔtₜF * ψ̃ₜ
 end
 
 @views function jacobian(
     P::QuantumStatePadeIntegrator,
     zₜ::AbstractVector,
     zₜ₊₁::AbstractVector,
-    traj::NamedTrajectory
+    t::Int
 )
-    free_time = traj.timestep isa Symbol
+    # obtain state and control vectors
+    ψ̃ₜ₊₁ = zₜ₊₁[P.state_components]
+    ψ̃ₜ = zₜ[P.state_components]
+    aₜ = zₜ[P.drive_components]
 
-    ψ̃ₜ₊₁ = zₜ₊₁[traj.components[P.state_symb]]
-    ψ̃ₜ = zₜ[traj.components[P.state_symb]]
+    Gₜ = P.G(aₜ)
 
-
-    Δtₜ = free_time ? zₜ[traj.components[traj.timestep]][1] : traj.timestep
-
-    if P.drive_symb isa Tuple
-        inds = [traj.components[s] for s in P.drive_symb]
-        inds = vcat(collect.(inds)...)
+    # obtain timestep
+    if P.freetime
+        Δtₜ = zₜ[P.timestep]
     else
-        inds = traj.components[P.drive_symb]
+        Δtₜ = P.timestep
     end
 
-    for i = 1:length(inds) - 1
-        @assert inds[i] + 1 == inds[i + 1] "Controls must be in order"
-    end
+    Gₜ_powers = compute_powers(Gₜ, P.order ÷ 2)
 
-    aₜ = zₜ[inds]
+    ∂aₜP = ∂aₜ(P, Gₜ_powers, ψ̃ₜ₊₁, ψ̃ₜ, aₜ, Δtₜ)
 
-    ∂aₜP = ∂aₜ(P, ψ̃ₜ₊₁, ψ̃ₜ, aₜ, Δtₜ)
-    if free_time
-        ∂ΔtₜP = ∂Δtₜ(P, ψ̃ₜ₊₁, ψ̃ₜ, aₜ, Δtₜ)
-    end
+    # jacobian wrt state
+    Fₜ, Bₜ = pade_operators(Gₜ_powers, I(2P.ketdim), Δtₜ)
 
-    Gₜ = P.G(aₜ, P.G_drift, P.G_drives)
-    n = P.order ÷ 2
-    Gₜ_powers = compute_powers(Gₜ, n)
-    B = P.I_2N + sum([(-1)^k * PADE_COEFFICIENTS[P.order][k] * Δtₜ^k * Gₜ_powers[k] for k = 1:n])
-    F = P.I_2N + sum([PADE_COEFFICIENTS[P.order][k] * Δtₜ^k * Gₜ_powers[k] for k = 1:n])
+    ∂ψ̃ₜP = -Fₜ
+    ∂ψ̃ₜ₊₁P = Bₜ
 
-    ∂ψ̃ₜP = -F
-    ∂ψ̃ₜ₊₁P = B
-
-    if free_time
+    if P.freetime
+        ∂ΔtₜP = ∂Δtₜ(P, Gₜ_powers, ψ̃ₜ₊₁, ψ̃ₜ, Δtₜ)
         return ∂ψ̃ₜP, ∂ψ̃ₜ₊₁P, ∂aₜP, ∂ΔtₜP
     else
         return ∂ψ̃ₜP, ∂ψ̃ₜ₊₁P, ∂aₜP
@@ -571,7 +746,7 @@ function μ∂aₜ∂Ũ⃗ₜ(
             Ĝʲ = P.G(aₜ, P.G_drift_anticomms[j], P.G_drive_anticomms[:, j])
             ∂aₜ∂Ũ⃗ₜ_block_i = -(Δtₜ / 2 * Gʲ + Δtₜ^2 / 12 * Ĝʲ)
             # sparse is necessary since blockdiag doesn't accept dense matrices
-            ∂aₜ∂Ũ⃗ₜ = blockdiag(fill(sparse(∂aₜ∂Ũ⃗ₜ_block_i), P.N)...)
+            ∂aₜ∂Ũ⃗ₜ = blockdiag(fill(sparse(∂aₜ∂Ũ⃗ₜ_block_i), P.ketdim)...)
             μ∂aₜ∂Ũ⃗ₜP[:, j] = ∂aₜ∂Ũ⃗ₜ' * μₜ
         end
     else
@@ -595,7 +770,7 @@ function μ∂Ũ⃗ₜ₊₁∂aₜ(
         Ĝʲ = P.G(aₜ, P.G_drift_anticomms[j], P.G_drive_anticomms[:, j])
         ∂Ũ⃗ₜ₊₁∂aₜ_block_i = -Δtₜ / 2 * Gʲ + Δtₜ^2 / 12 * Ĝʲ
         # sparse is necessary since blockdiag doesn't accept dense matrices
-        ∂Ũ⃗ₜ₊₁∂aₜ = blockdiag(fill(sparse(∂Ũ⃗ₜ₊₁∂aₜ_block_i), P.N)...)
+        ∂Ũ⃗ₜ₊₁∂aₜ = blockdiag(fill(sparse(∂Ũ⃗ₜ₊₁∂aₜ_block_i), P.ketdim)...)
         μ∂Ũ⃗ₜ₊₁∂aₜP[j, :] = μₜ' * ∂Ũ⃗ₜ₊₁∂aₜ
     end
 
@@ -659,7 +834,7 @@ function μ∂²aₜ(
             for j = 1:i
                 ∂aʲ∂aⁱP_block =
                     Δtₜ^2 / 12 * P.G_drive_anticomms[i, j]
-                ∂aʲ∂aⁱP = blockdiag(fill(sparse(∂aʲ∂aⁱP_block), P.N)...)
+                ∂aʲ∂aⁱP = blockdiag(fill(sparse(∂aʲ∂aⁱP_block), P.ketdim)...)
                 μ∂²aₜP[j, i] = dot(μₜ, ∂aʲ∂aⁱP*(Ũ⃗ₜ₊₁ - Ũ⃗ₜ))
             end
         end
@@ -707,8 +882,8 @@ function μ∂Δtₜ∂aₜ(
         for j = 1:n_drives
             Gʲ = P.G_drives[j]
             Ĝʲ = P.G(aₜ, P.G_drift_anticomms[j], P.G_drive_anticomms[:, j])
-            B = blockdiag(fill(sparse(-1/2 * Gʲ + 1/6 * Δtₜ * Ĝʲ), P.N)...)
-            F = blockdiag(fill(sparse(1/2 * Gʲ + 1/6 * Δtₜ * Ĝʲ), P.N)...)
+            B = blockdiag(fill(sparse(-1/2 * Gʲ + 1/6 * Δtₜ * Ĝʲ), P.ketdim)...)
+            F = blockdiag(fill(sparse(1/2 * Gʲ + 1/6 * Δtₜ * Ĝʲ), P.ketdim)...)
             ∂Δtₜ∂aₜ_j =  B*Ũ⃗ₜ₊₁ - F*Ũ⃗ₜ
             μ∂Δtₜ∂aₜP[j] = dot(μₜ, ∂Δtₜ∂aₜ_j)
         end
@@ -749,7 +924,7 @@ function μ∂Δtₜ∂Ũ⃗ₜ(
 )
     Gₜ = P.G(aₜ, P.G_drift, P.G_drives)
     minus_F = -(1/2 * Gₜ + 1/6 * Δtₜ * Gₜ^2)
-    big_minus_F = blockdiag(fill(sparse(minus_F), P.N)...)
+    big_minus_F = blockdiag(fill(sparse(minus_F), P.ketdim)...)
     return big_minus_F' * μₜ
 end
 
@@ -761,7 +936,7 @@ function μ∂Ũ⃗ₜ₊₁∂Δtₜ(
 )
     Gₜ = P.G(aₜ, P.G_drift, P.G_drives)
     B = -1/2 * Gₜ + 1/6 * Δtₜ * Gₜ^2
-    big_B = blockdiag(fill(sparse(B), P.N)...)
+    big_B = blockdiag(fill(sparse(B), P.ketdim)...)
     return μₜ' * big_B
 end
 
@@ -797,7 +972,7 @@ function μ∂²Δtₜ(
 )
     Gₜ = P.G(aₜ, P.G_drift, P.G_drives)
     ∂²Δtₜ_gen_block = 1/6 * Gₜ^2
-    ∂²Δtₜ_gen = blockdiag(fill(sparse(∂²Δtₜ_gen_block), P.N)...)
+    ∂²Δtₜ_gen = blockdiag(fill(sparse(∂²Δtₜ_gen_block), P.ketdim)...)
     ∂²Δtₜ = ∂²Δtₜ_gen * (Ũ⃗ₜ₊₁ -  Ũ⃗ₜ)
     return μₜ' * ∂²Δtₜ
 end
@@ -823,16 +998,16 @@ end
 )
     free_time = traj.timestep isa Symbol
 
-    Ũ⃗ₜ₊₁ = zₜ₊₁[traj.components[P.unitary_symb]]
-    Ũ⃗ₜ = zₜ[traj.components[P.unitary_symb]]
+    Ũ⃗ₜ₊₁ = zₜ₊₁[traj.components[P.unitary_name]]
+    Ũ⃗ₜ = zₜ[traj.components[P.unitary_name]]
 
     Δtₜ = free_time ? zₜ[traj.components[traj.timestep]][1] : traj.timestep
 
-    if P.drive_symb isa Tuple
-        inds = [traj.components[s] for s in P.drive_symb]
+    if P.drive_name isa Tuple
+        inds = [traj.components[s] for s in P.drive_name]
         inds = vcat(collect.(inds)...)
     else
-        inds = traj.components[P.drive_symb]
+        inds = traj.components[P.drive_name]
     end
 
     aₜ = zₜ[inds]
@@ -876,16 +1051,16 @@ end
 )
     free_time = traj.timestep isa Symbol
 
-    ψ̃ₜ₊₁ = zₜ₊₁[traj.components[P.state_symb]]
-    ψ̃ₜ = zₜ[traj.components[P.state_symb]]
+    ψ̃ₜ₊₁ = zₜ₊₁[traj.components[P.state_name]]
+    ψ̃ₜ = zₜ[traj.components[P.state_name]]
 
     Δtₜ = free_time ? zₜ[traj.components[traj.timestep]][1] : traj.timestep
 
-    if P.drive_symb isa Tuple
-        inds = [traj.components[s] for s in P.drive_symb]
+    if P.drive_name isa Tuple
+        inds = [traj.components[s] for s in P.drive_name]
         inds = vcat(collect.(inds)...)
     else
-        inds = traj.components[P.drive_symb]
+        inds = traj.components[P.drive_name]
     end
 
     aₜ = zₜ[inds]

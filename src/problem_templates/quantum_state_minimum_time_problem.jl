@@ -1,3 +1,6 @@
+export QuantumStateMinimumTimeProblem
+
+
 """
     QuantumStateMinimumTimeProblem
 

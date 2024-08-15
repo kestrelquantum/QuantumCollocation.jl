@@ -65,7 +65,7 @@ function RydbergChainSystem(;
         H_drift = zeros(ComplexF64, 2^N, 2^N)
         for gap in 0:N-2
             for i in 1:N-gap-1
-                H_drift += C * kron_from_dict(
+                H_drift += C * operator_from_string(
                     generate_pattern_with_gap(N, i, gap),
                     PAULIS
                 ) / ((gap + 1) * distance)^6
@@ -73,10 +73,10 @@ function RydbergChainSystem(;
         end
     else
         if cutoff_order == 1
-            H_drift = sum([C*kron_from_dict(generate_pattern(N,i),PAULIS)/(distance^6) for i in 1:N-1])
+            H_drift = sum([C*operator_from_string(generate_pattern(N,i),PAULIS)/(distance^6) for i in 1:N-1])
         elseif cutoff_order == 2
-            H_drift = sum([C*kron_from_dict(generate_pattern(N,i),PAULIS)/(distance^6) for i in 1:N-1])
-            H_drift += sum([C*kron_from_dict(generate_pattern_with_gap(N,i,1),PAULIS)/((2*distance)^6) for i in 1:N-2])
+            H_drift = sum([C*operator_from_string(generate_pattern(N,i),PAULIS)/(distance^6) for i in 1:N-1])
+            H_drift += sum([C*operator_from_string(generate_pattern_with_gap(N,i,1),PAULIS)/((2*distance)^6) for i in 1:N-2])
         else
             error("Higher cutoff order not supported")
         end
@@ -85,17 +85,17 @@ function RydbergChainSystem(;
     H_drives = Matrix{ComplexF64}[]
 
     # Add global X drive
-    Hx = sum([0.5*kron_from_dict(lift('X',i,N), PAULIS) for i in 1:N])
+    Hx = sum([0.5*operator_from_string(lift('X',i,N), PAULIS) for i in 1:N])
     push!(H_drives, Hx)
 
     if !ignore_Y_drive
         # Add global Y drive
-        Hy = sum([0.5*kron_from_dict(lift('Y',i,N), PAULIS) for i in 1:N])
+        Hy = sum([0.5*operator_from_string(lift('Y',i,N), PAULIS) for i in 1:N])
         push!(H_drives, Hy)
     end
 
     # Add global detuning
-    H_detune = -sum([kron_from_dict(lift('n',i,N), PAULIS) for i in 1:N])
+    H_detune = -sum([operator_from_string(lift('n',i,N), PAULIS) for i in 1:N])
     push!(H_drives, H_detune)
 
     params = Dict{Symbol, Any}(

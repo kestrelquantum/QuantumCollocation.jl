@@ -1,3 +1,6 @@
+export UnitaryBangBangProblem
+
+
 @doc raw"""
     UnitaryBangBangProblem(system::QuantumSystem, operator, T, Δt; kwargs...)
 
@@ -33,7 +36,7 @@ TODO: Document bang-bang modification.
 or
 - `system::QuantumSystem`: the system to be controlled
 with
-- `operator::Union{EmbeddedOperator, AbstractMatrix{<:Number}}`: the target unitary, either in the form of an `EmbeddedOperator` or a `Matrix{ComplexF64}
+- `operator::OperatorType`: the target unitary, either in the form of an `EmbeddedOperator` or a `Matrix{ComplexF64}
 - `T::Int`: the number of timesteps
 - `Δt::Float64`: the (initial) time step size
 
@@ -68,7 +71,7 @@ TODO: control modulus norm, advanced feature, needs documentation
 """
 function UnitaryBangBangProblem(
     system::AbstractQuantumSystem,
-    operator::Union{EmbeddedOperator, AbstractMatrix{<:Number}},
+    operator::OperatorType,
     T::Int,
     Δt::Union{Float64, Vector{Float64}};
     ipopt_options::IpoptOptions=IpoptOptions(),
@@ -87,13 +90,14 @@ function UnitaryBangBangProblem(
     R=1e-2,
     R_a::Union{Float64, Vector{Float64}}=R,
     R_da::Union{Float64, Vector{Float64}}=R,
-    R_bang_bang::Union{Float64, Vector{Float64}}=1.0,
+    R_bang_bang::Union{Float64, Vector{Float64}}=1e-1,
     leakage_suppression=false,
     R_leakage=1e-1,
     control_norm_constraint=false,
     control_norm_constraint_components=nothing,
     control_norm_R=nothing,
     bound_unitary=piccolo_options.integrator == :exponential,
+    global_data::Union{NamedTuple, Nothing}=nothing,
     kwargs...
 )
     # Trajectory
@@ -116,13 +120,27 @@ function UnitaryBangBangProblem(
             a_guess=a_guess,
             system=system,
             rollout_integrator=piccolo_options.rollout_integrator,
+            global_data=global_data
         )
     end
 
     # Objective
-    J = UnitaryInfidelityObjective(:Ũ⃗, traj, Q;
-        subspace=operator isa EmbeddedOperator ? operator.subspace_indices : nothing,
-    )
+    if isnothing(global_data)
+        J = UnitaryInfidelityObjective(:Ũ⃗, traj, Q;
+            subspace=operator isa EmbeddedOperator ? operator.subspace_indices : nothing,
+        )
+    else
+        # TODO: remove hardcoded args
+        J = UnitaryFreePhaseInfidelityObjective(
+            name=:Ũ⃗,
+            phase_name=:ϕ,
+            goal=operator_to_iso_vec(operator isa EmbeddedOperator ? operator.operator : operator),
+            phase_operators=[GATES[:Z] for _ in eachindex(traj.global_components[:ϕ])],
+            Q=Q,
+            eval_hessian=piccolo_options.eval_hessian,
+            subspace=operator isa EmbeddedOperator ? operator.subspace_indices : nothing
+        )
+    end
     J += QuadraticRegularizer(:a, traj, R_a)
     J += QuadraticRegularizer(:da, traj, R_da)
 
@@ -131,16 +149,16 @@ function UnitaryBangBangProblem(
         R_bang_bang = fill(R_bang_bang, length(system.G_drives))
     end
     J += L1Regularizer!(
-        constraints, :da, traj, 
+        constraints, :da, traj,
         R=R_bang_bang, eval_hessian=piccolo_options.eval_hessian
     )
 
     if leakage_suppression
         if operator isa EmbeddedOperator
-            leakage_indices = get_unitary_isomorphism_leakage_indices(operator)
+            leakage_indices = get_iso_vec_leakage_indices(operator)
             J += L1Regularizer!(
-                constraints, :Ũ⃗, traj, 
-                R_value=R_leakage, 
+                constraints, :Ũ⃗, traj,
+                R_value=R_leakage,
                 indices=leakage_indices,
                 eval_hessian=piccolo_options.eval_hessian
             )
@@ -170,10 +188,10 @@ function UnitaryBangBangProblem(
     # Integrators
     if piccolo_options.integrator == :pade
         unitary_integrator =
-            UnitaryPadeIntegrator(system, :Ũ⃗, :a; order=piccolo_options.pade_order)
+            UnitaryPadeIntegrator(system, :Ũ⃗, :a, traj; order=piccolo_options.pade_order)
     elseif piccolo_options.integrator == :exponential
         unitary_integrator =
-            UnitaryExponentialIntegrator(system, :Ũ⃗, :a)
+            UnitaryExponentialIntegrator(system, :Ũ⃗, :a, traj)
     else
         error("integrator must be one of (:pade, :exponential)")
     end
@@ -225,26 +243,24 @@ end
     U_goal = GATES[:H]
     T = 51
     Δt = 0.2
-    
+
     ipopt_options = IpoptOptions(print_level=1, max_iter=25)
     piccolo_options = PiccoloOptions(verbose=false)
-    
+
     prob = UnitaryBangBangProblem(
         sys, U_goal, T, Δt,
         R_bang_bang=10.,
-        ipopt_options=ipopt_options, piccolo_options=piccolo_options 
+        ipopt_options=ipopt_options, piccolo_options=piccolo_options
     )
-    
+
     smooth_prob = UnitarySmoothPulseProblem(
         sys, U_goal, T, Δt,
         ipopt_options=ipopt_options, piccolo_options=piccolo_options
     )
-    
     initial = unitary_fidelity(prob)
     solve!(prob)
     final = unitary_fidelity(prob)
     @test final > initial
-    
     solve!(smooth_prob)
     threshold = 1e-3
     a_sparse = sum(prob.trajectory.da .> 5e-2)

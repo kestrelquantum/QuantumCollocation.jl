@@ -2,11 +2,15 @@ module QuantumCollocation
 
 using Reexport
 
+
+include("isomorphisms.jl")
+@reexport using .Isomorphisms
+
+include("quantum_object_utils.jl")
+@reexport using .QuantumObjectUtils
+
 include("structure_utils.jl")
 @reexport using .StructureUtils
-
-include("quantum_utils.jl")
-@reexport using .QuantumUtils
 
 include("quantum_systems.jl")
 @reexport using .QuantumSystems
@@ -20,13 +24,13 @@ include("embedded_operators.jl")
 include("quantum_system_utils.jl")
 @reexport using .QuantumSystemUtils
 
-include("losses.jl")
+include("losses/_losses.jl")
 @reexport using .Losses
 
-include("constraints.jl")
+include("constraints/_constraints.jl")
 @reexport using .Constraints
 
-include("objectives.jl")
+include("objectives/_objectives.jl")
 @reexport using .Objectives
 
 include("integrators/_integrators.jl")

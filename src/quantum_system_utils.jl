@@ -4,10 +4,12 @@ export operator_algebra
 export is_reachable
 
 using ..EmbeddedOperators
+using ..QuantumObjectUtils
 using ..QuantumSystems
 
 using LinearAlgebra
 using SparseArrays
+using TestItemRunner
 
 
 commutator(A::AbstractMatrix, B::AbstractMatrix) = A * B - B * A
@@ -76,8 +78,8 @@ operator_algebra(generators; return_layers=false, normalize=false, verbose=false
     - `remove_trace::Bool=true`: remove trace from generators
 """
 function operator_algebra(
-    generators::Vector{<:AbstractMatrix{T}}; 
-    return_layers=false, 
+    generators::Vector{<:AbstractMatrix{T}};
+    return_layers=false,
     normalize=false,
     verbose=false,
     remove_trace=true
@@ -131,7 +133,9 @@ function operator_algebra(
             end
 
             if isempty(layer)
-                println("Subspace termination.")
+                if verbose
+                    println("Subspace termination.")
+                end
                 break
             else
                 current_layer = layer
@@ -166,11 +170,11 @@ end
 function is_in_span(
     gen::AbstractMatrix,
     basis::AbstractVector{<:AbstractMatrix};
-    subspace_indices::AbstractVector{<:Int}=1:size(gen, 1),
+    subspace::AbstractVector{<:Int}=1:size(gen, 1),
     atol=eps(Float32),
     return_effective_gen=false,
 )
-    g_basis = [deepcopy(b[subspace_indices, subspace_indices]) for b ∈ basis]
+    g_basis = [deepcopy(b[subspace, subspace]) for b ∈ basis]
     linearly_independent_subset!(g_basis)
     # Traceless basis needs traceless fit
     x = fit_gen_to_basis(gen, g_basis)
@@ -184,25 +188,32 @@ function is_in_span(
 end
 
 """
-is_reachable(hamiltonians, gate, subspace_levels, levels; kwargs...)
+    is_reachable(gate, hamiltonians; kwargs...)
 
-    Check if the gate is reachable from the given generators.
+Check if the gate is reachable from the given generators. If subspace_indices are provided,
+then the gate should be given in the subspace.
 
-    # Arguments
-    - `hamiltonians::AbstractVector{<:AbstractMatrix}`: generators of the Lie algebra
-    - `gate::AbstractMatrix`: target gate
-    - `subspace_levels::Vector{<:Int}`: levels of the subspace
-    - `levels::Vector{<:Int}`: levels of the system
+# Arguments
+- `gate::AbstractMatrix`: target gate
+- `hamiltonians::AbstractVector{<:AbstractMatrix}`: generators of the Lie algebra
+
+# Keyword Arguments
+- `subspace::AbstractVector{<:Int}=1:size(gate, 1)`: subspace indices
+- `compute_basis::Bool=true`: compute the basis
+- `remove_trace::Bool=true`: remove trace from generators
+- `verbose::Bool=false`: print debug information
+- `atol::Float32=eps(Float32)`: absolute tolerance
 """
 function is_reachable(
     gate::AbstractMatrix,
     hamiltonians::AbstractVector{<:AbstractMatrix};
-    subspace_indices::AbstractVector{<:Int}=1:size(gate, 1),
+    subspace::AbstractVector{<:Int}=1:size(gate, 1),
     compute_basis=true,
     remove_trace=true,
     verbose=false,
     atol=eps(Float32)
 )
+    @assert size(gate, 1) == length(subspace) "Gate must be given in the subspace."
     generator = im * log(gate)
 
     if remove_trace
@@ -218,7 +229,7 @@ function is_reachable(
     return is_in_span(
         generator,
         basis,
-        subspace_indices=subspace_indices,
+        subspace=subspace,
         atol=atol
     )
 end
@@ -237,5 +248,126 @@ function is_reachable(
     return is_reachable(gate, hamiltonians; kwargs...)
 end
 
+function is_reachable(
+    gate::EmbeddedOperator,
+    system::QuantumSystem;
+    kwargs...
+)
+    return is_reachable(
+        unembed(gate),
+        system;
+        subspace=gate.subspace_indices,
+        kwargs...
+    )
+end
+
+# ============================================================================= #
+
+@testitem "Lie algebra basis" begin
+    # Check 1 qubit with complete basis
+    gen = operator_from_string.(["X", "Y"])
+    basis = operator_algebra(gen, return_layers=false, verbose=false)
+    @test length(basis) == size(first(gen), 1)^2-1
+
+    # Check 1 qubit with complete basis and layers
+    basis, layers = operator_algebra(gen, return_layers=true, verbose=false)
+    @test length(basis) == size(first(gen), 1)^2-1
+
+    # Check 1 qubit with subspace
+    gen = operator_from_string.(["X"])
+    basis = operator_algebra(gen, verbose=false)
+    @test length(basis) == 1
+
+    # Check 2 qubit with complete basis
+    gen = operator_from_string.(["XX", "YY", "XI", "YI", "IY", "IX"])
+    basis = operator_algebra(gen, verbose=false)
+    @test length(basis) == size(first(gen), 1)^2-1
+
+    # Check 2 qubit with linearly dependent basis
+    gen = operator_from_string.(["XX", "YY", "XI", "XI", "IY", "IX"])
+    basis = operator_algebra(gen, verbose=false)
+    @test length(basis) == length(gen)
+
+    # Check 2 qubit with pair of 1-qubit subspaces
+    gen = operator_from_string.(["XI", "YI", "IY", "IX"])
+    basis = operator_algebra(gen, verbose=false)
+    @test length(basis) == 2 * (2^2 - 1)
+end
+
+
+@testitem "Lie Algebra reachability" begin
+    using LinearAlgebra
+
+    H_ops = Dict(
+        "X" => GATES[:X],
+        "Y" => GATES[:Y],
+        "Z" => GATES[:Z]
+    )
+
+    # Check 1 qubit with complete basis
+    gen = operator_from_string.(["X", "Y"])
+    target = H_ops["Z"]
+    @test is_reachable(target, gen, compute_basis=true, verbose=false)
+
+    # System
+    sys = QuantumSystem([GATES[:X], GATES[:Y], GATES[:Z]])
+    target = GATES[:Z]
+    @test is_reachable(target, sys)
+
+    # System with drift
+    sys = QuantumSystem(GATES[:Z], [GATES[:X]])
+    target = GATES[:Z]
+    @test is_reachable(target, sys)
+
+    # Check 2 qubit with complete basis
+    XI = GATES[:X] ⊗ GATES[:I]
+    IX = GATES[:I] ⊗ GATES[:X]
+    YI = GATES[:Y] ⊗ GATES[:I]
+    IY = GATES[:I] ⊗ GATES[:Y]
+    XX = GATES[:X] ⊗ GATES[:X]
+    YY = GATES[:Y] ⊗ GATES[:Y]
+    ZI = GATES[:Z] ⊗ GATES[:I]
+    IZ = GATES[:I] ⊗ GATES[:Z]
+    ZZ = GATES[:Z] ⊗ GATES[:Z]
+
+    complete_gen = [XX+YY, XI, YI, IX, IY]
+    incomplete_gen = [XI, ZZ]
+    r = [0, 1, 2, 3, 4]
+    r /= norm(r)
+    R2 = exp(-im * sum([θ * H for (H, θ) in zip(complete_gen, r)]))
+    CZ = [1 0 0 0; 0 1 0 0; 0 0 1 0; 0 0 0 -1]
+    CX = [1 0 0 0; 0 1 0 0; 0 0 0 1; 0 0 1 0]
+
+    # Pass
+    @test is_reachable(R2, complete_gen)
+    @test is_reachable(CZ, complete_gen)
+    @test is_reachable(CX, complete_gen)
+    @test is_reachable(XI, complete_gen)
+
+    # Mostly fail
+    @test !is_reachable(R2, incomplete_gen)
+    @test !is_reachable(CZ, incomplete_gen)
+    @test !is_reachable(CX, incomplete_gen)
+    @test is_reachable(XI, incomplete_gen)
+
+    # QuantumSystems
+    complete_gen_sys = QuantumSystem(complete_gen)
+    incomplete_gen_sys = QuantumSystem(incomplete_gen)
+    # Pass
+    @test is_reachable(R2, complete_gen_sys)
+    @test is_reachable(CZ, complete_gen_sys)
+    @test is_reachable(CX, complete_gen_sys)
+    @test is_reachable(XI, complete_gen_sys)
+
+    # Mostly fail
+    @test !is_reachable(R2, incomplete_gen_sys)
+    @test !is_reachable(CZ, incomplete_gen_sys)
+    @test !is_reachable(CX, incomplete_gen_sys)
+    @test is_reachable(XI, incomplete_gen_sys)
+end
+
+@testitem "Lie Algebra subspace reachability" begin
+    # TODO: implement tests
+end
 
 end

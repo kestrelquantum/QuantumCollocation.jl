@@ -12,14 +12,10 @@ export QuantumStateExponentialIntegrator
 
 export DerivativeIntegrator
 
-export state
-export controls
-export timestep
-export comps
-export dim
-
 export jacobian
 export hessian_of_the_lagrangian
+
+export get_comps
 
 export nth_order_pade
 export fourth_order_pade
@@ -28,7 +24,10 @@ export eighth_order_pade
 export tenth_order_pade
 
 using ..QuantumSystems
-using ..QuantumUtils
+using ..Isomorphisms
+using ..QuantumObjectUtils
+using ..Losses
+using ..QuantumSystemUtils
 
 using NamedTrajectories
 using TrajectoryIndexingUtils
@@ -56,9 +55,6 @@ function comps(P::AbstractIntegrator, traj::NamedTrajectory)
         return state_comps, control_comps, timestep_comp
     end
 end
-
-dim(integrator::AbstractIntegrator) = integrator.dim
-dim(integrators::AbstractVector{<:AbstractIntegrator}) = sum(dim, integrators)
 
 
 

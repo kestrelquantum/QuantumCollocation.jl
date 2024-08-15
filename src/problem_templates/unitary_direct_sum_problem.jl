@@ -1,3 +1,6 @@
+export UnitaryDirectSumProblem
+
+
 @doc """
     UnitaryDirectSumProblem(probs, final_fidelity; kwargs...)
 
@@ -103,8 +106,9 @@ function UnitaryDirectSumProblem(
     if drive_reset_ratio > 0
         for ℓ in prob_labels
             a_symb, da_symb, dda_symb = add_suffix(:a, ℓ), add_suffix(:da, ℓ), add_suffix(:dda, ℓ)
+            n_drives = length(traj.components[a_symb])
             a, da, dda = TrajectoryInitialization.initialize_controls(
-                length(traj.components[a_symb]),
+                n_drives,
                 n_derivatives,
                 traj.T, 
                 traj.bounds[a_symb], 
@@ -116,9 +120,9 @@ function UnitaryDirectSumProblem(
         end
     end
 
-    # concatenate suffix integrators
+    # Rebuild integrators
     integrators = vcat(
-        [add_suffix(p.integrators, ℓ) for (p, ℓ) ∈ zip(probs, prob_labels)]...
+        [add_suffix(p.integrators, p.system, p.trajectory, traj, ℓ) for (p, ℓ) ∈ zip(probs, prob_labels)]...
     )
 
     # direct sum (used for problem saving, only)

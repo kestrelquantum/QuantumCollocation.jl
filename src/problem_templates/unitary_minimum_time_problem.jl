@@ -1,3 +1,6 @@
+export UnitaryMinimumTimeProblem
+
+
 @doc raw"""
     UnitaryMinimumTimeProblem(
         trajectory::NamedTrajectory,
@@ -49,6 +52,7 @@ function UnitaryMinimumTimeProblem(
     integrators::Vector{<:AbstractIntegrator},
     constraints::Vector{<:AbstractConstraint};
     unitary_symbol::Symbol=:Ũ⃗,
+    global_symbol::Union{Nothing, Symbol}=nothing,
     final_fidelity::Union{Real, Nothing}=nothing,
     D=1.0,
     ipopt_options::IpoptOptions=IpoptOptions(),
@@ -59,20 +63,34 @@ function UnitaryMinimumTimeProblem(
     @assert unitary_symbol ∈ trajectory.names
 
     if isnothing(final_fidelity)
-        final_fidelity = unitary_fidelity(
+        final_fidelity = iso_vec_unitary_fidelity(
             trajectory[unitary_symbol][:, end], trajectory.goal[unitary_symbol]
         )
     end
 
     objective += MinimumTimeObjective(trajectory; D=D, eval_hessian=piccolo_options.eval_hessian)
 
-    fidelity_constraint = FinalUnitaryFidelityConstraint(
-        unitary_symbol,
-        final_fidelity,
-        trajectory;
-        subspace=subspace,
-        eval_hessian=piccolo_options.eval_hessian
-    )
+    if isnothing(global_symbol)
+        fidelity_constraint = FinalUnitaryFidelityConstraint(
+            unitary_symbol,
+            final_fidelity,
+            trajectory;
+            subspace=subspace,
+            eval_hessian=piccolo_options.eval_hessian
+        )
+    else
+        # TODO: remove hardcoded args
+        fidelity_constraint = FinalUnitaryFreePhaseFidelityConstraint(
+            value=final_fidelity,
+            state_slice=slice(trajectory.T, trajectory.components[unitary_symbol], trajectory.dim),
+            phase_slice=trajectory.global_components[global_symbol],
+            goal=trajectory.goal[unitary_symbol],
+            phase_operators=[GATES[:Z] for _ in eachindex(trajectory.global_components[global_symbol])],
+            zdim=trajectory.dim * trajectory.T + trajectory.global_dim,
+            subspace=subspace,
+            eval_hessian=piccolo_options.eval_hessian
+        )
+    end
 
     constraints = push!(constraints, fidelity_constraint) 
 

@@ -4,73 +4,128 @@ This file includes expoential integrators for states and unitaries
 
 using ExponentialAction
 
+# ----------------------------------------------------------------------------- #
+#                         Quantum Exponential Integrators                       #
+# ----------------------------------------------------------------------------- #
 
 abstract type QuantumExponentialIntegrator <: QuantumIntegrator end
 
+# ----------------------------------------------------------------------------- #
+#                         Unitary Exponential Integrator                        #
+# ----------------------------------------------------------------------------- #
+
 struct UnitaryExponentialIntegrator <: QuantumExponentialIntegrator
-    G_drift::SparseMatrixCSC{Float64, Int}
-    G_drives::Vector{SparseMatrixCSC{Float64, Int}}
-    unitary_name::Symbol
-    drive_names::Union{Symbol, Tuple{Vararg{Symbol}}}
+    unitary_components::Vector{Int}
+    drive_components::Vector{Int}
+    timestep::Union{Real, Int}
+    freetime::Bool
     n_drives::Int
     ketdim::Int
     dim::Int
+    zdim::Int
+    autodiff::Bool
     G::Function
 
     function UnitaryExponentialIntegrator(
         sys::AbstractQuantumSystem,
         unitary_name::Symbol,
-        drive_names::Union{Symbol, Tuple{Vararg{Symbol}}}
+        drive_name::Union{Symbol, Tuple{Vararg{Symbol}}},
+        traj::NamedTrajectory;
+        G::Function=a -> G_bilinear(a, sys.G_drift, sys.G_drives),
+        autodiff::Bool=false
     )
-        n_drives = length(sys.H_drives)
         ketdim = size(sys.H_drift, 1)
         dim = 2ketdim^2
 
+        unitary_components = traj.components[unitary_name]
+
+        if drive_name isa Tuple
+            drive_components = vcat((traj.components[s] for s ∈ drive_name)...)
+        else
+            drive_components = traj.components[drive_name]
+        end
+
+        n_drives = length(drive_components)
+
+        @assert all(diff(drive_components) .== 1) "controls must be in order"
+
+        freetime = traj.timestep isa Symbol
+
+        if freetime
+            timestep = traj.components[traj.timestep][1]
+        else
+            timestep = traj.timestep
+        end
+
         return new(
-            sys.G_drift,
-            sys.G_drives,
-            unitary_name,
-            drive_names,
+            unitary_components,
+            drive_components,
+            timestep,
+            freetime,
             n_drives,
             ketdim,
             dim,
-            G_bilinear
+            traj.dim,
+            autodiff,
+            G
         )
     end
 end
 
-state(integrator::UnitaryExponentialIntegrator) = integrator.unitary_name
-controls(integrator::UnitaryExponentialIntegrator) = integrator.drive_names
+function (integrator::UnitaryExponentialIntegrator)(
+    sys::AbstractQuantumSystem,
+    traj::NamedTrajectory;
+    unitary_name::Union{Nothing, Symbol}=nothing,
+    drive_name::Union{Nothing, Symbol, Tuple{Vararg{Symbol}}}=nothing,
+    G::Function=integrator.G,
+    autodiff::Bool=integrator.autodiff
+)
+    @assert !isnothing(unitary_name) "unitary_name must be provided"
+    @assert !isnothing(drive_name) "drive_name must be provided"
+    return UnitaryExponentialIntegrator(
+        sys,
+        unitary_name,
+        drive_name,
+        traj;
+        G=G,
+        autodiff=autodiff
+    )
+end
+
+function get_comps(P::UnitaryExponentialIntegrator, traj::NamedTrajectory)
+    if P.freetime
+        return P.unitary_components, P.drive_components, traj.components[traj.timestep]
+    else
+        return P.unitary_components, P.drive_components
+    end
+end
+
+# ------------------------------ Integrator --------------------------------- #
 
 @views function (ℰ::UnitaryExponentialIntegrator)(
     zₜ::AbstractVector,
     zₜ₊₁::AbstractVector,
-    traj::NamedTrajectory
+    t::Int
 )
-    Ũ⃗ₜ₊₁ = zₜ₊₁[traj.components[ℰ.unitary_name]]
-    Ũ⃗ₜ = zₜ[traj.components[ℰ.unitary_name]]
+    Ũ⃗ₜ₊₁ = zₜ₊₁[ℰ.unitary_components]
+    Ũ⃗ₜ = zₜ[ℰ.unitary_components]
+    aₜ = zₜ[ℰ.drive_components]
 
-    if traj.timestep isa Symbol
-        Δtₜ = zₜ[traj.components[traj.timestep]][1]
+    if ℰ.freetime
+        Δtₜ = zₜ[ℰ.timestep]
     else
-        Δtₜ = traj.timestep
+        Δtₜ = ℰ.timestep
     end
 
-    if ℰ.drive_names isa Tuple
-        aₜ = vcat([zₜ[traj.components[name]] for name ∈ ℰ.drive_names]...)
-    else
-        aₜ = zₜ[traj.components[ℰ.drive_names]]
-    end
-
-    Gₜ = ℰ.G(aₜ, ℰ.G_drift, ℰ.G_drives)
+    Gₜ = ℰ.G(aₜ)
 
     return Ũ⃗ₜ₊₁ - expv(Δtₜ, I(ℰ.ketdim) ⊗ Gₜ, Ũ⃗ₜ)
 end
 
 function hermitian_exp(G::AbstractMatrix)
-    Ĥ = Hermitian(Matrix(QuantumSystems.H(G)))
+    Ĥ = Hermitian(Matrix(Isomorphisms.H(G)))
     λ, V = eigen(Ĥ)
-    expG = QuantumSystems.iso(sparse(V * Diagonal(exp.(-im * λ)) * V'))
+    expG = Isomorphisms.iso(sparse(V * Diagonal(exp.(-im * λ)) * V'))
     droptol!(expG, 1e-12)
     return expG
 end
@@ -79,28 +134,21 @@ end
     ℰ::UnitaryExponentialIntegrator,
     zₜ::AbstractVector,
     zₜ₊₁::AbstractVector,
-    traj::NamedTrajectory
+    t::Int
 )
-    free_time = traj.timestep isa Symbol
+    # get the state and control vectors
+    Ũ⃗ₜ = zₜ[ℰ.unitary_components]
+    aₜ = zₜ[ℰ.drive_components]
 
-    Ũ⃗ₜ = zₜ[traj.components[ℰ.unitary_name]]
-
-    Δtₜ = free_time ? zₜ[traj.components[traj.timestep]][1] : traj.timestep
-
-    if ℰ.drive_names isa Tuple
-        inds = [traj.components[s] for s in ℰ.drive_names]
-        inds = vcat(collect.(inds)...)
+    # obtain the timestep
+    if ℰ.freetime
+        Δtₜ = zₜ[ℰ.timestep]
     else
-        inds = traj.components[ℰ.drive_names]
+        Δtₜ = ℰ.timestep
     end
 
-    for i = 1:length(inds) - 1
-        @assert inds[i] + 1 == inds[i + 1] "Controls must be in order"
-    end
-
-    aₜ = zₜ[inds]
-
-    Gₜ = ℰ.G(aₜ, ℰ.G_drift, ℰ.G_drives)
+    # compute the generator
+    Gₜ = ℰ.G(aₜ)
 
     Id = I(ℰ.ketdim)
 
@@ -110,11 +158,11 @@ end
     ∂Ũ⃗ₜℰ = -expĜₜ
 
     ∂aₜℰ = -ForwardDiff.jacobian(
-        a -> expv(Δtₜ, Id ⊗ ℰ.G(a, ℰ.G_drift, ℰ.G_drives), Ũ⃗ₜ),
+        a -> expv(Δtₜ, Id ⊗ ℰ.G(a), Ũ⃗ₜ),
         aₜ
     )
 
-    if free_time
+    if ℰ.freetime
         ∂Δtₜℰ = -(Id ⊗ Gₜ) * expĜₜ * Ũ⃗ₜ
         return ∂Ũ⃗ₜℰ, ∂Ũ⃗ₜ₊₁ℰ, ∂aₜℰ, ∂Δtₜℰ
     else
@@ -123,61 +171,110 @@ end
 end
 
 struct QuantumStateExponentialIntegrator <: QuantumExponentialIntegrator
-    G_drift::SparseMatrixCSC{Float64, Int}
-    G_drives::Vector{SparseMatrixCSC{Float64, Int}}
-    state_name::Symbol
-    drive_names::Union{Symbol, Tuple{Vararg{Symbol}}}
+    state_components::Vector{Int}
+    drive_components::Vector{Int}
+    timestep::Union{Real, Int}
+    freetime::Bool
     n_drives::Int
     ketdim::Int
     dim::Int
+    zdim::Int
+    autodiff::Bool
     G::Function
 
     function QuantumStateExponentialIntegrator(
         sys::AbstractQuantumSystem,
         state_name::Symbol,
-        drive_names::Union{Symbol, Tuple{Vararg{Symbol}}}
+        drive_name::Union{Symbol, Tuple{Vararg{Symbol}}},
+        traj::NamedTrajectory;
+        G::Function=a -> G_bilinear(a, sys.G_drift, sys.G_drives),
+        autodiff::Bool=false
     )
-        n_drives = length(sys.H_drives)
         ketdim = size(sys.H_drift, 1)
         dim = 2ketdim
 
+        state_components = traj.components[state_name]
+
+        if drive_name isa Tuple
+            drive_components = vcat((traj.components[s] for s ∈ drive_name)...)
+        else
+            drive_components = traj.components[drive_name]
+        end
+
+        n_drives = length(drive_components)
+
+        @assert all(diff(drive_components) .== 1) "controls must be in order"
+
+        freetime = traj.timestep isa Symbol
+
+        if freetime
+            timestep = traj.components[traj.timestep][1]
+        else
+            timestep = traj.timestep
+        end
+
         return new(
-            sys.G_drift,
-            sys.G_drives,
-            state_name,
-            drive_names,
+            state_components,
+            drive_components,
+            timestep,
+            freetime,
             n_drives,
             ketdim,
             dim,
-            G_bilinear
+            traj.dim,
+            autodiff,
+            G
         )
     end
 end
 
-state(integrator::QuantumStateExponentialIntegrator) = integrator.state_name
-controls(integrator::QuantumStateExponentialIntegrator) = integrator.drive_names
+function get_comps(P::QuantumStateExponentialIntegrator, traj::NamedTrajectory)
+    if P.freetime
+        return P.state_components, P.drive_components, traj.components[traj.timestep]
+    else
+        return P.state_components, P.drive_components
+    end
+end
+
+function (integrator::QuantumStateExponentialIntegrator)(
+    sys::AbstractQuantumSystem,
+    traj::NamedTrajectory;
+    state_name::Union{Nothing, Symbol}=nothing,
+    drive_name::Union{Nothing, Symbol, Tuple{Vararg{Symbol}}}=nothing,
+    G::Function=integrator.G,
+    autodiff::Bool=integrator.autodiff
+)
+    @assert !isnothing(state_name) "state_name must be provided"
+    @assert !isnothing(drive_name) "drive_name must be provided"
+    return QuantumStateExponentialIntegrator(
+        sys,
+        state_name,
+        drive_name,
+        traj;
+        G=G,
+        autodiff=autodiff
+    )
+end
+
+# ------------------------------ Integrator --------------------------------- #
 
 @views function (ℰ::QuantumStateExponentialIntegrator)(
     zₜ::AbstractVector,
     zₜ₊₁::AbstractVector,
-    traj::NamedTrajectory
+    t::Int
 )
-    ψ̃ₜ₊₁ = zₜ₊₁[traj.components[ℰ.state_name]]
-    ψ̃ₜ = zₜ[traj.components[ℰ.state_name]]
+    ψ̃ₜ₊₁ = zₜ₊₁[ℰ.state_components]
+    ψ̃ₜ = zₜ[ℰ.state_components]
+    aₜ = zₜ[ℰ.drive_components]
 
-    if traj.timestep isa Symbol
-        Δtₜ = zₜ[traj.components[traj.timestep]][1]
+    if ℰ.freetime
+        Δtₜ = zₜ[ℰ.timestep]
     else
-        Δtₜ = traj.timestep
+        Δtₜ = ℰ.timestep
     end
 
-    if ℰ.drive_names isa Tuple
-        aₜ = vcat([zₜ[traj.components[name]] for name ∈ ℰ.drive_names]...)
-    else
-        aₜ = zₜ[traj.components[ℰ.drive_names]]
-    end
+    Gₜ = ℰ.G(aₜ)
 
-    Gₜ = ℰ.G(aₜ, ℰ.G_drift, ℰ.G_drives)
 
     return ψ̃ₜ₊₁ - expv(Δtₜ, Gₜ, ψ̃ₜ)
 end
@@ -186,28 +283,21 @@ end
     ℰ::QuantumStateExponentialIntegrator,
     zₜ::AbstractVector,
     zₜ₊₁::AbstractVector,
-    traj::NamedTrajectory
+    t::Int
 )
-    free_time = traj.timestep isa Symbol
+    # get the state and control vectors
+    ψ̃ₜ = zₜ[ℰ.state_components]
+    aₜ = zₜ[ℰ.drive_components]
 
-    ψ̃ₜ = zₜ[traj.components[ℰ.state_name]]
-
-    Δtₜ = free_time ? zₜ[traj.components[traj.timestep]][1] : traj.timestep
-
-    if ℰ.drive_names isa Tuple
-        inds = [traj.components[s] for s in ℰ.drive_names]
-        inds = vcat(collect.(inds)...)
+    # obtain the timestep
+    if ℰ.freetime
+        Δtₜ = zₜ[ℰ.timestep]
     else
-        inds = traj.components[ℰ.drive_names]
+        Δtₜ = ℰ.timestep
     end
 
-    for i = 1:length(inds) - 1
-        @assert inds[i] + 1 == inds[i + 1] "Controls must be in order"
-    end
-
-    aₜ = zₜ[inds]
-
-    Gₜ = ℰ.G(aₜ, ℰ.G_drift, ℰ.G_drives)
+    # compute the generator
+    Gₜ = ℰ.G(aₜ)
 
     expGₜ = hermitian_exp(Δtₜ * Gₜ)
 
@@ -215,11 +305,11 @@ end
     ∂ψ̃ₜℰ = -expGₜ
 
     ∂aₜℰ = -ForwardDiff.jacobian(
-        a -> expv(Δtₜ, ℰ.G(a, ℰ.G_drift, ℰ.G_drives), ψ̃ₜ),
+        a -> expv(Δtₜ, ℰ.G(a), ψ̃ₜ),
         aₜ
     )
 
-    if free_time
+    if ℰ.freetime
         ∂Δtₜℰ = -Gₜ * expGₜ * ψ̃ₜ
         return ∂ψ̃ₜℰ, ∂ψ̃ₜ₊₁ℰ, ∂aₜℰ, ∂Δtₜℰ
     else
@@ -260,13 +350,13 @@ end
         goal=(Ũ⃗ = Ũ⃗_goal,)
     )
 
-    ℰ = UnitaryExponentialIntegrator(system, :Ũ⃗, :a)
+    ℰ = UnitaryExponentialIntegrator(system, :Ũ⃗, :a, Z)
 
 
-    ∂Ũ⃗ₜℰ, ∂Ũ⃗ₜ₊₁ℰ, ∂aₜℰ, ∂Δtₜℰ = jacobian(ℰ, Z[1].data, Z[2].data, Z)
+    ∂Ũ⃗ₜℰ, ∂Ũ⃗ₜ₊₁ℰ, ∂aₜℰ, ∂Δtₜℰ = jacobian(ℰ, Z[1].data, Z[2].data, 1)
 
     ∂ℰ_forwarddiff = ForwardDiff.jacobian(
-        zz -> ℰ(zz[1:Z.dim], zz[Z.dim+1:end], Z),
+        zz -> ℰ(zz[1:Z.dim], zz[Z.dim+1:end], 1),
         [Z[1].data; Z[2].data]
     )
 
@@ -290,8 +380,8 @@ end
     U_init = GATES[:I]
     U_goal = GATES[:X]
 
-    ψ̃_init = ket_to_iso(quantum_state("g", [2]))
-    ψ̃_goal = ket_to_iso(quantum_state("e", [2]))
+    ψ̃_init = ket_to_iso(ket_from_string("g", [2]))
+    ψ̃_goal = ket_to_iso(ket_from_string("e", [2]))
 
     dt = 0.1
 
@@ -307,12 +397,11 @@ end
         goal=(ψ̃ = ψ̃_goal,)
     )
 
-    ℰ = QuantumStateExponentialIntegrator(system, :ψ̃, :a)
-
-    ∂ψ̃ₜℰ, ∂ψ̃ₜ₊₁ℰ, ∂aₜℰ, ∂Δtₜℰ = jacobian(ℰ, Z[1].data, Z[2].data, Z)
+    ℰ = QuantumStateExponentialIntegrator(system, :ψ̃, :a, Z)
+    ∂ψ̃ₜℰ, ∂ψ̃ₜ₊₁ℰ, ∂aₜℰ, ∂Δtₜℰ = jacobian(ℰ, Z[1].data, Z[2].data, 1)
 
     ∂ℰ_forwarddiff = ForwardDiff.jacobian(
-        zz -> ℰ(zz[1:Z.dim], zz[Z.dim+1:end], Z),
+        zz -> ℰ(zz[1:Z.dim], zz[Z.dim+1:end], 1),
         [Z[1].data; Z[2].data]
     )
 

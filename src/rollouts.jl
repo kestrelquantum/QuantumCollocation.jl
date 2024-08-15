@@ -1,50 +1,104 @@
 module Rollouts
 
 export rollout
+export open_rollout
 export unitary_rollout
 export lab_frame_unitary_rollout
 export lab_frame_unitary_rollout_trajectory
-export sample_at
-export resample
 
-using ..QuantumUtils
+using ..Isomorphisms
 using ..QuantumSystems
+using ..QuantumSystemUtils
+using ..QuantumObjectUtils
 using ..EmbeddedOperators
 using ..Integrators
+using ..Losses
 using ..Problems
 using ..DirectSums
 
-using LinearAlgebra
 using NamedTrajectories
 
+using ExponentialAction
+using LinearAlgebra
+using ProgressMeter
+using TestItemRunner
+
+
+# ----------------------------------------------------------------------------- #
+
+"""
+    infer_is_jvp(integrator::Function)
+
+Infer whether the integrator is a jacobian-vector product (JVP) function.
+
+If `true`, the integrator is expected to have a signature like the exponential action,
+`expv`. Otherwise, it is expected to have a signature like `exp`.
+"""
+function infer_is_jvp(integrator::Function)
+    # name + args
+    ns = fieldcount.([m.sig for m ∈ methods(integrator)])
+    is_exp = 2 ∈ ns
+    is_expv = 4 ∈ ns
+    if is_exp && is_expv
+        throw(ErrorException("Ambiguous rollout integrator signature. Please specify manually."))
+    elseif is_exp
+        return false
+    elseif is_expv
+        return true
+    else
+        throw(ErrorException("No valid rollout integrator signature found."))
+    end
+end
+
+# ----------------------------------------------------------------------------- #
+# Quantum state rollouts
+# ----------------------------------------------------------------------------- #
+
+@doc raw"""
+    rollout(
+        ψ̃_init::AbstractVector{<:Float64},
+        controls::AbstractMatrix,
+        Δt::AbstractVector,
+        system::AbstractQuantumSystem
+    )
+
+Rollout a quantum state `ψ̃_init` under the control `controls` for a time `Δt`
+using the system `system`.
+
+If `jacobian_vector_product` is `true`, the integrator is expected to have a signature like
+the exponential action, `expv`. Otherwise, it is expected to have a signature like `exp`.
+
+Types should allow for autodifferentiable controls and times.
+"""
 function rollout(
-    ψ̃₁::AbstractVector{Float64},
-    controls::AbstractMatrix{Float64},
-    Δt::Union{AbstractVector{Float64}, AbstractMatrix{Float64}, Float64},
+    ψ̃_init::AbstractVector{<:Real},
+    controls::AbstractMatrix,
+    Δt::AbstractVector,
     system::AbstractQuantumSystem;
-    integrator=exp,
+    show_progress=false,
+    integrator=expv,
+    jacobian_vector_product=infer_is_jvp(integrator),
     G=Integrators.G_bilinear
 )
-    if Δt isa AbstractMatrix
-        @assert size(Δt, 1) == 1
-        Δt = vec(Δt)
-    elseif Δt isa Float64
-        Δt = fill(Δt, size(controls, 2))
-    end
-
     T = size(controls, 2)
 
-    Ψ̃ = zeros(length(ψ̃₁), T)
+    Ψ̃ = zeros(Real, length(ψ̃_init), T)
 
-    Ψ̃[:, 1] .= ψ̃₁
+    Ψ̃[:, 1] .= ψ̃_init
 
     G_drift = Matrix{Float64}(system.G_drift)
     G_drives = Matrix{Float64}.(system.G_drives)
 
+    p = Progress(T-1; enabled=show_progress)
     for t = 2:T
         aₜ₋₁ = controls[:, t - 1]
         Gₜ = G(aₜ₋₁, G_drift, G_drives)
-        Ψ̃[:, t] .= integrator(Gₜ * Δt[t - 1]) * Ψ̃[:, t - 1]
+        if jacobian_vector_product
+            Ψ̃[:, t] .= integrator(Δt[t - 1], Gₜ, Ψ̃[:, t - 1])
+        else
+            Ψ̃[:, t] .= integrator(Gₜ * Δt[t - 1]) * Ψ̃[:, t - 1]
+        end
+        next!(p)
     end
 
     return Ψ̃
@@ -54,35 +108,35 @@ rollout(ψ::Vector{<:Complex}, args...; kwargs...) =
     rollout(ket_to_iso(ψ), args...; kwargs...)
 
 function rollout(
-    ψ̃₁s::AbstractVector{<:AbstractVector}, args...; kwargs...
+    inits::AbstractVector{<:AbstractVector}, args...; kwargs...
 )
-    return vcat([rollout(ψ̃₁, args...; kwargs...) for ψ̃₁ ∈ ψ̃₁s]...)
+    return vcat([rollout(state, args...; kwargs...) for state ∈ inits]...)
 end
 
-function QuantumUtils.fidelity(
-    ψ̃₁::AbstractVector{Float64},
-    ψ̃_goal::AbstractVector{Float64},
-    controls::AbstractMatrix{Float64},
-    Δt::Union{AbstractVector{Float64}, AbstractMatrix{Float64}, Float64},
+function Losses.iso_fidelity(
+    ψ̃_init::AbstractVector{<:Real},
+    ψ̃_goal::AbstractVector{<:Real},
+    controls::AbstractMatrix,
+    Δt::AbstractVector,
     system::AbstractQuantumSystem;
     kwargs...
 )
-    Ψ̃ = rollout(ψ̃₁, controls, Δt, system; kwargs...)
+    Ψ̃ = rollout(ψ̃_init, controls, Δt, system; kwargs...)
     return iso_fidelity(Ψ̃[:, end], ψ̃_goal)
 end
 
-function QuantumUtils.fidelity(
-    ψ₁::AbstractVector{<:Complex},
+function Losses.fidelity(
+    ψ_init::AbstractVector{<:Complex},
     ψ_goal::AbstractVector{<:Complex},
-    controls::AbstractMatrix{Float64},
-    Δt::Union{AbstractVector{Float64}, AbstractMatrix{Float64}, Float64},
+    controls::AbstractMatrix,
+    Δt::AbstractVector,
     system::AbstractQuantumSystem;
     kwargs...
 )
-    return fidelity(ket_to_iso(ψ₁), ket_to_iso(ψ_goal), controls, Δt, system; kwargs...)
+    return iso_fidelity(ket_to_iso(ψ_init), ket_to_iso(ψ_goal), controls, Δt, system; kwargs...)
 end
 
-function QuantumUtils.fidelity(
+function Losses.fidelity(
     trajectory::NamedTrajectory,
     system::AbstractQuantumSystem;
     state_symb::Symbol=:ψ̃,
@@ -92,76 +146,114 @@ function QuantumUtils.fidelity(
     fids = []
     for symb in trajectory.names
         if startswith(symb, state_symb)
+            controls = trajectory[control_symb]
             init = trajectory.initial[symb]
             goal = trajectory.goal[symb]
-            push!(
-                fids, 
-                fidelity(init, goal, trajectory[control_symb], get_timesteps(trajectory), system; kwargs...)
-            )
+            fid = iso_fidelity(init, goal, controls, get_timesteps(trajectory), system; kwargs...)
+            push!(fids, fid)
         end
     end
-    return fids
+    return length(fids) == 1 ? fids[1] : fids
 end
 
-function QuantumUtils.fidelity(
+function Losses.fidelity(
     prob::QuantumControlProblem;
     kwargs...
 )
     return fidelity(prob.trajectory, prob.system; kwargs...)
 end
 
-# ============================================================================= #
+# ----------------------------------------------------------------------------- #
+# Open quantum system rollouts
+# ----------------------------------------------------------------------------- #
 
-function unitary_rollout(
-    Ũ⃗₁::AbstractVector{<:Real},
-    controls::AbstractMatrix{Float64},
-    Δt::Union{AbstractVector{Float64}, AbstractMatrix{Float64}, Float64},
+function open_rollout(
+    ρ⃗₁::AbstractVector{<:Complex},
+    controls::AbstractMatrix,
+    Δt::AbstractVector,
     system::AbstractQuantumSystem;
-    integrator=exp,
-    G=Integrators.G_bilinear
+    show_progress=false,
+    integrator=expv,
+    jacobian_vector_product=infer_is_jvp(integrator),
+    H=a -> Integrators.G_bilinear(a, system.H_drift, system.H_drives),
 )
-    if Δt isa AbstractMatrix
-        @assert size(Δt, 1) == 1
-        Δt = vec(Δt)
-    elseif Δt isa Float64
-        Δt = fill(Δt, size(controls, 2))
-    end
-
     T = size(controls, 2)
 
-    Ũ⃗ = zeros(length(Ũ⃗₁), T)
+    ρ⃗̃ = zeros(Real, 2length(ρ⃗₁), T)
 
-    Ũ⃗[:, 1] .= Ũ⃗₁
+    ρ⃗̃[:, 1] .= ket_to_iso(ρ⃗₁)
+
+    if isnothing(system.dissipation_operators)
+        @error "No dissipation operators found in system"
+        L = iso(zeros(Float64, size(system.H_drift)))
+    else
+        L_dissipators = system.dissipation_operators
+        L = Integrators.L_function(L_dissipators)
+    end
+
+    p = Progress(T-1; enabled=show_progress)
+    for t = 2:T
+        aₜ₋₁ = controls[:, t - 1]
+        adGₜ = Isomorphisms.G(ad_vec(H(aₜ₋₁)))
+        if jacobian_vector_product
+            ρ⃗̃[:, t] = integrator(Δt[t - 1], adGₜ + iso(L), ρ⃗̃[:, t - 1])
+        else
+            ρ⃗̃[:, t] = integrator(Δt[t - 1], adGₜ + iso(L)) * ρ⃗̃[:, t - 1]
+        end
+        next!(p)
+    end
+
+    return ρ⃗̃
+end
+
+# ----------------------------------------------------------------------------- #
+# Unitary rollouts
+# ----------------------------------------------------------------------------- #
+
+function unitary_rollout(
+    Ũ⃗_init::AbstractVector{<:Real},
+    controls::AbstractMatrix,
+    Δt::AbstractVector,
+    system::AbstractQuantumSystem;
+    show_progress=false,
+    integrator=expv,
+    jacobian_vector_product=infer_is_jvp(integrator),
+    G=Integrators.G_bilinear,
+)
+    T = size(controls, 2)
+
+    Ũ⃗ = zeros(Real, length(Ũ⃗_init), T)
+
+    Ũ⃗[:, 1] .= Ũ⃗_init
 
     G_drift = Matrix{Float64}(system.G_drift)
     G_drives = Matrix{Float64}.(system.G_drives)
 
+    p = Progress(T-1; enabled=show_progress)
     for t = 2:T
         aₜ₋₁ = controls[:, t - 1]
         Gₜ = G(aₜ₋₁, G_drift, G_drives)
-        Ũ⃗ₜ₋₁ = Ũ⃗[:, t - 1]
-        Ũₜ₋₁ = iso_vec_to_iso_operator(Ũ⃗ₜ₋₁)
-        Ũₜ = integrator(Gₜ * Δt[t - 1]) * Ũₜ₋₁
-        Ũ⃗ₜ = iso_operator_to_iso_vec(Ũₜ)
-        Ũ⃗[:, t] .= Ũ⃗ₜ
+        Ũₜ₋₁ = iso_vec_to_iso_operator(Ũ⃗[:, t - 1])
+        if jacobian_vector_product
+            Ũₜ = integrator(Δt[t - 1], Gₜ, Ũₜ₋₁)
+        else
+            Ũₜ = integrator(Gₜ * Δt[t - 1]) * Ũₜ₋₁
+        end
+        Ũ⃗[:, t] .= iso_operator_to_iso_vec(Ũₜ)
+        next!(p)
     end
 
     return Ũ⃗
 end
 
 function unitary_rollout(
-    controls::AbstractMatrix{Float64},
-    Δt::Union{AbstractVector{Float64}, AbstractMatrix{Float64}, Float64},
+    controls::AbstractMatrix,
+    Δt::AbstractVector,
     system::AbstractQuantumSystem;
-    integrator=exp
+    kwargs...
 )
-    return unitary_rollout(
-        operator_to_iso_vec(Matrix{ComplexF64}(I(size(system.H_drift, 1)))),
-        controls,
-        Δt,
-        system;
-        integrator=integrator
-    )
+    Ĩ⃗ = operator_to_iso_vec(Matrix{ComplexF64}(I(size(system.H_drift, 1))))
+    return unitary_rollout(Ĩ⃗, controls, Δt, system; kwargs...)
 end
 
 function unitary_rollout(
@@ -169,53 +261,94 @@ function unitary_rollout(
     system::AbstractQuantumSystem;
     unitary_name::Symbol=:Ũ⃗,
     drive_name::Symbol=:a,
-    integrator=exp,
-    only_drift=false
+    kwargs...
 )
-    Ũ⃗₁ = traj.initial[unitary_name]
-    if only_drift
-        controls = zeros(size(traj[drive_name]))
-    else
-        controls = traj[drive_name]
-    end
-    Δt = get_timesteps(traj)
     return unitary_rollout(
-        Ũ⃗₁,
-        controls,
-        Δt,
+        traj.initial[unitary_name],
+        traj[drive_name],
+        get_timesteps(traj),
         system;
-        integrator=integrator
+        kwargs...
     )
 end
 
-function QuantumUtils.unitary_fidelity(
+function Losses.iso_vec_unitary_fidelity(
+    Ũ⃗_init::AbstractVector{<:Real},
+    Ũ⃗_goal::AbstractVector{<:Real},
+    controls::AbstractMatrix,
+    Δt::AbstractVector,
+    system::AbstractQuantumSystem;
+    subspace::AbstractVector{Int}=axes(iso_vec_to_operator(Ũ⃗_goal), 1),
+    kwargs...
+)
+    Ũ⃗ = unitary_rollout(Ũ⃗_init, controls, Δt, system; kwargs...)
+    return iso_vec_unitary_fidelity(Ũ⃗[:, end], Ũ⃗_goal; subspace=subspace)
+end
+
+function Losses.iso_vec_unitary_fidelity(
+    Ũ⃗_goal::AbstractVector{<:Real},
+    controls::AbstractMatrix,
+    Δt::AbstractVector,
+    system::AbstractQuantumSystem;
+    kwargs...
+)
+    Ĩ⃗ = operator_to_iso_vec(Matrix{ComplexF64}(I(size(system.H_drift, 1))))
+    return iso_vec_unitary_fidelity(Ĩ⃗, Ũ⃗_goal, controls, Δt, system; kwargs...)
+end
+
+function Losses.unitary_fidelity(
+    U_init::AbstractMatrix{<:Complex},
+    U_goal::AbstractMatrix{<:Complex},
+    controls::AbstractMatrix,
+    Δt::AbstractVector,
+    system::AbstractQuantumSystem;
+    kwargs...
+)
+    Ũ⃗_init = operator_to_iso_vec(U_init)
+    Ũ⃗_goal = operator_to_iso_vec(U_goal)
+    return iso_vec_unitary_fidelity(Ũ⃗_init, Ũ⃗_goal, controls, Δt, system; kwargs...)
+end
+
+Losses.unitary_fidelity(
+    U_goal::AbstractMatrix{<:Complex},
+    controls::AbstractMatrix,
+    Δt::AbstractVector,
+    system::AbstractQuantumSystem;
+    kwargs...
+) = iso_vec_unitary_fidelity(operator_to_iso_vec(U_goal), controls, Δt, system; kwargs...)
+
+Losses.unitary_fidelity(
+    U_goal::EmbeddedOperator,
+    controls::AbstractMatrix,
+    Δt::AbstractVector,
+    system::AbstractQuantumSystem;
+    subspace::AbstractVector{Int}=U_goal.subspace_indices,
+    kwargs...
+) = unitary_fidelity(U_goal.operator, controls, Δt, system; subspace=subspace, kwargs...)
+
+function Losses.unitary_fidelity(
     traj::NamedTrajectory,
     sys::AbstractQuantumSystem;
     unitary_name::Symbol=:Ũ⃗,
-    subspace=nothing,
+    drive_name::Symbol=:a,
     kwargs...
 )
-    Ũ⃗_final = unitary_rollout(traj, sys; unitary_name=unitary_name, kwargs...)[:, end]
-    return unitary_fidelity( Ũ⃗_final, traj.goal[unitary_name]; subspace=subspace)
+    Ũ⃗_init = traj.initial[unitary_name]
+    Ũ⃗_goal = traj.goal[unitary_name]
+    controls = traj[drive_name]
+    Δt = get_timesteps(traj)
+    return iso_vec_unitary_fidelity(Ũ⃗_init, Ũ⃗_goal, controls, Δt, sys; kwargs...)
 end
 
-QuantumUtils.unitary_fidelity(prob::QuantumControlProblem; kwargs...) =
+Losses.unitary_fidelity(prob::QuantumControlProblem; kwargs...) =
     unitary_fidelity(prob.trajectory, prob.system; kwargs...)
 
-function QuantumUtils.unitary_fidelity(
-    U_goal::AbstractMatrix{ComplexF64},
-    controls::AbstractMatrix{Float64},
-    Δt::Union{AbstractVector{Float64}, AbstractMatrix{Float64}, Float64},
-    sys::AbstractQuantumSystem;
-    subspace=nothing,
-    integrator=exp
-)
-    Ũ⃗_final = unitary_rollout(controls, Δt, sys; integrator=integrator)[:, end]
-    Ũ⃗_goal = operator_to_iso_vec(U_goal)
-    return unitary_fidelity(Ũ⃗_final, Ũ⃗_goal; subspace=subspace)
-end
 
-QuantumUtils.unitary_fidelity(
+# ----------------------------------------------------------------------------- #
+# Experimental rollouts
+# ----------------------------------------------------------------------------- #
+
+Losses.unitary_fidelity(
     U_goal::EmbeddedOperator,
     controls::AbstractMatrix{Float64},
     Δt::Union{AbstractVector{Float64}, AbstractMatrix{Float64}, Float64},
@@ -294,73 +427,103 @@ function lab_frame_unitary_rollout_trajectory(
     )
 end
 
-"""
-    sample_at(controls::AbstractMatrix{Float64}, t::Float64, ts::AbstractVector{Float64}; interp_method::Symbol=:linear)
+# ============================================================================= #
 
-Sample the controls at time `t` using linear interpolation.
+@testitem "Test rollouts using fidelities" begin
+    using ExponentialAction
 
-# Keyword Arguments
-- `interp_method::Symbol=:linear`: Interpolation method. Either `:linear` or `:constant`.
-"""
-function sample_at(
-    t::Float64,
-    controls::AbstractMatrix{Float64},
-    ts::AbstractVector{Float64};
-    interp_method::Symbol=:linear
-)
-    @assert interp_method ∈ (:constant, :linear) "interp_method must be either :constant or :linear"
-    @assert t >= 0 "t must be non-negative"
-    @assert t <= ts[end] "t must be less than the duration of the controls"
-    if interp_method == :constant
-        return controls[:, searchsortedfirst(ts, t)]
-    else
-        i = searchsortedfirst(ts, t)
-        if i == 1
-            return controls[:, 1]
-        else
-            t_prev = ts[i - 1]
-            t_next = ts[i]
-            α = (t - t_prev) / (t_next - t_prev)
-            return (1 - α) * controls[:, i - 1] + α * controls[:, i]
-        end
-    end
+    sys = QuantumSystem(0 * GATES[:Z], [GATES[:X], GATES[:Y]])
+    U_goal = GATES[:X]
+    embedded_U_goal = EmbeddedOperator(U_goal, sys)
+    T = 51
+    Δt = 0.2
+    ts = fill(Δt, T)
+    as = collect([π/(T-1)/Δt * sin.(π*(0:T-1)/(T-1)).^2 zeros(T)]')
+
+    prob = UnitarySmoothPulseProblem(
+        sys, U_goal, T, Δt, a_guess=as,
+        ipopt_options=IpoptOptions(print_level=1),
+        piccolo_options=PiccoloOptions(verbose=false, free_time=false)
+    )
+
+    ψ = ComplexF64[1, 0]
+    ψ_goal = U_goal * ψ
+    ψ̃ = ket_to_iso(ψ)
+    ψ̃_goal = ket_to_iso(ψ_goal)
+
+    # Default integrator
+    # State fidelity
+    @test fidelity(ψ, ψ_goal, as, ts, sys) ≈ 1
+    @test iso_fidelity(ψ̃, ψ̃_goal, as, ts, sys) ≈ 1
+
+    # Unitary fidelity
+    @test unitary_fidelity(U_goal, as, ts, sys) ≈ 1
+    @test unitary_fidelity(prob.trajectory, sys) ≈ 1
+    @test unitary_fidelity(prob) ≈ 1
+    @test unitary_fidelity(embedded_U_goal, as, ts, sys) ≈ 1
+
+    # Expv explicit
+    # State fidelity
+    @test fidelity(ψ, ψ_goal, as, ts, sys, integrator=expv) ≈ 1
+    @test iso_fidelity(ψ̃, ψ̃_goal, as, ts, sys, integrator=expv) ≈ 1
+
+    # Unitary fidelity
+    @test unitary_fidelity(U_goal, as, ts, sys, integrator=expv) ≈ 1
+    @test unitary_fidelity(prob.trajectory, sys, integrator=expv) ≈ 1
+    @test unitary_fidelity(prob, integrator=expv) ≈ 1
+    @test unitary_fidelity(embedded_U_goal, as, ts, sys, integrator=expv) ≈ 1
+
+    # Exp explicit
+    # State fidelity
+    @test fidelity(ψ, ψ_goal, as, ts, sys, integrator=exp) ≈ 1
+    @test iso_fidelity(ψ̃, ψ̃_goal, as, ts, sys, integrator=exp) ≈ 1
+
+    # Unitary fidelity
+    @test unitary_fidelity(U_goal, as, ts, sys, integrator=exp) ≈ 1
+    @test unitary_fidelity(prob.trajectory, sys, integrator=exp) ≈ 1
+    @test unitary_fidelity(prob, integrator=exp) ≈ 1
+    @test unitary_fidelity(embedded_U_goal, as, ts, sys, integrator=exp) ≈ 1
+
+    # Bad integrator
+    @test_throws ErrorException unitary_fidelity(U_goal, as, ts, sys, integrator=(a,b) -> 1) ≈ 1
 end
 
+@testitem "Foward diff rollout" begin
+    using ForwardDiff
+    using ExponentialAction
 
+    sys = QuantumSystem(0 * GATES[:Z], [GATES[:X], GATES[:Y]])
+    T = 51
+    Δt = 0.2
+    ts = fill(Δt, T)
+    as = collect([π/(T-1)/Δt * sin.(π*(0:T-1)/(T-1)).^2 zeros(T)]')
 
-function resample(
-    controls::AbstractMatrix{Float64},
-    ts::AbstractVector{Float64},
-    ts_new::AbstractVector{Float64};
-    kwargs...
-)
-    controls_new = stack([sample_at(t, controls, ts; kwargs...) for t ∈ ts_new])
-    controls_new[:, end] = controls[:, end]
-    return controls_new
+    # Control derivatives
+    ψ = ComplexF64[1, 0]
+    result1 = ForwardDiff.jacobian(
+        as -> rollout(ψ, as, ts, sys, integrator=expv)[:, end], as
+    )
+    iso_ket_dim = length(ket_to_iso(ψ))
+    @test size(result1) == (iso_ket_dim, T * length(sys.H_drives))
+
+    result2 = ForwardDiff.jacobian(
+        as -> unitary_rollout(as, ts, sys, integrator=expv)[:, end], as
+    )
+    iso_vec_dim = length(operator_to_iso_vec(sys.H_drift))
+    @test size(result2) == (iso_vec_dim, T * length(sys.H_drives))
+
+    # Time derivatives
+    ψ = ComplexF64[1, 0]
+    result1 = ForwardDiff.jacobian(
+        ts -> rollout(ψ, as, ts, sys, integrator=expv)[:, end], ts
+    )
+    iso_ket_dim = length(ket_to_iso(ψ))
+    @test size(result1) == (iso_ket_dim, T)
+
+    result2 = ForwardDiff.jacobian(
+        ts -> unitary_rollout(as, ts, sys, integrator=expv)[:, end], ts
+    )
+    iso_vec_dim = length(operator_to_iso_vec(sys.H_drift))
+    @test size(result2) == (iso_vec_dim, T)
 end
-
-function resample(controls, ts, Δt::Float64; kwargs...)
-    n_samples = Int(ts[end] / Δt)
-    ts_new = range(0, step=Δt, length=n_samples)
-    return resample(controls, ts, ts_new)
-end
-
-function resample(controls, ts, N::Int; kwargs...)
-    Δt = ts[end] / N
-    ts_new = range(0, step=Δt, length=N)
-    return resample(controls, ts, ts_new; kwargs...)
-end
-
-"""
-    resample(controls::AbstractMatrix{Float64}, ts::AbstractVector{Float64}, ts_new::AbstractVector{Float64})
-    resample(controls::AbstractMatrix{Float64}, ts::AbstractVector{Float64}, Δt::Float64)
-    resample(controls::AbstractMatrix{Float64}, ts::AbstractVector{Float64}, N::Int)
-
-Resample the controls at new time points.
-
-# Keyword Arguments
-- `interp_method::Symbol=:linear`: Interpolation method. Either `:linear` or `:constant`.
-"""
-function resample end
-
 end

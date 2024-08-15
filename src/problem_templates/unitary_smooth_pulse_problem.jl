@@ -1,3 +1,6 @@
+export UnitarySmoothPulseProblem
+
+
 @doc raw"""
     UnitarySmoothPulseProblem(system::QuantumSystem, operator, T, Δt; kwargs...)
 
@@ -32,7 +35,7 @@ is the *infidelity* objective function, $Q$ is a weight, $R_a$, $R_{\dot{a}}$, a
 or
 - `system::QuantumSystem`: the system to be controlled
 with
-- `operator::Union{EmbeddedOperator, AbstractMatrix{<:Number}}`: the target unitary, either in the form of an `EmbeddedOperator` or a `Matrix{ComplexF64}
+- `operator::OperatorType`: the target unitary, either in the form of an `EmbeddedOperator` or a `Matrix{ComplexF64}
 - `T::Int`: the number of timesteps
 - `Δt::Float64`: the (initial) time step size
 
@@ -69,7 +72,7 @@ TODO: control modulus norm, advanced feature, needs documentation
 """
 function UnitarySmoothPulseProblem(
     system::AbstractQuantumSystem,
-    operator::Union{EmbeddedOperator, AbstractMatrix{<:Number}},
+    operator::OperatorType,
     T::Int,
     Δt::Union{Float64, Vector{Float64}};
     ipopt_options::IpoptOptions=IpoptOptions(),
@@ -97,6 +100,7 @@ function UnitarySmoothPulseProblem(
     control_norm_constraint_components=nothing,
     control_norm_R=nothing,
     bound_unitary=piccolo_options.integrator == :exponential,
+    global_data::Union{NamedTuple, Nothing}=nothing,
     kwargs...
 )
     # Trajectory
@@ -118,13 +122,27 @@ function UnitarySmoothPulseProblem(
             a_guess=a_guess,
             system=system,
             rollout_integrator=piccolo_options.rollout_integrator,
+            global_data=global_data
         )
     end
 
     # Objective
-    J = UnitaryInfidelityObjective(:Ũ⃗, traj, Q;
-        subspace=operator isa EmbeddedOperator ? operator.subspace_indices : nothing,
-    )
+    if isnothing(global_data)
+        J = UnitaryInfidelityObjective(:Ũ⃗, traj, Q;
+            subspace=operator isa EmbeddedOperator ? operator.subspace_indices : nothing,
+        )
+    else
+        # TODO: remove hardcoded args
+        J = UnitaryFreePhaseInfidelityObjective(
+            name=:Ũ⃗,
+            phase_name=:ϕ,
+            goal=operator_to_iso_vec(operator isa EmbeddedOperator ? operator.operator : operator),
+            phase_operators=[GATES[:Z] for _ in eachindex(traj.global_components[:ϕ])],
+            Q=Q,
+            eval_hessian=piccolo_options.eval_hessian,
+            subspace=operator isa EmbeddedOperator ? operator.subspace_indices : nothing
+        )
+    end
     J += QuadraticRegularizer(:a, traj, R_a)
     J += QuadraticRegularizer(:da, traj, R_da)
     J += QuadraticRegularizer(:dda, traj, R_dda)
@@ -132,7 +150,7 @@ function UnitarySmoothPulseProblem(
     # Constraints
     if leakage_suppression
         if operator isa EmbeddedOperator
-            leakage_indices = get_unitary_isomorphism_leakage_indices(operator)
+            leakage_indices = get_iso_vec_leakage_indices(operator)
             J += L1Regularizer!(
                 constraints, :Ũ⃗, traj,
                 R_value=R_leakage,
@@ -165,10 +183,10 @@ function UnitarySmoothPulseProblem(
     # Integrators
     if piccolo_options.integrator == :pade
         unitary_integrator =
-            UnitaryPadeIntegrator(system, :Ũ⃗, :a; order=piccolo_options.pade_order)
+            UnitaryPadeIntegrator(system, :Ũ⃗, :a, traj; order=piccolo_options.pade_order)
     elseif piccolo_options.integrator == :exponential
         unitary_integrator =
-            UnitaryExponentialIntegrator(system, :Ũ⃗, :a)
+            UnitaryExponentialIntegrator(system, :Ũ⃗, :a, traj)
     else
         error("integrator must be one of (:pade, :exponential)")
     end
@@ -227,6 +245,24 @@ end
         da_bound=1.0,
         ipopt_options=IpoptOptions(print_level=1),
         piccolo_options=PiccoloOptions(verbose=false)
+    )
+
+    initial = unitary_fidelity(prob)
+    solve!(prob, max_iter=20)
+    final = unitary_fidelity(prob)
+    @test final > initial
+end
+
+@testitem "Hadamard gate with exponential integrator" begin
+    sys = QuantumSystem(GATES[:Z], [GATES[:X], GATES[:Y]])
+    U_goal = GATES[:H]
+    T = 51
+    Δt = 0.2
+
+    prob = UnitarySmoothPulseProblem(
+        sys, U_goal, T, Δt,
+        ipopt_options=IpoptOptions(print_level=1),
+        piccolo_options=PiccoloOptions(verbose=false, integrator=:exponential, jacobian_structure=false)
     )
 
     initial = unitary_fidelity(prob)

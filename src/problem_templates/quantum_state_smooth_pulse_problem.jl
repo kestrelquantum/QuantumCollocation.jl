@@ -1,3 +1,6 @@
+export QuantumStateSmoothPulseProblem
+
+
 """
     QuantumStateSmoothPulseProblem(
         system::AbstractQuantumSystem,
@@ -122,7 +125,7 @@ function QuantumStateSmoothPulseProblem(
 
     # Integrators
     ψ̃_integrators = [
-        QuantumStatePadeIntegrator(system, Symbol("ψ̃$i"), :a)
+        QuantumStatePadeIntegrator(system, Symbol("ψ̃$i"), :a, traj)
             for i = 1:length(ψ_inits)
     ]
 
@@ -184,6 +187,42 @@ end
         sys, ψ_inits, ψ_targets, T, Δt;
         ipopt_options=IpoptOptions(print_level=1),
         piccolo_options=PiccoloOptions(verbose=false)
+    )
+    initial = fidelity(prob)
+    solve!(prob, max_iter=20)
+    final = fidelity(prob)
+    @test all(final .> initial)
+end
+
+@testitem "Test quantum state smooth pulse w/ exponential integrator" begin
+    # System
+    T = 50
+    Δt = 0.2
+    sys = QuantumSystem(0.1 * GATES[:Z], [GATES[:X], GATES[:Y]])
+    ψ_init = [1.0, 0.0]
+    ψ_target = [0.0, 1.0]
+    integrator=:exponential
+
+    # Single initial and target states
+    # --------------------------------
+    prob = QuantumStateSmoothPulseProblem(
+        sys, ψ_init, ψ_target, T, Δt;
+        ipopt_options=IpoptOptions(print_level=1),
+        piccolo_options=PiccoloOptions(verbose=false, integrator=integrator)
+    )
+    initial = fidelity(prob)
+    solve!(prob, max_iter=20)
+    final = fidelity(prob)
+    @test final > initial
+
+    # Multiple initial and target states
+    # ----------------------------------
+    ψ_inits = [[1.0, 0.0], [0.0, 1.0]]
+    ψ_targets = [[0.0, 1.0], [1.0, 0.0]]
+    prob = QuantumStateSmoothPulseProblem(
+        sys, ψ_inits, ψ_targets, T, Δt;
+        ipopt_options=IpoptOptions(print_level=1),
+        piccolo_options=PiccoloOptions(verbose=false, integrator=integrator)
     )
     initial = fidelity(prob)
     solve!(prob, max_iter=20)
