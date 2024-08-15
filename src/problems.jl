@@ -180,6 +180,7 @@ function QuantumControlProblem(
         traj,
         obj,
         dynamics;
+        ipopt_options=ipopt_options,
         piccolo_options=piccolo_options,
         kwargs...
     )
@@ -212,6 +213,7 @@ function QuantumControlProblem(
         traj,
         obj,
         dynamics;
+        ipopt_options=ipopt_options,
         piccolo_options=piccolo_options,
         kwargs...
     )
@@ -243,6 +245,7 @@ function QuantumControlProblem(
         traj,
         obj,
         dynamics;
+        ipopt_options=ipopt_options,
         piccolo_options=piccolo_options,
         kwargs...
     )

@@ -136,12 +136,6 @@ function direct_sum(
     )
 end
 
-Base.endswith(symb::Symbol, suffix::AbstractString) = endswith(String(symb), suffix)
-Base.endswith(integrator::UnitaryPadeIntegrator, suffix::String) = endswith(integrator.unitary_symb, suffix)
-Base.endswith(integrator::DerivativeIntegrator, suffix::String) = endswith(integrator.variable, suffix)
-Base.startswith(symb::Symbol, prefix::AbstractString) = startswith(String(symb), prefix)
-Base.startswith(symb::Symbol, prefix::Symbol) = startswith(String(symb), String(prefix))
-
 # Add suffix utilities
 # -----------------------
 Base.startswith(symb::Symbol, prefix::AbstractString) = startswith(String(symb), prefix)
@@ -373,6 +367,8 @@ end
 # --------------------
 
 Base.endswith(symb::Symbol, suffix::AbstractString) = endswith(String(symb), suffix)
+Base.endswith(integrator::UnitaryPadeIntegrator, suffix::String) = endswith(integrator.unitary_symb, suffix)
+Base.endswith(integrator::DerivativeIntegrator, suffix::String) = endswith(integrator.variable, suffix)
 
 function Base.endswith(integrator::AbstractIntegrator, traj::NamedTrajectory, suffix::String)
     if integrator isa UnitaryExponentialIntegrator
