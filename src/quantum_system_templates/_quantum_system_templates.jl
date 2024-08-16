@@ -8,6 +8,7 @@ export QuantumOpticsSystem
 
 using ..Isomorphisms
 using ..QuantumSystems
+using ..QuantumObjectUtils
 
 using LinearAlgebra
 using TestItemRunner
