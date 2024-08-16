@@ -2,7 +2,7 @@
 
 julia_version = "1.10.3"
 manifest_format = "2.0"
-project_hash = "5e178e21dd5611648bbafe2f993ffc99ab5db572"
+project_hash = "62b5cb2f6b0a4dc82d99cbf28491fcf5a171a1fe"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "99a6f5d0ce1c7c6afdb759daa30226f71c54f6b0"
@@ -1105,6 +1105,14 @@ git-tree-sha1 = "0877504529a3e5c3343c6f8b4c0381e57e4387e4"
 uuid = "77ba4419-2d1f-58cd-9bb1-8ffee604a2e3"
 version = "1.0.2"
 
+[[deps.NamedTrajectories]]
+deps = ["CairoMakie", "JLD2", "LaTeXStrings", "Latexify", "OrderedCollections", "Random", "Reexport", "Unidecode"]
+git-tree-sha1 = "807af5b83a36284a5b2b328829807a3511445e8e"
+repo-rev = "main"
+repo-url = "https://github.com/kestrelquantum/NamedTrajectories.jl"
+uuid = "538bc3a1-5ab9-4fc3-b776-35ca1e893e08"
+version = "0.1.9"
+
 [[deps.Netpbm]]
 deps = ["FileIO", "ImageCore", "ImageMetadata"]
 git-tree-sha1 = "d92b107dbb887293622df7697a2223f9f8176fcd"
@@ -1733,6 +1741,12 @@ deps = ["REPL"]
 git-tree-sha1 = "53915e50200959667e78a92a418594b428dffddf"
 uuid = "1cfade01-22cf-5700-b092-accc4b62d6e1"
 version = "0.4.1"
+
+[[deps.Unidecode]]
+deps = ["REPL", "Test", "Unicode"]
+git-tree-sha1 = "2264362f72926965e708ee26f58824b929c72637"
+uuid = "967fb449-e509-55aa-8007-234b4096b967"
+version = "1.1.0"
 
 [[deps.Unityper]]
 deps = ["ConstructionBase"]
