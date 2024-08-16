@@ -32,9 +32,9 @@ T = 100
 Δt = 0.1
 
 # use the exported gate dictionary to get the gates we need
-σx = GATES(:X)
-σy = GATES(:Y)
-σz = GATES(:Z)
+σx = GATES[:X]
+σy = GATES[:Y]
+σz = GATES[:Z]
 
 # define drift and drive Hamiltonians
 H_drift = 0.5 * σz
