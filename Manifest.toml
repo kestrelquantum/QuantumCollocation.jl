@@ -2,7 +2,7 @@
 
 julia_version = "1.10.3"
 manifest_format = "2.0"
-project_hash = "2fdd4788b0d34bd5bb4f7f4502c0e867820f483a"
+project_hash = "8f699eaced2984284612f4735ecfb535e1c71437"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "99a6f5d0ce1c7c6afdb759daa30226f71c54f6b0"
@@ -1107,11 +1107,11 @@ version = "1.0.2"
 
 [[deps.NamedTrajectories]]
 deps = ["CairoMakie", "JLD2", "LaTeXStrings", "Latexify", "OrderedCollections", "Random", "Reexport", "Unidecode"]
-git-tree-sha1 = "807af5b83a36284a5b2b328829807a3511445e8e"
+git-tree-sha1 = "94fa6864fcf891e7214a1dd73c773d325556de28"
 repo-rev = "main"
 repo-url = "https://github.com/kestrelquantum/NamedTrajectories.jl.git"
 uuid = "538bc3a1-5ab9-4fc3-b776-35ca1e893e08"
-version = "0.1.9"
+version = "0.2.0"
 
 [[deps.Netpbm]]
 deps = ["FileIO", "ImageCore", "ImageMetadata"]
