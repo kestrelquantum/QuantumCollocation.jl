@@ -6,6 +6,7 @@ export set!
 
 using Ipopt
 using Libdl
+using ExponentialAction
 using Base: @kwdef
 
 abstract type AbstractOptions end
@@ -55,16 +56,17 @@ end
 
 """
     Solver settings for Quantum Collocation.
-""" 
+"""
 @kwdef mutable struct PiccoloOptions <: AbstractOptions
     verbose::Bool = true
+    verbose_evaluator::Bool = false
     free_time::Bool = true
     timesteps_all_equal::Bool = true
     integrator::Symbol = :pade
     pade_order::Int = 4
     eval_hessian::Bool = false
     jacobian_structure::Bool = true
-    rollout_integrator::Function = exp
+    rollout_integrator::Function = expv
     geodesic = true
     blas_multithreading::Bool = true
     build_trajectory_constraints::Bool = true

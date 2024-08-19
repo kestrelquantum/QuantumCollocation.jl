@@ -1,3 +1,6 @@
+export UnitarySamplingProblem
+
+
 @doc raw"""
     UnitarySamplingProblem
 
@@ -7,7 +10,7 @@ robust solution by including multiple systems reflecting the problem uncertainty
 
 # Arguments
 - `systems::AbstractVector{<:AbstractQuantumSystem}`: A vector of quantum systems.
-- `operator::Union{EmbeddedOperator, AbstractMatrix{<:Number}}`: The target unitary operator.
+- `operator::OperatorType`: The target unitary operator.
 - `T::Int`: The number of time steps.
 - `Δt::Union{Float64, Vector{Float64}}`: The time step size.
 - `system_labels::Vector{String}`: The labels for each system.
@@ -42,7 +45,7 @@ robust solution by including multiple systems reflecting the problem uncertainty
 """
 function UnitarySamplingProblem(
     systems::AbstractVector{<:AbstractQuantumSystem},
-    operator::Union{EmbeddedOperator, AbstractMatrix{<:Number}},
+    operator::OperatorType,
     T::Int,
     Δt::Union{Float64, Vector{Float64}};
     system_labels=string.(1:length(systems)),
@@ -115,7 +118,7 @@ function UnitarySamplingProblem(
     # Constraints
     if leakage_suppression
         if operator isa EmbeddedOperator
-            leakage_indices = get_unitary_isomorphism_leakage_indices(operator)
+            leakage_indices = get_iso_vec_leakage_indices(operator)
             for Ũ⃗_key in Ũ⃗_keys
                 J += L1Regularizer!(
                     constraints, Ũ⃗_key, traj,
@@ -153,12 +156,12 @@ function UnitarySamplingProblem(
         if piccolo_options.integrator == :pade
             push!(
                 unitary_integrators,
-                UnitaryPadeIntegrator(sys, Ũ⃗_key, :a; order=piccolo_options.pade_order)
+                UnitaryPadeIntegrator(sys, Ũ⃗_key, :a, traj; order=piccolo_options.pade_order)
             )
         elseif piccolo_options.integrator == :exponential
             push!(
                 unitary_integrators,
-                UnitaryExponentialIntegrator(sys, Ũ⃗_key, :a)
+                UnitaryExponentialIntegrator(sys, Ũ⃗_key, :a, traj)
             )
         else
             error("integrator must be one of (:pade, :exponential)")
@@ -187,7 +190,7 @@ function UnitarySamplingProblem(
     system::Function,
     distribution::Sampleable,
     num_samples::Int,
-    operator::Union{EmbeddedOperator, AbstractMatrix{<:Number}},
+    operator::OperatorType,
     T::Int,
     Δt::Union{Float64, Vector{Float64}};
     kwargs...
@@ -240,10 +243,10 @@ end
     default_fids = []
     for ζ in ζ_tests
         Ũ⃗_end = unitary_rollout(prob.trajectory.a, timesteps, systems(ζ))[:, end]
-        push!(fids, unitary_fidelity(Ũ⃗_end, Ũ⃗_goal))
+        push!(fids, iso_vec_unitary_fidelity(Ũ⃗_end, Ũ⃗_goal))
 
         d_Ũ⃗_end = unitary_rollout(d_prob.trajectory.a, timesteps, systems(ζ))[:, end]
-        push!(default_fids, unitary_fidelity(d_Ũ⃗_end, Ũ⃗_goal))
+        push!(default_fids, iso_vec_unitary_fidelity(d_Ũ⃗_end, Ũ⃗_goal))
     end
     @test sum(fids) > sum(default_fids)
 

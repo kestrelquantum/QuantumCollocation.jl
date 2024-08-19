@@ -41,10 +41,10 @@ f = [P, D]
 dynamics = QuantumDynamics(f, Z)
 
 # test dynamics jacobian
-shape = (Z.dims.states * (Z.T - 1), Z.dim * Z.T)
+shape = (Z.dims.states * (Z.T - 1), Z.dim * Z.T + Z.global_dim)
 @btime dyn_res = dynamics.F(Z.datavec)
 @btime J_dynamics, J_struc = dynamics.∂F(Z.datavec), dynamics.∂F_structure
-shape = (Z.dim * Z.T, Z.dim * Z.T)
+shape = (Z.dim * Z.T + Z.global_dim, Z.dim * Z.T + Z.global_dim)
 
 μ = ones(Z.dims.states * (Z.T - 1))
 

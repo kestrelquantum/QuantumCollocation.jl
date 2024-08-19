@@ -6,14 +6,14 @@ export MultiTransmonSystem
 export RydbergChainSystem
 export QuantumOpticsSystem
 
-using ..QuantumUtils
+using ..Isomorphisms
 using ..QuantumSystems
+using ..QuantumObjectUtils
 
 using LinearAlgebra
 using TestItemRunner
 
 include("transmons.jl")
 include("rydberg.jl")
-include("quantum_optics.jl")
 
 end

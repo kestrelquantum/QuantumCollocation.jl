@@ -6,70 +6,42 @@ export CompositeQuantumSystem
 export QuantumSystemCoupling
 
 export iso
+export lift
 
-using ..QuantumUtils
+using ..Isomorphisms
+using ..QuantumObjectUtils
 
 using LinearAlgebra
 using SparseArrays
+using TestItemRunner
 
-const Im2 = [
-    0 -1;
-    1  0
-]
+# TODO:
+# [ ] subtypes? SingleQubitSystem, TwoQubitSystem, TransmonSystem, MultimodeSystem, etc.
+# [ ] add frame info to type
+# [ ] add methods to combine composite quantum systems
 
-@doc raw"""
-    G(H::AbstractMatrix)::Matrix{Float64}
-
-Returns the isomorphism of ``-iH``:
-
-```math
-G(H) = \widetilde{- i H} = \mqty(1 & 0 \\ 0 & 1) \otimes \Im(H) - \mqty(0 & -1 \\ 1 & 0) \otimes \Re(H)
-```
-
-where ``\Im(H)`` and ``\Re(H)`` are the imaginary and real parts of ``H`` and the tilde indicates the standard isomorphism of a complex valued matrix:
-
-```math
-\widetilde{H} = \mqty(1 & 0 \\ 0 & 1) \otimes \Re(H) + \mqty(0 & -1 \\ 1 & 0) \otimes \Im(H)
-```
-"""
-G(H::AbstractMatrix{<:Number}) = I(2) ⊗ imag(H) - typeof(H)(Im2) ⊗ real(H)
-
-iso(H::AbstractMatrix{<:Number}) = I(2) ⊗ real(H) + typeof(H)(Im2) ⊗ imag(H)
-
-
-"""
-    H(G::AbstractMatrix{<:Number})::Matrix{ComplexF64}
-
-Returns the inverse of `G(H) = iso(-iH)`, i.e. returns H
-
-"""
-function H(G::AbstractMatrix{<:Number})
-    dim = size(G, 1) ÷ 2
-    H_imag = G[1:dim, 1:dim]
-    H_real = -G[dim+1:end, 1:dim]
-    return H_real + 1.0im * H_imag
-end
+# ----------------------------------------------------------------------------- #
+# AbstractQuantumSystem
+# ----------------------------------------------------------------------------- #
 
 """
 ```julia
 AbstractQuantumSystem
 ```
-
-Abstract type for defining systems.
-"""
-abstract type AbstractQuantumSystem end
-
-# TODO: make subtypes: SingleQubitSystem, TwoQubitSystem, TransmonSystem, MultimodeSystem, etc.
-
-"""
-QuantumSystem
    |
     -> EmbeddedOperator
    |                  |
    |                   -> QuantumObjective
    |                  |
     -> Matrix (goal) -
+
+Abstract type for defining systems.
 """
+abstract type AbstractQuantumSystem end
+
+# ----------------------------------------------------------------------------- #
+# QuantumSystem
+# ----------------------------------------------------------------------------- #
 
 """
     QuantumSystem <: AbstractQuantumSystem
@@ -82,12 +54,11 @@ struct QuantumSystem <: AbstractQuantumSystem
     H_drives::Vector{SparseMatrixCSC{ComplexF64, Int}}
     G_drift::SparseMatrixCSC{Float64, Int}
     G_drives::Vector{SparseMatrixCSC{Float64, Int}}
+    dissipation_operators::Union{Nothing, Vector{SparseMatrixCSC{ComplexF64, Int}}}
     levels::Int
     constructor::Union{Function, Nothing}
     params::Dict{Symbol, <:Any}
 end
-
-# TODO: add frame info to type
 
 """
     QuantumSystem(
@@ -102,14 +73,15 @@ Constructs a `QuantumSystem` object from the drift and drive Hamiltonian terms.
 function QuantumSystem(
     H_drift::AbstractMatrix{<:Number},
     H_drives::Vector{<:AbstractMatrix{<:Number}};
+    dissipation_operators=nothing,
     constructor::Union{Function, Nothing}=nothing,
     params::Dict{Symbol, <:Any}=Dict{Symbol, Any}(),
     kwargs...
 )
     H_drift = sparse(H_drift)
     H_drives = sparse.(H_drives)
-    G_drift = G(H_drift)
-    G_drives = G.(H_drives)
+    G_drift = Isomorphisms.G(H_drift)
+    G_drives = Isomorphisms.G.(H_drives)
     params = merge(params, Dict{Symbol, Any}(kwargs...))
     levels = size(H_drift, 1)
     return QuantumSystem(
@@ -117,6 +89,7 @@ function QuantumSystem(
         H_drives,
         G_drift,
         G_drives,
+        dissipation_operators,
         levels,
         constructor,
         params
@@ -145,19 +118,20 @@ function (sys::QuantumSystem)(; params...)
         key ∈ keys(sys.params) for key ∈ keys(params)
     ]) "Invalid parameter(s) provided."
     return sys.constructor(; merge(sys.params, Dict(params...))...)
-end 
+end
 
 function QuantumSystem(
     H_drift::SparseMatrixCSC{ComplexF64, Int64},
     H_drives::Vector{SparseMatrixCSC{ComplexF64, Int64}};
+    dissipation_operators=nothing,
     constructor::Union{Function, Nothing}=nothing,
     params::Dict{Symbol, <:Any}=Dict{Symbol, Any}(),
     kwargs...
 )
     H_drift = sparse(H_drift)
     H_drives = sparse.(H_drives)
-    G_drift = G(H_drift)
-    G_drives = G.(H_drives)
+    G_drift = Isomorphisms.G(H_drift)
+    G_drives = Isomorphisms.G.(H_drives)
     params = merge(params, Dict{Symbol, Any}(kwargs...))
     levels = size(H_drift, 1)
     return QuantumSystem(
@@ -165,12 +139,12 @@ function QuantumSystem(
         H_drives,
         G_drift,
         G_drives,
+        dissipation_operators,
         levels,
         constructor,
         params
     )
 end
-
 
 function Base.copy(sys::QuantumSystem)
     return QuantumSystem(
@@ -181,12 +155,42 @@ function Base.copy(sys::QuantumSystem)
     )
 end
 
-
-
-
-# ------------------------------------------------------------------
+# ----------------------------------------------------------------------------- #
 # Quantum System couplings
-# ------------------------------------------------------------------
+# ----------------------------------------------------------------------------- #
+
+@doc raw"""
+    lift(U::AbstractMatrix{<:Number}, qubit_index::Int, n_qubits::Int; levels::Int=size(U, 1))
+
+Lift an operator `U` acting on a single qubit to an operator acting on the entire system of `n_qubits`.
+"""
+function lift(
+    U::AbstractMatrix{<:Number},
+    qubit_index::Int,
+    n_qubits::Int;
+    levels::Int=size(U, 1)
+)::Matrix{ComplexF64}
+    Is = Matrix{Complex}[I(levels) for _ = 1:n_qubits]
+    Is[qubit_index] = U
+    return foldr(⊗, Is)
+end
+
+@doc raw"""
+    lift(op::AbstractMatrix{<:Number}, i::Int, subsystem_levels::Vector{Int})
+
+Lift an operator `op` acting on the i-th subsystem to an operator acting on the entire system with given subsystem levels.
+"""
+function lift(
+    op::AbstractMatrix{<:Number},
+    i::Int,
+    subsystem_levels::Vector{Int}
+)::Matrix{ComplexF64}
+    @assert size(op, 1) == size(op, 2) == subsystem_levels[i] "Operator must be square and match dimension of subsystem i"
+
+    Is = [collect(1.0 * typeof(op)(I, l, l)) for l ∈ subsystem_levels]
+    Is[i] = op
+    return kron(1.0, Is...)
+end
 
 """
     QuantumSystemCoupling <: AbstractQuantumSystem
@@ -287,8 +291,8 @@ function CompositeQuantumSystem(
         end
     end
 
-    G_drift = G(H_drift)
-    G_drives = G.(H_drives)
+    G_drift = Isomorphisms.G(H_drift)
+    G_drives = Isomorphisms.G.(H_drives)
     levels = size(H_drift, 1)
     subsystem_levels = [sys.levels for sys ∈ subsystems]
     params = Dict{Symbol, Any}()
@@ -400,9 +404,30 @@ function (csys::CompositeQuantumSystem)(;
     )
 end
 
-QuantumUtils.quantum_state(ket::String, csys::CompositeQuantumSystem; kwargs...) =
-    quantum_state(ket, csys.subsystem_levels; kwargs...)
+# ============================================================================= #
 
-# TODO: add methods to combine composite quantum systems
+@testitem "System creation" begin
+    H_drift = GATES[:Z]
+    H_drives = [GATES[:X], GATES[:Y]]
+    n_drives = length(H_drives)
+
+    system = QuantumSystem(H_drift, H_drives)
+end
+
+function is_reachable(
+    gate::AbstractMatrix,
+    system::QuantumSystem;
+    use_drift::Bool=true,
+    kwargs...
+)
+    if !iszero(system.H_drift) && use_drift
+        hamiltonians = [system.H_drift, system.H_drives...]
+    else
+        hamiltonians = system.H_drives
+    end
+    return is_reachable(gate, hamiltonians; kwargs...)
+end
+
+
 
 end

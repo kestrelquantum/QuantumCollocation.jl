@@ -12,6 +12,8 @@ export dynamics_jacobian_structure
 export dynamics_hessian_of_lagrangian_structure
 export dynamics_structure
 
+export sparsity_structure
+
 export loss_hessian_structure
 
 using NamedTrajectories
@@ -21,6 +23,21 @@ using SparseArrays
 using Symbolics
 using ForwardDiff
 using Einsum
+
+function sparsity_structure(S::SparseMatrixCSC; return_pairs=false, type::Type=Float64)
+    Is, Js = findnz(S)
+    if return_pairs
+        return zip(Is, Js)
+    else
+        return sparse(Is, Js, ones(type, nnz(S)), size(S)...)
+    end
+end
+
+function sparsity_structure(A::AbstractMatrix; kwargs...)
+    return sparsity_structure(sparse(A); kwargs...)
+end
+
+
 
 function upper_half_vals(A::AbstractMatrix)
     n = size(A, 1)
@@ -203,7 +220,7 @@ function dynamics_structure(
         # getting symbolic variables
         z1 = collect(Symbolics.@variables(z[1:traj.dim])...)
         z2 = collect(Symbolics.@variables(z[1:traj.dim])...)
-        ∂f_structure = structure(sparse(∂f(z1, z2)))
+        ∂f_structure = structure(sparse(∂f(z1, z2, 1)))
     else
         if verbose
             println("            computing full jacobian block...")

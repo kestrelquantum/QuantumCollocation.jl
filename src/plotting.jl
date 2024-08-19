@@ -5,7 +5,7 @@ export pretty_print
 
 using NamedTrajectories
 
-using ..QuantumUtils
+using ..Isomorphisms
 using ..Problems
 
 
@@ -44,7 +44,7 @@ function plot_unitary_populations(
 
     transformations = OrderedDict(
         unitary_name => [
-            x -> populations(iso_vec_to_operator(x)[:, i])
+            x -> abs2.(iso_vec_to_operator(x)[:, i])
                 for i ∈ unitary_columns
         ]
     )

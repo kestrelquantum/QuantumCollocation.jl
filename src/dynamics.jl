@@ -9,7 +9,7 @@ export dynamics_hessian_of_lagrangian
 export dynamics_components
 
 using ..QuantumSystems
-using ..QuantumUtils
+using ..Isomorphisms
 using ..StructureUtils
 using ..Integrators
 
@@ -39,9 +39,9 @@ function dynamics_components(integrators::Vector{<:AbstractIntegrator})
     dynamics_comps = []
     comp_mark = 0
     for integrator ∈ integrators
-        integrator_comps = (comp_mark + 1):(comp_mark + dim(integrator))
+        integrator_comps = (comp_mark + 1):(comp_mark + integrator.dim)
         push!(dynamics_comps, integrator_comps)
-        comp_mark += dim(integrator)
+        comp_mark += integrator.dim
     end
     return dynamics_comps
 end
@@ -51,11 +51,11 @@ function dynamics(
     traj::NamedTrajectory
 )
     dynamics_comps = dynamics_components(integrators)
-    dynamics_dim = dim(integrators)
-    function f(zₜ, zₜ₊₁)
+    dynamics_dim = sum(integrator.dim for integrator ∈ integrators)
+    function f(zₜ, zₜ₊₁, t)
         δ = Vector{eltype(zₜ)}(undef, dynamics_dim)
         for (integrator, integrator_comps) ∈ zip(integrators, dynamics_comps)
-            δ[integrator_comps] = integrator(zₜ, zₜ₊₁, traj)
+            δ[integrator_comps] = integrator(zₜ, zₜ₊₁, t)
         end
         return δ
     end
@@ -69,28 +69,27 @@ function dynamics_jacobian(
     traj::NamedTrajectory
 )
     dynamics_comps = dynamics_components(integrators)
-    dynamics_dim = dim(integrators)
-    free_time = traj.timestep isa Symbol
-    @views function ∂f(zₜ, zₜ₊₁)
+    dynamics_dim = sum(integrator.dim for integrator ∈ integrators)
+    @views function ∂f(zₜ, zₜ₊₁, t)
         ∂ = zeros(eltype(zₜ), dynamics_dim, 2traj.dim)
         for (integrator, integrator_comps) ∈ zip(integrators, dynamics_comps)
             if integrator isa QuantumIntegrator
                 if integrator isa QuantumPadeIntegrator && integrator.autodiff
-                    ∂Pᵢ(z1, z2) = ForwardDiff.jacobian(
-                        zz -> integrator(zz[1:traj.dim], zz[traj.dim+1:end], traj),
+                    ∂Pᵢ(z1, z2, t) = ForwardDiff.jacobian(
+                        zz -> integrator(zz[1:traj.dim], zz[traj.dim+1:end], t),
                         [z1; z2]
                     )
-                    ∂[integrator_comps, 1:2traj.dim] = ∂Pᵢ(zₜ, zₜ₊₁)
+                    ∂[integrator_comps, 1:2traj.dim] = ∂Pᵢ(zₜ, zₜ₊₁, t)
                 else
-                    if free_time
-                        x_comps, u_comps, Δt_comps = comps(integrator, traj)
+                    if integrator.freetime
+                        x_comps, u_comps, Δt_comps = get_comps(integrator, traj)
                         ∂xₜf, ∂xₜ₊₁f, ∂uₜf, ∂Δtₜf =
-                            Integrators.jacobian(integrator, zₜ, zₜ₊₁, traj)
+                            Integrators.jacobian(integrator, zₜ, zₜ₊₁, t)
                         ∂[integrator_comps, Δt_comps] = ∂Δtₜf
                     else
-                        x_comps, u_comps = comps(integrator, traj)
+                        x_comps, u_comps = get_comps(integrator, traj)
                         ∂xₜf, ∂xₜ₊₁f, ∂uₜf =
-                            Integrators.jacobian(integrator, zₜ, zₜ₊₁, traj)
+                            Integrators.jacobian(integrator, zₜ, zₜ₊₁, t)
                     end
                     ∂[integrator_comps, x_comps] = ∂xₜf
                     ∂[integrator_comps, x_comps .+ traj.dim] = ∂xₜ₊₁f
@@ -103,19 +102,19 @@ function dynamics_jacobian(
                     end
                 end
             elseif integrator isa DerivativeIntegrator
-                if free_time
-                    x_comps, dx_comps, Δt_comps = comps(integrator, traj)
+                if integrator.freetime
+                    x_comps, dx_comps, Δt_comps = get_comps(integrator, traj)
                     ∂xₜf, ∂xₜ₊₁f, ∂dxₜf, ∂Δtₜf =
-                        Integrators.jacobian(integrator, zₜ, zₜ₊₁, traj)
+                        Integrators.jacobian(integrator, zₜ, zₜ₊₁, t)
                 else
-                    x_comps, dx_comps = comps(integrator, traj)
+                    x_comps, dx_comps = get_comps(integrator, traj)
                     ∂xₜf, ∂xₜ₊₁f, ∂dxₜf =
-                        Integrators.jacobian(integrator, zₜ, zₜ₊₁, traj)
+                        Integrators.jacobian(integrator, zₜ, zₜ₊₁, t)
                 end
                 ∂[integrator_comps, x_comps] = ∂xₜf
                 ∂[integrator_comps, x_comps .+ traj.dim] = ∂xₜ₊₁f
                 ∂[integrator_comps, dx_comps] = ∂dxₜf
-                if free_time
+                if integrator.freetime
                     ∂[integrator_comps, Δt_comps] = ∂Δtₜf
                 end
             else
@@ -209,27 +208,27 @@ function QuantumDynamics(
 
     free_time = traj.timestep isa Symbol
 
-    if free_time
-        @assert all([
-            !isnothing(state(integrator)) &&
-            !isnothing(controls(integrator))
-                for integrator ∈ integrators
-        ])
-    else
-        @assert all([
-            !isnothing(state(integrator)) &&
-            !isnothing(controls(integrator))
-                for integrator ∈ integrators
-        ])
-    end
+    # if free_time
+    #     @assert all([
+    #         !isnothing(state(integrator)) &&
+    #         !isnothing(controls(integrator))
+    #             for integrator ∈ integrators
+    #     ])
+    # else
+    #     @assert all([
+    #         !isnothing(state(integrator)) &&
+    #         !isnothing(controls(integrator))
+    #             for integrator ∈ integrators
+    #     ])
+    # end
 
-    for integrator ∈ integrators
-        if integrator isa QuantumIntegrator && controls(integrator) isa Tuple
-            drive_comps = [traj.components[s] for s ∈ integrator.drive_symb]
-            number_of_drives = sum(length.(drive_comps))
-            @assert number_of_drives == integrator.n_drives "number of drives ($(number_of_drives)) does not match number of drive terms in Hamiltonian ($(integrator.n_drives))"
-        end
-    end
+    # for integrator ∈ integrators
+    #     if integrator isa QuantumIntegrator && controls(integrator) isa Tuple
+    #         drive_comps = [traj.components[s] for s ∈ integrator.drive_symb]
+    #         number_of_drives = sum(length.(drive_comps))
+    #         @assert number_of_drives == integrator.n_drives "number of drives ($(number_of_drives)) does not match number of drive terms in Hamiltonian ($(integrator.n_drives))"
+    #     end
+    # end
 
     f = dynamics(integrators, traj)
 
@@ -245,7 +244,7 @@ function QuantumDynamics(
         println("        determining dynamics derivative structure...")
     end
 
-    dynamics_dim = dim(integrators)
+    dynamics_dim = sum(integrator.dim for integrator ∈ integrators)
 
     if eval_hessian
         ∂f_structure, ∂F_structure, μ∂²f_structure, μ∂²F_structure =
@@ -276,7 +275,7 @@ function QuantumDynamics(
         Threads.@threads for t = 1:traj.T-1
             zₜ = Z⃗[slice(t, traj.dim)]
             zₜ₊₁ = Z⃗[slice(t + 1, traj.dim)]
-            δ[slice(t, dynamics_dim)] = f(zₜ, zₜ₊₁)
+            δ[slice(t, dynamics_dim)] = f(zₜ, zₜ₊₁, t)
         end
         return δ
     end
@@ -286,7 +285,7 @@ function QuantumDynamics(
         Threads.@threads for t = 1:traj.T-1
             zₜ = Z⃗[slice(t, traj.dim)]
             zₜ₊₁ = Z⃗[slice(t + 1, traj.dim)]
-            ∂fₜ = ∂f(zₜ, zₜ₊₁)
+            ∂fₜ = ∂f(zₜ, zₜ₊₁, t)
             for (k, (i, j)) ∈ enumerate(∂f_structure)
                 ∂s[index(t, k, ∂f_nnz)] = ∂fₜ[i, j]
             end
@@ -311,7 +310,7 @@ function QuantumDynamics(
     else
         μ∂²F = nothing
     end
-    
+
     return QuantumDynamics(
         integrators,
         F,

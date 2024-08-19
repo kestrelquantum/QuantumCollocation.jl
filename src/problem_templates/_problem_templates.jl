@@ -1,31 +1,24 @@
 module ProblemTemplates
 
-export UnitarySmoothPulseProblem
-export UnitaryMinimumTimeProblem
-export UnitaryRobustnessProblem
-export UnitaryDirectSumProblem
-export UnitarySamplingProblem
-export UnitaryBangBangProblem
-
-export QuantumStateSmoothPulseProblem
-export QuantumStateMinimumTimeProblem
-
 using ..QuantumSystems
-using ..QuantumUtils
+using ..Isomorphisms
 using ..EmbeddedOperators
 using ..DirectSums
 using ..Rollouts
 using ..TrajectoryInitialization
 using ..Objectives
 using ..Constraints
+using ..Losses
 using ..Integrators
 using ..Problems
 using ..Options
 
 using Distributions
+using TrajectoryIndexingUtils
 using NamedTrajectories
 using LinearAlgebra
 using SparseArrays
+using ExponentialAction
 using JLD2
 
 using TestItemRunner
