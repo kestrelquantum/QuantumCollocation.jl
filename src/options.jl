@@ -58,6 +58,10 @@ end
     Solver settings for Quantum Collocation.
 """
 @kwdef mutable struct PiccoloOptions <: AbstractOptions
+    state_type::Symbol = :unitary
+    state_name::Symbol = :Ũ⃗
+    control_name::Symbol = :a
+    timestep_name::Symbol = :Δt
     verbose::Bool = true
     verbose_evaluator::Bool = false
     free_time::Bool = true
