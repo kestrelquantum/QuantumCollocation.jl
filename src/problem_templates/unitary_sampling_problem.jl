@@ -69,12 +69,6 @@ function UnitarySamplingProblem(
     R_a::Union{Float64, Vector{Float64}}=R,
     R_da::Union{Float64, Vector{Float64}}=R,
     R_dda::Union{Float64, Vector{Float64}}=R,
-    leakage_suppression=false,
-    R_leakage=1e-1,
-    bound_unitary=piccolo_options.integrator == :exponential,
-    control_norm_constraint=false,
-    control_norm_constraint_components=nothing,
-    control_norm_R=nothing,
     kwargs...
 )
     # Create keys for multiple systems
@@ -94,7 +88,7 @@ function UnitarySamplingProblem(
             free_time=piccolo_options.free_time,
             Δt_bounds=(Δt_min, Δt_max),
             geodesic=piccolo_options.geodesic,
-            bound_unitary=bound_unitary,
+            bound_unitary=piccolo_options.bound_state,
             drive_derivative_σ=drive_derivative_σ,
             a_guess=a_guess,
             system=systems,
@@ -116,13 +110,13 @@ function UnitarySamplingProblem(
     J += QuadraticRegularizer(:dda, traj, R_dda)
 
     # Constraints
-    if leakage_suppression
+    if piccolo_options.leakage_suppression
         if operator isa EmbeddedOperator
             leakage_indices = get_iso_vec_leakage_indices(operator)
             for Ũ⃗_key in Ũ⃗_keys
                 J += L1Regularizer!(
                     constraints, Ũ⃗_key, traj,
-                    R_value=R_leakage,
+                    R_value=piccolo_options.R_leakage,
                     indices=leakage_indices,
                     eval_hessian=piccolo_options.eval_hessian
                 )
@@ -138,14 +132,11 @@ function UnitarySamplingProblem(
         end
     end
 
-    if control_norm_constraint
-        @assert !isnothing(control_norm_constraint_components) "control_norm_constraint_components must be provided"
-        @assert !isnothing(control_norm_R) "control_norm_R must be provided"
+    if !isnothing(piccolo_options.complex_control_norm_constraint_name)
         norm_con = ComplexModulusContraint(
-            :a,
-            control_norm_R,
+            piccolo_options.complex_control_norm_constraint_name,
+            piccolo_options.complex_control_norm_constraint_radius,
             traj;
-            name_comps=control_norm_constraint_components,
         )
         push!(constraints, norm_con)
     end

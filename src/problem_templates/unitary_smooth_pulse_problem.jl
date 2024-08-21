@@ -77,7 +77,6 @@ function UnitarySmoothPulseProblem(
     Δt::Union{Float64, Vector{Float64}};
     ipopt_options::IpoptOptions=IpoptOptions(),
     piccolo_options::PiccoloOptions=PiccoloOptions(),
-    constraints::Vector{<:AbstractConstraint}=AbstractConstraint[],
     init_trajectory::Union{NamedTrajectory, Nothing}=nothing,
     a_bound::Float64=1.0,
     a_bounds=fill(a_bound, length(system.G_drives)),
@@ -94,30 +93,45 @@ function UnitarySmoothPulseProblem(
     R_a::Union{Float64, Vector{Float64}}=R,
     R_da::Union{Float64, Vector{Float64}}=R,
     R_dda::Union{Float64, Vector{Float64}}=R,
-    leakage_suppression=false,
-    R_leakage=1e-1,
-    control_norm_constraint=false,
-    control_norm_constraint_components=nothing,
-    control_norm_R=nothing,
-    bound_unitary=piccolo_options.integrator == :exponential,
     global_data::Union{NamedTuple, Nothing}=nothing,
+    constraints::Vector{<:AbstractConstraint}=AbstractConstraint[],
     kwargs...
 )
+
+    state_name = piccolo_options.state_name
+    control_name = piccolo_options.control_name
+    control_velocity_name = Symbol(string("d", control_name))
+    control_acceleration_name = Symbol(string("dd", control_name))
+    timestep_name = piccolo_options.timestep_name
+
     # Trajectory
     if !isnothing(init_trajectory)
         traj = init_trajectory
     else
         n_drives = length(system.G_drives)
+
+        control_bound_names = (
+            control_name,             # a
+            control_velocity_name,    # da
+            control_acceleration_name # dda
+        )
+
+        control_bounds = NamedTuple{control_bound_names}((
+            a_bounds,
+            da_bounds,
+            dda_bounds
+        ))
+
         traj = initialize_unitary_trajectory(
             operator,
             T,
             Δt,
             n_drives,
-            (a = a_bounds, da = da_bounds, dda = dda_bounds);
+            control_bounds;
             free_time=piccolo_options.free_time,
             Δt_bounds=(Δt_min, Δt_max),
             geodesic=piccolo_options.geodesic,
-            bound_unitary=bound_unitary,
+            bound_unitary=piccolo_options.bound_state,
             drive_derivative_σ=drive_derivative_σ,
             a_guess=a_guess,
             system=system,
@@ -128,13 +142,13 @@ function UnitarySmoothPulseProblem(
 
     # Objective
     if isnothing(global_data)
-        J = UnitaryInfidelityObjective(:Ũ⃗, traj, Q;
+        J = UnitaryInfidelityObjective(state_name, traj, Q;
             subspace=operator isa EmbeddedOperator ? operator.subspace_indices : nothing,
         )
     else
         # TODO: remove hardcoded args
         J = UnitaryFreePhaseInfidelityObjective(
-            name=:Ũ⃗,
+            name=state_name,
             phase_name=:ϕ,
             goal=operator_to_iso_vec(operator isa EmbeddedOperator ? operator.operator : operator),
             phase_operators=[GATES[:Z] for _ in eachindex(traj.global_components[:ϕ])],
@@ -143,58 +157,36 @@ function UnitarySmoothPulseProblem(
             subspace=operator isa EmbeddedOperator ? operator.subspace_indices : nothing
         )
     end
-    J += QuadraticRegularizer(:a, traj, R_a)
-    J += QuadraticRegularizer(:da, traj, R_da)
-    J += QuadraticRegularizer(:dda, traj, R_dda)
 
-    # Constraints
-    if leakage_suppression
-        if operator isa EmbeddedOperator
-            leakage_indices = get_iso_vec_leakage_indices(operator)
-            J += L1Regularizer!(
-                constraints, :Ũ⃗, traj,
-                R_value=R_leakage,
-                indices=leakage_indices,
-                eval_hessian=piccolo_options.eval_hessian
-            )
-        else
-            @warn "leakage_suppression is not supported for non-embedded operators, ignoring."
-        end
-    end
+    J += QuadraticRegularizer(control_bound_names[1], traj, R_a)
+    J += QuadraticRegularizer(control_bound_names[2], traj, R_da)
+    J += QuadraticRegularizer(control_bound_names[3], traj, R_dda)
 
-    if piccolo_options.free_time
-        if piccolo_options.timesteps_all_equal
-            push!(constraints, TimeStepsAllEqualConstraint(:Δt, traj))
-        end
-    end
+    # Piccolo constraints and objective
+    J_piccolo, constraints_piccolo =
+        get_piccolo_objective_and_constraints(piccolo_options, traj)
 
-    if control_norm_constraint
-        @assert !isnothing(control_norm_constraint_components) "control_norm_constraint_components must be provided"
-        @assert !isnothing(control_norm_R) "control_norm_R must be provided"
-        norm_con = ComplexModulusContraint(
-            :a,
-            control_norm_R,
-            traj;
-            name_comps=control_norm_constraint_components,
-        )
-        push!(constraints, norm_con)
-    end
+    J += J_piccolo
+
+    append!(constraints, constraints_piccolo)
 
     # Integrators
     if piccolo_options.integrator == :pade
         unitary_integrator =
-            UnitaryPadeIntegrator(system, :Ũ⃗, :a, traj; order=piccolo_options.pade_order)
+            UnitaryPadeIntegrator(system, state_name, control_name, traj;
+                order=piccolo_options.pade_order
+            )
     elseif piccolo_options.integrator == :exponential
         unitary_integrator =
-            UnitaryExponentialIntegrator(system, :Ũ⃗, :a, traj)
+            UnitaryExponentialIntegrator(system, state_name, control_name, traj)
     else
         error("integrator must be one of (:pade, :exponential)")
     end
 
     integrators = [
         unitary_integrator,
-        DerivativeIntegrator(:a, :da, traj),
-        DerivativeIntegrator(:da, :dda, traj),
+        DerivativeIntegrator(control_name, control_velocity_name, traj),
+        DerivativeIntegrator(control_velocity_name, control_acceleration_name, traj),
     ]
 
     return QuantumControlProblem(
@@ -270,6 +262,34 @@ end
     final = unitary_fidelity(prob)
     @test final > initial
 end
+
+@testitem "Hadamard gate with exponential integrator, bounded states, and control norm constraint" begin
+    sys = QuantumSystem(GATES[:Z], [GATES[:X], GATES[:Y]])
+    U_goal = GATES[:H]
+    T = 51
+    Δt = 0.2
+
+    piccolo_options = PiccoloOptions(
+        verbose=false,
+        integrator=:exponential,
+        # jacobian_structure=false,
+        bound_state=true,
+        complex_control_norm_constraint_name=:a
+    )
+
+    prob = UnitarySmoothPulseProblem(
+        sys, U_goal, T, Δt,
+        ipopt_options=IpoptOptions(print_level=1),
+        piccolo_options=piccolo_options
+    )
+
+    initial = unitary_fidelity(prob)
+    solve!(prob, max_iter=20)
+    final = unitary_fidelity(prob)
+    @test final > initial
+end
+
+
 
 @testitem "EmbeddedOperator Hadamard gate" begin
     a = annihilate(3)

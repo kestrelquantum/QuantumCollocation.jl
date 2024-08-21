@@ -33,4 +33,57 @@ include("unitary_bang_bang_problem.jl")
 include("quantum_state_smooth_pulse_problem.jl")
 include("quantum_state_minimum_time_problem.jl")
 
+
+function get_piccolo_objective_and_constraints(
+    piccolo_options::PiccoloOptions,
+    traj::NamedTrajectory
+)
+    J = NullObjective()
+    constraints = AbstractConstraint[]
+
+    state_names = [
+        Symbol(name)
+            for name ∈ string.(traj.names)
+                if startswith(name, string(piccolo_options.state_name))
+    ]
+
+    if piccolo_options.leakage_suppression
+        if operator isa EmbeddedOperator
+            leakage_indices = get_iso_vec_leakage_indices(operator)
+            for state_name in state_names
+                J += L1Regularizer!(
+                    constraints, state_name, traj,
+                    R_value=piccolo_options.R_leakage,
+                    indices=leakage_indices,
+                    eval_hessian=piccolo_options.eval_hessian
+                )
+            end
+        else
+            @warn "leakage_suppression is not supported for non-embedded operators, ignoring."
+        end
+    end
+
+    if piccolo_options.free_time
+        if piccolo_options.timesteps_all_equal
+            push!(
+                constraints,
+                TimeStepsAllEqualConstraint(piccolo_options.timestep_name, traj)
+            )
+        end
+    end
+
+    if !isnothing(piccolo_options.complex_control_norm_constraint_name)
+        norm_con = ComplexModulusContraint(
+            piccolo_options.complex_control_norm_constraint_name,
+            piccolo_options.complex_control_norm_constraint_radius,
+            traj;
+        )
+        push!(constraints, norm_con)
+    end
+
+    return J, constraints
+end
+
+
+
 end

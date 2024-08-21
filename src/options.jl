@@ -58,6 +58,10 @@ end
     Solver settings for Quantum Collocation.
 """
 @kwdef mutable struct PiccoloOptions <: AbstractOptions
+    state_type::Symbol = :unitary
+    state_name::Symbol = :Ũ⃗
+    control_name::Symbol = :a
+    timestep_name::Symbol = :Δt
     verbose::Bool = true
     verbose_evaluator::Bool = false
     free_time::Bool = true
@@ -65,11 +69,16 @@ end
     integrator::Symbol = :pade
     pade_order::Int = 4
     eval_hessian::Bool = false
-    jacobian_structure::Bool = true
+    jacobian_structure::Bool = integrator == :pade
     rollout_integrator::Function = expv
     geodesic = true
     blas_multithreading::Bool = true
     build_trajectory_constraints::Bool = true
+    complex_control_norm_constraint_name::Union{Nothing, Symbol} = nothing
+    complex_control_norm_constraint_radius::Float64 = 1.0
+    bound_state::Bool = false
+    leakage_suppression::Bool = false
+    R_leakage::Float64 = 1.0
 end
 
 
