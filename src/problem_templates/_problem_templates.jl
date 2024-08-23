@@ -38,8 +38,8 @@ function apply_piccolo_options!(
     J::Objective,
     constraints::AbstractVector{<:AbstractConstraint},
     piccolo_options::PiccoloOptions,
-    traj::NamedTrajectory,
-    operator::OperatorType
+    traj::NamedTrajectory;
+    operator::Union{Nothing, OperatorType}=nothing
 )
     if piccolo_options.leakage_suppression
         state_names = [
