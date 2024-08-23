@@ -16,8 +16,10 @@ struct DataInterpolation
     values_components::Vector{Int}
 
     function DataInterpolation(
-        times::AbstractVector{Float64}, values::AbstractMatrix{Float64};
-        timestep_components::AbstractVector{Int}=Int[], kind::Symbol=:linear
+        times::AbstractVector{Float64},
+        values::AbstractMatrix{Float64};
+        timestep_components::AbstractVector{Int}=Int[],
+        kind::Symbol=:linear
     )
         comps = setdiff(1:size(values, 1), timestep_components)
         if kind == :linear
