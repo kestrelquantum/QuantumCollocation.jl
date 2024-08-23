@@ -1,6 +1,5 @@
-"""
-    utility functions for debugging tests
-"""
+using NamedTrajectories
+
 
 """
     dense(vals, structure, shape)

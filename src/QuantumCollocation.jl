@@ -57,6 +57,9 @@ include("rollouts.jl")
 include("trajectory_initialization.jl")
 @reexport using .TrajectoryInitialization
 
+include("trajectory_interpolations.jl")
+@reexport using .TrajectoryInterpolation
+
 include("problem_templates/_problem_templates.jl")
 @reexport using .ProblemTemplates
 
