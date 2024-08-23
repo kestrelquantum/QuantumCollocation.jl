@@ -162,14 +162,6 @@ function UnitarySmoothPulseProblem(
     J += QuadraticRegularizer(control_bound_names[2], traj, R_da)
     J += QuadraticRegularizer(control_bound_names[3], traj, R_dda)
 
-    # Piccolo constraints and objective
-    J_piccolo, constraints_piccolo =
-        get_piccolo_objective_and_constraints(piccolo_options, traj)
-
-    J += J_piccolo
-
-    append!(constraints, constraints_piccolo)
-
     # Integrators
     if piccolo_options.integrator == :pade
         unitary_integrator =
@@ -188,6 +180,9 @@ function UnitarySmoothPulseProblem(
         DerivativeIntegrator(control_name, control_velocity_name, traj),
         DerivativeIntegrator(control_velocity_name, control_acceleration_name, traj),
     ]
+
+    # Optional Piccolo constraints and objectives
+    apply_piccolo_options!(J, constraints, piccolo_options, traj, operator)
 
     return QuantumControlProblem(
         system,

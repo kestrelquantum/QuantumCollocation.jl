@@ -34,20 +34,20 @@ include("quantum_state_smooth_pulse_problem.jl")
 include("quantum_state_minimum_time_problem.jl")
 
 
-function get_piccolo_objective_and_constraints(
+function apply_piccolo_options!(
+    J::Objective,
+    constraints::AbstractVector{<:AbstractConstraint},
     piccolo_options::PiccoloOptions,
-    traj::NamedTrajectory
+    traj::NamedTrajectory,
+    operator::OperatorType
 )
-    J = NullObjective()
-    constraints = AbstractConstraint[]
-
-    state_names = [
-        Symbol(name)
-            for name ∈ string.(traj.names)
-                if startswith(name, string(piccolo_options.state_name))
-    ]
-
     if piccolo_options.leakage_suppression
+        state_names = [
+            Symbol(name)
+                for name ∈ string.(traj.names)
+                    if startswith(name, string(state_name))
+        ]
+    
         if operator isa EmbeddedOperator
             leakage_indices = get_iso_vec_leakage_indices(operator)
             for state_name in state_names
@@ -59,7 +59,7 @@ function get_piccolo_objective_and_constraints(
                 )
             end
         else
-            @warn "leakage_suppression is not supported for non-embedded operators, ignoring."
+            @warn "leakage_suppression is only supported for embedded operators, ignoring."
         end
     end
 
@@ -81,9 +81,8 @@ function get_piccolo_objective_and_constraints(
         push!(constraints, norm_con)
     end
 
-    return J, constraints
+    return
 end
-
 
 
 end
