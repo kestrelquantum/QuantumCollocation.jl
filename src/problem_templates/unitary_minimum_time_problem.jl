@@ -79,14 +79,15 @@ function UnitaryMinimumTimeProblem(
             eval_hessian=piccolo_options.eval_hessian
         )
     else
-        # TODO: remove hardcoded args
+        phase_operators= [
+            GATES[:Z] for _ in eachindex(trajectory.global_components[global_symbol])
+        ]
         fidelity_constraint = FinalUnitaryFreePhaseFidelityConstraint(
-            value=final_fidelity,
-            state_slice=slice(trajectory.T, trajectory.components[unitary_symbol], trajectory.dim),
-            phase_slice=trajectory.global_components[global_symbol],
-            goal=trajectory.goal[unitary_symbol],
-            phase_operators=[GATES[:Z] for _ in eachindex(trajectory.global_components[global_symbol])],
-            zdim=trajectory.dim * trajectory.T + trajectory.global_dim,
+            unitary_symbol,
+            global_symbol,
+            phase_operators,
+            final_fidelity,
+            trajectory;
             subspace=subspace,
             eval_hessian=piccolo_options.eval_hessian
         )
