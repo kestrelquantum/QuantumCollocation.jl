@@ -150,7 +150,11 @@ function UnitarySmoothPulseProblem(
         J = UnitaryFreePhaseInfidelityObjective(
             name=state_name,
             phase_name=:ϕ,
-            goal=operator_to_iso_vec(operator isa EmbeddedOperator ? operator.operator : operator),
+            goal=operator_to_iso_vec(
+                operator isa EmbeddedOperator ?
+                operator.operator :
+                operator
+            ),
             phase_operators=[GATES[:Z] for _ in eachindex(traj.global_components[:ϕ])],
             Q=Q,
             eval_hessian=piccolo_options.eval_hessian,

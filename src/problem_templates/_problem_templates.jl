@@ -43,16 +43,17 @@ function apply_piccolo_options!(
 )
     if piccolo_options.leakage_suppression
         state_names = [
-            Symbol(name)
-                for name ∈ string.(traj.names)
-                    if startswith(name, string(state_name))
+            name for name ∈ traj.names
+                if startswith(string(name), string(piccolo_options.state_name))
         ]
-    
+
         if operator isa EmbeddedOperator
             leakage_indices = get_iso_vec_leakage_indices(operator)
             for state_name in state_names
                 J += L1Regularizer!(
-                    constraints, state_name, traj,
+                    constraints,
+                    state_name,
+                    traj;
                     R_value=piccolo_options.R_leakage,
                     indices=leakage_indices,
                     eval_hessian=piccolo_options.eval_hessian
