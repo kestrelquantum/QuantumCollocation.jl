@@ -58,6 +58,7 @@ end
     Solver settings for Quantum Collocation.
 """
 @kwdef mutable struct PiccoloOptions <: AbstractOptions
+    # TODO: return names to problem templates
     state_type::Symbol = :unitary
     state_name::Symbol = :Ũ⃗
     control_name::Symbol = :a
@@ -79,8 +80,12 @@ end
     bound_state::Bool = false
     leakage_suppression::Bool = false
     R_leakage::Float64 = 1.0
+    free_phase_infidelity::Bool = false
+    phase_operators::Union{Nothing, AbstractVector{<:AbstractMatrix{<:Complex}}} = nothing
+    phase_name::Symbol = :ϕ
 end
 
+⊗
 
 function set!(optimizer::Ipopt.Optimizer, options::AbstractOptions)
     for name in fieldnames(typeof(options))
