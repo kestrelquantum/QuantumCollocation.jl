@@ -778,6 +778,7 @@ weakdeps = ["DiffRules", "ForwardDiff", "IntervalSets", "LinearAlgebra", "Recipe
     IntervalArithmeticIntervalSetsExt = "IntervalSets"
     IntervalArithmeticLinearAlgebraExt = "LinearAlgebra"
     IntervalArithmeticRecipesBaseExt = "RecipesBase"
+    IntervalArithmeticsIntervalSetsExt = "IntervalSets"
 
 [[deps.IntervalSets]]
 git-tree-sha1 = "dba9ddf07f77f60450fe5d2e2beb9854d9a49bd0"
@@ -1120,7 +1121,9 @@ version = "1.0.2"
 
 [[deps.NamedTrajectories]]
 deps = ["CairoMakie", "JLD2", "LaTeXStrings", "Latexify", "OrderedCollections", "Random", "Reexport", "Unidecode"]
-git-tree-sha1 = "8b72d6806501fd61684dcc6e9c336855acd5abe1"
+git-tree-sha1 = "900c2091843bbee472da11a8cc862d01e2482aa5"
+repo-rev = "main"
+repo-url = "https://github.com/kestrelquantum/NamedTrajectories.jl.git"
 uuid = "538bc3a1-5ab9-4fc3-b776-35ca1e893e08"
 version = "0.2.2"
 
@@ -1653,11 +1656,9 @@ version = "3.7.1"
 
     [deps.SymbolicUtils.extensions]
     SymbolicUtilsLabelledArraysExt = "LabelledArrays"
-    SymbolicUtilsReverseDiffExt = "ReverseDiff"
 
     [deps.SymbolicUtils.weakdeps]
     LabelledArrays = "2ee39098-c373-598a-b85f-a56591580800"
-    ReverseDiff = "37e2e3b7-166d-5795-8a7a-e32c996b4267"
 
 [[deps.Symbolics]]
 deps = ["ADTypes", "ArrayInterface", "Bijections", "CommonWorldInvalidations", "ConstructionBase", "DataStructures", "DiffRules", "Distributions", "DocStringExtensions", "DomainSets", "DynamicPolynomials", "IfElse", "LaTeXStrings", "LambertW", "Latexify", "Libdl", "LinearAlgebra", "LogExpFunctions", "MacroTools", "Markdown", "NaNMath", "PrecompileTools", "Primes", "RecipesBase", "Reexport", "RuntimeGeneratedFunctions", "SciMLBase", "Setfield", "SparseArrays", "SpecialFunctions", "StaticArraysCore", "SymbolicIndexingInterface", "SymbolicLimits", "SymbolicUtils", "TermInterface"]
@@ -1668,7 +1669,7 @@ version = "6.13.1"
     [deps.Symbolics.extensions]
     SymbolicsForwardDiffExt = "ForwardDiff"
     SymbolicsGroebnerExt = "Groebner"
-    SymbolicsLuxExt = "Lux"
+    SymbolicsLuxCoreExt = "LuxCore"
     SymbolicsNemoExt = "Nemo"
     SymbolicsPreallocationToolsExt = ["PreallocationTools", "ForwardDiff"]
     SymbolicsSymPyExt = "SymPy"
@@ -1676,7 +1677,7 @@ version = "6.13.1"
     [deps.Symbolics.weakdeps]
     ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
     Groebner = "0b43b601-686d-58a3-8a1c-6623616c7cd4"
-    Lux = "b2108857-7c20-44ae-9111-449ecde12c47"
+    LuxCore = "bb33d45b-7691-41d6-9220-0943567d0623"
     Nemo = "2edaba10-b0f1-5616-af89-8c11ac63239a"
     PreallocationTools = "d236fae5-4411-538c-8e31-a6e3d9e00b46"
     SymPy = "24249f21-da20-56a4-8eb1-6a02cf4ae2e6"
