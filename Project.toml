@@ -1,7 +1,7 @@
 name = "QuantumCollocation"
 uuid = "0dc23a59-5ffb-49af-b6bd-932a8ae77adf"
 authors = ["Aaron Trowbridge <aaron.j.trowbridge@gmail.com> and contributors"]
-version = "0.2.1"
+version = "0.2.2"
 
 [deps]
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
@@ -29,7 +29,7 @@ TrajectoryIndexingUtils = "6dad8b7f-dd9a-4c28-9b70-85b9a079bfc8"
 
 [compat]
 BenchmarkTools = "1.5"
-CairoMakie = "0.10, 0.11, 0.12"
+CairoMakie = "0.12"
 Distributions = "0.25"
 Einsum = "0.4"
 ExponentialAction = "0.2"
@@ -37,14 +37,14 @@ ForwardDiff = "0.10"
 IJulia = "1.25"
 Interpolations = "0.15"
 Ipopt = "1.6"
-JLD2 = "0.4"
+JLD2 = "0.5"
 MathOptInterface = "1.31"
 NamedTrajectories = "0.2"
 ProgressMeter = "1.10"
 Reexport = "1.2"
-Symbolics = "6.2"
-TestItemRunner = "0.2"
-TestItems = "0.1"
+Symbolics = "6.11"
+TestItemRunner = "1.0"
+TestItems = "1.0"
 TrajectoryIndexingUtils = "0.1"
 julia = "1.10"
 
