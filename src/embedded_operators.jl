@@ -221,6 +221,23 @@ basis_labels(subsystem_levels::AbstractVector{Int}; baseline=1) =
 
 basis_labels(subsystem_level::Int; kwargs...) = basis_labels([subsystem_level]; kwargs...)
 
+"""
+    get_subspace_indices(subspaces::Vector{<:AbstractVector{Int}}, subsystem_levels::AbstractVector{Int})
+
+Get the indices for the subspace of composite quantum system.
+
+Example: for the two-qubit subspace of two 3-level systems:
+```julia
+subspaces = [1:2, 1:2]
+subsystem_levels = [3, 3]
+get_subspace_indices(subspaces, subsystem_levels) == [1, 2, 4, 5]
+```
+
+# Arguments
+
+- `subspaces::Vector{<:AbstractVector{Int}}`: Subspaces to get indices for. e.g. `[1:2, 1:2]`.
+- `subsystem_levels::AbstractVector{Int}`: Levels of the subsystems in the composite system. e.g. `[3, 3]`. Each element corresponds to a subsystem.
+"""
 function get_subspace_indices(
     subspaces::Vector{<:AbstractVector{Int}},
     subsystem_levels::AbstractVector{Int}
@@ -232,11 +249,34 @@ function get_subspace_indices(
     )
 end
 
+"""
+    get_subspace_indices(subspace::AbstractVector{Int}, levels::Int)
+
+Get the indices for the subspace of simple, non-composite, quantum system. For example:
+```julia
+get_subspace_indices([1, 2], 3) == [1, 2]
+```
+
+# Arguments
+- `subspace::AbstractVector{Int}`: Subspace to get indices for. e.g. `[1, 2]`.
+- `levels::Int`: Levels of the subsystem. e.g. `3`.
+"""
 get_subspace_indices(subspace::AbstractVector{Int}, levels::Int) =
     get_subspace_indices([subspace], [levels])
 
-get_subspace_indices(levels::AbstractVector{Int}; subspace=1:2, kwargs...) =
-    get_subspace_indices(fill(subspace, length(levels)), levels; kwargs...)
+"""
+    get_subspace_indices(levels::AbstractVector{Int}; subspace=1:2, kwargs...)
+
+Get the indices for the subspace of composite quantum system. This is a convenience function that allows to specify the subspace as a range that is constant for every subsystem, which defaults to `1:2`, that is qubit systems.
+
+# Arguments
+- `levels::AbstractVector{Int}`: Levels of the subsystems in the composite system. e.g. `[3, 3]`.
+
+# Keyword Arguments
+- `subspace::AbstractVector{Int}`: Subspace to get indices for. e.g. `1:2`.
+"""
+get_subspace_indices(levels::AbstractVector{Int}; subspace=1:2) =
+    get_subspace_indices(fill(subspace, length(levels)), levels)
 
 function get_subspace_enr_indices(excitation_restriction::Int, subsystem_levels::AbstractVector{Int})
     # excitation_number uses baseline of zero
