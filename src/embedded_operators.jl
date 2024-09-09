@@ -22,36 +22,73 @@ using ..QuantumObjectUtils
 using ..QuantumSystems
 # using ..QuantumSystemUtils
 
+@doc raw"""
+    embed(matrix::Matrix{ComplexF64}, subspace_indices::AbstractVector{Int}, levels::Int)
 
+Embed an operator $U$ in the subspace of a larger system $\mathcal{X} = \mathcal{X}_{\text{subspace}} \oplus \mathcal{X}_{\text{leakage}}$ which is composed of matrices of size $\text{levels} \times \text{levels}$.
+
+# Arguments
+- `matrix::Matrix{ComplexF64}`: Operator to embed.
+- `subspace_indices::AbstractVector{Int}`: Indices of the subspace to embed the operator in.
+- `levels::Int`: Total number of levels in the system.
+"""
 function embed(op::Matrix{ComplexF64}, subspace_indices::AbstractVector{Int}, levels::Int)
-    """
-    Embed an operator in a subspace defined at `subspace_indices` within `levels`.
-    """
     @assert size(op, 1) == size(op, 2) "Operator must be square."
     op_embedded = zeros(ComplexF64, levels, levels)
     op_embedded[subspace_indices, subspace_indices] = op
     return op_embedded
 end
 
+@doc raw"""
+    unembed(matrix::AbstractMatrix, subspace_indices::AbstractVector{Int})
+
+Unembed an operator $U$ from a subspace of a larger system $\mathcal{X} = \mathcal{X}_{\text{subspace}} \oplus \mathcal{X}_{\text{leakage}}$ which is composed of matrices of size $\text{levels} \times \text{levels}$.
+
+This is equivalent to calling `matrix[subspace_indices, subspace_indices]`.
+
+# Arguments
+- `matrix::AbstractMatrix`: Operator to unembed.
+- `subspace_indices::AbstractVector{Int}`: Indices of the subspace to unembed the operator from.
+"""
+function unembed(matrix::AbstractMatrix, subspace_indices::AbstractVector{Int})
+    return matrix[subspace_indices, subspace_indices]
+end
+
 # ----------------------------------------------------------------------------- #
 #                             Embedded Operator                                 #
 # ----------------------------------------------------------------------------- #
 
+"""
+    EmbeddedOperator
+
+Embedded operator type to represent an operator embedded in a subspace of a larger quantum system.
+
+# Fields
+- `operator::Matrix{ComplexF64}`: Embedded operator of size `prod(subsystem_levels) x prod(subsystem_levels)`.
+- `subspace_indices::Vector{Int}`: Indices of the subspace the operator is embedded in.
+- `subsystem_levels::Vector{Int}`: Levels of the subsystems in the composite system.
+"""
 struct EmbeddedOperator
     operator::Matrix{ComplexF64}
     subspace_indices::Vector{Int}
     subsystem_levels::Vector{Int}
 
+    @doc raw"""
+        EmbeddedOperator(op::Matrix{<:Number}, subspace_indices::AbstractVector{Int}, subsystem_levels::AbstractVector{Int})
+
+    Create an embedded operator. The operator `op` is embedded in the subspace defined by `subspace_indices` in `subsystem_levels`.
+
+    # Arguments
+    - `op::Matrix{<:Number}`: Operator to embed.
+    - `subspace_indices::AbstractVector{Int}`: Indices of the subspace to embed the operator in. e.g. `get_subspace_indices([1:2, 1:2], [3, 3])`.
+    - `subsystem_levels::AbstractVector{Int}`: Levels of the subsystems in the composite system. e.g. `[3, 3]` for two 3-level systems.
+    """
     function EmbeddedOperator(
         op::Matrix{<:Number},
         subspace_indices::AbstractVector{Int},
         subsystem_levels::AbstractVector{Int}
     )
-    """
-    Create an embedded operator.
 
-    The operator `op` is embedded in the subspace defined by `subspace_indices` in `subsystem_levels`.
-    """
         op_embedded = embed(Matrix{ComplexF64}(op), subspace_indices, prod(subsystem_levels))
         return new(op_embedded, subspace_indices, subsystem_levels)
     end
