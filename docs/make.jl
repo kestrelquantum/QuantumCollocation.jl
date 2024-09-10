@@ -68,6 +68,6 @@ makedocs(;
 )
 
 deploydocs(;
-    repo="github.com/aarontrowbridge/QuantumCollocation.jl.git",
+    repo="github.com/kestrelquantum/QuantumCollocation.jl.git",
     devbranch="main",
 )
