@@ -16,23 +16,23 @@ function get_layout(index::Int, n::Int)
     return ((index - 1) ÷ √n + 1, (index - 1) % √n + 1)
 end
 
-# """
-#     plot_unitary_populations(
-#         traj::NamedTrajectory;
-#         unitary_columns::AbstractVector{Int}=1:2,
-#         unitary_name::Symbol=:Ũ⃗,
-#         control_name::Symbol=:a,
-#         kwargs...
-#     )
+"""
+    plot_unitary_populations(
+        traj::NamedTrajectory;
+        unitary_columns::AbstractVector{Int}=1:2,
+        unitary_name::Symbol=:Ũ⃗,
+        control_name::Symbol=:a,
+        kwargs...
+    )
 
-#     plot_unitary_populations(
-#         prob::QuantumControlProblem;
-#         kwargs...
-#     )
+    plot_unitary_populations(
+        prob::QuantumControlProblem;
+        kwargs...
+    )
 
-# Plot the populations of the unitary columns of the unitary matrix in the trajectory. `kwargs` are passed to [`NamedTrajectories.plot`](https://aarontrowbridge.github.io/NamedTrajectories.jl/dev/generated/plotting/).
-# """
-# function plot_unitary_populations end
+Plot the populations of the unitary columns of the unitary matrix in the trajectory. `kwargs` are passed to [`NamedTrajectories.plot`](https://aarontrowbridge.github.io/NamedTrajectories.jl/dev/generated/plotting/).
+"""
+function plot_unitary_populations end
 
 function plot_unitary_populations(
     traj::NamedTrajectory;
