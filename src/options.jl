@@ -65,7 +65,7 @@ end
     integrator::Symbol = :pade
     pade_order::Int = 4
     eval_hessian::Bool = false
-    jacobian_structure::Bool = true
+    jacobian_structure::Bool = integrator == :pade
     rollout_integrator::Function = expv
     geodesic = true
     blas_multithreading::Bool = true

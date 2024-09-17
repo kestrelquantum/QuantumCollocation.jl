@@ -19,6 +19,7 @@ pages = [
         "Embedded Operators" => "generated/man/embedded_operators.md",
     ],
     "Examples" => [
+        "Two Qubit Gates" => "generated/examples/two_qubit_gates.md",
         "Multilevel Transmon" => "generated/examples/multilevel_transmon.md",
     ],
     "Library" => "lib.md",
