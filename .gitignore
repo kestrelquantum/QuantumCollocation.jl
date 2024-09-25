@@ -32,3 +32,6 @@ Manifest.toml
 pardiso.lic
 /.CondaPkg/
 *.code-workspace
+
+# generated build folder
+build/
