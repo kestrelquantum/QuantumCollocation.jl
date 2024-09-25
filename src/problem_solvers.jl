@@ -9,6 +9,7 @@ using ..Options
 
 using NamedTrajectories
 using MathOptInterface
+using Ipopt
 const MOI = MathOptInterface
 
 function solve!(
@@ -18,7 +19,8 @@ function solve!(
     max_iter::Int=prob.ipopt_options.max_iter,
     linear_solver::String=prob.ipopt_options.linear_solver,
     print_level::Int=prob.ipopt_options.print_level,
-    remove_slack_variables=false
+    remove_slack_variables=false,
+    callback=nothing
 )
     prob.ipopt_options.max_iter = max_iter
     prob.ipopt_options.linear_solver = linear_solver
@@ -31,7 +33,10 @@ function solve!(
     else
         set_trajectory!(prob)
     end
-
+    
+    if !isnothing(callback)
+        MOI.set(prob.optimizer, Ipopt.CallbackFunction(), callback)
+    end
     MOI.optimize!(prob.optimizer)
 
     update_trajectory!(prob)
