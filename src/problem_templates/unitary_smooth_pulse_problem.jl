@@ -77,6 +77,10 @@ function UnitarySmoothPulseProblem(
     Δt::Union{Float64, Vector{Float64}};
     ipopt_options::IpoptOptions=IpoptOptions(),
     piccolo_options::PiccoloOptions=PiccoloOptions(),
+    state_type::Symbol = :unitary,
+    state_name::Symbol = :Ũ⃗,
+    control_name::Symbol = :a,
+    timestep_name::Symbol = :Δt,
     init_trajectory::Union{NamedTrajectory, Nothing}=nothing,
     a_bound::Float64=1.0,
     a_bounds=fill(a_bound, length(system.G_drives)),
@@ -98,36 +102,22 @@ function UnitarySmoothPulseProblem(
     kwargs...
 )
 
-    state_name = piccolo_options.state_name
-    control_name = piccolo_options.control_name
-    control_velocity_name = Symbol(string("d", control_name))
-    control_acceleration_name = Symbol(string("dd", control_name))
-    timestep_name = piccolo_options.timestep_name
-
     # Trajectory
     if !isnothing(init_trajectory)
         traj = init_trajectory
     else
         n_drives = length(system.G_drives)
 
-        control_bound_names = (
-            control_name,             # a
-            control_velocity_name,    # da
-            control_acceleration_name # dda
-        )
-
-        control_bounds = NamedTuple{control_bound_names}((
-            a_bounds,
-            da_bounds,
-            dda_bounds
-        ))
-
         traj = initialize_unitary_trajectory(
             operator,
             T,
             Δt,
             n_drives,
-            control_bounds;
+            (a_bounds, da_bounds, dda_bounds);
+            n_derivatives=2,
+            state_name=state_name,
+            control_name=control_name,
+            timestep_name=timestep_name,
             free_time=piccolo_options.free_time,
             Δt_bounds=(Δt_min, Δt_max),
             geodesic=piccolo_options.geodesic,
@@ -162,9 +152,14 @@ function UnitarySmoothPulseProblem(
         )
     end
 
-    J += QuadraticRegularizer(control_bound_names[1], traj, R_a)
-    J += QuadraticRegularizer(control_bound_names[2], traj, R_da)
-    J += QuadraticRegularizer(control_bound_names[3], traj, R_dda)
+    control_names = [
+        name for name ∈ traj.names
+            if endswith(string(name), string(control_name))
+    ]
+
+    J += QuadraticRegularizer(control_names[1], traj, R_a)
+    J += QuadraticRegularizer(control_names[2], traj, R_da)
+    J += QuadraticRegularizer(control_names[3], traj, R_dda)
 
     # Integrators
     if piccolo_options.integrator == :pade
@@ -181,12 +176,12 @@ function UnitarySmoothPulseProblem(
 
     integrators = [
         unitary_integrator,
-        DerivativeIntegrator(control_name, control_velocity_name, traj),
-        DerivativeIntegrator(control_velocity_name, control_acceleration_name, traj),
+        DerivativeIntegrator(control_name, control_names[2], traj),
+        DerivativeIntegrator(control_names[2], control_names[3], traj),
     ]
 
     # Optional Piccolo constraints and objectives
-    apply_piccolo_options!(J, constraints, piccolo_options, traj, operator)
+    apply_piccolo_options!(J, constraints, piccolo_options, traj, operator, state_name, timestep_name)
 
     return QuantumControlProblem(
         system,

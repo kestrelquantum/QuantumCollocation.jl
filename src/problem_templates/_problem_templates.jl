@@ -38,13 +38,15 @@ function apply_piccolo_options!(
     J::Objective,
     constraints::AbstractVector{<:AbstractConstraint},
     piccolo_options::PiccoloOptions,
-    traj::NamedTrajectory;
-    operator::Union{Nothing, OperatorType}=nothing
+    traj::NamedTrajectory,
+    operator::OperatorType,
+    state_name::Symbol,
+    timestep_name::Symbol
 )
     if piccolo_options.leakage_suppression
         state_names = [
             name for name ∈ traj.names
-                if startswith(string(name), string(piccolo_options.state_name))
+                if startswith(string(name), string(state_name))
         ]
 
         if operator isa EmbeddedOperator
@@ -68,7 +70,7 @@ function apply_piccolo_options!(
         if piccolo_options.timesteps_all_equal
             push!(
                 constraints,
-                TimeStepsAllEqualConstraint(piccolo_options.timestep_name, traj)
+                TimeStepsAllEqualConstraint(timestep_name, traj)
             )
         end
     end

@@ -53,6 +53,9 @@ function UnitarySamplingProblem(
     init_trajectory::Union{NamedTrajectory, Nothing}=nothing,
     ipopt_options::IpoptOptions=IpoptOptions(),
     piccolo_options::PiccoloOptions=PiccoloOptions(),
+    state_name::Symbol = :Ũ⃗,
+    control_name::Symbol = :a,
+    timestep_name::Symbol = :Δt,
     constraints::Vector{<:AbstractConstraint}=AbstractConstraint[],
     a_bound::Float64=1.0,
     a_bounds=fill(a_bound, length(systems[1].G_drives)),
@@ -72,19 +75,23 @@ function UnitarySamplingProblem(
     kwargs...
 )
     # Create keys for multiple systems
-    Ũ⃗_keys = [add_suffix(:Ũ⃗, ℓ) for ℓ ∈ system_labels]
+    Ũ⃗_names = [add_suffix(state_name, ℓ) for ℓ ∈ system_labels]
 
     # Trajectory
     if !isnothing(init_trajectory)
         traj = init_trajectory
     else
         n_drives = length(systems[1].G_drives)
+
         traj = initialize_unitary_trajectory(
             operator,
             T,
             Δt,
             n_drives,
-            (a = a_bounds, da = da_bounds, dda = dda_bounds);
+            (a_bounds, da_bounds, dda_bounds);
+            state_name=state_name,
+            control_name=control_name,
+            timestep_name=timestep_name,
             free_time=piccolo_options.free_time,
             Δt_bounds=(Δt_min, Δt_max),
             geodesic=piccolo_options.geodesic,
@@ -93,29 +100,34 @@ function UnitarySamplingProblem(
             a_guess=a_guess,
             system=systems,
             rollout_integrator=piccolo_options.rollout_integrator,
-            Ũ⃗_keys=Ũ⃗_keys
+            Ũ⃗_names=Ũ⃗_names
         )
     end
 
+    control_names = [
+        name for name ∈ traj.names
+            if endswith(string(name), string(control_name))
+    ]
+
     # Objective
     J = NullObjective()
-    for (wᵢ, Ũ⃗_key) in zip(system_weights, Ũ⃗_keys)
+    for (wᵢ, Ũ⃗_name) in zip(system_weights, Ũ⃗_names)
         J += wᵢ * UnitaryInfidelityObjective(
-            Ũ⃗_key, traj, Q;
+            Ũ⃗_name, traj, Q;
             subspace=operator isa EmbeddedOperator ? operator.subspace_indices : nothing
         )
     end
-    J += QuadraticRegularizer(:a, traj, R_a)
-    J += QuadraticRegularizer(:da, traj, R_da)
-    J += QuadraticRegularizer(:dda, traj, R_dda)
+    J += QuadraticRegularizer(control_names[1], traj, R_a)
+    J += QuadraticRegularizer(control_names[2], traj, R_da)
+    J += QuadraticRegularizer(control_names[3], traj, R_dda)
 
     # Constraints
     if piccolo_options.leakage_suppression
         if operator isa EmbeddedOperator
             leakage_indices = get_iso_vec_leakage_indices(operator)
-            for Ũ⃗_key in Ũ⃗_keys
+            for Ũ⃗_name in Ũ⃗_names
                 J += L1Regularizer!(
-                    constraints, Ũ⃗_key, traj,
+                    constraints, Ũ⃗_name, traj,
                     R_value=piccolo_options.R_leakage,
                     indices=leakage_indices,
                     eval_hessian=piccolo_options.eval_hessian
@@ -143,16 +155,16 @@ function UnitarySamplingProblem(
 
     # Integrators
     unitary_integrators = AbstractIntegrator[]
-    for (sys, Ũ⃗_key) in zip(systems, Ũ⃗_keys)
+    for (sys, Ũ⃗_name) in zip(systems, Ũ⃗_names)
         if piccolo_options.integrator == :pade
             push!(
                 unitary_integrators,
-                UnitaryPadeIntegrator(sys, Ũ⃗_key, :a, traj; order=piccolo_options.pade_order)
+                UnitaryPadeIntegrator(sys, Ũ⃗_name, control_name, traj; order=piccolo_options.pade_order)
             )
         elseif piccolo_options.integrator == :exponential
             push!(
                 unitary_integrators,
-                UnitaryExponentialIntegrator(sys, Ũ⃗_key, :a, traj)
+                UnitaryExponentialIntegrator(sys, Ũ⃗_name, control_name, traj)
             )
         else
             error("integrator must be one of (:pade, :exponential)")
@@ -161,8 +173,8 @@ function UnitarySamplingProblem(
 
     integrators = [
         unitary_integrators...,
-        DerivativeIntegrator(:a, :da, traj),
-        DerivativeIntegrator(:da, :dda, traj),
+        DerivativeIntegrator(control_name, control_names[2], traj),
+        DerivativeIntegrator(control_names[w], control_names[3], traj),
     ]
 
     return QuantumControlProblem(

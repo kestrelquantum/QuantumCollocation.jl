@@ -250,9 +250,12 @@ function initialize_unitary_trajectory(
     T::Int,
     Δt::Union{Float64, AbstractVecOrMat{<:Float64}},
     n_drives::Int,
-    all_a_bounds::NamedTuple{anames, <:Tuple{Vararg{VectorBound}}} where anames;
+    control_bounds::Tuple{Vararg{VectorBound}};
+    state_name=:Ũ⃗,
+    control_name=:a,
+    timestep_name=:Δt,
     U_init::AbstractMatrix{<:Number}=Matrix{ComplexF64}(I(size(U_goal, 1))),
-    n_derivatives::Int=2,
+    n_derivatives::Int=0,
     geodesic=true,
     bound_unitary=false,
     free_time=false,
@@ -262,10 +265,16 @@ function initialize_unitary_trajectory(
     system::Union{AbstractQuantumSystem, AbstractVector{<:AbstractQuantumSystem}, Nothing}=nothing,
     global_data::Union{NamedTuple, Nothing}=nothing,
     rollout_integrator::Function=expv,
-    Ũ⃗_keys::AbstractVector{<:Symbol}=[:Ũ⃗],
-    a_keys::AbstractVector{<:Symbol}=[Symbol("d"^i * "a") for i in 0:n_derivatives]
+    state_names::AbstractVector{<:Symbol}=[state_name],
 )
-    @assert length(a_keys) == n_derivatives + 1 "a_keys must have the same length as n_derivatives + 1"
+    control_derivative_names = [
+        Symbol("d"^i * string(control_name))
+            for i = 1:n_derivatives
+    ]
+
+    control_names = (control_name, control_derivative_names...)
+
+    control_bounds = NamedTuple{control_names}(control_bounds)
 
     if free_time
         if Δt isa Real
@@ -275,7 +284,7 @@ function initialize_unitary_trajectory(
         else
             @assert size(Δt) == (1, T) "Δt must be a Real, AbstractVector, or 1x$(T) AbstractMatrix"
         end
-        timestep = :Δt
+        timestep = timestep_name
     else
         @assert Δt isa Real "Δt must be a Real if free_time is false"
         timestep = Δt
@@ -289,9 +298,9 @@ function initialize_unitary_trajectory(
     end
 
     # Constraints
-    Ũ⃗_inits = repeat([Ũ⃗_init], length(Ũ⃗_keys))
+    Ũ⃗_inits = repeat([Ũ⃗_init], length(state_names))
     initial = (;
-        (Ũ⃗_keys .=> Ũ⃗_inits)...,
+        (state_names .=> Ũ⃗_inits)...,
         a = zeros(n_drives),
     )
 
@@ -299,27 +308,27 @@ function initialize_unitary_trajectory(
         a = zeros(n_drives),
     )
 
-    Ũ⃗_goals = repeat([Ũ⃗_goal], length(Ũ⃗_keys))
-    goal = (; (Ũ⃗_keys .=> Ũ⃗_goals)...)
+    Ũ⃗_goals = repeat([Ũ⃗_goal], length(state_names))
+    goal = (; (state_names .=> Ũ⃗_goals)...)
 
     # Bounds
-    bounds = all_a_bounds
+    bounds = control_bounds
 
     if bound_unitary
         Ũ⃗_dim = length(Ũ⃗_init)
-        Ũ⃗_bounds = repeat([(-ones(Ũ⃗_dim), ones(Ũ⃗_dim))], length(Ũ⃗_keys))
-        bounds = merge(bounds, (; (Ũ⃗_keys .=> Ũ⃗_bounds)...))
+        Ũ⃗_bounds = repeat([(-ones(Ũ⃗_dim), ones(Ũ⃗_dim))], length(state_names))
+        bounds = merge(bounds, (; (state_names .=> Ũ⃗_bounds)...))
     end
 
     # Initial state and control values
     if isnothing(a_guess)
         Ũ⃗ = initialize_unitaries(U_init, U_goal, T, geodesic=geodesic)
-        Ũ⃗_values = repeat([Ũ⃗], length(Ũ⃗_keys))
+        Ũ⃗_values = repeat([Ũ⃗], length(state_names))
         a_values = initialize_controls(
             n_drives,
             n_derivatives,
             T,
-            bounds[a_keys[1]],
+            bounds[control_name],
             drive_derivative_σ
         )
     else
@@ -336,33 +345,33 @@ function initialize_unitary_trajectory(
         end
 
         if system isa AbstractVector
-            @assert length(system) == length(Ũ⃗_keys) "systems must have the same length as Ũ⃗_keys"
+            @assert length(system) == length(state_names) "systems must have the same length as state_names"
             Ũ⃗_values = map(system) do sys
                 unitary_rollout(Ũ⃗_init, a_guess, ts, sys; integrator=rollout_integrator)
             end
         else
             Ũ⃗ = unitary_rollout(Ũ⃗_init, a_guess, ts, system; integrator=rollout_integrator)
-            Ũ⃗_values = repeat([Ũ⃗], length(Ũ⃗_keys))
+            Ũ⃗_values = repeat([Ũ⃗], length(state_names))
         end
         Ũ⃗_values = Matrix{Float64}.(Ũ⃗_values)
         a_values = initialize_controls(a_guess, ts, n_derivatives)
     end
 
     # Trajectory
-    keys = [Ũ⃗_keys..., a_keys...]
+    names = [state_names..., control_names...]
     values = [Ũ⃗_values..., a_values...]
 
     if free_time
-        push!(keys, :Δt)
+        push!(names, timestep_name)
         push!(values, Δt)
-        controls = (a_keys[end], :Δt)
+        controls = (control_names[end], :Δt)
         bounds = merge(bounds, (Δt = Δt_bounds,))
     else
-        controls = (a_keys[end],)
+        controls = (control_names[end],)
     end
 
     return NamedTrajectory(
-        (; (keys .=> values)...);
+        (; (names .=> values)...);
         controls=controls,
         timestep=timestep,
         bounds=bounds,
