@@ -26,8 +26,8 @@ function QuantumStateSmoothPulseProblem end
 
 function QuantumStateSmoothPulseProblem(
     system::AbstractQuantumSystem,
-    ψ_init::Union{AbstractVector{<:Number}, Vector{<:AbstractVector{<:Number}}},
-    ψ_goal::Union{AbstractVector{<:Number}, Vector{<:AbstractVector{<:Number}}},
+    ψ_init::Union{AbstractVector{<:ComplexF64}, Vector{<:AbstractVector{<:ComplexF64}}},
+    ψ_goal::Union{AbstractVector{<:ComplexF64}, Vector{<:AbstractVector{<:ComplexF64}}},
     T::Int,
     Δt::Float64;
     ipopt_options::IpoptOptions=IpoptOptions(),
@@ -74,13 +74,13 @@ function QuantumStateSmoothPulseProblem(
     if !isnothing(init_trajectory)
         traj = init_trajectory
     else
-        traj = initialize_quantum_state_trajectory(
-            ψ̃_goals,
-            ψ̃_inits,
+        traj = initialize_trajectory(
+            ψ_goals,
+            ψ_inits,
             T,
             Δt,
             n_drives,
-            (a = a_bounds, da = da_bounds, dda = dda_bounds);
+            (a_bounds, da_bounds, dda_bounds);
             free_time=piccolo_options.free_time,
             Δt_bounds=(Δt_min, Δt_max),
             drive_derivative_σ=drive_derivative_σ,
@@ -95,8 +95,12 @@ function QuantumStateSmoothPulseProblem(
     J += QuadraticRegularizer(:da, traj, R_da)
     J += QuadraticRegularizer(:dda, traj, R_dda)
 
-    for i = 1:length(ψ_inits)
-        J += QuantumStateObjective(Symbol("ψ̃$i"), traj, Q)
+    if length(ψ_inits) == 1
+        J += QuantumStateObjective(:ψ̃, traj, Q)
+    else
+        for i = 1:length(ψ_inits)
+            J += QuantumStateObjective(Symbol("ψ̃$i"), traj, Q)
+        end
     end
 
     # Constraints
@@ -124,10 +128,16 @@ function QuantumStateSmoothPulseProblem(
     end
 
     # Integrators
-    ψ̃_integrators = [
-        QuantumStatePadeIntegrator(system, Symbol("ψ̃$i"), :a, traj)
-            for i = 1:length(ψ_inits)
-    ]
+    if length(ψ_inits) == 1
+        ψ̃_integrators = [
+            QuantumStatePadeIntegrator(system, :ψ̃, :a, traj)
+        ]
+    else
+        ψ̃_integrators = [
+            QuantumStatePadeIntegrator(system, Symbol("ψ̃$i"), :a, traj)
+                for i = 1:length(ψ_inits)
+        ]
+    end
 
     integrators = [
         ψ̃_integrators...,
@@ -164,8 +174,8 @@ end
     T = 50
     Δt = 0.2
     sys = QuantumSystem(0.1 * GATES[:Z], [GATES[:X], GATES[:Y]])
-    ψ_init = [1.0, 0.0]
-    ψ_target = [0.0, 1.0]
+    ψ_init = Vector{ComplexF64}([1.0, 0.0])
+    ψ_target = Vector{ComplexF64}([0.0, 1.0])
 
     # Single initial and target states
     # --------------------------------
@@ -181,8 +191,8 @@ end
 
     # Multiple initial and target states
     # ----------------------------------
-    ψ_inits = [[1.0, 0.0], [0.0, 1.0]]
-    ψ_targets = [[0.0, 1.0], [1.0, 0.0]]
+    ψ_inits = Vector{ComplexF64}.([[1.0, 0.0], [0.0, 1.0]])
+    ψ_targets = Vector{ComplexF64}.([[0.0, 1.0], [1.0, 0.0]])
     prob = QuantumStateSmoothPulseProblem(
         sys, ψ_inits, ψ_targets, T, Δt;
         ipopt_options=IpoptOptions(print_level=1),
@@ -199,8 +209,8 @@ end
     T = 50
     Δt = 0.2
     sys = QuantumSystem(0.1 * GATES[:Z], [GATES[:X], GATES[:Y]])
-    ψ_init = [1.0, 0.0]
-    ψ_target = [0.0, 1.0]
+    ψ_init = Vector{ComplexF64}([1.0, 0.0])
+    ψ_target = Vector{ComplexF64}([0.0, 1.0])
     integrator=:exponential
 
     # Single initial and target states
@@ -217,8 +227,8 @@ end
 
     # Multiple initial and target states
     # ----------------------------------
-    ψ_inits = [[1.0, 0.0], [0.0, 1.0]]
-    ψ_targets = [[0.0, 1.0], [1.0, 0.0]]
+    ψ_inits = Vector{ComplexF64}.([[1.0, 0.0], [0.0, 1.0]])
+    ψ_targets = Vector{ComplexF64}.([[0.0, 1.0], [1.0, 0.0]])
     prob = QuantumStateSmoothPulseProblem(
         sys, ψ_inits, ψ_targets, T, Δt;
         ipopt_options=IpoptOptions(print_level=1),

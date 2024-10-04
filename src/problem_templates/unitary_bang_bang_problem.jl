@@ -60,7 +60,7 @@ with
 - `R_bang_bang::Union{Float64, Vector{Float64}}=1.0`: the weight on the bang-bang regularization term
 - `leakage_suppression::Bool=false`: whether or not to suppress leakage to higher energy states
 - `R_leakage=1e-1`: the weight on the leakage suppression term
-- `bound_unitary=integrator == :exponential`: whether or not to bound the unitary
+- `bound_state=integrator == :exponential`: whether or not to bound the unitary
 - `control_norm_constraint=false`: whether or not to enforce a constraint on the control pulse norm
 - `control_norm_constraint_components=nothing`: the components of the control pulse to use for the norm constraint
 - `control_norm_R=nothing`: the weight on the control pulse norm constraint
@@ -76,7 +76,9 @@ function UnitaryBangBangProblem(
     Δt::Union{Float64, Vector{Float64}};
     ipopt_options::IpoptOptions=IpoptOptions(),
     piccolo_options::PiccoloOptions=PiccoloOptions(),
-    constraints::Vector{<:AbstractConstraint}=AbstractConstraint[],
+    state_name::Symbol = :Ũ⃗,
+    control_name::Symbol = :a,
+    timestep_name::Symbol = :Δt,
     init_trajectory::Union{NamedTrajectory, Nothing}=nothing,
     a_bound::Float64=1.0,
     a_bounds=fill(a_bound, length(system.G_drives)),
@@ -91,13 +93,8 @@ function UnitaryBangBangProblem(
     R_a::Union{Float64, Vector{Float64}}=R,
     R_da::Union{Float64, Vector{Float64}}=R,
     R_bang_bang::Union{Float64, Vector{Float64}}=1e-1,
-    leakage_suppression=false,
-    R_leakage=1e-1,
-    control_norm_constraint=false,
-    control_norm_constraint_components=nothing,
-    control_norm_R=nothing,
-    bound_unitary=piccolo_options.integrator == :exponential,
     global_data::Union{NamedTuple, Nothing}=nothing,
+    constraints::Vector{<:AbstractConstraint}=AbstractConstraint[],
     kwargs...
 )
     # Trajectory
@@ -105,17 +102,19 @@ function UnitaryBangBangProblem(
         traj = init_trajectory
     else
         n_drives = length(system.G_drives)
-        traj = initialize_unitary_trajectory(
+        traj = initialize_trajectory(
             operator,
             T,
             Δt,
             n_drives,
-            (a = a_bounds, da = da_bounds);
-            n_derivatives=1,
+            (a_bounds, da_bounds);
+            state_name=state_name,
+            control_name=control_name,
+            timestep_name=timestep_name,
             free_time=piccolo_options.free_time,
             Δt_bounds=(Δt_min, Δt_max),
             geodesic=piccolo_options.geodesic,
-            bound_unitary=bound_unitary,
+            bound_state=piccolo_options.bound_state,
             drive_derivative_σ=drive_derivative_σ,
             a_guess=a_guess,
             system=system,
@@ -126,80 +125,59 @@ function UnitaryBangBangProblem(
 
     # Objective
     if isnothing(global_data)
-        J = UnitaryInfidelityObjective(:Ũ⃗, traj, Q;
+        J = UnitaryInfidelityObjective(state_name, traj, Q;
             subspace=operator isa EmbeddedOperator ? operator.subspace_indices : nothing,
         )
     else
         # TODO: remove hardcoded args
         J = UnitaryFreePhaseInfidelityObjective(
-            name=:Ũ⃗,
-            phase_name=:ϕ,
-            goal=operator_to_iso_vec(operator isa EmbeddedOperator ? operator.operator : operator),
-            phase_operators=[GATES[:Z] for _ in eachindex(traj.global_components[:ϕ])],
+            name=state_name,
+            phase_name=piccolo_options.phase_name,
+            goal=operator_to_iso_vec(
+                operator isa EmbeddedOperator ? operator.operator : operator
+            ),
+            phase_operators=[GATES[:Z] for _ in eachindex(traj.global_components[:piccolo_options.phase_name])],
             Q=Q,
             eval_hessian=piccolo_options.eval_hessian,
             subspace=operator isa EmbeddedOperator ? operator.subspace_indices : nothing
         )
     end
-    J += QuadraticRegularizer(:a, traj, R_a)
-    J += QuadraticRegularizer(:da, traj, R_da)
+
+    control_names = [
+        name for name ∈ traj.names
+            if endswith(string(name), string(control_name))
+    ]
+
+    J += QuadraticRegularizer(control_names[1], traj, R_a)
+    J += QuadraticRegularizer(control_names[2], traj, R_da)
 
     # Constraints
     if R_bang_bang isa Float64
         R_bang_bang = fill(R_bang_bang, length(system.G_drives))
     end
     J += L1Regularizer!(
-        constraints, :da, traj,
+        constraints, control_names[2], traj,
         R=R_bang_bang, eval_hessian=piccolo_options.eval_hessian
     )
-
-    if leakage_suppression
-        if operator isa EmbeddedOperator
-            leakage_indices = get_iso_vec_leakage_indices(operator)
-            J += L1Regularizer!(
-                constraints, :Ũ⃗, traj,
-                R_value=R_leakage,
-                indices=leakage_indices,
-                eval_hessian=piccolo_options.eval_hessian
-            )
-        else
-            @warn "leakage_suppression is not supported for non-embedded operators, ignoring."
-        end
-    end
-
-    if piccolo_options.free_time
-        if piccolo_options.timesteps_all_equal
-            push!(constraints, TimeStepsAllEqualConstraint(:Δt, traj))
-        end
-    end
-
-    if control_norm_constraint
-        @assert !isnothing(control_norm_constraint_components) "control_norm_constraint_components must be provided"
-        @assert !isnothing(control_norm_R) "control_norm_R must be provided"
-        norm_con = ComplexModulusContraint(
-            :a,
-            control_norm_R,
-            traj;
-            name_comps=control_norm_constraint_components,
-        )
-        push!(constraints, norm_con)
-    end
 
     # Integrators
     if piccolo_options.integrator == :pade
         unitary_integrator =
-            UnitaryPadeIntegrator(system, :Ũ⃗, :a, traj; order=piccolo_options.pade_order)
+            UnitaryPadeIntegrator(system, state_name, control_names[1], traj; order=piccolo_options.pade_order)
     elseif piccolo_options.integrator == :exponential
         unitary_integrator =
-            UnitaryExponentialIntegrator(system, :Ũ⃗, :a, traj)
+            UnitaryExponentialIntegrator(system, state_name, control_names[1], traj)
     else
         error("integrator must be one of (:pade, :exponential)")
     end
 
     integrators = [
         unitary_integrator,
-        DerivativeIntegrator(:a, :da, traj),
+        DerivativeIntegrator(control_names[1], control_names[2], traj),
     ]
+
+    # Optional Piccolo constraints and objectives
+    apply_piccolo_options!(J, constraints, piccolo_options, traj, operator, state_name, timestep_name)
 
     return QuantumControlProblem(
         system,
@@ -245,25 +223,29 @@ end
     Δt = 0.2
 
     ipopt_options = IpoptOptions(print_level=1, max_iter=25)
-    piccolo_options = PiccoloOptions(verbose=false)
+    piccolo_options = PiccoloOptions(verbose=false, pade_order=12)
 
     prob = UnitaryBangBangProblem(
         sys, U_goal, T, Δt,
         R_bang_bang=10.,
-        ipopt_options=ipopt_options, piccolo_options=piccolo_options
+        ipopt_options=ipopt_options,
+        piccolo_options=piccolo_options,
+        control_name=:u
     )
 
     smooth_prob = UnitarySmoothPulseProblem(
-        sys, U_goal, T, Δt,
-        ipopt_options=ipopt_options, piccolo_options=piccolo_options
+        sys, U_goal, T, Δt;
+        ipopt_options=ipopt_options,
+        piccolo_options=piccolo_options,
+        control_name=:u
     )
-    initial = unitary_fidelity(prob)
+    initial = unitary_fidelity(prob; drive_name=:u)
     solve!(prob)
-    final = unitary_fidelity(prob)
+    final = unitary_fidelity(prob; drive_name=:u)
     @test final > initial
     solve!(smooth_prob)
     threshold = 1e-3
-    a_sparse = sum(prob.trajectory.da .> 5e-2)
-    a_dense = sum(smooth_prob.trajectory.da .> 5e-2)
+    a_sparse = sum(prob.trajectory.du .> 5e-2)
+    a_dense = sum(smooth_prob.trajectory.du .> 5e-2)
     @test a_sparse < a_dense
 end

@@ -2,7 +2,7 @@ export UnitarySmoothPulseProblem
 
 
 @doc raw"""
-    UnitarySmoothPulseProblem(system::QuantumSystem, operator, T, Δt; kwargs...)
+    UnitarySmoothPulseProblem(system, operator, T, Δt; kwargs...)
 
 Construct a `QuantumControlProblem` for a free-time unitary gate problem with smooth control pulses enforced by constraining the second derivative of the pulse trajectory, i.e.,
 
@@ -42,32 +42,27 @@ with
 # Keyword Arguments
 - `ipopt_options::IpoptOptions=IpoptOptions()`: the options for the Ipopt solver
 - `piccolo_options::PiccoloOptions=PiccoloOptions()`: the options for the Piccolo solver
-- `constraints::Vector{<:AbstractConstraint}=AbstractConstraint[]`: the constraints to enforce
+- `state_name::Symbol = :Ũ⃗`: the name of the state
+- `control_name::Symbol = :a`: the name of the control
+- `timestep_name::Symbol = :Δt`: the name of the timestep
 - `init_trajectory::Union{NamedTrajectory, Nothing}=nothing`: an initial trajectory to use
 - `a_bound::Float64=1.0`: the bound on the control pulse
 - `a_bounds::Vector{Float64}=fill(a_bound, length(system.G_drives))`: the bounds on the control pulses, one for each drive
 - `a_guess::Union{Matrix{Float64}, Nothing}=nothing`: an initial guess for the control pulses
 - `da_bound::Float64=Inf`: the bound on the control pulse derivative
 - `da_bounds::Vector{Float64}=fill(da_bound, length(system.G_drives))`: the bounds on the control pulse derivatives, one for each drive
-- `dda_bound::Float64=1.0`: the bound on the control pulse derivative
-- `dda_bounds::Vector{Float64}=fill(dda_bound, length(system.G_drives))`: the bounds on the control pulse derivatives, one for each drive
-- `Δt_min::Float64=0.5 * Δt`: the minimum time step size
-- `Δt_max::Float64=1.5 * Δt`: the maximum time step size
+- `dda_bound::Float64=1.0`: the bound on the control pulse second derivative
+- `dda_bounds::Vector{Float64}=fill(dda_bound, length(system.G_drives))`: the bounds on the control pulse second derivatives, one for each drive
+- `Δt_min::Float64=Δt isa Float64 ? 0.5 * Δt : 0.5 * mean(Δt)`: the minimum time step size
+- `Δt_max::Float64=Δt isa Float64 ? 1.5 * Δt : 1.5 * mean(Δt)`: the maximum time step size
 - `drive_derivative_σ::Float64=0.01`: the standard deviation of the initial guess for the control pulse derivatives
 - `Q::Float64=100.0`: the weight on the infidelity objective
 - `R=1e-2`: the weight on the regularization terms
 - `R_a::Union{Float64, Vector{Float64}}=R`: the weight on the regularization term for the control pulses
 - `R_da::Union{Float64, Vector{Float64}}=R`: the weight on the regularization term for the control pulse derivatives
 - `R_dda::Union{Float64, Vector{Float64}}=R`: the weight on the regularization term for the control pulse second derivatives
-- `leakage_suppression::Bool=false`: whether or not to suppress leakage to higher energy states
-- `R_leakage=1e-1`: the weight on the leakage suppression term
-- `bound_unitary=integrator == :exponential`: whether or not to bound the unitary
-- `control_norm_constraint=false`: whether or not to enforce a constraint on the control pulse norm
-- `control_norm_constraint_components=nothing`: the components of the control pulse to use for the norm constraint
-- `control_norm_R=nothing`: the weight on the control pulse norm constraint
-
-
-TODO: control modulus norm, advanced feature, needs documentation
+- `global_data::Union{NamedTuple, Nothing}=nothing`: global data for the problem
+- `constraints::Vector{<:AbstractConstraint}=AbstractConstraint[]`: the constraints to enforce
 
 """
 function UnitarySmoothPulseProblem(
@@ -77,7 +72,6 @@ function UnitarySmoothPulseProblem(
     Δt::Union{Float64, Vector{Float64}};
     ipopt_options::IpoptOptions=IpoptOptions(),
     piccolo_options::PiccoloOptions=PiccoloOptions(),
-    state_type::Symbol = :unitary,
     state_name::Symbol = :Ũ⃗,
     control_name::Symbol = :a,
     timestep_name::Symbol = :Δt,
@@ -108,20 +102,19 @@ function UnitarySmoothPulseProblem(
     else
         n_drives = length(system.G_drives)
 
-        traj = initialize_unitary_trajectory(
+        traj = initialize_trajectory(
             operator,
             T,
             Δt,
             n_drives,
             (a_bounds, da_bounds, dda_bounds);
-            n_derivatives=2,
             state_name=state_name,
             control_name=control_name,
             timestep_name=timestep_name,
             free_time=piccolo_options.free_time,
             Δt_bounds=(Δt_min, Δt_max),
             geodesic=piccolo_options.geodesic,
-            bound_unitary=piccolo_options.bound_state,
+            bound_state=piccolo_options.bound_state,
             drive_derivative_σ=drive_derivative_σ,
             a_guess=a_guess,
             system=system,

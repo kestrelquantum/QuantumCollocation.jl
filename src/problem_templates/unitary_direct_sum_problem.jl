@@ -4,15 +4,15 @@ export UnitaryDirectSumProblem
 @doc """
     UnitaryDirectSumProblem(probs, final_fidelity; kwargs...)
 
-Construct a `QuantumControlProblem` as a direct sum of unitary gate problems. The 
-purpose is to find solutions that are as close as possible with respect to one of 
+Construct a `QuantumControlProblem` as a direct sum of unitary gate problems. The
+purpose is to find solutions that are as close as possible with respect to one of
 their components. In particular, this is useful for finding interpolatable control solutions.
 
 A graph of edges (specified by problem labels) will enforce a `PairwiseQuadraticRegularizer` between
 the component trajectories of the problem in `probs` corresponding to the names of the edge in `edges`
 with corresponding edge weight `Q`.
 
-Boundary values can be included to enforce a `QuadraticRegularizer` on edges where one of the nodes is 
+Boundary values can be included to enforce a `QuadraticRegularizer` on edges where one of the nodes is
 not optimized. The boundary values are specified as a dictionary with keys corresponding to the edge
 labels and values corresponding to the boundary values.
 
@@ -107,11 +107,11 @@ function UnitaryDirectSumProblem(
         for ℓ in prob_labels
             a_symb, da_symb, dda_symb = add_suffix(:a, ℓ), add_suffix(:da, ℓ), add_suffix(:dda, ℓ)
             n_drives = length(traj.components[a_symb])
-            a, da, dda = TrajectoryInitialization.initialize_controls(
+            a, da, dda = TrajectoryInitialization.initialize_control_trajectory(
                 n_drives,
                 n_derivatives,
-                traj.T, 
-                traj.bounds[a_symb], 
+                traj.T,
+                traj.bounds[a_symb],
                 drive_derivative_σ
             )
             update!(traj, a_symb, (1 - drive_reset_ratio) * traj[a_symb] + drive_reset_ratio * a)
@@ -164,7 +164,7 @@ function UnitaryDirectSumProblem(
             Q_fid = isa(Q, Number) ? Q : Q[1]
             J += UnitaryInfidelityObjective(
                 add_suffix(:Ũ⃗, ℓ), traj, Q_fid,
-                subspace=subspace, 
+                subspace=subspace,
                 eval_hessian=piccolo_options.eval_hessian
             )
         end
@@ -212,11 +212,11 @@ end
 
     # Test label graph
     direct_sum_prob2 = UnitaryDirectSumProblem(
-        [prob1, prob2], 
+        [prob1, prob2],
         0.99,
         prob_labels=["a", "b"],
         graph=[("a", "b")],
-        verbose=false, 
+        verbose=false,
         ipopt_options=ops)
     state_names_ab = vcat(
         add_suffix(prob1.trajectory.state_names, "a")...,
@@ -231,20 +231,20 @@ end
 
     # Test bad graph
     @test_throws ArgumentError UnitaryDirectSumProblem(
-        [prob1, prob2], 
-        0.99, 
+        [prob1, prob2],
+        0.99,
         prob_labels=["a", "b"],
         graph=[("x", "b")],
-        verbose=false, 
+        verbose=false,
         ipopt_options=ops
     )
 
     # Test symbol graph
     direct_sum_prob3 = UnitaryDirectSumProblem(
-        [prob1, prob2], 
-        0.99, 
+        [prob1, prob2],
+        0.99,
         graph=[(:a1, :a2)],
-        verbose=false, 
+        verbose=false,
         ipopt_options=ops
     )
     @test issetequal(direct_sum_prob3.trajectory.state_names, state_names)
@@ -259,13 +259,13 @@ end
 
     # Test boundary values
     direct_sum_prob5 = UnitaryDirectSumProblem(
-        [prob1, prob2], 
+        [prob1, prob2],
         0.99,
         graph=[("x", "1"), ("1", "2")],
         R_b=1e3,
         Q_symb=:dda,
         boundary_values=Dict("x"=>copy(prob1.trajectory[:dda])),
-        verbose=false, 
+        verbose=false,
         ipopt_options=ops
     )
     # # TODO: Check for objectives?

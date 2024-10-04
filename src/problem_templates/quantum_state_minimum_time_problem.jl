@@ -87,8 +87,8 @@ end
         T = 50
         Δt = 0.2
         sys = QuantumSystem(0.1 * GATES[:Z], [GATES[:X], GATES[:Y]])
-        ψ_init = [1.0, 0.0]
-        ψ_target = [0.0, 1.0]
+        ψ_init = Vector{ComplexF64}([1.0, 0.0])
+        ψ_target = Vector{ComplexF64}([0.0, 1.0])
 
         prob = QuantumStateSmoothPulseProblem(
             sys, ψ_init, ψ_target, T, Δt;

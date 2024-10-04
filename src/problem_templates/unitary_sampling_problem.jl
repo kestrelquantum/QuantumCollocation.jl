@@ -2,7 +2,7 @@ export UnitarySamplingProblem
 
 
 @doc raw"""
-    UnitarySamplingProblem
+    UnitarySamplingProblem(systemns, operator, T, Δt; kwargs...)
 
 A `UnitarySamplingProblem` is a quantum control problem where the goal is to find a control pulse that generates a target unitary operator for a set of quantum systems.
 The controls are shared among all systems, and the optimization seeks to find the control pulse that achieves the operator for each system. The idea is to enforce a
@@ -12,34 +12,33 @@ robust solution by including multiple systems reflecting the problem uncertainty
 - `systems::AbstractVector{<:AbstractQuantumSystem}`: A vector of quantum systems.
 - `operator::OperatorType`: The target unitary operator.
 - `T::Int`: The number of time steps.
-- `Δt::Union{Float64, Vector{Float64}}`: The time step size.
-- `system_labels::Vector{String}`: The labels for each system.
-- `system_weights::Vector{Float64}`: The weights for each system.
-- `init_trajectory::Union{NamedTrajectory, Nothing}`: The initial trajectory.
-- `ipopt_options::IpoptOptions`: The IPOPT options.
-- `piccolo_options::PiccoloOptions`: The Piccolo options.
-- `constraints::Vector{<:AbstractConstraint}`: The constraints.
-- `a_bound::Float64`: The bound for the control amplitudes.
-- `a_bounds::Vector{Float64}`: The bounds for the control amplitudes.
-- `a_guess::Union{Matrix{Float64}, Nothing}`: The initial guess for the control amplitudes.
-- `da_bound::Float64`: The bound for the control first derivatives.
-- `da_bounds::Vector{Float64}`: The bounds for the control first derivatives.
-- `dda_bound::Float64`: The bound for the control second derivatives.
-- `dda_bounds::Vector{Float64}`: The bounds for the control second derivatives.
-- `Δt_min::Float64`: The minimum time step size.
-- `Δt_max::Float64`: The maximum time step size.
-- `drive_derivative_σ::Float64`: The standard deviation for the drive derivative noise.
-- `Q::Float64`: The fidelity weight.
-- `R::Float64`: The regularization weight.
-- `R_a::Union{Float64, Vector{Float64}}`: The regularization weight for the control amplitudes.
-- `R_da::Union{Float64, Vector{Float64}}`: The regularization weight for the control first derivatives.
-- `R_dda::Union{Float64, Vector{Float64}}`: The regularization weight for the control second derivatives.
-- `leakage_suppression::Bool`: Whether to suppress leakage.
-- `R_leakage::Float64`: The regularization weight for the leakage.
-- `bound_unitary::Bool`: Whether to bound the unitary.
-- `control_norm_constraint::Bool`: Whether to enforce a control norm constraint.
-- `control_norm_constraint_components`: The components for the control norm constraint.
-- `control_norm_R`: The regularization weight for the control norm constraint.
+- `Δt::Union{Float64, Vector{Float64}}`: The time step value or vector of time steps.
+
+# Keyword Arguments
+- `system_labels::Vector{String} = string.(1:length(systems))`: The labels for each system.
+- `system_weights::Vector{Float64} = fill(1.0, length(systems))`: The weights for each system.
+- `init_trajectory::Union{NamedTrajectory, Nothing} = nothing`: The initial trajectory.
+- `ipopt_options::IpoptOptions = IpoptOptions()`: The IPOPT options.
+- `piccolo_options::PiccoloOptions = PiccoloOptions()`: The Piccolo options.
+- `state_name::Symbol = :Ũ⃗`: The name of the state variable.
+- `control_name::Symbol = :a`: The name of the control variable.
+- `timestep_name::Symbol = :Δt`: The name of the timestep variable.
+- `constraints::Vector{<:AbstractConstraint} = AbstractConstraint[]`: The constraints.
+- `a_bound::Float64 = 1.0`: The bound for the control amplitudes.
+- `a_bounds::Vector{Float64} = fill(a_bound, length(systems[1].G_drives))`: The bounds for the control amplitudes.
+- `a_guess::Union{Matrix{Float64}, Nothing} = nothing`: The initial guess for the control amplitudes.
+- `da_bound::Float64 = Inf`: The bound for the control first derivatives.
+- `da_bounds::Vector{Float64} = fill(da_bound, length(systems[1].G_drives))`: The bounds for the control first derivatives.
+- `dda_bound::Float64 = 1.0`: The bound for the control second derivatives.
+- `dda_bounds::Vector{Float64} = fill(dda_bound, length(systems[1].G_drives))`: The bounds for the control second derivatives.
+- `Δt_min::Float64 = 0.5 * Δt`: The minimum time step size.
+- `Δt_max::Float64 = 1.5 * Δt`: The maximum time step size.
+- `drive_derivative_σ::Float64 = 0.01`: The standard deviation for the drive derivative noise.
+- `Q::Float64 = 100.0`: The fidelity weight.
+- `R::Float64 = 1e-2`: The regularization weight.
+- `R_a::Union{Float64, Vector{Float64}} = R`: The regularization weight for the control amplitudes.
+- `R_da::Union{Float64, Vector{Float64}} = R`: The regularization weight for the control first derivatives.
+- `R_dda::Union{Float64, Vector{Float64}} = R`: The regularization weight for the control second derivatives.
 - `kwargs...`: Additional keyword arguments.
 
 """
@@ -47,19 +46,19 @@ function UnitarySamplingProblem(
     systems::AbstractVector{<:AbstractQuantumSystem},
     operator::OperatorType,
     T::Int,
-    Δt::Union{Float64, Vector{Float64}};
+    Δt::Union{Float64,Vector{Float64}};
     system_labels=string.(1:length(systems)),
     system_weights=fill(1.0, length(systems)),
-    init_trajectory::Union{NamedTrajectory, Nothing}=nothing,
+    init_trajectory::Union{NamedTrajectory,Nothing}=nothing,
     ipopt_options::IpoptOptions=IpoptOptions(),
     piccolo_options::PiccoloOptions=PiccoloOptions(),
-    state_name::Symbol = :Ũ⃗,
-    control_name::Symbol = :a,
-    timestep_name::Symbol = :Δt,
+    state_name::Symbol=:Ũ⃗,
+    control_name::Symbol=:a,
+    timestep_name::Symbol=:Δt,
     constraints::Vector{<:AbstractConstraint}=AbstractConstraint[],
     a_bound::Float64=1.0,
     a_bounds=fill(a_bound, length(systems[1].G_drives)),
-    a_guess::Union{Matrix{Float64}, Nothing}=nothing,
+    a_guess::Union{Matrix{Float64},Nothing}=nothing,
     da_bound::Float64=Inf,
     da_bounds::Vector{Float64}=fill(da_bound, length(systems[1].G_drives)),
     dda_bound::Float64=1.0,
@@ -69,9 +68,9 @@ function UnitarySamplingProblem(
     drive_derivative_σ::Float64=0.01,
     Q::Float64=100.0,
     R=1e-2,
-    R_a::Union{Float64, Vector{Float64}}=R,
-    R_da::Union{Float64, Vector{Float64}}=R,
-    R_dda::Union{Float64, Vector{Float64}}=R,
+    R_a::Union{Float64,Vector{Float64}}=R,
+    R_da::Union{Float64,Vector{Float64}}=R,
+    R_dda::Union{Float64,Vector{Float64}}=R,
     kwargs...
 )
     # Create keys for multiple systems
@@ -83,7 +82,7 @@ function UnitarySamplingProblem(
     else
         n_drives = length(systems[1].G_drives)
 
-        traj = initialize_unitary_trajectory(
+        traj = initialize_trajectory(
             operator,
             T,
             Δt,
@@ -95,18 +94,18 @@ function UnitarySamplingProblem(
             free_time=piccolo_options.free_time,
             Δt_bounds=(Δt_min, Δt_max),
             geodesic=piccolo_options.geodesic,
-            bound_unitary=piccolo_options.bound_state,
+            bound_state=piccolo_options.bound_state,
             drive_derivative_σ=drive_derivative_σ,
             a_guess=a_guess,
             system=systems,
             rollout_integrator=piccolo_options.rollout_integrator,
-            Ũ⃗_names=Ũ⃗_names
+            state_names=Ũ⃗_names
         )
     end
 
     control_names = [
         name for name ∈ traj.names
-            if endswith(string(name), string(control_name))
+        if endswith(string(name), string(control_name))
     ]
 
     # Objective
@@ -174,7 +173,7 @@ function UnitarySamplingProblem(
     integrators = [
         unitary_integrators...,
         DerivativeIntegrator(control_name, control_names[2], traj),
-        DerivativeIntegrator(control_names[w], control_names[3], traj),
+        DerivativeIntegrator(control_names[2], control_names[3], traj),
     ]
 
     return QuantumControlProblem(
@@ -195,7 +194,7 @@ function UnitarySamplingProblem(
     num_samples::Int,
     operator::OperatorType,
     T::Int,
-    Δt::Union{Float64, Vector{Float64}};
+    Δt::Union{Float64,Vector{Float64}};
     kwargs...
 )
     samples = rand(distribution, num_samples)
@@ -223,7 +222,7 @@ end
     operator = GATES[:H]
     systems(ζ) = QuantumSystem(ζ * GATES[:Z], [GATES[:X], GATES[:Y]])
 
-    ip_ops = IpoptOptions(print_level=1, recalc_y = "yes", recalc_y_feas_tol = 1e1)
+    ip_ops = IpoptOptions(print_level=1, recalc_y="yes", recalc_y_feas_tol=1e1)
     pi_ops = PiccoloOptions(verbose=false)
 
     prob = UnitarySamplingProblem(
