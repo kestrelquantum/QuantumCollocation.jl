@@ -2,8 +2,5 @@
 *.jl.cov
 *.jl.mem
 /docs/build/
-/examples/**/plots/
-/examples/**/trajectories/
-pardiso.lic
-/.CondaPkg/
 *.code-workspace
+manifest.toml
