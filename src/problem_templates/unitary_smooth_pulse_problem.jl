@@ -138,7 +138,7 @@ function UnitarySmoothPulseProblem(
                 operator.operator :
                 operator
             ),
-            phase_operators=[GATES[:Z] for _ in eachindex(traj.global_components[:ϕ])],
+            phase_operators=fill(GATES[:Z], length(traj.global_components[:ϕ])),
             Q=Q,
             eval_hessian=piccolo_options.eval_hessian,
             subspace=operator isa EmbeddedOperator ? operator.subspace_indices : nothing
@@ -150,9 +150,9 @@ function UnitarySmoothPulseProblem(
             if endswith(string(name), string(control_name))
     ]
 
-    J += QuadraticRegularizer(control_names[1], traj, R_a)
-    J += QuadraticRegularizer(control_names[2], traj, R_da)
-    J += QuadraticRegularizer(control_names[3], traj, R_dda)
+    J += QuadraticRegularizer(control_names[1], traj, R_a; timestep_name=timestep_name)
+    J += QuadraticRegularizer(control_names[2], traj, R_da; timestep_name=timestep_name)
+    J += QuadraticRegularizer(control_names[3], traj, R_dda; timestep_name=timestep_name)
 
     # Integrators
     if piccolo_options.integrator == :pade

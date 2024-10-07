@@ -43,28 +43,26 @@ with
 # Keyword Arguments
 - `ipopt_options::IpoptOptions=IpoptOptions()`: the options for the Ipopt solver
 - `piccolo_options::PiccoloOptions=PiccoloOptions()`: the options for the Piccolo solver
-- `constraints::Vector{<:AbstractConstraint}=AbstractConstraint[]`: the constraints to enforce
+- `state_name::Symbol = :Ũ⃗`: the name of the state variable
+- `control_name::Symbol = :a`: the name of the control variable
+- `timestep_name::Symbol = :Δt`: the name of the timestep variable
 - `init_trajectory::Union{NamedTrajectory, Nothing}=nothing`: an initial trajectory to use
 - `a_bound::Float64=1.0`: the bound on the control pulse
-- `a_bounds::Vector{Float64}=fill(a_bound, length(system.G_drives))`: the bounds on the control pulses, one for each drive
+- `a_bounds=fill(a_bound, length(system.G_drives))`: the bounds on the control pulses, one for each drive
 - `a_guess::Union{Matrix{Float64}, Nothing}=nothing`: an initial guess for the control pulses
 - `da_bound::Float64=1.0`: the bound on the control pulse derivative
-- `da_bounds::Vector{Float64}=fill(da_bound, length(system.G_drives))`: the bounds on the control pulse derivatives, one for each drive
-- `Δt_min::Float64=0.5 * Δt`: the minimum time step size
-- `Δt_max::Float64=1.5 * Δt`: the maximum time step size
+- `da_bounds=fill(da_bound, length(system.G_drives))`: the bounds on the control pulse derivatives, one for each drive
+- `Δt_min::Float64=Δt isa Float64 ? 0.5 * Δt : 0.5 * mean(Δt)`: the minimum time step size
+- `Δt_max::Float64=Δt isa Float64 ? 1.5 * Δt : 1.5 * mean(Δt)`: the maximum time step size
 - `drive_derivative_σ::Float64=0.01`: the standard deviation of the initial guess for the control pulse derivatives
 - `Q::Float64=100.0`: the weight on the infidelity objective
 - `R=1e-2`: the weight on the regularization terms
+- `quadratic_control_regularization=false`: whether or not to use quadratic regularization for the control pulses
 - `R_a::Union{Float64, Vector{Float64}}=R`: the weight on the regularization term for the control pulses
 - `R_da::Union{Float64, Vector{Float64}}=R`: the weight on the regularization term for the control pulse derivatives
-- `R_bang_bang::Union{Float64, Vector{Float64}}=1.0`: the weight on the bang-bang regularization term
-- `leakage_suppression::Bool=false`: whether or not to suppress leakage to higher energy states
-- `R_leakage=1e-1`: the weight on the leakage suppression term
-- `bound_state=integrator == :exponential`: whether or not to bound the unitary
-- `control_norm_constraint=false`: whether or not to enforce a constraint on the control pulse norm
-- `control_norm_constraint_components=nothing`: the components of the control pulse to use for the norm constraint
-- `control_norm_R=nothing`: the weight on the control pulse norm constraint
-
+- `R_bang_bang::Union{Float64, Vector{Float64}}=1e-1`: the weight on the bang-bang regularization term
+- `global_data::Union{NamedTuple, Nothing}=nothing`: global data to be used in the problem
+- `constraints::Vector{<:AbstractConstraint}=AbstractConstraint[]`: the constraints to enforce
 
 TODO: control modulus norm, advanced feature, needs documentation
 
@@ -90,6 +88,7 @@ function UnitaryBangBangProblem(
     drive_derivative_σ::Float64=0.01,
     Q::Float64=100.0,
     R=1e-2,
+    quadratic_control_regularization=false,
     R_a::Union{Float64, Vector{Float64}}=R,
     R_da::Union{Float64, Vector{Float64}}=R,
     R_bang_bang::Union{Float64, Vector{Float64}}=1e-1,
@@ -148,8 +147,11 @@ function UnitaryBangBangProblem(
             if endswith(string(name), string(control_name))
     ]
 
-    J += QuadraticRegularizer(control_names[1], traj, R_a)
-    J += QuadraticRegularizer(control_names[2], traj, R_da)
+    # TODO: do we need these regularizers?
+    if quadratic_control_regularization
+        J += QuadraticRegularizer(control_names[1], traj, R_a; timestep_name=timestep_name)
+        J += QuadraticRegularizer(control_names[2], traj, R_da; timestep_name=timestep_name)
+    end
 
     # Constraints
     if R_bang_bang isa Float64

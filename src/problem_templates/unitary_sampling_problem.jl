@@ -116,9 +116,9 @@ function UnitarySamplingProblem(
             subspace=operator isa EmbeddedOperator ? operator.subspace_indices : nothing
         )
     end
-    J += QuadraticRegularizer(control_names[1], traj, R_a)
-    J += QuadraticRegularizer(control_names[2], traj, R_da)
-    J += QuadraticRegularizer(control_names[3], traj, R_dda)
+    J += QuadraticRegularizer(control_names[1], traj, R_a; timestep_name=timestep_name)
+    J += QuadraticRegularizer(control_names[2], traj, R_da; timestep_name=timestep_name)
+    J += QuadraticRegularizer(control_names[3], traj, R_dda; timestep_name=timestep_name)
 
     # Constraints
     if piccolo_options.leakage_suppression

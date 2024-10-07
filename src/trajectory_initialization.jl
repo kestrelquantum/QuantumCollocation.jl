@@ -357,7 +357,7 @@ function initialize_trajectory(
         push!(names, timestep_name)
         push!(values, Δt)
         controls = (control_names[end], timestep_name)
-        bounds = merge(bounds, (Δt = Δt_bounds,))
+        bounds = merge(bounds, (; timestep_name => Δt_bounds,))
     else
         controls = (control_names[end],)
     end
@@ -547,99 +547,6 @@ function initialize_trajectory(
     )
 end
 
-
-
-function initialize_quantum_state_trajectory(
-    ψ̃_goals::AbstractVector{<:AbstractVector{<:Real}},
-    ψ̃_inits::AbstractVector{<:AbstractVector{<:Real}},
-    T::Int,
-    Δt::Union{Real, AbstractVector{<:Real}},
-    n_drives::Int,
-    all_a_bounds::NamedTuple{anames, <:Tuple{Vararg{VectorBound}}} where anames;
-    n_derivatives::Int=3,
-    free_time=false,
-    Δt_bounds::ScalarBound=(1.5 * Δt, 1.5 * Δt),
-    drive_derivative_σ::Float64=0.1,
-    a_guess::Union{AbstractMatrix{<:Float64}, Nothing}=nothing,
-    system::Union{AbstractQuantumSystem, AbstractVector{<:AbstractQuantumSystem}, Nothing}=nothing,
-    global_data::Union{NamedTuple, Nothing}=nothing,
-    rollout_integrator::Function=exp,
-    ψ̃_keys::AbstractVector{<:Symbol}=[Symbol("ψ̃$i") for i = 2:length(ψ̃_goals)],
-    a_keys::AbstractVector{<:Symbol}=[Symbol("d"^i * "a") for i = 1:n_derivatives]
-)
-    @assert length(ψ̃_inits) == length(ψ̃_goals) "ψ̃_inits and ψ̃_goals must have the same length"
-    @assert length(ψ̃_keys) == length(ψ̃_goals) "ψ̃_keys and ψ̃_goals must have the same length"
-
-    if free_time
-        if Δt isa Real
-            Δt = fill(Δt, 2, T)
-        elseif Δt isa AbstractVector
-            Δt = reshape(Δt, 2, :)
-        else
-            @assert size(Δt) == (2, T) "Δt must be a Real, AbstractVector, or 1x$(T) AbstractMatrix"
-        end
-    end
-
-    # Constraints
-    state_initial = (; (ψ̃_keys .=> ψ̃_inits)...)
-    control_initial = (a = zeros(n_drives),)
-    initial = merge(state_initial, control_initial)
-
-    final = (a = zeros(n_drives),)
-
-    goal = (; (ψ̃_keys .=> ψ̃_goals)...)
-
-    # Bounds
-    bounds = all_a_bounds
-
-    # Initial state and control values
-    if isnothing(a_guess)
-        ψ̃_values = NamedTuple([
-            k => linear_interpolation(ψ̃_init, ψ̃_goal, T)
-                for (k, ψ̃_init, ψ̃_goal) in zip(ψ̃_keys, ψ̃_inits, ψ̃_goals)
-        ])
-        a_values = initialize_controls(
-            n_drives,
-            n_derivatives,
-            T,
-            bounds[a_keys[2]],
-            drive_derivative_σ
-        )
-    else
-        ψ̃_values = NamedTuple([
-            k => rollout(ψ̃_init, a_guess, Δt, system, integrator=rollout_integrator)
-                for (k, ψ̃_init) in zip(ψ̃_keys, ψ̃_inits)
-        ])
-        a_values = initialize_controls(a_guess, Δt, n_derivatives)
-    end
-
-    # Trajectory
-    keys = [ψ̃_keys..., a_keys...]
-    values = [ψ̃_values..., a_values...]
-
-    if free_time
-        push!(keys, :Δt)
-        push!(values, Δt)
-        controls = (a_keys[end], :Δt)
-        timestep = :Δt
-        bounds = merge(bounds, (Δt = Δt_bounds,))
-    else
-        controls = (a_keys[end],)
-        @assert Δt isa Real "Δt must be a Real if free_time is false"
-        timestep = Δt
-    end
-
-    return NamedTrajectory(
-        (; (keys .=> values)...);
-        controls=controls,
-        timestep=timestep,
-        bounds=bounds,
-        initial=initial,
-        final=final,
-        goal=goal,
-        global_data=isnothing(global_data) ? (;) : global_data
-    )
-end
 
 # ============================================================================= #
 

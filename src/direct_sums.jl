@@ -83,21 +83,21 @@ to the `reduce` function.
 - `traj1::NamedTrajectory`: The first `NamedTrajectory` object.
 - `traj2::NamedTrajectory`: The second `NamedTrajectory` object.
 - `free_time::Bool=false`: Whether to construct a free time problem.
-- `timestep_symbol::Symbol=:Δt`: The timestep symbol to use for free time problems.
+- `timestep_name::Symbol=:Δt`: The timestep symbol to use for free time problems.
 """
 function direct_sum(
     traj1::NamedTrajectory,
     traj2::NamedTrajectory;
     free_time::Bool=false,
-    timestep_symbol::Symbol=:Δt,
+    timestep_name::Symbol=:Δt,
 )
-    return direct_sum([traj1, traj2]; free_time=free_time, timestep_symbol=timestep_symbol)
+    return direct_sum([traj1, traj2]; free_time=free_time, timestep_name=timestep_name)
 end
 
 function direct_sum(
     trajs::AbstractVector{<:NamedTrajectory};
     free_time::Bool=false,
-    timestep_symbol::Symbol=:Δt,
+    timestep_name::Symbol=:Δt,
 )
     if length(trajs) < 2
         throw(ArgumentError("At least two trajectories must be provided"))
@@ -122,13 +122,13 @@ function direct_sum(
 
     # add timestep to components
     if free_time
-        components = merge_outer(components, NamedTuple{(timestep_symbol,)}([get_timesteps(trajs[1])]))
+        components = merge_outer(components, NamedTuple{(timestep_name,)}([get_timesteps(trajs[1])]))
     end
 
     return NamedTrajectory(
         components,
         controls=merge_outer([traj.control_names for traj in trajs]),
-        timestep=free_time ? timestep_symbol : timestep,
+        timestep=free_time ? timestep_name : timestep,
         bounds=merge_outer([traj.bounds for traj in trajs]),
         initial=merge_outer([traj.initial for traj in trajs]),
         final=merge_outer([traj.final for traj in trajs]),
@@ -670,21 +670,21 @@ end
     pi_false_ops = PiccoloOptions(verbose=false, free_time=false)
     pi_true_ops = PiccoloOptions(verbose=false, free_time=true)
     suffix = "_new"
-    timestep_symbol = :Δt
+    timestep_name = :Δt
 
     prob1 = UnitarySmoothPulseProblem(sys, GATES[:Y], T, Δt, piccolo_options=pi_false_ops, ipopt_options=ops)
     traj1 = direct_sum(prob1.trajectory, add_suffix(prob1.trajectory, suffix), free_time=true)
 
     # Direct sum (shared timestep name)
-    @test get_suffix(traj1, suffix).timestep == timestep_symbol
-    @test get_suffix(traj1, suffix, remove=true).timestep == timestep_symbol
+    @test get_suffix(traj1, suffix).timestep == timestep_name
+    @test get_suffix(traj1, suffix, remove=true).timestep == timestep_name
 
     prob2 = UnitarySmoothPulseProblem(sys, GATES[:Y], T, Δt, ipopt_options=ops, piccolo_options=pi_true_ops)
     traj2 = add_suffix(prob2.trajectory, suffix)
 
     # Trajectory (unique timestep name)
-    @test get_suffix(traj2, suffix).timestep == add_suffix(timestep_symbol, suffix)
-    @test get_suffix(traj2, suffix, remove=true).timestep == timestep_symbol
+    @test get_suffix(traj2, suffix).timestep == add_suffix(timestep_name, suffix)
+    @test get_suffix(traj2, suffix, remove=true).timestep == timestep_name
 end
 
 end # module

@@ -39,11 +39,11 @@ function apply_piccolo_options!(
     constraints::AbstractVector{<:AbstractConstraint},
     piccolo_options::PiccoloOptions,
     traj::NamedTrajectory,
-    operator::OperatorType,
+    operator::Union{Nothing, OperatorType},
     state_name::Symbol,
     timestep_name::Symbol
 )
-    if piccolo_options.leakage_suppression
+    if !isnothing(operator) && piccolo_options.leakage_suppression
         state_names = [
             name for name ∈ traj.names
                 if startswith(string(name), string(state_name))

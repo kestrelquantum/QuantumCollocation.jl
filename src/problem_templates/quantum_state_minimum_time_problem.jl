@@ -2,9 +2,28 @@ export QuantumStateMinimumTimeProblem
 
 
 """
-    QuantumStateMinimumTimeProblem
+    QuantumStateMinimumTimeProblem(traj, sys, obj, integrators, constraints; kwargs...)
+    QuantumStateMinimumTimeProblem(prob; kwargs...)
 
-TODO: Add documentation
+Construct a `QuantumControlProblem` for the minimum time problem of reaching a target state.
+
+# Arguments
+- `traj::NamedTrajectory`: The initial trajectory.
+- `sys::QuantumSystem`: The quantum system.
+- `obj::Objective`: The objective function.
+- `integrators::Vector{<:AbstractIntegrator}`: The integrators.
+- `constraints::Vector{<:AbstractConstraint}`: The constraints.
+or
+- `prob::QuantumControlProblem`: The quantum control problem.
+
+# Keyword Arguments
+- `state_name::Symbol=:ψ̃`: The symbol for the state variables.
+- `final_fidelity::Union{Real, Nothing}=nothing`: The final fidelity.
+- `D=1.0`: The cost weight on the time.
+- `ipopt_options::IpoptOptions=IpoptOptions()`: The Ipopt options.
+- `piccolo_options::PiccoloOptions=PiccoloOptions()`: The Piccolo options.
+- `kwargs...`: Additional keyword arguments, passed to [`QuantumControlProblem`](@ref).
+
 """
 function QuantumStateMinimumTimeProblem end
 
@@ -14,14 +33,14 @@ function QuantumStateMinimumTimeProblem(
     obj::Objective,
     integrators::Vector{<:AbstractIntegrator},
     constraints::Vector{<:AbstractConstraint};
-    state_symbol::Symbol=:ψ̃,
+    state_name::Symbol=:ψ̃,
     final_fidelity::Union{Real, Nothing}=nothing,
     D=1.0,
     ipopt_options::IpoptOptions=IpoptOptions(),
     piccolo_options::PiccoloOptions=PiccoloOptions(),
     kwargs...
 )
-    state_names = [name for name in traj.names if startswith(name, state_symbol)]
+    state_names = [name for name in traj.names if startswith(name, state_name)]
     @assert length(state_names) ≥ 1 "No matching states found in trajectory"
 
     obj += MinimumTimeObjective(traj; D=D, eval_hessian=piccolo_options.eval_hessian)
