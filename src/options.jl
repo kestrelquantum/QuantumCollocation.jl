@@ -70,8 +70,15 @@ end
     geodesic = true
     blas_multithreading::Bool = true
     build_trajectory_constraints::Bool = true
+    complex_control_norm_constraint_name::Union{Nothing, Symbol} = nothing
+    complex_control_norm_constraint_radius::Float64 = 1.0
+    bound_state::Bool = false
+    leakage_suppression::Bool = false
+    R_leakage::Float64 = 1.0
+    free_phase_infidelity::Bool = false
+    phase_operators::Union{Nothing, AbstractVector{<:AbstractMatrix{<:Complex}}} = nothing
+    phase_name::Symbol = :ϕ
 end
-
 
 function set!(optimizer::Ipopt.Optimizer, options::AbstractOptions)
     for name in fieldnames(typeof(options))

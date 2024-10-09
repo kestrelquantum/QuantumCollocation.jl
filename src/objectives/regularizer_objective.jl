@@ -13,7 +13,7 @@ export PairwiseQuadraticRegularizer
     QuadraticRegularizer
 
 A quadratic regularizer for a trajectory component.
-    
+
 Fields:
     `name`: the name of the trajectory component to regularize
     `times`: the times at which to evaluate the regularizer
@@ -21,7 +21,7 @@ Fields:
     `R`: the regularization matrix
     `baseline`: the baseline values for the trajectory component
     `eval_hessian`: whether to evaluate the Hessian of the regularizer
-    `timestep_symbol`: the symbol for the timestep variable
+    `timestep_name`: the symbol for the timestep variable
 """
 function QuadraticRegularizer(;
 	name::Union{Nothing, Symbol}=nothing,
@@ -30,7 +30,7 @@ function QuadraticRegularizer(;
 	R::Union{Nothing, AbstractVector{<:Real}}=nothing,
     baseline::Union{Nothing, AbstractArray{<:Real}}=nothing,
 	eval_hessian::Bool=true,
-    timestep_symbol::Symbol=:Δt
+    timestep_name::Symbol=:Δt
 )
 
     @assert !isnothing(name) "name must be specified"
@@ -59,7 +59,7 @@ function QuadraticRegularizer(;
         J = 0.0
         for t ∈ times
             if Z.timestep isa Symbol
-                Δt = Z⃗[slice(t, Z.components[timestep_symbol], Z.dim)]
+                Δt = Z⃗[slice(t, Z.components[timestep_name], Z.dim)]
             else
                 Δt = Z.timestep
             end
@@ -80,7 +80,7 @@ function QuadraticRegularizer(;
             Δv = Z⃗[vₜ_slice] .- baseline[:, t]
 
             if Z.timestep isa Symbol
-                Δt_slice = slice(t, Z.components[timestep_symbol], Z.dim)
+                Δt_slice = slice(t, Z.components[timestep_name], Z.dim)
                 Δt = Z⃗[Δt_slice]
                 ∇[Δt_slice] .= Δv' * (R .* (Δt .* Δv))
             else
@@ -106,7 +106,7 @@ function QuadraticRegularizer(;
                 append!(structure, vₜ_vₜ_inds)
 
                 if Z.timestep isa Symbol
-                    Δt_slice = slice(t, Z.components[timestep_symbol], Z.dim)
+                    Δt_slice = slice(t, Z.components[timestep_name], Z.dim)
                     # ∂²_vₜ_Δt
                     vₜ_Δt_inds = [(i, j) for i ∈ vₜ_slice for j ∈ Δt_slice]
                     append!(structure, vₜ_Δt_inds)
@@ -126,7 +126,7 @@ function QuadraticRegularizer(;
             # Match Hessian structure indices
             for t ∈ times
                 if Z.timestep isa Symbol
-                    Δt = Z⃗[slice(t, Z.components[timestep_symbol], Z.dim)]
+                    Δt = Z⃗[slice(t, Z.components[timestep_name], Z.dim)]
                     append!(values, R .* Δt.^2)
                     # ∂²_vₜ_Δt, ∂²_Δt_vₜ
                     vₜ = Z⃗[slice(t, Z.components[name], Z.dim)]
@@ -433,7 +433,7 @@ regularization strength `R`. The regularizer is defined as
     J_{v⃗}(u) = \sum_t \frac{1}{2} \Delta t_t^2 (v⃗_{1,t} - v⃗_{2,t})^T R (v⃗_{1,t} - v⃗_{2,t})
 ```
 
-where $v⃗_{1}$ and $v⃗_{2}$ are selected by `name1` and `name2`. The indices specify the 
+where $v⃗_{1}$ and $v⃗_{2}$ are selected by `name1` and `name2`. The indices specify the
 appropriate block diagonal components of the direct sum vector `v⃗`.
 
 TODO: Hessian not implemented
@@ -444,7 +444,7 @@ Fields:
     `times`: the time steps to apply the regularizer
     `name1`: the first name
     `name2`: the second name
-    `timestep_symbol`: the symbol for the timestep
+    `timestep_name`: the symbol for the timestep
     `eval_hessian`: whether to evaluate the Hessian
 """
 function PairwiseQuadraticRegularizer(
@@ -452,7 +452,7 @@ function PairwiseQuadraticRegularizer(
     times::AbstractVector{Int},
     name1::Symbol,
     name2::Symbol;
-    timestep_symbol::Symbol=:Δt,
+    timestep_name::Symbol=:Δt,
     eval_hessian::Bool=false,
 )
     params = Dict(
@@ -467,7 +467,7 @@ function PairwiseQuadraticRegularizer(
         J = 0.0
         for t ∈ times
             if Z.timestep isa Symbol
-                Δt = Z⃗[slice(t, Z.components[timestep_symbol], Z.dim)]
+                Δt = Z⃗[slice(t, Z.components[timestep_name], Z.dim)]
             else
                 Δt = Z.timestep
             end
@@ -488,7 +488,7 @@ function PairwiseQuadraticRegularizer(
             z2_t = Z⃗[z2_t_slice]
 
             if Z.timestep isa Symbol
-                Δt_slice = slice(t, Z.components[timestep_symbol], Z.dim)
+                Δt_slice = slice(t, Z.components[timestep_name], Z.dim)
                 Δt = Z⃗[Δt_slice]
                 ∇[Δt_slice] .= (z1_t .- z2_t)' * (R .* (Δt .* (z1_t .- z2_t)))
             else
@@ -515,7 +515,7 @@ end
 @doc raw"""
     PairwiseQuadraticRegularizer
 
-A convenience constructor for creating a PairwiseQuadraticRegularizer for the 
+A convenience constructor for creating a PairwiseQuadraticRegularizer for the
 trajectory component `name` with regularization strength `Rs` over the graph `graph`.
 """
 function PairwiseQuadraticRegularizer(
@@ -567,7 +567,7 @@ end
     include("../../test/test_utils.jl")
 
     T = 10
-    
+
     Z = NamedTrajectory(
         (ψ̃ = randn(4, T), u = randn(2, T)),
         controls=:u,

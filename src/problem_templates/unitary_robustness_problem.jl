@@ -3,18 +3,25 @@ export UnitaryRobustnessProblem
 
 @doc raw"""
     UnitaryRobustnessProblem(
-        H_error, trajectory, system, objective, integrators, constraints;
-        unitary_symbol=:Ũ⃗,
-        final_fidelity=nothing,
-        subspace=nothing,
-        ipopt_options=IpoptOptions(),
-        piccolo_options=PiccoloOptions(),
+        H_error,
+        trajectory,
+        system,
+        objective,
+        integrators,
+        constraints;
         kwargs...
     )
 
     UnitaryRobustnessProblem(Hₑ, prob::QuantumControlProblem; kwargs...)
 
 Create a quantum control problem for robustness optimization of a unitary trajectory.
+
+# Keyword Arguments
+- `unitary_symbol::Symbol=:Ũ⃗`: The symbol for the unitary trajectory in `trajectory`.
+- `final_fidelity::Union{Real, Nothing}=nothing`: The target fidelity for the final unitary.
+- `ipopt_options::IpoptOptions=IpoptOptions()`: Options for the Ipopt solver.
+- `piccolo_options::PiccoloOptions=PiccoloOptions()`: Options for the Piccolo solver.
+- `kwargs...`: Additional keyword arguments passed to `QuantumControlProblem`.
 """
 function UnitaryRobustnessProblem end
 
@@ -96,12 +103,12 @@ end
     H_drift = zeros(3, 3)
     H_drives = [create(3) + annihilate(3), im * (create(3) - annihilate(3))]
     sys = QuantumSystem(H_drift, H_drives)
-    
+
     U_goal = EmbeddedOperator(:X, sys)
     H_embed = EmbeddedOperator(:Z, sys)
     T = 51
     Δt = 0.2
-    
+
     #  test initial problem
     # ---------------------
     prob = UnitarySmoothPulseProblem(
@@ -126,7 +133,7 @@ end
         final_fidelity=final_fidelity,
         ipopt_options=IpoptOptions(recalc_y="yes", recalc_y_feas_tol=100.0, print_level=1),
     )
-    solve!(rob_prob, max_iter=50)    
+    solve!(rob_prob, max_iter=50)
 
     loss(Z⃗) = UnitaryRobustnessObjective(H_error=H_embed).L(Z⃗, prob.trajectory)
 

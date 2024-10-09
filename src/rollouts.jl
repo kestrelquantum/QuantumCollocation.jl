@@ -27,14 +27,14 @@ using TestItemRunner
 # ----------------------------------------------------------------------------- #
 
 """
-    infer_is_jvp(integrator::Function)
+    infer_is_evp(integrator::Function)
 
-Infer whether the integrator is a jacobian-vector product (JVP) function.
+Infer whether the integrator is a exponential-vector product (EVP) function.
 
 If `true`, the integrator is expected to have a signature like the exponential action,
 `expv`. Otherwise, it is expected to have a signature like `exp`.
 """
-function infer_is_jvp(integrator::Function)
+function infer_is_evp(integrator::Function)
     # name + args
     ns = fieldcount.([m.sig for m ∈ methods(integrator)])
     is_exp = 2 ∈ ns
@@ -65,7 +65,7 @@ end
 Rollout a quantum state `ψ̃_init` under the control `controls` for a time `Δt`
 using the system `system`.
 
-If `jacobian_vector_product` is `true`, the integrator is expected to have a signature like
+If `exp_vector_product` is `true`, the integrator is expected to have a signature like
 the exponential action, `expv`. Otherwise, it is expected to have a signature like `exp`.
 
 Types should allow for autodifferentiable controls and times.
@@ -77,7 +77,7 @@ function rollout(
     system::AbstractQuantumSystem;
     show_progress=false,
     integrator=expv,
-    jacobian_vector_product=infer_is_jvp(integrator),
+    exp_vector_product=infer_is_evp(integrator),
     G=Integrators.G_bilinear
 )
     T = size(controls, 2)
@@ -93,7 +93,7 @@ function rollout(
     for t = 2:T
         aₜ₋₁ = controls[:, t - 1]
         Gₜ = G(aₜ₋₁, G_drift, G_drives)
-        if jacobian_vector_product
+        if exp_vector_product
             Ψ̃[:, t] .= integrator(Δt[t - 1], Gₜ, Ψ̃[:, t - 1])
         else
             Ψ̃[:, t] .= integrator(Gₜ * Δt[t - 1]) * Ψ̃[:, t - 1]
@@ -174,7 +174,7 @@ function open_rollout(
     system::AbstractQuantumSystem;
     show_progress=false,
     integrator=expv,
-    jacobian_vector_product=infer_is_jvp(integrator),
+    exp_vector_product=infer_is_evp(integrator),
     H=a -> Integrators.G_bilinear(a, system.H_drift, system.H_drives),
 )
     T = size(controls, 2)
@@ -195,7 +195,7 @@ function open_rollout(
     for t = 2:T
         aₜ₋₁ = controls[:, t - 1]
         adGₜ = Isomorphisms.G(ad_vec(H(aₜ₋₁)))
-        if jacobian_vector_product
+        if exp_vector_product
             ρ⃗̃[:, t] = integrator(Δt[t - 1], adGₜ + iso(L), ρ⃗̃[:, t - 1])
         else
             ρ⃗̃[:, t] = integrator(Δt[t - 1], adGₜ + iso(L)) * ρ⃗̃[:, t - 1]
@@ -217,7 +217,7 @@ function unitary_rollout(
     system::AbstractQuantumSystem;
     show_progress=false,
     integrator=expv,
-    jacobian_vector_product=infer_is_jvp(integrator),
+    exp_vector_product=infer_is_evp(integrator),
     G=Integrators.G_bilinear,
 )
     T = size(controls, 2)
@@ -234,7 +234,7 @@ function unitary_rollout(
         aₜ₋₁ = controls[:, t - 1]
         Gₜ = G(aₜ₋₁, G_drift, G_drives)
         Ũₜ₋₁ = iso_vec_to_iso_operator(Ũ⃗[:, t - 1])
-        if jacobian_vector_product
+        if exp_vector_product
             Ũₜ = integrator(Δt[t - 1], Gₜ, Ũₜ₋₁)
         else
             Ũₜ = integrator(Gₜ * Δt[t - 1]) * Ũₜ₋₁

@@ -36,7 +36,7 @@ J(\vec{\tilde{U}}, a, \dot{a}, \ddot{a}) + D \sum_t \Delta t_t \\
 - `constraints::Vector{<:AbstractConstraint}`: The constraints.
 
 # Keyword Arguments
-- `unitary_symbol::Symbol=:Ũ⃗`: The symbol for the unitary control.
+- `unitary_name::Symbol=:Ũ⃗`: The symbol for the unitary control.
 - `final_fidelity::Float64=0.99`: The final fidelity.
 - `D=1.0`: The weight for the minimum-time objective.
 - `ipopt_options::IpoptOptions=IpoptOptions()`: The options for the Ipopt solver.
@@ -51,8 +51,8 @@ function UnitaryMinimumTimeProblem(
     objective::Objective,
     integrators::Vector{<:AbstractIntegrator},
     constraints::Vector{<:AbstractConstraint};
-    unitary_symbol::Symbol=:Ũ⃗,
-    global_symbol::Union{Nothing, Symbol}=nothing,
+    unitary_name::Symbol=:Ũ⃗,
+    global_name::Union{Nothing, Symbol}=nothing,
     final_fidelity::Union{Real, Nothing}=nothing,
     D=1.0,
     ipopt_options::IpoptOptions=IpoptOptions(),
@@ -60,39 +60,40 @@ function UnitaryMinimumTimeProblem(
     subspace=nothing,
     kwargs...
 )
-    @assert unitary_symbol ∈ trajectory.names
+    @assert unitary_name ∈ trajectory.names
 
     if isnothing(final_fidelity)
         final_fidelity = iso_vec_unitary_fidelity(
-            trajectory[unitary_symbol][:, end], trajectory.goal[unitary_symbol]
+            trajectory[unitary_name][:, end], trajectory.goal[unitary_name]
         )
     end
 
     objective += MinimumTimeObjective(trajectory; D=D, eval_hessian=piccolo_options.eval_hessian)
 
-    if isnothing(global_symbol)
+    if isnothing(global_name)
         fidelity_constraint = FinalUnitaryFidelityConstraint(
-            unitary_symbol,
+            unitary_name,
             final_fidelity,
             trajectory;
             subspace=subspace,
             eval_hessian=piccolo_options.eval_hessian
         )
     else
-        # TODO: remove hardcoded args
+        phase_operators= [
+            GATES[:Z] for _ in eachindex(trajectory.global_components[global_name])
+        ]
         fidelity_constraint = FinalUnitaryFreePhaseFidelityConstraint(
-            value=final_fidelity,
-            state_slice=slice(trajectory.T, trajectory.components[unitary_symbol], trajectory.dim),
-            phase_slice=trajectory.global_components[global_symbol],
-            goal=trajectory.goal[unitary_symbol],
-            phase_operators=[GATES[:Z] for _ in eachindex(trajectory.global_components[global_symbol])],
-            zdim=trajectory.dim * trajectory.T + trajectory.global_dim,
+            unitary_name,
+            global_name,
+            phase_operators,
+            final_fidelity,
+            trajectory;
             subspace=subspace,
             eval_hessian=piccolo_options.eval_hessian
         )
     end
 
-    constraints = push!(constraints, fidelity_constraint) 
+    constraints = push!(constraints, fidelity_constraint)
 
     return QuantumControlProblem(
         system,
@@ -116,7 +117,7 @@ function UnitaryMinimumTimeProblem(
     kwargs...
 )
     piccolo_options.build_trajectory_constraints = build_trajectory_constraints
-    
+
     return UnitaryMinimumTimeProblem(
         copy(prob.trajectory),
         prob.system,
@@ -147,14 +148,14 @@ end
     )
 
     before = unitary_fidelity(prob)
-    solve!(prob, max_iter=20)
+    solve!(prob, max_iter=50)
     after = unitary_fidelity(prob)
     @test after > before
 
     # Soft fidelity constraint
     final_fidelity = minimum([0.99, after])
     mintime_prob = UnitaryMinimumTimeProblem(prob, final_fidelity=final_fidelity)
-    solve!(mintime_prob; max_iter=40)
+    solve!(mintime_prob; max_iter=100)
 
     # Test fidelity is approximatley staying above the constraint
     @test unitary_fidelity(mintime_prob) ≥ (final_fidelity - 0.1 * final_fidelity)

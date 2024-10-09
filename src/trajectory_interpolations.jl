@@ -16,9 +16,11 @@ struct DataInterpolation
     values_components::Vector{Int}
 
     function DataInterpolation(
-        times::AbstractVector{Float64}, values::AbstractMatrix{Float64}; 
-        timestep_components::AbstractVector{Int}=Int[], kind::Symbol=:linear
-    )   
+        times::AbstractVector{Float64},
+        values::AbstractMatrix{Float64};
+        timestep_components::AbstractVector{Int}=Int[],
+        kind::Symbol=:linear
+    )
         comps = setdiff(1:size(values, 1), timestep_components)
         if kind == :linear
             interpolants = [linear_interpolation(times, values[c, :]) for c in comps]
@@ -38,10 +40,10 @@ struct DataInterpolation
     end
 
     function DataInterpolation(
-        traj::NamedTrajectory; timestep_symbol::Symbol=:Δt, kwargs...
+        traj::NamedTrajectory; timestep_name::Symbol=:Δt, kwargs...
     )
-        if timestep_symbol ∈ keys(traj.components)
-            timestep_components = traj.components[timestep_symbol]
+        if timestep_name ∈ keys(traj.components)
+            timestep_components = traj.components[timestep_name]
         else
             timestep_components = Int[]
         end
@@ -90,7 +92,7 @@ end
     interp = DataInterpolation(free_traj)
     new_free_data = interp(get_times(traj))
 
-    # Replace the final timestep with the original value (can't be known a priori) 
+    # Replace the final timestep with the original value (can't be known a priori)
     new_free_data[free_traj.components.Δt, end] = free_traj.data[free_traj.components.Δt, end]
     @test new_free_data ≈ free_traj.data
 
