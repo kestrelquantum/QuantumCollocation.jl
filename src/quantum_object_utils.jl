@@ -122,17 +122,17 @@ operator_from_string(operator::String; lookup::Dict{Symbol, AbstractMatrix}=PAUL
 function operator_from_string(
     operator::String;
     lookup::Dict{Symbol, <:AbstractMatrix}=PAULIS
-)
+)::Matrix{ComplexF64}
     # TODO: allow multi-character keys, ['(', ')']
 
     # split string into keys and replace with operators
     characters = [Symbol(c) for c ∈ operator]
     operators = replace(characters, lookup...)
 
-    return Matrix{ComplexF64}(foldr(kron, operators))
+    return foldr(kron, operators)
 end
 
-function cavity_state(state::Int, levels::Int)
+function cavity_state(state::Int, levels::Int)::Vector{ComplexF64}
     @assert state ≤ levels - 1 "Level $state is not allowed for $levels levels"
     ket = zeros(levels)
     ket[state + 1] = 1
@@ -158,7 +158,7 @@ function ket_from_string(
     levels::Vector{Int};
     level_dict=Dict(:g => 0, :e => 1, :f => 2, :h => 2),
     return_states=false
-)
+)::Vector{ComplexF64}
     kets = []
 
     for x ∈ split(ket, ['(', ')'])
@@ -207,11 +207,11 @@ end
 
 Get the state vector for a qubit system given a ket string `ket` of 0s and 1s.
 """
-function ket_from_bitstring(ket::String)
+function ket_from_bitstring(ket::String)::Vector{ComplexF64}
     cs = [c for c ∈ ket]
     @assert all(c ∈ "01" for c ∈ cs)
     states = [c == '0' ? [1, 0] : [0, 1] for c ∈ cs]
-    return Vector{ComplexF64}(foldr(kron, states))
+    return foldr(kron, states)
 end
 
 ###

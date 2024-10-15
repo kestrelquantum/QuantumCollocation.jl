@@ -6,6 +6,14 @@ CurrentModule = QuantumCollocation
 
 *Direct Collocation for Quantum Optimal Control* ([arXiv](https://arxiv.org/abs/2305.03261))
 
+Check out our JuliaCon 2023 talk:
+
+```@raw html
+<center>
+<iframe width="560" height="315" src="https://www.youtube.com/embed/NBdck6UX0Tc?si=YE4iK0mO4GlWnbaW" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+</center>
+```
+
 ## Motivation
 
 In quantum optimal control, we are interested in finding a pulse sequence $a_{1:T-1}$ to drive a quantum system and realize a target gate $U_{\text{goal}}$. We formulate this problem as a nonlinear program (NLP) of the form

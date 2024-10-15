@@ -2,7 +2,8 @@ export UnitarySmoothPulseProblem
 
 
 @doc raw"""
-    UnitarySmoothPulseProblem(system, operator, T, Δt; kwargs...)
+    UnitarySmoothPulseProblem(system::AbstractQuantumSystem, operator, T, Δt; kwargs...)
+    UnitarySmoothPulseProblem(H_drift, H_drives, operator, T, Δt; kwargs...)
 
 Construct a `QuantumControlProblem` for a free-time unitary gate problem with smooth control pulses enforced by constraining the second derivative of the pulse trajectory, i.e.,
 
@@ -11,7 +12,7 @@ Construct a `QuantumControlProblem` for a free-time unitary gate problem with sm
 \underset{\vec{\tilde{U}}, a, \dot{a}, \ddot{a}, \Delta t}{\text{minimize}} & \quad
 Q \cdot \ell\qty(\vec{\tilde{U}}_T, \vec{\tilde{U}}_{\text{goal}}) + \frac{1}{2} \sum_t \qty(R_a a_t^2 + R_{\dot{a}} \dot{a}_t^2 + R_{\ddot{a}} \ddot{a}_t^2) \\
 \text{ subject to } & \quad \vb{P}^{(n)}\qty(\vec{\tilde{U}}_{t+1}, \vec{\tilde{U}}_t, a_t, \Delta t_t) = 0 \\
-& a_{t+1} - a_t - \dot{a}_t \Delta t_t = 0 \\
+& \quad a_{t+1} - a_t - \dot{a}_t \Delta t_t = 0 \\
 & \quad \dot{a}_{t+1} - \dot{a}_t - \ddot{a}_t \Delta t_t = 0 \\
 & \quad |a_t| \leq a_{\text{bound}} \\
 & \quad |\ddot{a}_t| \leq \ddot{a}_{\text{bound}} \\
@@ -30,10 +31,10 @@ is the *infidelity* objective function, $Q$ is a weight, $R_a$, $R_{\dot{a}}$, a
 
 # Arguments
 
+- `system::AbstractQuantumSystem`: the system to be controlled
+or
 - `H_drift::AbstractMatrix{<:Number}`: the drift hamiltonian
 - `H_drives::Vector{<:AbstractMatrix{<:Number}}`: the control hamiltonians
-or
-- `system::QuantumSystem`: the system to be controlled
 with
 - `operator::OperatorType`: the target unitary, either in the form of an `EmbeddedOperator` or a `Matrix{ComplexF64}
 - `T::Int`: the number of timesteps
@@ -188,19 +189,6 @@ function UnitarySmoothPulseProblem(
     )
 end
 
-
-"""
-    UnitarySmoothPulseProblem(
-        H_drift::AbstractMatrix{<:Number},
-        H_drives::Vector{<:AbstractMatrix{<:Number}},
-        operator,
-        T,
-        Δt;
-        kwargs...
-    )
-
-Constructor for a `UnitarySmoothPulseProblem` from a drift Hamiltonian and a set of control Hamiltonians.
-"""
 function UnitarySmoothPulseProblem(
     H_drift::AbstractMatrix{<:Number},
     H_drives::Vector{<:AbstractMatrix{<:Number}},

@@ -3,15 +3,16 @@ export UnitaryBangBangProblem
 
 @doc raw"""
     UnitaryBangBangProblem(system::QuantumSystem, operator, T, Δt; kwargs...)
+    UnitaryBangBangProblem(H_drift, H_drives, operator, T, Δt; kwargs...)
 
 Construct a `QuantumControlProblem` for a free-time unitary gate problem with bang-bang control pulses.
 
 ```math
 \begin{aligned}
 \underset{\vec{\tilde{U}}, a, \dot{a}, \Delta t}{\text{minimize}} & \quad
-Q \cdot \ell\qty(\vec{\tilde{U}}_T, \vec{\tilde{U}}_{\text{goal}}) + \frac{1}{2} \sum_t \qty(R_a a_t^2 + R_{\dot{a}} \dot{a}_t^2) \\
+Q \cdot \ell\qty(\vec{\tilde{U}}_T, \vec{\tilde{U}}_{\text{goal}}) + R_{\text{bang-bang}} \cdot \sum_t |\dot{a}_t| \\
 \text{ subject to } & \quad \vb{P}^{(n)}\qty(\vec{\tilde{U}}_{t+1}, \vec{\tilde{U}}_t, a_t, \Delta t_t) = 0 \\
-& a_{t+1} - a_t - \dot{a}_t \Delta t_t = 0 \\
+& \quad a_{t+1} - a_t - \dot{a}_t \Delta t_t = 0 \\
 & \quad |a_t| \leq a_{\text{bound}} \\
 & \quad |\dot{a}_t| \leq da_{\text{bound}} \\
 & \quad \Delta t_{\text{min}} \leq \Delta t_t \leq \Delta t_{\text{max}} \\
@@ -63,10 +64,9 @@ with
 - `R_bang_bang::Union{Float64, Vector{Float64}}=1e-1`: the weight on the bang-bang regularization term
 - `global_data::Union{NamedTuple, Nothing}=nothing`: global data to be used in the problem
 - `constraints::Vector{<:AbstractConstraint}=AbstractConstraint[]`: the constraints to enforce
-
-TODO: control modulus norm, advanced feature, needs documentation
-
 """
+function UnitaryBangBangProblem end
+
 function UnitaryBangBangProblem(
     system::AbstractQuantumSystem,
     operator::OperatorType,
@@ -193,19 +193,6 @@ function UnitaryBangBangProblem(
     )
 end
 
-
-"""
-    UnitaryBangBangProblem(
-        H_drift::AbstractMatrix{<:Number},
-        H_drives::Vector{<:AbstractMatrix{<:Number}},
-        operator,
-        T,
-        Δt;
-        kwargs...
-    )
-
-Constructor for a `UnitaryBangBangProblem` from a drift Hamiltonian and a set of control Hamiltonians.
-"""
 function UnitaryBangBangProblem(
     H_drift::AbstractMatrix{<:Number},
     H_drives::Vector{<:AbstractMatrix{<:Number}},

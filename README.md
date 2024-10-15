@@ -89,6 +89,12 @@ Documentation is built using [Documenter.jl](https://github.com/JuliaDocs/Docume
 julia --project=docs
 ```
 
+Then run the following commands in the Julia REPL:
+
+```
+] instantiate
+```
+
 Then (for ease of development) load the following packages:
 
 ```julia
