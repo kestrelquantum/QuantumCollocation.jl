@@ -1,8 +1,8 @@
-export ComplexModulusContraint
+export ComplexModulusConstraint
 
 
 """
-    ComplexModulusContraint(<keyword arguments>)
+    ComplexModulusConstraint(<keyword arguments>)
 
 Returns a NonlinearInequalityConstraint on the complex modulus of a complex control
 
@@ -16,7 +16,7 @@ TODO: Changed zdim -> dim. Constraint should be tested for global params.
 - `dim::Union{Int,Nothing}=nothing`: the dimension of a single time step of the trajectory
 - `T::Union{Int,Nothing}=nothing`: the number of time steps
 """
-function ComplexModulusContraint(;
+function ComplexModulusConstraint(;
     R::Union{Float64, Nothing}=nothing,
     comps::Union{AbstractVector{Int}, Nothing}=nothing,
     times::Union{AbstractVector{Int}, Nothing}=nothing,
@@ -33,7 +33,7 @@ function ComplexModulusContraint(;
 
     params = Dict{Symbol, Any}()
 
-    params[:type] = :ComplexModulusContraint
+    params[:type] = :ComplexModulusConstraint
     params[:R] = R
     params[:comps] = comps
     params[:times] = times
@@ -122,12 +122,12 @@ function ComplexModulusContraint(;
 end
 
 """
-    ComplexModulusContraint(symb::Symbol, R::Float64, traj::NamedTrajectory)
+    ComplexModulusConstraint(symb::Symbol, R::Float64, traj::NamedTrajectory)
 
-Returns a ComplexModulusContraint for the complex control NamedTrajector symbol
+Returns a ComplexModulusConstraint for the complex control NamedTrajector symbol
 where R is the maximum allowed complex modulus.
 """
-function ComplexModulusContraint(
+function ComplexModulusConstraint(
     name::Symbol,
     R::Float64,
     traj::NamedTrajectory;
@@ -136,7 +136,7 @@ function ComplexModulusContraint(
 )
     @assert name ∈ traj.names
     comps = traj.components[name][name_comps]
-    return ComplexModulusContraint(;
+    return ComplexModulusConstraint(;
         R=R,
         comps=comps,
         times=times,

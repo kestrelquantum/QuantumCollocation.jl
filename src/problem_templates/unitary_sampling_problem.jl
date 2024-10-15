@@ -144,7 +144,7 @@ function UnitarySamplingProblem(
         norm_con = ComplexModulusContraint(
             :a,
             control_norm_R,
-            traj;
+            traj;Constraint
             name_comps=control_norm_constraint_components,
         )
         push!(constraints, norm_con)
