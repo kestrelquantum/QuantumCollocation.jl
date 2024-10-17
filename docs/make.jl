@@ -14,8 +14,6 @@ pages = [
     "Contribution Guide" => "contribution_guide.md",
     "Manual" => [
         "Problem Templates" => "generated/man/problem_templates.md",
-        "Utilities" => "generated/man/utils.md",
-        "Losses" => "generated/man/losses.md",
         "Embedded Operators" => "generated/man/embedded_operators.md",
     ],
     "Examples" => [
@@ -28,7 +26,7 @@ pages = [
 
 format = Documenter.HTML(;
     prettyurls=get(ENV, "CI", "false") == "true",
-    canonical="https://aarontrowbridge.github.io/QuantumCollocation.jl",
+    canonical="https://kestrelquantum.github.io/QuantumCollocation.jl",
     edit_link="main",
     assets=String[],
     mathengine = MathJax3(Dict(

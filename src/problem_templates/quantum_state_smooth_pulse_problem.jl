@@ -3,6 +3,8 @@ export QuantumStateSmoothPulseProblem
 
 """
     QuantumStateSmoothPulseProblem(system, ψ_inits, ψ_goals, T, Δt; kwargs...)
+    QuantumStateSmoothPulseProblem(system, ψ_init, ψ_goal, T, Δt; kwargs...)
+    QuantumStateSmoothPulseProblem(H_drift, H_drives, args...; kwargs...)
 
 Create a quantum state smooth pulse problem. The goal is to find a control pulse
 `a(t)` that drives all of the initial states `ψ_inits` to the corresponding
@@ -10,10 +12,19 @@ target states `ψ_goals` using `T` timesteps of size `Δt`. This problem also co
 
 # Arguments
 - `system::AbstractQuantumSystem`: The quantum system.
+or
+- `H_drift::AbstractMatrix{<:Number}`: The drift Hamiltonian.
+- `H_drives::Vector{<:AbstractMatrix{<:Number}}`: The control Hamiltonians.
+with
 - `ψ_inits::Vector{<:AbstractVector{<:ComplexF64}}`: The initial states.
 - `ψ_goals::Vector{<:AbstractVector{<:ComplexF64}}`: The target states.
+or
+- `ψ_init::AbstractVector{<:ComplexF64}`: The initial state.
+- `ψ_goal::AbstractVector{<:ComplexF64}`: The target state.
+with
 - `T::Int`: The number of timesteps.
 - `Δt::Float64`: The timestep size.
+
 
 # Keyword Arguments
 - `ipopt_options::IpoptOptions=IpoptOptions()`: The IPOPT options.
@@ -40,6 +51,8 @@ target states `ψ_goals` using `T` timesteps of size `Δt`. This problem also co
 - `leakage_operator::Union{Nothing, EmbeddedOperator}=nothing`: The leakage operator, if leakage suppression is desired.
 - `constraints::Vector{<:AbstractConstraint}=AbstractConstraint[]`: The constraints.
 """
+function QuantumStateSmoothPulseProblem end
+
 function QuantumStateSmoothPulseProblem(
     system::AbstractQuantumSystem,
     ψ_inits::Vector{<:AbstractVector{<:ComplexF64}},

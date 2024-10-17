@@ -1,4 +1,4 @@
-module TrajectoryInterpolation
+module TrajectoryInterpolations
 
 export DataInterpolation
 

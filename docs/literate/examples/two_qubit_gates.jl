@@ -76,7 +76,7 @@ sys = QuantumSystem(H_drift, H_drives)
 ## Look at max eigenvalue of the generator (for deciding if Pade integrators are viable)
 maximum(abs.(eigvals(Δt_max * (H_drift + sum(a_bound .* H_drives)))))
 
-# That this value above is greater than one means that we must use an exponential integrator for these problems. We can set the kwarg `integrator=:exponential` in `the PiccoloOptions` struct as follows.
+# That this value above is greater than one means that we must use an exponential integrator for these problems. We can set the kwarg `integrator=:exponential` in the [`PiccoloOptions`](@ref) struct as follows.
 
 piccolo_options = PiccoloOptions(
     integrator=:exponential,

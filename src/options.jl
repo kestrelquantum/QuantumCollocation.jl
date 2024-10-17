@@ -55,7 +55,31 @@ end
 
 
 """
-    Solver settings for Quantum Collocation.
+    PiccoloOptions
+
+Options for the Piccolo quantum optimal control library.
+
+# Fields
+- `verbose::Bool = true`: Print verbose output
+- `verbose_evaluator::Bool = false`: Print verbose output from the evaluator
+- `free_time::Bool = true`: Allow free time optimization
+- `timesteps_all_equal::Bool = true`: Use equal timesteps
+- `integrator::Symbol = :pade`: Integrator to use
+- `pade_order::Int = 4`: Order of the Pade approximation
+- `rollout_integrator::Function = expv`: Integrator to use for rollout
+- `jacobian_structure::Bool = integrator == :pade`: Use the integrator's Jacobian structure
+- `eval_hessian::Bool = false`: Evaluate the Hessian
+- `geodesic = true`: Use the geodesic to initialize the optimization.
+- `blas_multithreading::Bool = true`: Use BLAS multithreading.
+- `build_trajectory_constraints::Bool = true`: Build trajectory constraints.
+- `complex_control_norm_constraint_name::Union{Nothing, Symbol} = nothing`: Name of the complex control norm constraint.
+- `complex_control_norm_constraint_radius::Float64 = 1.0`: Radius of the complex control norm constraint.
+- `bound_state::Bool = false`: Bound the state.
+- `leakage_suppression::Bool = false`: Suppress leakage.
+- `R_leakage::Float64 = 1.0`: Leakage suppression parameter.
+- `free_phase_infidelity::Bool = false`: Free phase infidelity.
+- `phase_operators::Union{Nothing, AbstractVector{<:AbstractMatrix{<:Complex}}} = nothing`: Phase operators.
+- `phase_name::Symbol = :ϕ`: Name of the phase.
 """
 @kwdef mutable struct PiccoloOptions <: AbstractOptions
     verbose::Bool = true
@@ -64,9 +88,9 @@ end
     timesteps_all_equal::Bool = true
     integrator::Symbol = :pade
     pade_order::Int = 4
-    eval_hessian::Bool = false
     jacobian_structure::Bool = integrator == :pade
     rollout_integrator::Function = expv
+    eval_hessian::Bool = false
     geodesic = true
     blas_multithreading::Bool = true
     build_trajectory_constraints::Bool = true
