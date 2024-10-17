@@ -14,8 +14,6 @@ pages = [
     "Contribution Guide" => "contribution_guide.md",
     "Manual" => [
         "Problem Templates" => "generated/man/problem_templates.md",
-        "Utilities" => "generated/man/utils.md",
-        "Losses" => "generated/man/losses.md",
         "Embedded Operators" => "generated/man/embedded_operators.md",
     ],
     "Examples" => [
