@@ -25,15 +25,7 @@ using TestItemRunner
 # ----------------------------------------------------------------------------- #
 
 """
-```julia
-AbstractQuantumSystem
-```
-   |
-    -> EmbeddedOperator
-   |                  |
-   |                   -> QuantumObjective
-   |                  |
-    -> Matrix (goal) -
+    AbstractQuantumSystem
 
 Abstract type for defining systems.
 """

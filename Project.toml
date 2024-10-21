@@ -1,7 +1,7 @@
 name = "QuantumCollocation"
 uuid = "0dc23a59-5ffb-49af-b6bd-932a8ae77adf"
 authors = ["Aaron Trowbridge <aaron.j.trowbridge@gmail.com> and contributors"]
-version = "0.2.2"
+version = "0.3.1"
 
 [deps]
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
@@ -42,7 +42,7 @@ MathOptInterface = "1.31"
 NamedTrajectories = "0.2"
 ProgressMeter = "1.10"
 Reexport = "1.2"
-Symbolics = "6.11"
+Symbolics = "6.14"
 TestItemRunner = "1.0"
 TestItems = "1.0"
 TrajectoryIndexingUtils = "0.1"

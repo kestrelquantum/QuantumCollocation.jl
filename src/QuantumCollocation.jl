@@ -3,6 +3,9 @@ module QuantumCollocation
 using Reexport
 
 
+include("options.jl")
+@reexport using .Options
+
 include("isomorphisms.jl")
 @reexport using .Isomorphisms
 
@@ -42,9 +45,6 @@ include("dynamics.jl")
 include("evaluators.jl")
 @reexport using .Evaluators
 
-include("options.jl")
-@reexport using .Options
-
 include("problems.jl")
 @reexport using .Problems
 
@@ -58,7 +58,7 @@ include("trajectory_initialization.jl")
 @reexport using .TrajectoryInitialization
 
 include("trajectory_interpolations.jl")
-@reexport using .TrajectoryInterpolation
+@reexport using .TrajectoryInterpolations
 
 include("problem_templates/_problem_templates.jl")
 @reexport using .ProblemTemplates

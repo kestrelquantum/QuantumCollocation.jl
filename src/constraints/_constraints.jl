@@ -3,6 +3,7 @@ module Constraints
 export AbstractConstraint
 
 export LinearConstraint
+
 export constrain!
 
 export NonlinearConstraint
@@ -12,6 +13,7 @@ export NonlinearInequalityConstraint
 using ..Losses
 using ..Isomorphisms
 using ..StructureUtils
+using ..Options
 
 using TrajectoryIndexingUtils
 using NamedTrajectories
@@ -125,5 +127,7 @@ struct NonlinearInequalityConstraint <: NonlinearConstraint
     dim::Int
     params::Dict{Symbol, Any}
 end
+
+
 
 end
