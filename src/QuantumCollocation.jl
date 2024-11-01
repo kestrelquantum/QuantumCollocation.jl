@@ -2,12 +2,10 @@ module QuantumCollocation
 
 using Reexport
 
+@reexport using QuantumCollocationCore
 
 include("options.jl")
 @reexport using .Options
-
-include("isomorphisms.jl")
-@reexport using .Isomorphisms
 
 include("quantum_object_utils.jl")
 @reexport using .QuantumObjectUtils

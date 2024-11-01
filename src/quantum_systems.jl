@@ -5,7 +5,6 @@ export QuantumSystem
 export CompositeQuantumSystem
 export QuantumSystemCoupling
 
-export iso
 export lift
 
 using ..Isomorphisms

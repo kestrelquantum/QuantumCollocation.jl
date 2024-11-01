@@ -2,7 +2,7 @@
 
 julia_version = "1.11.1"
 manifest_format = "2.0"
-project_hash = "cecc8792db4cc9bf9f6ba0dc2c5f0853bdc65504"
+project_hash = "bc51caf2fe1ada0f18728d27d7398f420fc47d2e"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "eea5d80188827b35333801ef97a40c2ed653b081"
@@ -1342,6 +1342,12 @@ version = "2.11.1"
 
     [deps.QuadGK.weakdeps]
     Enzyme = "7da242da-08ed-463a-9acd-ee780be4f1d9"
+
+[[deps.QuantumCollocationCore]]
+deps = ["Reexport", "TestItemRunner", "TestItems"]
+path = "../QuantumCollocationCore.jl"
+uuid = "2b384925-53cb-4042-a8d2-6faa627467e1"
+version = "0.0.1"
 
 [[deps.REPL]]
 deps = ["InteractiveUtils", "Markdown", "Sockets", "StyledStrings", "Unicode"]
