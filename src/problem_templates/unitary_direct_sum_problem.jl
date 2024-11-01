@@ -121,16 +121,9 @@ function UnitaryDirectSumProblem(
     end
 
     # Rebuild integrators
-    integrators = vcat([
-        add_suffix(p.integrators, p.system, p.trajectory, traj, ℓ)
-            for (p, ℓ) ∈ zip(probs, prob_labels)
-    ]...)
-
-    # direct sum (used for problem saving, only)
     system = direct_sum([p.system for p ∈ probs])
 
     # Rebuild trajectory constraints
-    piccolo_options.build_trajectory_constraints = true
     constraints = AbstractConstraint[]
 
     # Add goal constraints for each problem

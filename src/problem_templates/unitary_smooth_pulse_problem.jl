@@ -71,6 +71,8 @@ function UnitarySmoothPulseProblem(
     operator::OperatorType,
     T::Int,
     Δt::Union{Float64, Vector{Float64}};
+    G::Function=a -> G_bilinear(a, system.G_drift, system.G_drives),
+    ∂G::Function=a -> system.G_drives,
     ipopt_options::IpoptOptions=IpoptOptions(),
     piccolo_options::PiccoloOptions=PiccoloOptions(),
     state_name::Symbol = :Ũ⃗,

@@ -306,7 +306,7 @@ function add_suffix(
     mod_traj::NamedTrajectory,
     suffix::String
 )
-    return modify_integrator_suffix(add_suffix, integrator, sys, traj, mod_traj, suffix)
+    return modify_integrator_suffix(add_suffix, integrator, traj, mod_traj, suffix)
 end
 
 function add_suffix(
