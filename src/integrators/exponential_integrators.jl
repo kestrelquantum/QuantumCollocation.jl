@@ -4,6 +4,14 @@ This file includes expoential integrators for states and unitaries
 
 using ExponentialAction
 
+function exp_eigen(G::AbstractMatrix)
+    Ĥ = Hermitian(Matrix(Isomorphisms.H(G)))
+    λ, V = eigen(Ĥ)
+    expG = iso(sparse(V * Diagonal(exp.(-im * λ)) * V'))
+    droptol!(expG, 1e-12)
+    return expG
+end
+
 # ----------------------------------------------------------------------------- #
 #                         Quantum Exponential Integrators                       #
 # ----------------------------------------------------------------------------- #
@@ -27,15 +35,14 @@ struct UnitaryExponentialIntegrator <: QuantumExponentialIntegrator
     G::Function
 
     function UnitaryExponentialIntegrator(
-        sys::AbstractQuantumSystem,
         unitary_name::Symbol,
         drive_name::Union{Symbol, Tuple{Vararg{Symbol}}},
+        G::Function,
         traj::NamedTrajectory;
-        G::Function=a -> G_bilinear(a, sys.G_drift, sys.G_drives),
         autodiff::Bool=false
     )
-        ketdim = size(sys.H_drift, 1)
-        dim = 2ketdim^2
+        dim = traj.dims[unitary_name]
+        ketdim = Int(sqrt(dim ÷ 2))
 
         unitary_components = traj.components[unitary_name]
 
@@ -73,7 +80,6 @@ struct UnitaryExponentialIntegrator <: QuantumExponentialIntegrator
 end
 
 function (integrator::UnitaryExponentialIntegrator)(
-    sys::AbstractQuantumSystem,
     traj::NamedTrajectory;
     unitary_name::Union{Nothing, Symbol}=nothing,
     drive_name::Union{Nothing, Symbol, Tuple{Vararg{Symbol}}}=nothing,
@@ -83,11 +89,10 @@ function (integrator::UnitaryExponentialIntegrator)(
     @assert !isnothing(unitary_name) "unitary_name must be provided"
     @assert !isnothing(drive_name) "drive_name must be provided"
     return UnitaryExponentialIntegrator(
-        sys,
         unitary_name,
         drive_name,
+        G,
         traj;
-        G=G,
         autodiff=autodiff
     )
 end
@@ -122,14 +127,6 @@ end
     return Ũ⃗ₜ₊₁ - expv(Δtₜ, I(ℰ.ketdim) ⊗ Gₜ, Ũ⃗ₜ)
 end
 
-function hermitian_exp(G::AbstractMatrix)
-    Ĥ = Hermitian(Matrix(Isomorphisms.H(G)))
-    λ, V = eigen(Ĥ)
-    expG = Isomorphisms.iso(sparse(V * Diagonal(exp.(-im * λ)) * V'))
-    droptol!(expG, 1e-12)
-    return expG
-end
-
 @views function jacobian(
     ℰ::UnitaryExponentialIntegrator,
     zₜ::AbstractVector,
@@ -152,7 +149,7 @@ end
 
     Id = I(ℰ.ketdim)
 
-    expĜₜ = Id ⊗ hermitian_exp(Δtₜ * Gₜ)
+    expĜₜ = Id ⊗ exp_eigen(Δtₜ * Gₜ)
 
     ∂Ũ⃗ₜ₊₁ℰ = sparse(I, ℰ.dim, ℰ.dim)
     ∂Ũ⃗ₜℰ = -expĜₜ
@@ -183,15 +180,14 @@ struct QuantumStateExponentialIntegrator <: QuantumExponentialIntegrator
     G::Function
 
     function QuantumStateExponentialIntegrator(
-        sys::AbstractQuantumSystem,
         state_name::Symbol,
         drive_name::Union{Symbol, Tuple{Vararg{Symbol}}},
+        G::Function,
         traj::NamedTrajectory;
-        G::Function=a -> G_bilinear(a, sys.G_drift, sys.G_drives),
         autodiff::Bool=false
     )
-        ketdim = size(sys.H_drift, 1)
-        dim = 2ketdim
+        dim = traj.dims[state_name]
+        ketdim = dim ÷ 2
 
         state_components = traj.components[state_name]
 
@@ -237,7 +233,6 @@ function get_comps(P::QuantumStateExponentialIntegrator, traj::NamedTrajectory)
 end
 
 function (integrator::QuantumStateExponentialIntegrator)(
-    sys::AbstractQuantumSystem,
     traj::NamedTrajectory;
     state_name::Union{Nothing, Symbol}=nothing,
     drive_name::Union{Nothing, Symbol, Tuple{Vararg{Symbol}}}=nothing,
@@ -247,11 +242,10 @@ function (integrator::QuantumStateExponentialIntegrator)(
     @assert !isnothing(state_name) "state_name must be provided"
     @assert !isnothing(drive_name) "drive_name must be provided"
     return QuantumStateExponentialIntegrator(
-        sys,
         state_name,
         drive_name,
+        G,
         traj;
-        G=G,
         autodiff=autodiff
     )
 end
@@ -299,7 +293,7 @@ end
     # compute the generator
     Gₜ = ℰ.G(aₜ)
 
-    expGₜ = hermitian_exp(Δtₜ * Gₜ)
+    expGₜ = exp_eigen(Δtₜ * Gₜ)
 
     ∂ψ̃ₜ₊₁ℰ = sparse(I, ℰ.dim, ℰ.dim)
     ∂ψ̃ₜℰ = -expGₜ
@@ -338,6 +332,7 @@ end
 
     dt = 0.1
 
+
     Z = NamedTrajectory(
         (
             Ũ⃗ = unitary_geodesic(U_goal, T),
@@ -350,7 +345,9 @@ end
         goal=(Ũ⃗ = Ũ⃗_goal,)
     )
 
-    ℰ = UnitaryExponentialIntegrator(system, :Ũ⃗, :a, Z)
+    G = a -> Integrators.G_bilinear(a, system.G_drift, system.G_drives)
+
+    ℰ = UnitaryExponentialIntegrator(:Ũ⃗, :a, G, Z)
 
 
     ∂Ũ⃗ₜℰ, ∂Ũ⃗ₜ₊₁ℰ, ∂aₜℰ, ∂Δtₜℰ = jacobian(ℰ, Z[1].data, Z[2].data, 1)
@@ -397,7 +394,10 @@ end
         goal=(ψ̃ = ψ̃_goal,)
     )
 
-    ℰ = QuantumStateExponentialIntegrator(system, :ψ̃, :a, Z)
+    G = a -> Integrators.G_bilinear(a, system.G_drift, system.G_drives)
+
+    ℰ = QuantumStateExponentialIntegrator(:ψ̃, :a, G, Z)
+
     ∂ψ̃ₜℰ, ∂ψ̃ₜ₊₁ℰ, ∂aₜℰ, ∂Δtₜℰ = jacobian(ℰ, Z[1].data, Z[2].data, 1)
 
     ∂ℰ_forwarddiff = ForwardDiff.jacobian(

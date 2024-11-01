@@ -222,59 +222,50 @@ struct UnitaryPadeIntegrator <: QuantumPadeIntegrator
     G::Function
     ∂G::Function
 
-    """
+    @doc raw"""
         UnitaryPadeIntegrator(
-            sys::AbstractQuantumSystem,
             unitary_name::Symbol,
-            drive_name::Union{Symbol,Tuple{Vararg{Symbol}}};
+            drive_name::Union{Symbol,Tuple{Vararg{Symbol}}},
+            G::Function,
+            ∂G::Function,
+            traj::NamedTrajectory;
             order::Int=4,
-            autodiff::Bool=order != 4
-        ) where R <: Real
+            calculate_pade_operators_structure::Bool=true,
+            autodiff::Bool=false
+        )
 
-    Construct a `UnitaryPadeIntegrator` for the quantum system `sys`.
+    Construct a `UnitaryPadeIntegrator` which computes
 
-    # Examples
-
-    ## a bare integrator
-    ```julia
-        P = UnitaryPadeIntegrator(sys)
+    ```math
+    \text{isovec}\qty(B^{(n)}(a_t) U_{t+1} - F^{(n)}(a_t) U_t)
     ```
 
-    ## for a single drive `a`:
-    ```julia
-        P = UnitaryPadeIntegrator(sys, :Ũ⃗, :a)
-    ```
-
-    ## for two drives `α` and `γ`, order `4`, and autodiffed:
-    ```julia
-        P = UnitaryPadeIntegrator(sys, :Ũ⃗, (:α, :γ); order=4, autodiff=true)
-    ```
+    where `U_t` is the unitary at time `t`, `a_t` is the control at time `t`, and `B^{(n)}(a_t)` and `F^{(n)}(a_t)` are the `n`th order Pade operators of the exponential of the drift operator `G(a_t)`.
 
     # Arguments
-    - `sys::AbstractQuantumSystem`: the quantum system
-    - `unitary_name::Union{Symbol,Nothing}=nothing`: the nameol for the unitary
-    - `drive_name::Union{Symbol,Tuple{Vararg{Symbol}},Nothing}=nothing`: the nameol(s) for the drives
-    - `order::Int=4`: the order of the Pade approximation. Must be in `[4, 6, 8, 10]`. If order is not `4` and `autodiff` is `false`, then the integrator will use the hand-coded fourth order derivatives.
-    - `autodiff::Bool=order != 4`: whether to use automatic differentiation to compute the jacobian and hessian of the lagrangian
+    - `unitary_name::Symbol`: the name of the unitary in the trajectory
+    - `drive_name::Union{Symbol,Tuple{Vararg{Symbol}}}`: the name of the drive(s) in the trajectory
+    - `G::Function`: a function which takes the control vector `a_t` and returns the drive `G(a_t)`, $G(a_t) = \text{iso}(-i H(a_t))$
+    - `∂G::Function`: a function which takes the control vector `a_t` and returns a vector of matrices $\qty(\ldots, \pdv{G}{a^j_t}, \ldots)$
+    - `traj::NamedTrajectory`: the trajectory
+
+    # Keyword Arguments
+    - `order::Int=4`: the order of the Pade approximation. Must be in `[4, 6, 8, 10, 12, 14, 16, 18, 20]`.
 
     """
     function UnitaryPadeIntegrator(
-        sys::AbstractQuantumSystem,
         unitary_name::Symbol,
         drive_name::Union{Symbol,Tuple{Vararg{Symbol}}},
+        G::Function,
+        ∂G::Function,
         traj::NamedTrajectory;
         order::Int=4,
-        G::Function=a -> G_bilinear(a, sys.G_drift, sys.G_drives),
-        ∂G::Function=a -> sys.G_drives,
-        calculate_pade_operators_structure::Bool=true,
         autodiff::Bool=false
     )
         @assert order ∈ keys(PADE_COEFFICIENTS) "order ∉ $(keys(PADE_COEFFICIENTS))"
 
-        ketdim = size(sys.H_drift, 1)
-        dim = 2ketdim^2
-
-        I_2N = sparse(I(2ketdim))
+        dim = traj.dims[unitary_name]
+        ketdim = Int(sqrt(dim ÷ 2))
 
         unitary_components = traj.components[unitary_name]
 
@@ -322,7 +313,6 @@ function get_comps(P::UnitaryPadeIntegrator, traj::NamedTrajectory)
 end
 
 function (integrator::UnitaryPadeIntegrator)(
-    sys::AbstractQuantumSystem,
     traj::NamedTrajectory;
     unitary_name::Union{Symbol, Nothing}=nothing,
     drive_name::Union{Symbol, Tuple{Vararg{Symbol}}, Nothing}=nothing,
@@ -334,13 +324,12 @@ function (integrator::UnitaryPadeIntegrator)(
     @assert !isnothing(unitary_name) "unitary_name must be provided"
     @assert !isnothing(drive_name) "drive_name must be provided"
     return UnitaryPadeIntegrator(
-        sys,
         unitary_name,
         drive_name,
+        G,
+        ∂G,
         traj;
         order=order,
-        G=G,
-        ∂G=∂G,
         autodiff=autodiff
     )
 end
@@ -522,13 +511,12 @@ struct QuantumStatePadeIntegrator <: QuantumPadeIntegrator
     - `autodiff::Bool=false`: whether to use automatic differentiation to compute the jacobian and hessian of the lagrangian
     """
     function QuantumStatePadeIntegrator(
-        sys::AbstractQuantumSystem,
         state_name::Symbol,
         drive_name::Union{Symbol,Tuple{Vararg{Symbol}}},
+        G::Function,
+        ∂G::Function,
         traj::NamedTrajectory;
         order::Int=4,
-        G::Function=a -> G_bilinear(a, sys.G_drift, sys.G_drives),
-        ∂G::Function=a -> sys.G_drives,
         autodiff::Bool=false,
     )
         @assert order ∈ keys(PADE_COEFFICIENTS) "order ∉ $(keys(PADE_COEFFICIENTS))"
@@ -583,7 +571,6 @@ function get_comps(P::QuantumStatePadeIntegrator, traj::NamedTrajectory)
 end
 
 function (integrator::QuantumStatePadeIntegrator)(
-    sys::AbstractQuantumSystem,
     traj::NamedTrajectory;
     state_name::Union{Symbol, Nothing}=nothing,
     drive_name::Union{Symbol, Tuple{Vararg{Symbol}}, Nothing}=nothing,
@@ -595,13 +582,12 @@ function (integrator::QuantumStatePadeIntegrator)(
     @assert !isnothing(state_name) "state_name must be provided"
     @assert !isnothing(drive_name) "drive_name must be provided"
     return QuantumStatePadeIntegrator(
-        sys,
         state_name,
         drive_name,
+        G,
+        ∂G,
         traj;
         order=order,
-        G=G,
-        ∂G=∂G,
         autodiff=autodiff
     )
 end

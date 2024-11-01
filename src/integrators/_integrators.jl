@@ -12,6 +12,8 @@ export QuantumStateExponentialIntegrator
 
 export DerivativeIntegrator
 
+export G_bilinear
+
 export jacobian
 export hessian_of_the_lagrangian
 
@@ -23,11 +25,10 @@ export sixth_order_pade
 export eighth_order_pade
 export tenth_order_pade
 
-using ..QuantumSystems
 using ..Isomorphisms
-using ..QuantumObjectUtils
-using ..Losses
-using ..QuantumSystemUtils
+# using ..QuantumSystems
+# using ..QuantumObjectUtils
+# using ..QuantumSystemUtils
 
 using NamedTrajectories
 using TrajectoryIndexingUtils
@@ -35,6 +36,7 @@ using LinearAlgebra
 using SparseArrays
 using ForwardDiff
 using TestItemRunner
+
 
 abstract type AbstractIntegrator end
 
