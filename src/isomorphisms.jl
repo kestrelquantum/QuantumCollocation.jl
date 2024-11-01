@@ -12,10 +12,12 @@ export operator_to_iso_operator
 export iso
 export iso_dm
 export ad_vec
+export ⊗
 
 using LinearAlgebra
 using TestItemRunner
 
+⊗(x...) = kron(x...)
 
 @doc raw"""
     mat(x::AbstractVector)

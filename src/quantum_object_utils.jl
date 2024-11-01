@@ -2,7 +2,6 @@ module QuantumObjectUtils
 
 export PAULIS
 export GATES
-export ⊗
 export operator_from_string
 export ket_from_string
 export ket_from_bitstring
@@ -92,26 +91,6 @@ const PAULIS = Dict{Symbol, Matrix{ComplexF64}}(
     :Y => GATES[:Y],
     :Z => GATES[:Z]
 )
-
-###
-### Kronecker product utilities
-###
-
-@doc raw"""
-    ⊗(A::AbstractVecOrMat, B::AbstractVecOrMat) = kron(A, B)
-
-The Kronecker product, denoted by `⊗`, results in a block matrix formed by multiplying each element of `A` by the entire matrix `B`.
-
-```julia
-julia> GATES[:X] ⊗ GATES[:Y]
-4×4 Matrix{ComplexF64}:
- 0.0+0.0im  0.0+0.0im  0.0+0.0im  0.0-1.0im
- 0.0+0.0im  0.0+0.0im  0.0+1.0im  0.0+0.0im
- 0.0+0.0im  0.0-1.0im  0.0+0.0im  0.0+0.0im
- 0.0+1.0im  0.0+0.0im  0.0+0.0im  0.0+0.0im
-```
-"""
-⊗(A::AbstractVecOrMat, B::AbstractVecOrMat) = kron(A, B)
 
 @doc raw"""
 operator_from_string(operator::String; lookup::Dict{Symbol, AbstractMatrix}=PAULIS)

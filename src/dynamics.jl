@@ -8,8 +8,6 @@ export dynamics_jacobian
 export dynamics_hessian_of_lagrangian
 export dynamics_components
 
-using ..QuantumSystems
-using ..Isomorphisms
 using ..StructureUtils
 using ..Integrators
 

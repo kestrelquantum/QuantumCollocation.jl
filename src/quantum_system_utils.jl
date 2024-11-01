@@ -297,6 +297,7 @@ end
 
 @testitem "Lie Algebra reachability" begin
     using LinearAlgebra
+    using QuantumCollocation.Isomorphisms
 
     H_ops = Dict(
         "X" => GATES[:X],
