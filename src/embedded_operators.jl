@@ -136,7 +136,7 @@ function Base.kron(op1::EmbeddedOperator, op2::EmbeddedOperator)
     return EmbeddedOperator(unembed(op1) ⊗ unembed(op2), indices, levels)
 end
 
-QuantumObjectUtils.:⊗(A::EmbeddedOperator, B::EmbeddedOperator) = kron(A, B)
+Isomorphisms.:⊗(A::EmbeddedOperator, B::EmbeddedOperator) = kron(A, B)
 
 function EmbeddedOperator(
     op::AbstractMatrix{<:Number},

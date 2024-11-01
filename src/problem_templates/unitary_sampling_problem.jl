@@ -47,6 +47,14 @@ function UnitarySamplingProblem(
     operator::OperatorType,
     T::Int,
     Δt::Union{Float64,Vector{Float64}};
+    Gs::Vector{Function}=Function[
+        a -> G_bilinear(a, sys.G_drift, sys.G_drives)
+            for sys ∈ systems
+    ],
+    ∂Gs::Vector{Function}=Function[
+        a -> sys.G_drives
+            for sys ∈ systems
+    ],
     system_labels=string.(1:length(systems)),
     system_weights=fill(1.0, length(systems)),
     init_trajectory::Union{NamedTrajectory,Nothing}=nothing,
@@ -154,16 +162,16 @@ function UnitarySamplingProblem(
 
     # Integrators
     unitary_integrators = AbstractIntegrator[]
-    for (sys, Ũ⃗_name) in zip(systems, Ũ⃗_names)
+    for (sys, Ũ⃗_name, G, ∂G) in zip(systems, Ũ⃗_names, Gs, ∂Gs)
         if piccolo_options.integrator == :pade
             push!(
                 unitary_integrators,
-                UnitaryPadeIntegrator(sys, Ũ⃗_name, control_name, traj; order=piccolo_options.pade_order)
+                UnitaryPadeIntegrator(Ũ⃗_name, control_name, G, ∂G, traj; order=piccolo_options.pade_order)
             )
         elseif piccolo_options.integrator == :exponential
             push!(
                 unitary_integrators,
-                UnitaryExponentialIntegrator(sys, Ũ⃗_name, control_name, traj)
+                UnitaryExponentialIntegrator(Ũ⃗_name, control_name, G, traj)
             )
         else
             error("integrator must be one of (:pade, :exponential)")

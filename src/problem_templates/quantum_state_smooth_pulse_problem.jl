@@ -59,6 +59,8 @@ function QuantumStateSmoothPulseProblem(
     ψ_goals::Vector{<:AbstractVector{<:ComplexF64}},
     T::Int,
     Δt::Float64;
+    G::Function=a -> G_bilinear(a, system.G_drift, system.G_drives),
+    ∂G::Function=a -> system.G_drives,
     ipopt_options::IpoptOptions=IpoptOptions(),
     piccolo_options::PiccoloOptions=PiccoloOptions(),
     state_name::Symbol=:ψ̃,
@@ -138,17 +140,18 @@ function QuantumStateSmoothPulseProblem(
     if length(ψ_inits) == 1
         if piccolo_options.integrator == :pade
             state_integrators = [QuantumStatePadeIntegrator(
-                system,
                 state_name,
                 control_name,
+                G,
+                ∂G,
                 traj;
                 order=piccolo_options.pade_order
             )]
         elseif piccolo_options.integrator == :exponential
             state_integrators = [QuantumStateExponentialIntegrator(
-                system,
                 state_name,
                 control_name,
+                G,
                 traj
             )]
         else
@@ -163,17 +166,18 @@ function QuantumStateSmoothPulseProblem(
         for i = 1:length(ψ_inits)
             if piccolo_options.integrator == :pade
                 state_integrator = QuantumStatePadeIntegrator(
-                    system,
                     state_names[i],
                     control_name,
+                    G,
+                    ∂G,
                     traj;
                     order=piccolo_options.pade_order
                 )
             elseif piccolo_options.integrator == :exponential
                 state_integrator = QuantumStateExponentialIntegrator(
-                    system,
                     state_names[i],
                     control_name,
+                    G,
                     traj
                 )
             else

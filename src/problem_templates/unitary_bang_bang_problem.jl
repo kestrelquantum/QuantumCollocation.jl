@@ -72,6 +72,8 @@ function UnitaryBangBangProblem(
     operator::OperatorType,
     T::Int,
     Δt::Union{Float64, Vector{Float64}};
+    G::Function=a -> G_bilinear(a, system.G_drift, system.G_drives),
+    ∂G::Function=a -> system.G_drives,
     ipopt_options::IpoptOptions=IpoptOptions(),
     piccolo_options::PiccoloOptions=PiccoloOptions(),
     state_name::Symbol = :Ũ⃗,
@@ -165,10 +167,10 @@ function UnitaryBangBangProblem(
     # Integrators
     if piccolo_options.integrator == :pade
         unitary_integrator =
-            UnitaryPadeIntegrator(system, state_name, control_names[1], traj; order=piccolo_options.pade_order)
+            UnitaryPadeIntegrator(state_name, control_names[1], G, ∂G, traj; order=piccolo_options.pade_order)
     elseif piccolo_options.integrator == :exponential
         unitary_integrator =
-            UnitaryExponentialIntegrator(system, state_name, control_names[1], traj)
+            UnitaryExponentialIntegrator(state_name, control_names[1], G, traj)
     else
         error("integrator must be one of (:pade, :exponential)")
     end

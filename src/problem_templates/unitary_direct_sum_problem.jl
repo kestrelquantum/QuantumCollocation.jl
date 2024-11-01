@@ -122,7 +122,7 @@ function UnitaryDirectSumProblem(
 
     # Rebuild integrators
     integrators = vcat(
-        [add_suffix(p.integrators, p.system, p.trajectory, traj, ℓ) for (p, ℓ) ∈ zip(probs, prob_labels)]...
+        [add_suffix(p.integrators, p.trajectory, traj, ℓ) for (p, ℓ) ∈ zip(probs, prob_labels)]...
     )
 
     # direct sum (used for problem saving, only)

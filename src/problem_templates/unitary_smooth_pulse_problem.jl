@@ -71,6 +71,8 @@ function UnitarySmoothPulseProblem(
     operator::OperatorType,
     T::Int,
     Δt::Union{Float64, Vector{Float64}};
+    G::Function=a -> G_bilinear(a, system.G_drift, system.G_drives),
+    ∂G::Function=a -> system.G_drives,
     ipopt_options::IpoptOptions=IpoptOptions(),
     piccolo_options::PiccoloOptions=PiccoloOptions(),
     state_name::Symbol = :Ũ⃗,
@@ -156,14 +158,15 @@ function UnitarySmoothPulseProblem(
     J += QuadraticRegularizer(control_names[3], traj, R_dda; timestep_name=timestep_name)
 
     # Integrators
+
     if piccolo_options.integrator == :pade
         unitary_integrator =
-            UnitaryPadeIntegrator(system, state_name, control_name, traj;
+            UnitaryPadeIntegrator(state_name, control_name, G, ∂G, traj;
                 order=piccolo_options.pade_order
             )
     elseif piccolo_options.integrator == :exponential
         unitary_integrator =
-            UnitaryExponentialIntegrator(system, state_name, control_name, traj)
+            UnitaryExponentialIntegrator(state_name, control_name, G, traj)
     else
         error("integrator must be one of (:pade, :exponential)")
     end

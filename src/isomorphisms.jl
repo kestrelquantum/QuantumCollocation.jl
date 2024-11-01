@@ -17,7 +17,7 @@ export ⊗
 using LinearAlgebra
 using TestItemRunner
 
-⊗(x...) = kron(x...)
+⊗(xs::AbstractVecOrMat...) = kron(xs...)
 
 @doc raw"""
     mat(x::AbstractVector)

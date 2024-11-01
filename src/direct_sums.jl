@@ -227,7 +227,6 @@ end
 function modify_integrator_suffix(
     modifier::Function,
     integrator::AbstractIntegrator,
-    sys::AbstractQuantumSystem,
     traj::NamedTrajectory,
     mod_traj::NamedTrajectory,
     suffix::String
@@ -236,7 +235,6 @@ function modify_integrator_suffix(
         unitary_name = get_component_names(traj, integrator.unitary_components)
         drive_name = get_component_names(traj, integrator.drive_components)
         return integrator(
-            sys,
             mod_traj,
             unitary_name=modifier(unitary_name, suffix),
             drive_name=modifier(drive_name, suffix)
@@ -245,7 +243,6 @@ function modify_integrator_suffix(
         state_name = get_component_names(traj, integrator.state_components)
         drive_name = get_component_names(traj, integrator.drive_components)
         return integrator(
-            sys,
             mod_traj,
             state_name=modifier(state_name, suffix),
             drive_name=modifier(drive_name, suffix)
@@ -254,7 +251,6 @@ function modify_integrator_suffix(
         unitary_name = get_component_names(traj, integrator.unitary_components)
         drive_name = get_component_names(traj, integrator.drive_components)
         return integrator(
-            sys,
             mod_traj,
             unitary_name=modifier(unitary_name, suffix),
             drive_name=modifier(drive_name, suffix)
@@ -263,7 +259,6 @@ function modify_integrator_suffix(
         state_name = get_component_names(traj, integrator.state_components)
         drive_name = get_component_names(traj, integrator.drive_components)
         return integrator(
-            sys,
             mod_traj,
             state_name=modifier(state_name, suffix),
             drive_name=modifier(drive_name, suffix)
@@ -283,42 +278,38 @@ end
 
 function add_suffix(
     integrator::AbstractIntegrator,
-    sys::AbstractQuantumSystem,
     traj::NamedTrajectory,
     mod_traj::NamedTrajectory,
     suffix::String
 )
-    return modify_integrator_suffix(add_suffix, integrator, sys, traj, mod_traj, suffix)
+    return modify_integrator_suffix(add_suffix, integrator, traj, mod_traj, suffix)
 end
 
 function add_suffix(
     integrators::AbstractVector{<:AbstractIntegrator},
-    sys::AbstractQuantumSystem,
     traj::NamedTrajectory,
     mod_traj::NamedTrajectory,
     suffix::String
 )
-    return [add_suffix(intg, sys, traj, mod_traj, suffix) for intg in integrators]
+    return [add_suffix(intg, traj, mod_traj, suffix) for intg in integrators]
 end
 
 function remove_suffix(
     integrator::AbstractIntegrator,
-    sys::AbstractQuantumSystem,
     traj::NamedTrajectory,
     mod_traj::NamedTrajectory,
     suffix::String
 )
-    return modify_integrator_suffix(remove_suffix, integrator, sys, traj, mod_traj, suffix)
+    return modify_integrator_suffix(remove_suffix, integrator, traj, mod_traj, suffix)
 end
 
 function remove_suffix(
     integrators::AbstractVector{<:AbstractIntegrator},
-    sys::AbstractQuantumSystem,
     traj::NamedTrajectory,
     mod_traj::NamedTrajectory,
     suffix::String
 )
-    return [remove_suffix(intg, sys, traj, mod_traj, suffix) for intg in integrators]
+    return [remove_suffix(intg, traj, mod_traj, suffix) for intg in integrators]
 end
 
 

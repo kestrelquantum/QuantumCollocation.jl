@@ -521,8 +521,8 @@ struct QuantumStatePadeIntegrator <: QuantumPadeIntegrator
     )
         @assert order ∈ keys(PADE_COEFFICIENTS) "order ∉ $(keys(PADE_COEFFICIENTS))"
 
-        ketdim = size(sys.H_drift, 1)
-        dim = 2ketdim
+        dim = traj.dims[state_name]
+        ketdim = dim ÷ 2
 
         state_components = traj.components[state_name]
 
