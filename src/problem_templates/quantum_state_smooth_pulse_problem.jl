@@ -253,9 +253,9 @@ end
         ipopt_options=IpoptOptions(print_level=1),
         piccolo_options=PiccoloOptions(verbose=false)
     )
-    initial = fidelity(prob)
+    initial = rollout_fidelity(prob)
     solve!(prob, max_iter=20)
-    final = fidelity(prob)
+    final = rollout_fidelity(prob)
     @test final > initial
 
     # Multiple initial and target states
@@ -267,9 +267,9 @@ end
         ipopt_options=IpoptOptions(print_level=1),
         piccolo_options=PiccoloOptions(verbose=false)
     )
-    initial = fidelity(prob)
+    initial = rollout_fidelity(prob)
     solve!(prob, max_iter=20)
-    final = fidelity(prob)
+    final = rollout_fidelity(prob)
     @test all(final .> initial)
 end
 
@@ -289,9 +289,9 @@ end
         ipopt_options=IpoptOptions(print_level=1),
         piccolo_options=PiccoloOptions(verbose=false, integrator=integrator)
     )
-    initial = fidelity(prob)
+    initial = rollout_fidelity(prob)
     solve!(prob, max_iter=20)
-    final = fidelity(prob)
+    final = rollout_fidelity(prob)
     @test final > initial
 
     # Multiple initial and target states
@@ -303,9 +303,9 @@ end
         ipopt_options=IpoptOptions(print_level=1),
         piccolo_options=PiccoloOptions(verbose=false, integrator=integrator)
     )
-    initial = fidelity(prob)
+    initial = rollout_fidelity(prob)
     solve!(prob, max_iter=20)
-    final = fidelity(prob)
+    final = rollout_fidelity(prob)
     @test all(final .> initial)
 end
 
@@ -325,8 +325,8 @@ end
         control_name=:u,
         timestep_name=:dt
     )
-    initial = fidelity(prob)
+    initial = rollout_fidelity(prob)
     solve!(prob, max_iter=20)
-    final = fidelity(prob)
+    final = rollout_fidelity(prob)
     @test all(final .> initial)
 end

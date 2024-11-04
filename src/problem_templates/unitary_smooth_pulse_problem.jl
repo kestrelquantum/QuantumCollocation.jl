@@ -217,9 +217,9 @@ end
         piccolo_options=PiccoloOptions(verbose=false)
     )
 
-    initial = unitary_fidelity(prob)
+    initial = unitary_rollout_fidelity(prob)
     solve!(prob, max_iter=20)
-    final = unitary_fidelity(prob)
+    final = unitary_rollout_fidelity(prob)
     @test final > initial
 end
 
@@ -235,9 +235,9 @@ end
         piccolo_options=PiccoloOptions(verbose=false, integrator=:exponential, jacobian_structure=false)
     )
 
-    initial = unitary_fidelity(prob)
+    initial = unitary_rollout_fidelity(prob)
     solve!(prob, max_iter=20)
-    final = unitary_fidelity(prob)
+    final = unitary_rollout_fidelity(prob)
     @test final > initial
 end
 
@@ -261,9 +261,9 @@ end
         piccolo_options=piccolo_options
     )
 
-    initial = unitary_fidelity(prob)
+    initial = unitary_rollout_fidelity(prob)
     solve!(prob, max_iter=20)
-    final = unitary_fidelity(prob)
+    final = unitary_rollout_fidelity(prob)
     @test final > initial
 end
 
@@ -284,9 +284,9 @@ end
         piccolo_options=PiccoloOptions(verbose=false)
     )
 
-    initial = unitary_fidelity(prob, subspace=U_goal.subspace_indices)
+    initial = unitary_rollout_fidelity(prob, subspace=U_goal.subspace_indices)
     solve!(prob, max_iter=20)
-    final = unitary_fidelity(prob, subspace=U_goal.subspace_indices)
+    final = unitary_rollout_fidelity(prob, subspace=U_goal.subspace_indices)
     @test final > initial
 
     # Test leakage suppression
@@ -304,8 +304,40 @@ end
         piccolo_options=PiccoloOptions(verbose=false)
     )
 
-    initial = unitary_fidelity(prob, subspace=U_goal.subspace_indices)
+    initial = unitary_rollout_fidelity(prob, subspace=U_goal.subspace_indices)
     solve!(prob, max_iter=20)
-    final = unitary_fidelity(prob, subspace=U_goal.subspace_indices)
+    final = unitary_rollout_fidelity(prob, subspace=U_goal.subspace_indices)
     @test final > initial
+end
+
+@testitem "Additional Objective" begin
+    H_drift = GATES[:Z]
+    H_drives = [GATES[:X], GATES[:Y]]
+    U_goal = GATES[:H]
+    T = 50
+    Δt = 0.2
+
+    prob_vanilla = UnitarySmoothPulseProblem(
+        H_drift, H_drives, U_goal, T, Δt,
+        ipopt_options=IpoptOptions(print_level=1),
+        piccolo_options=PiccoloOptions(verbose=false),
+    )
+
+    J_extra = QuadraticSmoothnessRegularizer(:dda, prob_vanilla.trajectory, 10.0)
+
+    prob_additional = UnitarySmoothPulseProblem(
+        H_drift, H_drives, U_goal, T, Δt,
+        ipopt_options=IpoptOptions(print_level=1),
+        piccolo_options=PiccoloOptions(verbose=false),
+        additional_objective=J_extra,
+    )
+
+    J_prob_vanilla = Problems.get_objective(prob_vanilla)
+
+    J_additional = Problems.get_objective(prob_additional)
+
+    Z = prob_vanilla.trajectory
+    Z⃗ = vec(prob_vanilla.trajectory)
+
+    @test J_prob_vanilla.L(Z⃗, Z) + J_extra.L(Z⃗, Z) ≈ J_additional.L(Z⃗, Z)
 end

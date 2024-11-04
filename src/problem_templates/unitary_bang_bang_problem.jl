@@ -230,9 +230,9 @@ end
         piccolo_options=piccolo_options,
         control_name=:u
     )
-    initial = unitary_fidelity(prob; drive_name=:u)
+    initial = unitary_rollout_fidelity(prob; drive_name=:u)
     solve!(prob)
-    final = unitary_fidelity(prob; drive_name=:u)
+    final = unitary_rollout_fidelity(prob; drive_name=:u)
     @test final > initial
     solve!(smooth_prob)
     threshold = 1e-3

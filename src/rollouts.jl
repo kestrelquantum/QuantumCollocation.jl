@@ -6,23 +6,21 @@ export unitary_rollout
 export lab_frame_unitary_rollout
 export lab_frame_unitary_rollout_trajectory
 
-using ..Isomorphisms
-using ..QuantumSystems
+export rollout_fidelity
+export unitary_rollout_fidelity
+
 using ..QuantumSystemUtils
 using ..QuantumObjectUtils
 using ..EmbeddedOperators
-using ..Integrators
 using ..Losses
-using ..Problems
 using ..DirectSums
 
 using NamedTrajectories
-
+using QuantumCollocationCore
 using ExponentialAction
 using LinearAlgebra
 using ProgressMeter
 using TestItemRunner
-
 
 # ----------------------------------------------------------------------------- #
 
@@ -113,7 +111,7 @@ function rollout(
     return vcat([rollout(state, args...; kwargs...) for state ∈ inits]...)
 end
 
-function Losses.iso_fidelity(
+function rollout_fidelity(
     ψ̃_init::AbstractVector{<:Real},
     ψ̃_goal::AbstractVector{<:Real},
     controls::AbstractMatrix,
@@ -125,7 +123,7 @@ function Losses.iso_fidelity(
     return iso_fidelity(Ψ̃[:, end], ψ̃_goal)
 end
 
-function Losses.fidelity(
+function rollout_fidelity(
     ψ_init::AbstractVector{<:Complex},
     ψ_goal::AbstractVector{<:Complex},
     controls::AbstractMatrix,
@@ -133,10 +131,10 @@ function Losses.fidelity(
     system::AbstractQuantumSystem;
     kwargs...
 )
-    return iso_fidelity(ket_to_iso(ψ_init), ket_to_iso(ψ_goal), controls, Δt, system; kwargs...)
+    return rollout_fidelity(ket_to_iso(ψ_init), ket_to_iso(ψ_goal), controls, Δt, system; kwargs...)
 end
 
-function Losses.fidelity(
+function rollout_fidelity(
     trajectory::NamedTrajectory,
     system::AbstractQuantumSystem;
     state_symb::Symbol=:ψ̃,
@@ -149,18 +147,18 @@ function Losses.fidelity(
             controls = trajectory[control_symb]
             init = trajectory.initial[symb]
             goal = trajectory.goal[symb]
-            fid = iso_fidelity(init, goal, controls, get_timesteps(trajectory), system; kwargs...)
+            fid = rollout_fidelity(init, goal, controls, get_timesteps(trajectory), system; kwargs...)
             push!(fids, fid)
         end
     end
     return length(fids) == 1 ? fids[1] : fids
 end
 
-function Losses.fidelity(
+function rollout_fidelity(
     prob::QuantumControlProblem;
     kwargs...
 )
-    return fidelity(prob.trajectory, prob.system; kwargs...)
+    return rollout_fidelity(prob.trajectory, prob.system; kwargs...)
 end
 
 # ----------------------------------------------------------------------------- #
@@ -272,7 +270,7 @@ function unitary_rollout(
     )
 end
 
-function Losses.iso_vec_unitary_fidelity(
+function unitary_rollout_fidelity(
     Ũ⃗_init::AbstractVector{<:Real},
     Ũ⃗_goal::AbstractVector{<:Real},
     controls::AbstractMatrix,
@@ -285,7 +283,7 @@ function Losses.iso_vec_unitary_fidelity(
     return iso_vec_unitary_fidelity(Ũ⃗[:, end], Ũ⃗_goal; subspace=subspace)
 end
 
-function Losses.iso_vec_unitary_fidelity(
+function unitary_rollout_fidelity(
     Ũ⃗_goal::AbstractVector{<:Real},
     controls::AbstractMatrix,
     Δt::AbstractVector,
@@ -293,10 +291,10 @@ function Losses.iso_vec_unitary_fidelity(
     kwargs...
 )
     Ĩ⃗ = operator_to_iso_vec(Matrix{ComplexF64}(I(size(system.H_drift, 1))))
-    return iso_vec_unitary_fidelity(Ĩ⃗, Ũ⃗_goal, controls, Δt, system; kwargs...)
+    return unitary_rollout_fidelity(Ĩ⃗, Ũ⃗_goal, controls, Δt, system; kwargs...)
 end
 
-function Losses.unitary_fidelity(
+function unitary_rollout_fidelity(
     U_init::AbstractMatrix{<:Complex},
     U_goal::AbstractMatrix{<:Complex},
     controls::AbstractMatrix,
@@ -306,27 +304,27 @@ function Losses.unitary_fidelity(
 )
     Ũ⃗_init = operator_to_iso_vec(U_init)
     Ũ⃗_goal = operator_to_iso_vec(U_goal)
-    return iso_vec_unitary_fidelity(Ũ⃗_init, Ũ⃗_goal, controls, Δt, system; kwargs...)
+    return unitary_rollout_fidelity(Ũ⃗_init, Ũ⃗_goal, controls, Δt, system; kwargs...)
 end
 
-Losses.unitary_fidelity(
+unitary_rollout_fidelity(
     U_goal::AbstractMatrix{<:Complex},
     controls::AbstractMatrix,
     Δt::AbstractVector,
     system::AbstractQuantumSystem;
     kwargs...
-) = iso_vec_unitary_fidelity(operator_to_iso_vec(U_goal), controls, Δt, system; kwargs...)
+) = unitary_rollout_fidelity(operator_to_iso_vec(U_goal), controls, Δt, system; kwargs...)
 
-Losses.unitary_fidelity(
+unitary_rollout_fidelity(
     U_goal::EmbeddedOperator,
     controls::AbstractMatrix,
     Δt::AbstractVector,
     system::AbstractQuantumSystem;
     subspace::AbstractVector{Int}=U_goal.subspace_indices,
     kwargs...
-) = unitary_fidelity(U_goal.operator, controls, Δt, system; subspace=subspace, kwargs...)
+) = unitary_rollout_fidelity(U_goal.operator, controls, Δt, system; subspace=subspace, kwargs...)
 
-function Losses.unitary_fidelity(
+function unitary_rollout_fidelity(
     traj::NamedTrajectory,
     sys::AbstractQuantumSystem;
     unitary_name::Symbol=:Ũ⃗,
@@ -337,25 +335,25 @@ function Losses.unitary_fidelity(
     Ũ⃗_goal = traj.goal[unitary_name]
     controls = traj[drive_name]
     Δt = get_timesteps(traj)
-    return iso_vec_unitary_fidelity(Ũ⃗_init, Ũ⃗_goal, controls, Δt, sys; kwargs...)
+    return unitary_rollout_fidelity(Ũ⃗_init, Ũ⃗_goal, controls, Δt, sys; kwargs...)
 end
 
-Losses.unitary_fidelity(prob::QuantumControlProblem; kwargs...) =
-    unitary_fidelity(prob.trajectory, prob.system; kwargs...)
+unitary_rollout_fidelity(prob::QuantumControlProblem; kwargs...) =
+    unitary_rollout_fidelity(prob.trajectory, prob.system; kwargs...)
 
 
 # ----------------------------------------------------------------------------- #
 # Experimental rollouts
 # ----------------------------------------------------------------------------- #
 
-Losses.unitary_fidelity(
+unitary_rollout_fidelity(
     U_goal::EmbeddedOperator,
     controls::AbstractMatrix{Float64},
     Δt::Union{AbstractVector{Float64}, AbstractMatrix{Float64}, Float64},
     sys::AbstractQuantumSystem;
     subspace=U_goal.subspace_indices,
     kwargs...
-) = unitary_fidelity(U_goal.operator, controls, Δt, sys; subspace=subspace, kwargs...)
+) = unitary_rollout_fidelity(U_goal.operator, controls, Δt, sys; subspace=subspace, kwargs...)
 
 """
     lab_frame_unitary_rollout(
@@ -453,39 +451,36 @@ end
 
     # Default integrator
     # State fidelity
-    @test fidelity(ψ, ψ_goal, as, ts, sys) ≈ 1
-    @test iso_fidelity(ψ̃, ψ̃_goal, as, ts, sys) ≈ 1
+    @test rollout_fidelity(ψ, ψ_goal, as, ts, sys) ≈ 1
 
     # Unitary fidelity
-    @test unitary_fidelity(U_goal, as, ts, sys) ≈ 1
-    @test unitary_fidelity(prob.trajectory, sys) ≈ 1
-    @test unitary_fidelity(prob) ≈ 1
-    @test unitary_fidelity(embedded_U_goal, as, ts, sys) ≈ 1
+    @test unitary_rollout_fidelity(U_goal, as, ts, sys) ≈ 1
+    @test unitary_rollout_fidelity(prob.trajectory, sys) ≈ 1
+    @test unitary_rollout_fidelity(prob) ≈ 1
+    @test unitary_rollout_fidelity(embedded_U_goal, as, ts, sys) ≈ 1
 
     # Expv explicit
     # State fidelity
-    @test fidelity(ψ, ψ_goal, as, ts, sys, integrator=expv) ≈ 1
-    @test iso_fidelity(ψ̃, ψ̃_goal, as, ts, sys, integrator=expv) ≈ 1
+    @test rollout_fidelity(ψ, ψ_goal, as, ts, sys, integrator=expv) ≈ 1
 
     # Unitary fidelity
-    @test unitary_fidelity(U_goal, as, ts, sys, integrator=expv) ≈ 1
-    @test unitary_fidelity(prob.trajectory, sys, integrator=expv) ≈ 1
-    @test unitary_fidelity(prob, integrator=expv) ≈ 1
-    @test unitary_fidelity(embedded_U_goal, as, ts, sys, integrator=expv) ≈ 1
+    @test unitary_rollout_fidelity(U_goal, as, ts, sys, integrator=expv) ≈ 1
+    @test unitary_rollout_fidelity(prob.trajectory, sys, integrator=expv) ≈ 1
+    @test unitary_rollout_fidelity(prob, integrator=expv) ≈ 1
+    @test unitary_rollout_fidelity(embedded_U_goal, as, ts, sys, integrator=expv) ≈ 1
 
     # Exp explicit
     # State fidelity
-    @test fidelity(ψ, ψ_goal, as, ts, sys, integrator=exp) ≈ 1
-    @test iso_fidelity(ψ̃, ψ̃_goal, as, ts, sys, integrator=exp) ≈ 1
+    @test rollout_fidelity(ψ, ψ_goal, as, ts, sys, integrator=exp) ≈ 1
 
     # Unitary fidelity
-    @test unitary_fidelity(U_goal, as, ts, sys, integrator=exp) ≈ 1
-    @test unitary_fidelity(prob.trajectory, sys, integrator=exp) ≈ 1
-    @test unitary_fidelity(prob, integrator=exp) ≈ 1
-    @test unitary_fidelity(embedded_U_goal, as, ts, sys, integrator=exp) ≈ 1
+    @test unitary_rollout_fidelity(U_goal, as, ts, sys, integrator=exp) ≈ 1
+    @test unitary_rollout_fidelity(prob.trajectory, sys, integrator=exp) ≈ 1
+    @test unitary_rollout_fidelity(prob, integrator=exp) ≈ 1
+    @test unitary_rollout_fidelity(embedded_U_goal, as, ts, sys, integrator=exp) ≈ 1
 
     # Bad integrator
-    @test_throws ErrorException unitary_fidelity(U_goal, as, ts, sys, integrator=(a,b) -> 1) ≈ 1
+    @test_throws ErrorException unitary_rollout_fidelity(U_goal, as, ts, sys, integrator=(a,b) -> 1) ≈ 1
 end
 
 @testitem "Foward diff rollout" begin

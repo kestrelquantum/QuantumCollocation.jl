@@ -1,26 +1,19 @@
 module ProblemTemplates
 
-using ..QuantumSystems
-using ..Isomorphisms
 using ..EmbeddedOperators
 using ..DirectSums
 using ..Rollouts
 using ..TrajectoryInitialization
-using ..Objectives
-using ..Constraints
 using ..Losses
-using ..Integrators
-using ..Problems
-using ..Options
 
 using Distributions
 using TrajectoryIndexingUtils
 using NamedTrajectories
+using QuantumCollocationCore
 using LinearAlgebra
 using SparseArrays
 using ExponentialAction
 using JLD2
-
 using TestItemRunner
 
 include("unitary_smooth_pulse_problem.jl")

@@ -5,11 +5,12 @@ export is_reachable
 
 using ..EmbeddedOperators
 using ..QuantumObjectUtils
-using ..QuantumSystems
 
 using LinearAlgebra
 using SparseArrays
 using TestItemRunner
+using QuantumCollocationCore
+
 
 
 commutator(A::AbstractMatrix, B::AbstractMatrix) = A * B - B * A

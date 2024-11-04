@@ -47,7 +47,7 @@ function QuantumStateMinimumTimeProblem(
 
     # Default to average state fidelity
     if isnothing(final_fidelity)
-        vals = [fidelity(traj[n][:, end], traj.goal[n]) for n ∈ state_names]
+        vals = [iso_fidelity(traj[n][:, end], traj.goal[n]) for n ∈ state_names]
         final_fidelity = sum(vals) / length(vals)
     end
 

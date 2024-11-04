@@ -6,16 +6,10 @@ export get_suffix_label
 export direct_sum
 export merge_outer
 
-using ..Integrators
-using ..Problems
-using ..QuantumSystems
-using ..Isomorphisms
-using ..Objectives
-
 using SparseArrays
 using TestItemRunner
-
 using NamedTrajectories
+using QuantumCollocationCore
 
 
 """

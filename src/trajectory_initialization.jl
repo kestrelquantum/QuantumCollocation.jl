@@ -8,14 +8,12 @@ export convert_fixed_time
 export convert_free_time
 
 using NamedTrajectories
-
+using QuantumCollocationCore
 using Distributions
 using ExponentialAction
 using LinearAlgebra
 using TestItemRunner
 
-using ..Isomorphisms
-using ..QuantumSystems
 using ..Rollouts
 using ..EmbeddedOperators
 using ..DirectSums

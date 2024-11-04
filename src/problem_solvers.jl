@@ -2,13 +2,12 @@ module ProblemSolvers
 
 export solve!
 
-using ..Constraints
-using ..Problems
 using ..SaveLoadUtils
-using ..Options
 
 using NamedTrajectories
+using QuantumCollocationCore
 using MathOptInterface
+using TestItemRunner
 const MOI = MathOptInterface
 
 function solve!(

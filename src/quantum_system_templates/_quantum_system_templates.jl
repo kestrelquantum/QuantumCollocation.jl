@@ -6,10 +6,10 @@ export MultiTransmonSystem
 export RydbergChainSystem
 export QuantumOpticsSystem
 
-using ..Isomorphisms
-using ..QuantumSystems
+
 using ..QuantumObjectUtils
 
+using QuantumCollocationCore
 using LinearAlgebra
 using TestItemRunner
 

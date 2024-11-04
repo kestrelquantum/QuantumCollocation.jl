@@ -117,9 +117,9 @@ end
         ipopt_options=IpoptOptions(print_level=1),
         piccolo_options=PiccoloOptions(verbose=false)
     )
-    before = unitary_fidelity(prob, subspace=U_goal.subspace_indices)
+    before = unitary_rollout_fidelity(prob, subspace=U_goal.subspace_indices)
     solve!(prob, max_iter=15)
-    after = unitary_fidelity(prob, subspace=U_goal.subspace_indices)
+    after = unitary_rollout_fidelity(prob, subspace=U_goal.subspace_indices)
 
     # Subspace gate success
     @test after > before
@@ -144,5 +144,5 @@ end
     @test (after < before) || (before < 0.25)
 
     # TODO: Fidelity constraint approximately satisfied
-    @test_skip isapprox(unitary_fidelity(rob_prob; subspace=U_goal.subspace_indices), 0.99, atol=0.05)
+    @test_skip isapprox(unitary_rollout_fidelity(rob_prob; subspace=U_goal.subspace_indices), 0.99, atol=0.05)
 end

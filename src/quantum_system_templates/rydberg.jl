@@ -66,7 +66,7 @@ function RydbergChainSystem(;
     ignore_Y_drive::Bool=false,
 )
     PAULIS = Dict(:I => [1 0; 0 1], :X => [0 1; 1 0], :Y => [0 -im; im 0], :Z => [1 0; 0 -1], :n => [0 0; 0 1])
-    
+
     if all2all
         H_drift = zeros(ComplexF64, 2^N, 2^N)
         for gap in 0:N-2
@@ -122,5 +122,6 @@ function RydbergChainSystem(;
 end
 
 @testitem "Rydberg system test" begin
+    using QuantumCollocationCore
     @test RydbergChainSystem(N=3,cutoff_order=2,all2all=false) isa QuantumSystem
 end

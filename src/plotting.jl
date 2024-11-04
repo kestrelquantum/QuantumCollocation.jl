@@ -4,9 +4,8 @@ export plot_unitary_populations
 export pretty_print
 
 using NamedTrajectories
-
-using ..Isomorphisms
-using ..Problems
+using QuantumCollocationCore
+using TestItemRunner
 
 
 pretty_print(X::AbstractMatrix) = Base.show(stdout,"text/plain", X)

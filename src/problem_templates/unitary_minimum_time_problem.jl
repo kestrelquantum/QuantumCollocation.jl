@@ -147,9 +147,9 @@ end
         piccolo_options=PiccoloOptions(verbose=false)
     )
 
-    before = unitary_fidelity(prob)
+    before = unitary_rollout_fidelity(prob)
     solve!(prob, max_iter=50)
-    after = unitary_fidelity(prob)
+    after = unitary_rollout_fidelity(prob)
     @test after > before
 
     # Soft fidelity constraint
@@ -158,7 +158,7 @@ end
     solve!(mintime_prob; max_iter=100)
 
     # Test fidelity is approximatley staying above the constraint
-    @test unitary_fidelity(mintime_prob) ≥ (final_fidelity - 0.1 * final_fidelity)
+    @test unitary_rollout_fidelity(mintime_prob) ≥ (final_fidelity - 0.1 * final_fidelity)
     duration_after = sum(get_timesteps(mintime_prob.trajectory))
     duration_before = sum(get_timesteps(prob.trajectory))
     @test duration_after < duration_before
