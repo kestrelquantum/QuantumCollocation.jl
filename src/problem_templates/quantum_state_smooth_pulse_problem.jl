@@ -106,6 +106,7 @@ function QuantumStateSmoothPulseProblem(
             timestep_name=timestep_name,
             free_time=piccolo_options.free_time,
             Δt_bounds=(Δt_min, Δt_max),
+            bound_state=piccolo_options.bound_state,
             drive_derivative_σ=drive_derivative_σ,
             a_guess=a_guess,
             system=system,
@@ -113,31 +114,29 @@ function QuantumStateSmoothPulseProblem(
         )
     end
 
-    # Objective
+    state_names = [
+        name for name ∈ traj.names
+            if startswith(string(name), string(state_name))
+    ]
+    @assert length(state_names) == length(ψ_inits) "Number of states must match number of initial states"
+
     control_names = [
         name for name ∈ traj.names
             if endswith(string(name), string(control_name))
     ]
 
+    # Objective
     J = QuadraticRegularizer(control_names[1], traj, R_a; timestep_name=timestep_name)
     J += QuadraticRegularizer(control_names[2], traj, R_da; timestep_name=timestep_name)
     J += QuadraticRegularizer(control_names[3], traj, R_dda; timestep_name=timestep_name)
 
-    if length(ψ_inits) == 1
-        J += QuantumStateObjective(state_name, traj, Q)
-    else
-        state_names = [
-            name for name ∈ traj.names
-                if startswith(string(name), string(state_name))
-        ]
-        @assert length(state_names) == length(ψ_inits) "Number of states must match number of initial states"
-        for i = 1:length(ψ_inits)
-            J += QuantumStateObjective(state_names[i], traj, Q)
-        end
+    for name ∈ state_names
+        J += QuantumStateObjective(name, traj, Q)
     end
 
     # Integrators
-    if length(ψ_inits) == 1
+    state_integrators = []
+    for name ∈ state_names
         if piccolo_options.integrator == :pade
             state_integrators = [QuantumStatePadeIntegrator(
                 state_name,
@@ -195,13 +194,7 @@ function QuantumStateSmoothPulseProblem(
 
     # Optional Piccolo constraints and objectives
     apply_piccolo_options!(
-        J,
-        constraints,
-        piccolo_options,
-        traj,
-        leakage_operator,
-        state_name,
-        timestep_name
+        J, constraints, piccolo_options, traj, leakage_operator, state_name, timestep_name
     )
 
     return QuantumControlProblem(
