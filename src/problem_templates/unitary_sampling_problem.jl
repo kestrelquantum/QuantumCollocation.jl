@@ -47,7 +47,6 @@ function UnitarySamplingProblem(
     operator::OperatorType,
     T::Int,
     Δt::Union{Float64,Vector{Float64}};
-    system_labels=string.(1:length(systems)),
     system_weights=fill(1.0, length(systems)),
     init_trajectory::Union{NamedTrajectory,Nothing}=nothing,
     ipopt_options::IpoptOptions=IpoptOptions(),
