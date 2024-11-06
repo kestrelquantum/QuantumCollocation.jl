@@ -47,7 +47,6 @@ function UnitarySamplingProblem(
     operator::OperatorType,
     T::Int,
     Δt::Union{Float64,Vector{Float64}};
-    system_labels=string.(1:length(systems)),
     system_weights=fill(1.0, length(systems)),
     init_trajectory::Union{NamedTrajectory,Nothing}=nothing,
     ipopt_options::IpoptOptions=IpoptOptions(),
@@ -73,9 +72,6 @@ function UnitarySamplingProblem(
     R_dda::Union{Float64,Vector{Float64}}=R,
     kwargs...
 )
-    # Create keys for multiple systems
-    Ũ⃗_names = [add_suffix(state_name, ℓ) for ℓ ∈ system_labels]
-
     # Trajectory
     if !isnothing(init_trajectory)
         traj = init_trajectory
@@ -99,9 +95,13 @@ function UnitarySamplingProblem(
             a_guess=a_guess,
             system=systems,
             rollout_integrator=piccolo_options.rollout_integrator,
-            state_names=Ũ⃗_names
         )
     end
+
+    state_names = [
+        name for name ∈ traj.names
+        if startswith(string(name), string(state_name))
+    ]
 
     control_names = [
         name for name ∈ traj.names
@@ -110,23 +110,23 @@ function UnitarySamplingProblem(
 
     # Objective
     J = NullObjective()
-    for (wᵢ, Ũ⃗_name) in zip(system_weights, Ũ⃗_names)
-        J += wᵢ * UnitaryInfidelityObjective(
-            Ũ⃗_name, traj, Q;
+    for (weight, name) in zip(system_weights, state_names)
+        J += weight * UnitaryInfidelityObjective(
+            name, traj, Q;
             subspace=operator isa EmbeddedOperator ? operator.subspace_indices : nothing
         )
     end
-    J += QuadraticRegularizer(control_names[1], traj, R_a; timestep_name=timestep_name)
-    J += QuadraticRegularizer(control_names[2], traj, R_da; timestep_name=timestep_name)
-    J += QuadraticRegularizer(control_names[3], traj, R_dda; timestep_name=timestep_name)
+    for (R_name, name) in zip([R_a, R_da, R_dda], control_names)
+        J += QuadraticRegularizer(name, traj, R_name; timestep_name=timestep_name)
+    end
 
     # Constraints
     if piccolo_options.leakage_suppression
         if operator isa EmbeddedOperator
             leakage_indices = get_iso_vec_leakage_indices(operator)
-            for Ũ⃗_name in Ũ⃗_names
+            for name in state_names
                 J += L1Regularizer!(
-                    constraints, Ũ⃗_name, traj,
+                    constraints, name, traj,
                     R_value=piccolo_options.R_leakage,
                     indices=leakage_indices,
                     eval_hessian=piccolo_options.eval_hessian
@@ -154,16 +154,16 @@ function UnitarySamplingProblem(
 
     # Integrators
     unitary_integrators = AbstractIntegrator[]
-    for (sys, Ũ⃗_name) in zip(systems, Ũ⃗_names)
+    for (sys, name) in zip(systems, state_names)
         if piccolo_options.integrator == :pade
             push!(
                 unitary_integrators,
-                UnitaryPadeIntegrator(sys, Ũ⃗_name, control_name, traj; order=piccolo_options.pade_order)
+                UnitaryPadeIntegrator(sys, name, control_name, traj; order=piccolo_options.pade_order)
             )
         elseif piccolo_options.integrator == :exponential
             push!(
                 unitary_integrators,
-                UnitaryExponentialIntegrator(sys, Ũ⃗_name, control_name, traj)
+                UnitaryExponentialIntegrator(sys, name, control_name, traj)
             )
         else
             error("integrator must be one of (:pade, :exponential)")
@@ -262,7 +262,7 @@ end
         piccolo_options=pi_ops
     )
 
-    @test g1_prob.trajectory.Ũ⃗1 ≈ g1_prob.trajectory.Ũ⃗2
+    @test g1_prob.trajectory.Ũ⃗_system_1 ≈ g1_prob.trajectory.Ũ⃗_system_2
 
     g2_prob = UnitarySamplingProblem(
         [systems(0), systems(0.05)], operator, T, Δt;
@@ -270,5 +270,5 @@ end
         piccolo_options=pi_ops
     )
 
-    @test ~(g2_prob.trajectory.Ũ⃗1 ≈ g2_prob.trajectory.Ũ⃗2)
+    @test ~(g2_prob.trajectory.Ũ⃗_system_1 ≈ g2_prob.trajectory.Ũ⃗_system_2)
 end
