@@ -47,14 +47,6 @@ function UnitarySamplingProblem(
     operator::OperatorType,
     T::Int,
     Δt::Union{Float64,Vector{Float64}};
-    Gs::Vector{Function}=Function[
-        a -> G_bilinear(a, sys.G_drift, sys.G_drives)
-            for sys ∈ systems
-    ],
-    ∂Gs::Vector{Function}=Function[
-        a -> sys.G_drives
-            for sys ∈ systems
-    ],
     system_labels=string.(1:length(systems)),
     system_weights=fill(1.0, length(systems)),
     init_trajectory::Union{NamedTrajectory,Nothing}=nothing,
@@ -65,12 +57,12 @@ function UnitarySamplingProblem(
     timestep_name::Symbol=:Δt,
     constraints::Vector{<:AbstractConstraint}=AbstractConstraint[],
     a_bound::Float64=1.0,
-    a_bounds=fill(a_bound, length(systems[1].G_drives)),
+    a_bounds=fill(a_bound, systems[1].n_drives),
     a_guess::Union{Matrix{Float64},Nothing}=nothing,
     da_bound::Float64=Inf,
-    da_bounds::Vector{Float64}=fill(da_bound, length(systems[1].G_drives)),
+    da_bounds::Vector{Float64}=fill(da_bound, systems[1].n_drives),
     dda_bound::Float64=1.0,
-    dda_bounds::Vector{Float64}=fill(dda_bound, length(systems[1].G_drives)),
+    dda_bounds::Vector{Float64}=fill(dda_bound, systems[1].n_drives),
     Δt_min::Float64=0.5 * Δt,
     Δt_max::Float64=1.5 * Δt,
     drive_derivative_σ::Float64=0.01,
@@ -85,13 +77,11 @@ function UnitarySamplingProblem(
     if !isnothing(init_trajectory)
         traj = init_trajectory
     else
-        n_drives = length(systems[1].G_drives)
-
         traj = initialize_trajectory(
             operator,
             T,
             Δt,
-            n_drives,
+            systems[1].n_drives,
             (a_bounds, da_bounds, dda_bounds);
             state_name=state_name,
             control_name=control_name,
@@ -131,16 +121,16 @@ function UnitarySamplingProblem(
 
     # Integrators
     unitary_integrators = AbstractIntegrator[]
-    for (sys, Ũ⃗_name, G, ∂G) in zip(systems, Ũ⃗_names, Gs, ∂Gs)
+    for (sys, Ũ⃗_name) in zip(systems, state_names)
         if piccolo_options.integrator == :pade
             push!(
                 unitary_integrators,
-                UnitaryPadeIntegrator(Ũ⃗_name, control_name, G, ∂G, traj; order=piccolo_options.pade_order)
+                UnitaryPadeIntegrator(Ũ⃗_name, control_name, sys, traj; order=piccolo_options.pade_order)
             )
         elseif piccolo_options.integrator == :exponential
             push!(
                 unitary_integrators,
-                UnitaryExponentialIntegrator(Ũ⃗_name, control_name, G, traj)
+                UnitaryExponentialIntegrator(Ũ⃗_name, control_name, sys, traj)
             )
         else
             error("integrator must be one of (:pade, :exponential)")

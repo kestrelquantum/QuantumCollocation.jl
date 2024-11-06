@@ -46,18 +46,13 @@ end
 Returns the direct sum of two `QuantumSystem` objects.
 """
 function direct_sum(sys1::QuantumSystem, sys2::QuantumSystem)
-    H_drift = direct_sum(sys1.H_drift, sys2.H_drift)
-    H1_zero = spzeros(size(sys1.H_drift))
-    H2_zero = spzeros(size(sys2.H_drift))
-    H_drives = [
-        [direct_sum(H, H2_zero) for H ∈ sys1.H_drives]...,
-        [direct_sum(H1_zero, H) for H ∈ sys2.H_drives]...
-    ]
-    return QuantumSystem(
-        H_drift,
-        H_drives,
-        params=merge_outer(sys1.params, sys2.params)
-    )
+    @assert sys1.n_drives == sys2.n_drives
+    n_drives = sys1.n_drives
+    H = a -> direct_sum(sys1.H(a), sys2.H(a))
+    G = a -> direct_sum(sys1.G(a), sys2.G(a))
+    ∂G = a -> [direct_sum(∂Gᵢ(a), ∂Gⱼ(a)) for (∂Gᵢ, ∂Gⱼ) ∈ zip(sys1.∂G(a), sys2.∂G(a))]
+    levels = sys1.levels + sys2.levels
+    return QuantumSystem(H, G, ∂G, levels, n_drives)
 end
 
 direct_sum(systems::AbstractVector{<:QuantumSystem}) = reduce(direct_sum, systems)
@@ -170,13 +165,12 @@ function add_suffix(traj::NamedTrajectory, suffix::String)
     )
 end
 
-function add_suffix(sys::QuantumSystem, suffix::String)
-    return QuantumSystem(
-        sys.H_drift,
-        sys.H_drives,
-        params=add_suffix(sys.params, suffix)
-    )
-end
+# function add_suffix(sys::QuantumSystem, suffix::String)
+#     return QuantumSystem(
+#         sys.H_drift,
+#         sys.H_drives
+#     )
+# end
 
 # get suffix label utilities
 # --------------------
@@ -222,6 +216,7 @@ end
 function modify_integrator_suffix(
     modifier::Function,
     integrator::AbstractIntegrator,
+    sys::QuantumSystem,
     traj::NamedTrajectory,
     mod_traj::NamedTrajectory,
     suffix::String
@@ -229,42 +224,46 @@ function modify_integrator_suffix(
     if integrator isa UnitaryExponentialIntegrator
         unitary_name = get_component_names(traj, integrator.unitary_components)
         drive_name = get_component_names(traj, integrator.drive_components)
-        return integrator(
-            mod_traj,
-            unitary_name=modifier(unitary_name, suffix),
-            drive_name=modifier(drive_name, suffix)
+        return UnitaryExponentialIntegrator(
+            modifier(unitary_name, suffix),
+            modifier(drive_name, suffix),
+            sys,
+            mod_traj
         )
     elseif integrator isa QuantumStateExponentialIntegrator
         state_name = get_component_names(traj, integrator.state_components)
         drive_name = get_component_names(traj, integrator.drive_components)
-        return integrator(
-            mod_traj,
-            state_name=modifier(state_name, suffix),
-            drive_name=modifier(drive_name, suffix)
+        return QuantumStateExponentialIntegrator(
+            modifier(state_name, suffix),
+            modifier(drive_name, suffix),
+            sys,
+            mod_traj
         )
     elseif integrator isa UnitaryPadeIntegrator
         unitary_name = get_component_names(traj, integrator.unitary_components)
         drive_name = get_component_names(traj, integrator.drive_components)
-        return integrator(
-            mod_traj,
-            unitary_name=modifier(unitary_name, suffix),
-            drive_name=modifier(drive_name, suffix)
+        return UnitaryPadeIntegrator(
+            modifier(unitary_name, suffix),
+            modifier(drive_name, suffix),
+            sys,
+            mod_traj
         )
     elseif integrator isa QuantumStatePadeIntegrator
         state_name = get_component_names(traj, integrator.state_components)
         drive_name = get_component_names(traj, integrator.drive_components)
-        return integrator(
-            mod_traj,
-            state_name=modifier(state_name, suffix),
-            drive_name=modifier(drive_name, suffix)
+        return QuantumStatePadeIntegrator(
+            modifier(state_name, suffix),
+            modifier(drive_name, suffix),
+            sys,
+            mod_traj
         )
     elseif integrator isa DerivativeIntegrator
         variable = get_component_names(traj, integrator.variable_components)
         derivative = get_component_names(traj, integrator.derivative_components)
-        return integrator(
-            mod_traj,
-            variable=modifier(variable, suffix),
-            derivative=modifier(derivative, suffix)
+        return DerivativeIntegrator(
+            modifier(variable, suffix),
+            modifier(derivative, suffix),
+            mod_traj
         )
     else
         error("Integrator type not recognized")
@@ -273,20 +272,25 @@ end
 
 function add_suffix(
     integrator::AbstractIntegrator,
+    sys::QuantumSystem,
     traj::NamedTrajectory,
     mod_traj::NamedTrajectory,
     suffix::String
 )
-    return modify_integrator_suffix(add_suffix, integrator, traj, mod_traj, suffix)
+    return modify_integrator_suffix(add_suffix, integrator, sys, traj, mod_traj, suffix)
 end
 
 function add_suffix(
     integrators::AbstractVector{<:AbstractIntegrator},
+    sys::QuantumSystem,
     traj::NamedTrajectory,
     mod_traj::NamedTrajectory,
     suffix::String
 )
-    return [add_suffix(intg, traj, mod_traj, suffix) for intg in integrators]
+    return [
+        add_suffix(integrator, sys, traj, mod_traj, suffix)
+            for integrator ∈ integrators
+    ]
 end
 
 function remove_suffix(
@@ -565,24 +569,13 @@ end
     H_drift = 0.01 * GATES[:Z]
     H_drives = [GATES[:X], GATES[:Y]]
     T = 50
-    sys = QuantumSystem(H_drift, H_drives, params=Dict(:T=>T))
+    sys = QuantumSystem(H_drift, H_drives)
 
-    # apply suffix and sum
-    sys2 = direct_sum(
-        add_suffix(sys, "_1"),
-        add_suffix(sys, "_2")
-    )
+    # direct sum of systems
+    sys2 = direct_sum(sys, sys)
 
-    @test length(sys2.H_drives) == 4
-    @test sys2.params[:T_1] == T
-    @test sys2.params[:T_2] == T
+    @test sys2.levels == sys.levels * 2
 
-    # add another system
-    sys = QuantumSystem(H_drift, H_drives, params=Dict(:T=>T, :S=>2T))
-    sys3 = direct_sum(sys2, add_suffix(sys, "_3"))
-    @test length(sys3.H_drives) == 6
-    @test sys3.params[:T_3] == T
-    @test sys3.params[:S_3] == 2T
 end
 
 # TODO: fix broken test

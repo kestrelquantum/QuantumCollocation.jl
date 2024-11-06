@@ -73,7 +73,6 @@ function rollout(
     show_progress=false,
     integrator=expv,
     exp_vector_product=infer_is_evp(integrator),
-    G=Integrators.G_bilinear
 )
     T = size(controls, 2)
 
@@ -81,17 +80,14 @@ function rollout(
 
     Ψ̃[:, 1] .= ψ̃_init
 
-    G_drift = Matrix{Float64}(system.G_drift)
-    G_drives = Matrix{Float64}.(system.G_drives)
-
     p = Progress(T-1; enabled=show_progress)
     for t = 2:T
         aₜ₋₁ = controls[:, t - 1]
-        Gₜ = G(aₜ₋₁, G_drift, G_drives)
+        Gₜ = system.G(aₜ₋₁)
         if exp_vector_product
             Ψ̃[:, t] .= integrator(Δt[t - 1], Gₜ, Ψ̃[:, t - 1])
         else
-            Ψ̃[:, t] .= integrator(Gₜ * Δt[t - 1]) * Ψ̃[:, t - 1]
+            Ψ̃[:, t] .= integrator(Matrix(Gₜ) * Δt[t - 1]) * Ψ̃[:, t - 1]
         end
         next!(p)
     end
@@ -213,7 +209,6 @@ function unitary_rollout(
     show_progress=false,
     integrator=expv,
     exp_vector_product=infer_is_evp(integrator),
-    G=Integrators.G_bilinear,
 )
     T = size(controls, 2)
 
@@ -221,18 +216,15 @@ function unitary_rollout(
 
     Ũ⃗[:, 1] .= Ũ⃗_init
 
-    G_drift = Matrix{Float64}(system.G_drift)
-    G_drives = Matrix{Float64}.(system.G_drives)
-
     p = Progress(T-1; enabled=show_progress)
     for t = 2:T
         aₜ₋₁ = controls[:, t - 1]
-        Gₜ = G(aₜ₋₁, G_drift, G_drives)
+        Gₜ = system.G(aₜ₋₁)
         Ũₜ₋₁ = iso_vec_to_iso_operator(Ũ⃗[:, t - 1])
         if exp_vector_product
             Ũₜ = integrator(Δt[t - 1], Gₜ, Ũₜ₋₁)
         else
-            Ũₜ = integrator(Gₜ * Δt[t - 1]) * Ũₜ₋₁
+            Ũₜ = integrator(Matrix(Gₜ) * Δt[t - 1]) * Ũₜ₋₁
         end
         Ũ⃗[:, t] .= iso_operator_to_iso_vec(Ũₜ)
         next!(p)
@@ -247,7 +239,7 @@ function unitary_rollout(
     system::AbstractQuantumSystem;
     kwargs...
 )
-    Ĩ⃗ = operator_to_iso_vec(Matrix{ComplexF64}(I(size(system.H_drift, 1))))
+    Ĩ⃗ = operator_to_iso_vec(Matrix{ComplexF64}(I(system.levels)))
     return unitary_rollout(Ĩ⃗, controls, Δt, system; kwargs...)
 end
 
@@ -287,7 +279,7 @@ function unitary_rollout_fidelity(
     system::AbstractQuantumSystem;
     kwargs...
 )
-    Ĩ⃗ = operator_to_iso_vec(Matrix{ComplexF64}(I(size(system.H_drift, 1))))
+    Ĩ⃗ = operator_to_iso_vec(Matrix{ComplexF64}(I(system.levels)))
     return unitary_rollout_fidelity(Ĩ⃗, Ũ⃗_goal, controls, Δt, system; kwargs...)
 end
 
@@ -496,13 +488,13 @@ end
         as -> rollout(ψ, as, ts, sys, integrator=expv)[:, end], as
     )
     iso_ket_dim = length(ket_to_iso(ψ))
-    @test size(result1) == (iso_ket_dim, T * length(sys.H_drives))
+    @test size(result1) == (iso_ket_dim, T * sys.n_drives)
 
     result2 = ForwardDiff.jacobian(
         as -> unitary_rollout(as, ts, sys, integrator=expv)[:, end], as
     )
-    iso_vec_dim = length(operator_to_iso_vec(sys.H_drift))
-    @test size(result2) == (iso_vec_dim, T * length(sys.H_drives))
+    iso_vec_dim = length(operator_to_iso_vec(sys.H(zeros(sys.n_drives))))
+    @test size(result2) == (iso_vec_dim, T * sys.n_drives)
 
     # Time derivatives
     ψ = ComplexF64[1, 0]
@@ -515,7 +507,7 @@ end
     result2 = ForwardDiff.jacobian(
         ts -> unitary_rollout(as, ts, sys, integrator=expv)[:, end], ts
     )
-    iso_vec_dim = length(operator_to_iso_vec(sys.H_drift))
+    iso_vec_dim = length(operator_to_iso_vec(sys.H(zeros(sys.n_drives))))
     @test size(result2) == (iso_vec_dim, T)
 end
 end

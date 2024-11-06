@@ -71,8 +71,6 @@ function UnitarySmoothPulseProblem(
     operator::OperatorType,
     T::Int,
     Δt::Union{Float64, Vector{Float64}};
-    G::Function=a -> G_bilinear(a, system.G_drift, system.G_drives),
-    ∂G::Function=a -> system.G_drives,
     ipopt_options::IpoptOptions=IpoptOptions(),
     piccolo_options::PiccoloOptions=PiccoloOptions(),
     state_name::Symbol = :Ũ⃗,
@@ -80,12 +78,12 @@ function UnitarySmoothPulseProblem(
     timestep_name::Symbol = :Δt,
     init_trajectory::Union{NamedTrajectory, Nothing}=nothing,
     a_bound::Float64=1.0,
-    a_bounds=fill(a_bound, length(system.G_drives)),
+    a_bounds=fill(a_bound, system.n_drives),
     a_guess::Union{Matrix{Float64}, Nothing}=nothing,
     da_bound::Float64=Inf,
-    da_bounds::Vector{Float64}=fill(da_bound, length(system.G_drives)),
+    da_bounds::Vector{Float64}=fill(da_bound, system.n_drives),
     dda_bound::Float64=1.0,
-    dda_bounds::Vector{Float64}=fill(dda_bound, length(system.G_drives)),
+    dda_bounds::Vector{Float64}=fill(dda_bound, system.n_drives),
     Δt_min::Float64=Δt isa Float64 ? 0.5 * Δt : 0.5 * mean(Δt),
     Δt_max::Float64=Δt isa Float64 ? 1.5 * Δt : 1.5 * mean(Δt),
     drive_derivative_σ::Float64=0.01,
@@ -103,13 +101,11 @@ function UnitarySmoothPulseProblem(
     if !isnothing(init_trajectory)
         traj = init_trajectory
     else
-        n_drives = length(system.G_drives)
-
         traj = initialize_trajectory(
             operator,
             T,
             Δt,
-            n_drives,
+            system.n_drives,
             (a_bounds, da_bounds, dda_bounds);
             state_name=state_name,
             control_name=control_name,
@@ -161,12 +157,12 @@ function UnitarySmoothPulseProblem(
 
     if piccolo_options.integrator == :pade
         unitary_integrator =
-            UnitaryPadeIntegrator(state_name, control_name, G, ∂G, traj;
+            UnitaryPadeIntegrator(state_name, control_name, system, traj;
                 order=piccolo_options.pade_order
             )
     elseif piccolo_options.integrator == :exponential
         unitary_integrator =
-            UnitaryExponentialIntegrator(state_name, control_name, G, traj)
+            UnitaryExponentialIntegrator(state_name, control_name, system, traj)
     else
         error("integrator must be one of (:pade, :exponential)")
     end

@@ -54,13 +54,11 @@ with
 function QuantumStateSmoothPulseProblem end
 
 function QuantumStateSmoothPulseProblem(
-    system::AbstractQuantumSystem,
+    sys::AbstractQuantumSystem,
     ψ_inits::Vector{<:AbstractVector{<:ComplexF64}},
     ψ_goals::Vector{<:AbstractVector{<:ComplexF64}},
     T::Int,
     Δt::Float64;
-    G::Function=a -> G_bilinear(a, system.G_drift, system.G_drives),
-    ∂G::Function=a -> system.G_drives,
     ipopt_options::IpoptOptions=IpoptOptions(),
     piccolo_options::PiccoloOptions=PiccoloOptions(),
     state_name::Symbol=:ψ̃,
@@ -68,12 +66,12 @@ function QuantumStateSmoothPulseProblem(
     timestep_name::Symbol=:Δt,
     init_trajectory::Union{NamedTrajectory, Nothing}=nothing,
     a_bound::Float64=1.0,
-    a_bounds::Vector{Float64}=fill(a_bound, length(system.G_drives)),
+    a_bounds::Vector{Float64}=fill(a_bound, sys.n_drives),
     a_guess::Union{Matrix{Float64}, Nothing}=nothing,
     da_bound::Float64=Inf,
-    da_bounds::Vector{Float64}=fill(da_bound, length(system.G_drives)),
+    da_bounds::Vector{Float64}=fill(da_bound, sys.n_drives),
     dda_bound::Float64=1.0,
-    dda_bounds::Vector{Float64}=fill(dda_bound, length(system.G_drives)),
+    dda_bounds::Vector{Float64}=fill(dda_bound, sys.n_drives),
     Δt_min::Float64=0.5 * Δt,
     Δt_max::Float64=1.5 * Δt,
     drive_derivative_σ::Float64=0.01,
@@ -92,14 +90,12 @@ function QuantumStateSmoothPulseProblem(
     if !isnothing(init_trajectory)
         traj = init_trajectory
     else
-        n_drives = length(system.G_drives)
-
         traj = initialize_trajectory(
             ψ_goals,
             ψ_inits,
             T,
             Δt,
-            n_drives,
+            sys.n_drives,
             (a_bounds, da_bounds, dda_bounds);
             state_name=state_name,
             control_name=control_name,
@@ -109,7 +105,7 @@ function QuantumStateSmoothPulseProblem(
             bound_state=piccolo_options.bound_state,
             drive_derivative_σ=drive_derivative_σ,
             a_guess=a_guess,
-            system=system,
+            system=sys,
             rollout_integrator=piccolo_options.rollout_integrator,
         )
     end
@@ -135,14 +131,12 @@ function QuantumStateSmoothPulseProblem(
     end
 
     # Integrators
-    state_integrators = []
-    for name ∈ state_names
+    if length(ψ_inits) == 1
         if piccolo_options.integrator == :pade
             state_integrators = [QuantumStatePadeIntegrator(
                 state_name,
                 control_name,
-                G,
-                ∂G,
+                sys,
                 traj;
                 order=piccolo_options.pade_order
             )]
@@ -150,7 +144,7 @@ function QuantumStateSmoothPulseProblem(
             state_integrators = [QuantumStateExponentialIntegrator(
                 state_name,
                 control_name,
-                G,
+                sys,
                 traj
             )]
         else
@@ -167,8 +161,7 @@ function QuantumStateSmoothPulseProblem(
                 state_integrator = QuantumStatePadeIntegrator(
                     state_names[i],
                     control_name,
-                    G,
-                    ∂G,
+                    sys,
                     traj;
                     order=piccolo_options.pade_order
                 )
@@ -176,7 +169,7 @@ function QuantumStateSmoothPulseProblem(
                 state_integrator = QuantumStateExponentialIntegrator(
                     state_names[i],
                     control_name,
-                    G,
+                    sys,
                     traj
                 )
             else
@@ -198,7 +191,7 @@ function QuantumStateSmoothPulseProblem(
     )
 
     return QuantumControlProblem(
-        system,
+        sys,
         traj,
         J,
         integrators;

@@ -1280,7 +1280,7 @@ uuid = "69de0a69-1ddd-5017-9359-2bf0b02dc9f0"
 version = "2.8.1"
 
 [[deps.PiccoloQuantumObjects]]
-deps = ["LinearAlgebra", "Reexport", "SparseArrays", "TestItemRunner", "TestItems", "TrajectoryIndexingUtils"]
+deps = ["ForwardDiff", "LinearAlgebra", "Reexport", "SparseArrays", "TestItemRunner", "TestItems", "TrajectoryIndexingUtils"]
 path = "../PiccoloQuantumObjects.jl"
 uuid = "5a402ddf-f93c-42eb-975e-5582dcda653d"
 version = "1.0.0-DEV"
@@ -1363,9 +1363,9 @@ version = "1.2.1"
 
 [[deps.QOI]]
 deps = ["ColorTypes", "FileIO", "FixedPointNumbers"]
-git-tree-sha1 = "18e8f4d1426e965c7b532ddd260599e1510d26ce"
+git-tree-sha1 = "8b3fc30bc0390abdce15f8822c889f669baed73d"
 uuid = "4b34888f-f399-49d4-9bb3-47ed5cae4e65"
-version = "1.0.0"
+version = "1.0.1"
 
 [[deps.QuadGK]]
 deps = ["DataStructures", "LinearAlgebra"]
@@ -1872,9 +1872,9 @@ version = "0.1.6"
 
 [[deps.WebP]]
 deps = ["CEnum", "ColorTypes", "FileIO", "FixedPointNumbers", "ImageCore", "libwebp_jll"]
-git-tree-sha1 = "f1f6d497ff84039deeb37f264396dac0c2250497"
+git-tree-sha1 = "aa1ca3c47f119fbdae8770c29820e5e6119b83f2"
 uuid = "e3aaa7dc-3e4b-44e0-be63-ffb868ccd7c1"
-version = "0.1.2"
+version = "0.1.3"
 
 [[deps.WoodburyMatrices]]
 deps = ["LinearAlgebra", "SparseArrays"]
