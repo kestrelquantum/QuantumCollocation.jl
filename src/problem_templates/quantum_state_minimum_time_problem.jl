@@ -101,6 +101,7 @@ end
 
 @testitem "Test quantum state minimum time" begin
         using NamedTrajectories
+        using PiccoloQuantumObjects
 
         # System
         T = 50

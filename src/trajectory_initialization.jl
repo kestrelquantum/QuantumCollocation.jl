@@ -7,16 +7,16 @@ export initialize_trajectory
 export convert_fixed_time
 export convert_free_time
 
+using ..Rollouts
+using ..DirectSums
+
 using NamedTrajectories
 using QuantumCollocationCore
+using PiccoloQuantumObjects
 using Distributions
 using ExponentialAction
 using LinearAlgebra
 using TestItemRunner
-
-using ..Rollouts
-using ..EmbeddedOperators
-using ..DirectSums
 
 
 # ----------------------------------------------------------------------------- #

@@ -10,6 +10,7 @@ using SparseArrays
 using TestItemRunner
 using NamedTrajectories
 using QuantumCollocationCore
+using PiccoloQuantumObjects
 
 
 """

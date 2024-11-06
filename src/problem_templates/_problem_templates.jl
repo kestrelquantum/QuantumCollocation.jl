@@ -1,6 +1,5 @@
 module ProblemTemplates
 
-using ..EmbeddedOperators
 using ..DirectSums
 using ..Rollouts
 using ..TrajectoryInitialization
@@ -10,6 +9,7 @@ using Distributions
 using TrajectoryIndexingUtils
 using NamedTrajectories
 using QuantumCollocationCore
+using PiccoloQuantumObjects
 using LinearAlgebra
 using SparseArrays
 using ExponentialAction

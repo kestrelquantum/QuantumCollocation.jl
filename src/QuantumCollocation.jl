@@ -3,15 +3,7 @@ module QuantumCollocation
 using Reexport
 
 @reexport using QuantumCollocationCore
-
-include("quantum_object_utils.jl")
-@reexport using .QuantumObjectUtils
-
-include("quantum_system_templates/_quantum_system_templates.jl")
-@reexport using .QuantumSystemTemplates
-
-include("quantum_system_utils.jl")
-@reexport using .QuantumSystemUtils
+@reexport using PiccoloQuantumObjects
 
 include("direct_sums.jl")
 @reexport using .DirectSums

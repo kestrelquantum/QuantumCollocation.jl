@@ -9,14 +9,11 @@ export lab_frame_unitary_rollout_trajectory
 export rollout_fidelity
 export unitary_rollout_fidelity
 
-using ..QuantumSystemUtils
-using ..QuantumObjectUtils
-using ..EmbeddedOperators
-using ..Losses
 using ..DirectSums
 
 using NamedTrajectories
 using QuantumCollocationCore
+using PiccoloQuantumObjects
 using ExponentialAction
 using LinearAlgebra
 using ProgressMeter
