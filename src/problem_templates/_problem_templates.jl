@@ -32,7 +32,7 @@ include("unitary_bang_bang_problem.jl")
 
 include("quantum_state_smooth_pulse_problem.jl")
 include("quantum_state_minimum_time_problem.jl")
-
+include("quantum_state_sampling_problem.jl")
 
 function apply_piccolo_options!(
     J::Objective,

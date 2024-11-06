@@ -373,6 +373,44 @@ function initialize_trajectory(
     )
 end
 
+"""
+    Initialize the unitary states for a single set of parameters.
+
+"""
+function initialize_unitaries(
+    U_goal::OperatorType,
+    T::Int,
+    timesteps::AbstractVector{<:Real};
+    U_init::AbstractMatrix{<:Number}=Matrix{ComplexF64}(I(size(U_goal, 1))),
+    a_guess::Union{AbstractMatrix{<:Float64}, Nothing}=nothing,
+    system::Union{AbstractQuantumSystem, Nothing}=nothing,
+    rollout_integrator::Function=expv,
+    geodesic=true,
+)::Matrix{Float64}
+    Ũ⃗_init = operator_to_iso_vec(U_init)
+
+    if U_goal isa EmbeddedOperator
+        Ũ⃗_goal = operator_to_iso_vec(U_goal.operator)
+    else
+        Ũ⃗_goal = operator_to_iso_vec(U_goal)
+    end
+    
+    # Construct state data
+    if isnothing(a_guess)
+        state_data = initialize_unitary_trajectory(U_init, U_goal, T; geodesic=geodesic)
+    else
+        @assert !isnothing(system) "System must be provided if a_guess is provided."
+        state_data = unitary_rollout(Ũ⃗_init, a_guess, timesteps, system; integrator=rollout_integrator)
+    end
+
+    return state_data
+end
+    
+"""
+    initialize_trajectory
+
+Trajectory initialization of unitary states can broadcast over multiple systems.
+"""
 function initialize_trajectory(
     U_goal::OperatorType,
     T::Int,
@@ -395,54 +433,47 @@ function initialize_trajectory(
         Ũ⃗_goal = operator_to_iso_vec(U_goal)
     end
 
-    # Construct state data
-    if isnothing(a_guess)
-        # No guess provided, initialize a geodesic and randomly sample controls
-        Ũ⃗_traj = initialize_unitary_trajectory(U_init, U_goal, T; geodesic=geodesic)
-        if system isa AbstractVector
-            state_data = repeat([Ũ⃗_traj], length(system))
-        else
-            state_data = [Ũ⃗_traj]
-        end
+    # Construct timesteps
+    if Δt isa AbstractMatrix
+        timesteps = vec(Δt)
+    elseif Δt isa Float64
+        timesteps = fill(Δt, T)
     else
-        if Δt isa AbstractMatrix
-            timesteps = vec(Δt)
-        elseif Δt isa Float64
-            timesteps = fill(Δt, T)
-        else
-            timesteps = Δt
-        end
-        
-        @assert size(a_guess, 2) == T "a_guess must have the same number of timesteps as T"
-        if system isa AbstractQuantumSystem
-            @assert size(a_guess, 1) == length(system.H_drives) "a_guess must have the same number of drives as n_drives"
-            state_data = [unitary_rollout(Ũ⃗_init, a_guess, timesteps, system; integrator=rollout_integrator)]
-        elseif system isa AbstractVector
-            state_data = map(system) do sys
-                @assert size(a_guess, 1) == length(sys.H_drives) "a_guess must have the same number of drives as n_drives"
-                unitary_rollout(Ũ⃗_init, a_guess, timesteps, sys; integrator=rollout_integrator)
-            end
-        else
-            error("System must be provided if a_guess is provided.")
-        end
+        timesteps = Δt
     end
 
-    # Create a state name for each system
-    if system isa AbstractVector && length(system) > 1
+    # Construct state data
+    if system isa AbstractVector
+        state_data = map(system) do sys
+            initialize_unitaries(
+                U_goal, T, timesteps;
+                U_init=U_init,
+                a_guess=a_guess,
+                system=sys,
+                rollout_integrator=rollout_integrator,
+                geodesic=geodesic
+            )
+        end
+
         state_names = Symbol.([string(state_name) * "_system_$i" for i in eachindex(system)])
         if verbose
             println("Created state names for ($(length(system))) systems: $state_names")
         end
-        state_inits = repeat([Ũ⃗_init], length(state_names))
-        state_goals = repeat([Ũ⃗_goal], length(state_names))
+        state_inits = repeat([Ũ⃗_init], length(system))
+        state_goals = repeat([Ũ⃗_goal], length(system))
     else
+        state_data = [initialize_unitaries(
+            U_goal, T, timesteps; 
+            U_init=U_init,
+            a_guess=a_guess, 
+            system=system, 
+            rollout_integrator=rollout_integrator, 
+            geodesic=geodesic
+        )]
         state_names = [state_name]
         state_inits = [Ũ⃗_init]
         state_goals = [Ũ⃗_goal]
     end
-
-    # Convert data to Float64
-    state_data = Matrix{Float64}.(state_data)
 
     return initialize_trajectory(
         state_data,
@@ -458,6 +489,46 @@ function initialize_trajectory(
     )
 end
 
+"""
+    initialize_quantum_states
+
+Initialize the quantum states for a single set of parameters.
+"""
+function initialize_quantum_states(
+    ψ̃_goals::AbstractVector{<:AbstractVector{Float64}},
+    ψ̃_inits::AbstractVector{<:AbstractVector{Float64}},
+    T::Int,
+    timesteps::AbstractVector{<:Real};
+    a_guess::Union{AbstractMatrix{<:Float64}, Nothing}=nothing,
+    system::Union{AbstractQuantumSystem, Nothing}=nothing,
+    rollout_integrator::Function=expv,
+)
+    state_data = Matrix{Float64}[]
+    if isnothing(a_guess)
+        for (ψ̃_init, ψ̃_goal) ∈ zip(ψ̃_inits, ψ̃_goals)
+            ψ̃_traj = linear_interpolation(ψ̃_init, ψ̃_goal, T)
+            push!(state_data, ψ̃_traj)
+        end
+        if system isa AbstractVector
+            state_data = repeat(state_data, length(system))
+        end
+    else
+        for sys ∈ system
+            for ψ̃_init ∈ ψ̃_inits
+                ψ̃_traj = rollout(ψ̃_init, a_guess, timesteps, sys; integrator=rollout_integrator)
+                push!(state_data, ψ̃_traj)
+            end
+        end
+    end
+
+    return state_data
+end
+
+"""
+    initialize_trajectory
+    
+Trajectory initialization of quantum states can broadcast over multiple systems.
+"""
 function initialize_trajectory(
     ψ_goals::AbstractVector{<:AbstractVector{ComplexF64}},
     ψ_inits::AbstractVector{<:AbstractVector{ComplexF64}},
@@ -480,71 +551,43 @@ function initialize_trajectory(
     ψ̃_goals = ket_to_iso.(ψ_goals)
     ψ̃_inits = ket_to_iso.(ψ_inits)
 
-    if isnothing(a_guess)
-        state_data = []
-        for (ψ̃_init, ψ̃_goal) ∈ zip(ψ̃_inits, ψ̃_goals)
-            ψ̃_traj = linear_interpolation(ψ̃_init, ψ̃_goal, T)
-            push!(state_data, ψ̃_traj)
-        end
-        if system isa AbstractVector
-            state_data = repeat(state_data, length(system))
-        end
+    if Δt isa AbstractMatrix
+        timesteps = vec(Δt)
+    elseif Δt isa Float64
+        timesteps = fill(Δt, T)
     else
-        @assert size(a_guess, 1) == n_drives "a_guess must have n_drives = $(n_drives) drives"
-        @assert size(a_guess, 2) == T "a_guess must have T = $(T) timesteps"
-        @assert !isnothing(system) "system must be provided if a_guess is provided"
-
-        if Δt isa AbstractMatrix
-            timesteps = vec(Δt)
-        elseif Δt isa Float64
-            timesteps = fill(Δt, T)
-        else
-            timesteps = Δt
-        end
-
-        if system isa AbstractVector
-            state_data = []
-            for sys ∈ system
-                for ψ̃_init ∈ ψ̃_inits
-                    ψ̃_traj = rollout(ψ̃_init, a_guess, timesteps, sys;
-                        integrator=rollout_integrator
-                    )
-                    push!(state_data, ψ̃_traj)
-                end
-            end
-        else
-            state_data = []
-            for ψ̃_init ∈ ψ̃_inits
-                ψ̃_traj = rollout(ψ̃_init, a_guess, timesteps, system;
-                    integrator=rollout_integrator
-                )
-                push!(state_data, ψ̃_traj)
-            end
-        end
+        timesteps = Δt
     end
-
-    state_data = Matrix{Float64}.(state_data)
 
     if system isa AbstractVector
-        if lenth(state_names) != length(system) * length(ψ_goals)
-            state_names = vcat([
-                Symbol.(string.(state_names) .* "_system_$i")
-                    for i = 1:length(system)
-            ]...)
-            if verbose
-                println(
-                    "length of state_names and number of systems ($(length(system))) * ",
-                    "number of states ($(length(ψ_goals))) are not equal, created state ",
-                    "names for each system: $state_names"
-                )
-            end
+        state_data = map(system) do sys
+            initialize_quantum_states(
+                ψ̃_goals, ψ̃_inits, T, timesteps;
+                a_guess=a_guess,
+                system=sys,
+                rollout_integrator=rollout_integrator
+            )
         end
-        ψ̃_inits = repeat(ψ̃_inits, length(system))
-        ψ̃_goals = repeat(ψ̃_goals, length(system))
+        # Flatten state data along systems
+        state_data = vcat(state_data...)
+        # Update state names using systems
+        state_names = Symbol.([string(n) * "_system_$i" for i in eachindex(system) for n in state_names])
+        if verbose
+            println("Created state names for ($(length(system))) systems: $state_names")
+        end
+        state_inits = repeat(ψ̃_inits, length(system))
+        state_goals = repeat(ψ̃_goals, length(system))
+    else
+        state_data = initialize_quantum_states(
+            ψ̃_goals, ψ̃_inits, T, timesteps;
+            a_guess=a_guess,
+            system=system,
+            rollout_integrator=rollout_integrator
+        )
+        # state_names are the same
+        state_inits = ψ̃_inits
+        state_goals = ψ̃_goals
     end
-
-    state_inits = ψ̃_inits
-    state_goals = ψ̃_goals
 
     return initialize_trajectory(
         state_data,

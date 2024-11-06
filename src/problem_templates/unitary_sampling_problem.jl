@@ -109,47 +109,15 @@ function UnitarySamplingProblem(
     ]
 
     # Objective
-    J = NullObjective()
+    J = QuadraticRegularizer(control_names[1], traj, R_a; timestep_name=timestep_name)
+    J += QuadraticRegularizer(control_names[2], traj, R_da; timestep_name=timestep_name)
+    J += QuadraticRegularizer(control_names[3], traj, R_dda; timestep_name=timestep_name)
+
     for (weight, name) in zip(system_weights, state_names)
         J += weight * UnitaryInfidelityObjective(
             name, traj, Q;
             subspace=operator isa EmbeddedOperator ? operator.subspace_indices : nothing
         )
-    end
-    for (R_name, name) in zip([R_a, R_da, R_dda], control_names)
-        J += QuadraticRegularizer(name, traj, R_name; timestep_name=timestep_name)
-    end
-
-    # Constraints
-    if piccolo_options.leakage_suppression
-        if operator isa EmbeddedOperator
-            leakage_indices = get_iso_vec_leakage_indices(operator)
-            for name in state_names
-                J += L1Regularizer!(
-                    constraints, name, traj,
-                    R_value=piccolo_options.R_leakage,
-                    indices=leakage_indices,
-                    eval_hessian=piccolo_options.eval_hessian
-                )
-            end
-        else
-            @warn "leakage_suppression is not supported for non-embedded operators, ignoring."
-        end
-    end
-
-    if piccolo_options.free_time
-        if piccolo_options.timesteps_all_equal
-            push!(constraints, TimeStepsAllEqualConstraint(:Δt, traj))
-        end
-    end
-
-    if !isnothing(piccolo_options.complex_control_norm_constraint_name)
-        norm_con = ComplexModulusContraint(
-            piccolo_options.complex_control_norm_constraint_name,
-            piccolo_options.complex_control_norm_constraint_radius,
-            traj;
-        )
-        push!(constraints, norm_con)
     end
 
     # Integrators
@@ -175,6 +143,11 @@ function UnitarySamplingProblem(
         DerivativeIntegrator(control_name, control_names[2], traj),
         DerivativeIntegrator(control_names[2], control_names[3], traj),
     ]
+
+    # Optional Piccolo constraints and objectives
+    apply_piccolo_options!(
+        J, constraints, piccolo_options, traj, operator, state_name, timestep_name
+    )
 
     return QuantumControlProblem(
         direct_sum(systems),

@@ -158,7 +158,8 @@ function UnitarySmoothPulseProblem(
     # Integrators
     if piccolo_options.integrator == :pade
         unitary_integrator =
-            UnitaryPadeIntegrator(system, state_name, control_name, traj;
+            UnitaryPadeIntegrator(
+                system, state_name, control_name, traj;
                 order=piccolo_options.pade_order
             )
     elseif piccolo_options.integrator == :exponential
