@@ -77,7 +77,6 @@ function QuantumStateSamplingProblem(
     J = QuadraticRegularizer(control_names[1], traj, R_a; timestep_name=timestep_name)
     J += QuadraticRegularizer(control_names[2], traj, R_da; timestep_name=timestep_name)
     J += QuadraticRegularizer(control_names[3], traj, R_dda; timestep_name=timestep_name)
-
     for (weight, names) in zip(system_weights, eachcol(state_names))
         for name in names
             J += weight * QuantumStateObjective(name, traj, Q)
@@ -114,7 +113,6 @@ function QuantumStateSamplingProblem(
     apply_piccolo_options!(
         J, constraints, piccolo_options, traj, leakage_operator, state_name, timestep_name
     )
-
     return QuantumControlProblem(
         direct_sum(systems),
         traj,

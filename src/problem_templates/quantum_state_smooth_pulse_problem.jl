@@ -131,7 +131,8 @@ function QuantumStateSmoothPulseProblem(
     end
 
     # Integrators
-    if length(ψ_inits) == 1
+    state_integrators = []
+    for name ∈ state_names
         if piccolo_options.integrator == :pade
             state_integrators = [QuantumStatePadeIntegrator(
                 state_name,
@@ -139,7 +140,7 @@ function QuantumStateSmoothPulseProblem(
                 sys,
                 traj;
                 order=piccolo_options.pade_order
-            )]
+            )
         elseif piccolo_options.integrator == :exponential
             state_integrators = [QuantumStateExponentialIntegrator(
                 state_name,
