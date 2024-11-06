@@ -158,7 +158,8 @@ function UnitarySmoothPulseProblem(
     # Integrators
     if piccolo_options.integrator == :pade
         unitary_integrator =
-            UnitaryPadeIntegrator(system, state_name, control_name, traj;
+            UnitaryPadeIntegrator(
+                system, state_name, control_name, traj;
                 order=piccolo_options.pade_order
             )
     elseif piccolo_options.integrator == :exponential
@@ -175,7 +176,9 @@ function UnitarySmoothPulseProblem(
     ]
 
     # Optional Piccolo constraints and objectives
-    apply_piccolo_options!(J, constraints, piccolo_options, traj, operator, state_name, timestep_name)
+    apply_piccolo_options!(
+        J, constraints, piccolo_options, traj, operator, state_name, timestep_name
+    )
 
     return QuantumControlProblem(
         system,
