@@ -250,15 +250,15 @@ initialize_control_trajectory(a::AbstractMatrix, Δt::Real, n_derivatives::Int) 
 # ----------------------------------------------------------------------------- #
 
 """
-    initialize_unitary_trajectory
+    initialize_trajectory
 
 
-Initialize a trajectory for a unitary control problem. The trajectory is initialized with
+Initialize a trajectory for a control problem. The trajectory is initialized with
 data that should be consistently the same type (in this case, Float64).
 
 """
 function initialize_trajectory(
-    state_data::Vector{Matrix{Float64}},
+    state_data::Vector{<:AbstractMatrix{Float64}},
     state_inits::Vector{<:AbstractVector{Float64}},
     state_goals::Vector{<:AbstractVector{Float64}},
     state_names::AbstractVector{Symbol},
@@ -275,11 +275,9 @@ function initialize_trajectory(
     drive_derivative_σ::Float64=0.1,
     a_guess::Union{AbstractMatrix{<:Float64}, Nothing}=nothing,
     global_data::Union{NamedTuple, Nothing}=nothing,
+    verbose=false,
 )
-    @assert !isnothing(state_inits) "state_init must be provided"
-    @assert !isnothing(state_goals) "state_goal must be provided"
     @assert length(state_data) == length(state_names) == length(state_inits) == length(state_goals) "state_data, state_names, state_inits, and state_goals must have the same length"
-
     @assert length(control_bounds) == n_control_derivatives + 1 "control_bounds must have $n_control_derivatives + 1 elements"
 
     # assert that state names are unique
@@ -287,9 +285,11 @@ function initialize_trajectory(
 
     # Control data
     control_derivative_names = [
-        Symbol("d"^i * string(control_name))
-            for i = 1:n_control_derivatives
+        Symbol("d"^i * string(control_name)) for i = 1:n_control_derivatives
     ]
+    if verbose
+        println("control_derivative_names: $control_derivative_names")
+    end
 
     control_names = (control_name, control_derivative_names...)
 
@@ -309,7 +309,6 @@ function initialize_trajectory(
         @assert Δt isa Real "Δt must be a Real if free_time is false"
         timestep = Δt
     end
-
 
     # Constraints
     initial = (;
@@ -378,12 +377,12 @@ function initialize_trajectory(
     Δt::Union{Real, AbstractVecOrMat{<:Real}},
     args...;
     state_name::Symbol=:Ũ⃗,
-    state_names::AbstractVector{<:Symbol}=[state_name],
     U_init::AbstractMatrix{<:Number}=Matrix{ComplexF64}(I(size(U_goal, 1))),
     a_guess::Union{AbstractMatrix{<:Float64}, Nothing}=nothing,
     system::Union{AbstractQuantumSystem, AbstractVector{<:AbstractQuantumSystem}, Nothing}=nothing,
     rollout_integrator::Function=expv,
     geodesic=true,
+    verbose=false,
     kwargs...
 )
     Ũ⃗_init = operator_to_iso_vec(U_init)
@@ -394,22 +393,16 @@ function initialize_trajectory(
         Ũ⃗_goal = operator_to_iso_vec(U_goal)
     end
 
+    # Construct state data
     if isnothing(a_guess)
         # No guess provided, initialize a geodesic and randomly sample controls
-
         Ũ⃗_traj = initialize_unitary_trajectory(U_init, U_goal, T; geodesic=geodesic)
-
-        state_data = repeat([Ũ⃗_traj], length(state_names))
-    else
-        if system isa AbstractQuantumSystem
-            @assert size(a_guess, 1) == length(system.H_drives) "a_guess must have the same number of drives as n_drives"
-        elseif system isa AbstractVector
-            @assert size(a_guess, 1) == length(system[1].H_drives) "a_guess must have the same number of drives as n_drives"
+        if system isa AbstractVector
+            state_data = repeat([Ũ⃗_traj], length(system))
+        else
+            state_data = [Ũ⃗_traj]
         end
-
-        @assert size(a_guess, 2) == T "a_guess must have the same number of timesteps as T"
-        @assert !isnothing(system) "system must be provided if a_guess is provided"
-
+    else
         if Δt isa AbstractMatrix
             timesteps = vec(Δt)
         elseif Δt isa Float64
@@ -417,26 +410,37 @@ function initialize_trajectory(
         else
             timesteps = Δt
         end
-
-        if system isa AbstractVector
-            @assert length(system) == length(state_names) "systems must have the same length as state_names"
+        
+        @assert size(a_guess, 2) == T "a_guess must have the same number of timesteps as T"
+        if system isa AbstractQuantumSystem
+            @assert size(a_guess, 1) == length(system.H_drives) "a_guess must have the same number of drives as n_drives"
+            state_data = [unitary_rollout(Ũ⃗_init, a_guess, timesteps, system; integrator=rollout_integrator)]
+        elseif system isa AbstractVector
             state_data = map(system) do sys
+                @assert size(a_guess, 1) == length(sys.H_drives) "a_guess must have the same number of drives as n_drives"
                 unitary_rollout(Ũ⃗_init, a_guess, timesteps, sys; integrator=rollout_integrator)
             end
         else
-            state = unitary_rollout(Ũ⃗_init, a_guess, timesteps, system; integrator=rollout_integrator)
-            state_data = [state]
+            error("System must be provided if a_guess is provided.")
         end
-        state_data = Matrix{Float64}.(state_data)
     end
 
-    if system isa AbstractVector && length(state_names) != length(system)
-        state_names = [string(state_name) * "_system_$i" for i = 1:length(system)]
-        @warn "length of state_names and number of systems ($(length(system))) are not equal, created state names for each system: " state_names
+    # Create a state name for each system
+    if system isa AbstractVector && length(system) > 1
+        state_names = Symbol.([string(state_name) * "_system_$i" for i in eachindex(system)])
+        if verbose
+            println("Created state names for ($(length(system))) systems: $state_names")
+        end
+        state_inits = repeat([Ũ⃗_init], length(state_names))
+        state_goals = repeat([Ũ⃗_goal], length(state_names))
+    else
+        state_names = [state_name]
+        state_inits = [Ũ⃗_init]
+        state_goals = [Ũ⃗_goal]
     end
 
-    state_inits = repeat([Ũ⃗_init], length(state_names))
-    state_goals = repeat([Ũ⃗_goal], length(state_names))
+    # Convert data to Float64
+    state_data = Matrix{Float64}.(state_data)
 
     return initialize_trajectory(
         state_data,
@@ -447,6 +451,7 @@ function initialize_trajectory(
         Δt,
         args...;
         a_guess=a_guess,
+        verbose=verbose,
         kwargs...
     )
 end
@@ -464,6 +469,7 @@ function initialize_trajectory(
     a_guess::Union{AbstractMatrix{<:Float64}, Nothing}=nothing,
     system::Union{AbstractQuantumSystem, AbstractVector{<:AbstractQuantumSystem}, Nothing}=nothing,
     rollout_integrator::Function=expv,
+    verbose=false,
     kwargs...
 )
     @assert length(ψ_inits) == length(ψ_goals) "ψ_inits and ψ_goals must have the same length"
@@ -523,7 +529,13 @@ function initialize_trajectory(
                 Symbol.(string.(state_names) .* "_system_$i")
                     for i = 1:length(system)
             ]...)
-            @warn "length of state_names and number of systems ($(length(system))) * number of states ($(length(ψ_goals))) are not equal, created state names for each system: " state_names
+            if verbose
+                println(
+                    "length of state_names and number of systems ($(length(system))) * ",
+                    "number of states ($(length(ψ_goals))) are not equal, created state ",
+                    "names for each system: $state_names"
+                )
+            end
         end
         ψ̃_inits = repeat(ψ̃_inits, length(system))
         ψ̃_goals = repeat(ψ̃_goals, length(system))
@@ -541,6 +553,7 @@ function initialize_trajectory(
         Δt,
         args...;
         a_guess=a_guess,
+        verbose=verbose,
         kwargs...
     )
 end

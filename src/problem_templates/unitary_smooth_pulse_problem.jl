@@ -178,7 +178,9 @@ function UnitarySmoothPulseProblem(
     ]
 
     # Optional Piccolo constraints and objectives
-    apply_piccolo_options!(J, constraints, piccolo_options, traj, operator, state_name, timestep_name)
+    apply_piccolo_options!(
+        J, constraints, piccolo_options, traj, operator, state_name, timestep_name
+    )
 
     return QuantumControlProblem(
         system,
