@@ -30,9 +30,12 @@ where $n$ is the dimension of the unitary operators.
     U_goal::Matrix;
     subspace::AbstractVector{Int}=axes(U_goal, 1)
 )
-    U_goal = U_goal[subspace, subspace]
-    U = U[subspace, subspace]
-    return 1 / size(U_goal, 1) * abs(tr(U_goal'U))
+    # avoids type coercion neceessary because tr(Matrix{Any}) fails
+    return iso_vec_unitary_fidelity(
+        operator_to_iso_vec(U),
+        operator_to_iso_vec(U_goal),
+        subspace=subspace
+    )
 end
 
 
@@ -240,7 +243,6 @@ function free_phase(
     return reduce(kron, [expv(im * ϕ, H, Id) for (ϕ, H) ∈ zip(ϕs, Hs)])
 end
 
-# TODO: in-place
 function free_phase_gradient(
     ϕs::AbstractVector,
     Hs::AbstractVector{<:AbstractMatrix}
