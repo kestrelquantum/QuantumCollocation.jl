@@ -119,8 +119,8 @@ Fields:
 """
 function UnitaryFreePhaseInfidelityObjective(;
     name::Union{Nothing,Symbol}=nothing,
-    phase_name::Union{Nothing,Symbol}=nothing,
     goal::Union{Nothing,AbstractVector{<:R}}=nothing,
+    phase_name::Union{Nothing,Symbol}=nothing,
     phase_operators::Union{Nothing,AbstractVector{<:AbstractMatrix{<:Complex{R}}}}=nothing,
 	Q::R=1.0,
 	eval_hessian::Bool=false,
@@ -167,4 +167,24 @@ function UnitaryFreePhaseInfidelityObjective(;
     ∂²L(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory) = []
 
 	return Objective(L, ∇L, ∂²L, ∂²L_structure, Dict[params])
+end
+
+function UnitaryFreePhaseInfidelityObjective(
+    name::Symbol,
+    phase_name::Symbol,
+    phase_operators::AbstractVector{<:AbstractMatrix{<:Complex}},
+    traj::NamedTrajectory,
+    Q::Float64;
+    subspace=nothing,
+	eval_hessian::Bool=true
+)
+    return UnitaryFreePhaseInfidelityObjective(
+        name=name,
+        goal=traj.goal[name],
+        phase_name=phase_name,
+        phase_operators=phase_operators,
+        Q=Q,
+        subspace=subspace,
+        eval_hessian=eval_hessian,
+    )
 end
