@@ -122,25 +122,27 @@ function UnitarySmoothPulseProblem(
         )
     end
 
+    # Subspace
+    subspace = operator isa EmbeddedOperator ? operator.subspace_indices : nothing
+    goal = operator_to_iso_vec(operator isa EmbeddedOperator ? operator.operator : operator)
+
     # Objective
     if isnothing(global_data)
-        J = UnitaryInfidelityObjective(state_name, traj, Q;
-            subspace=operator isa EmbeddedOperator ? operator.subspace_indices : nothing,
+        J = UnitaryInfidelityObjective(
+            state_name, traj, Q; 
+            subspace=subspace,
+            eval_hessian=piccolo_options.eval_hessian,
         )
     else
         # TODO: remove hardcoded args
         J = UnitaryFreePhaseInfidelityObjective(
             name=state_name,
             phase_name=:ϕ,
-            goal=operator_to_iso_vec(
-                operator isa EmbeddedOperator ?
-                operator.operator :
-                operator
-            ),
+            goal=goal,
             phase_operators=fill(GATES[:Z], length(traj.global_components[:ϕ])),
             Q=Q,
             eval_hessian=piccolo_options.eval_hessian,
-            subspace=operator isa EmbeddedOperator ? operator.subspace_indices : nothing
+            subspace=subspace
         )
     end
 

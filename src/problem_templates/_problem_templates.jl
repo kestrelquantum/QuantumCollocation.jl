@@ -1,5 +1,6 @@
 module ProblemTemplates
 
+using ..EmbeddedOperators
 using ..DirectSums
 using ..Rollouts
 using ..TrajectoryInitialization
@@ -9,7 +10,6 @@ using Distributions
 using TrajectoryIndexingUtils
 using NamedTrajectories
 using QuantumCollocationCore
-using PiccoloQuantumObjects
 using LinearAlgebra
 using SparseArrays
 using ExponentialAction
@@ -26,8 +26,6 @@ include("unitary_bang_bang_problem.jl")
 include("quantum_state_smooth_pulse_problem.jl")
 include("quantum_state_minimum_time_problem.jl")
 include("quantum_state_sampling_problem.jl")
-
-include("density_operator_smooth_pulse_problem.jl")
 
 function apply_piccolo_options!(
     J::Objective,
