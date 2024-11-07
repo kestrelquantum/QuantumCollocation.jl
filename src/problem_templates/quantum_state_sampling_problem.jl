@@ -160,12 +160,24 @@ end
         piccolo_options=PiccoloOptions(verbose=false)
     )
 
-    state_names = [n for n ∈ prob.trajectory.names if startswith(string(n), "ψ̃")]
+    state_name = :ψ̃
+    state_names = [n for n ∈ prob.trajectory.names if startswith(string(n), string(state_name))]
+    sys1_state_names = [n for n ∈ state_names if endswith(string(n), "1")]
 
-    init = [fidelity(prob.trajectory, sys1, state_symb=n) for n in state_names]
+    # Separately compute all unique initial and goal state fidelities 
+    init = [fidelity(prob.trajectory, sys1, state_symb=n) for n in sys1_state_names]
     solve!(prob, max_iter=20)
-    final = [fidelity(prob.trajectory, sys1, state_symb=n) for n in state_names]
+    final = [fidelity(prob.trajectory, sys1, state_symb=n) for n in sys1_state_names]
     @test all(final .> init)
+
+    # Check that a_guess can be used
+    prob = QuantumStateSamplingProblem(
+        [sys1, sys2], ψ_init, ψ_target, T, Δt;
+        ipopt_options=IpoptOptions(print_level=1),
+        piccolo_options=PiccoloOptions(verbose=false),
+        a_guess=prob.trajectory.a
+    )
+    solve!(prob, max_iter=20)
 
     # Compare a solution without robustness
     # -------------------------------------
@@ -177,6 +189,7 @@ end
     )
     solve!(prob_default, max_iter=20)
     final_default = fidelity(prob_default.trajectory, sys1)
+    # Pick any initial state
     final_robust = fidelity(prob.trajectory, sys1, state_symb=state_names[1])
     @test final_robust > final_default
 end
@@ -199,11 +212,13 @@ end
         piccolo_options=PiccoloOptions(verbose=false)
     )
 
-    state_names = [n for n ∈ prob.trajectory.names if startswith(string(n), "ψ̃")]
+    state_name = :ψ̃
+    state_names = [n for n ∈ prob.trajectory.names if startswith(string(n), string(state_name))]
+    sys1_state_names = [n for n ∈ state_names if endswith(string(n), "1")]
 
-    init = [fidelity(prob.trajectory, sys1, state_symb=n) for n in state_names]
+    init = [fidelity(prob.trajectory, sys1, state_symb=n) for n in sys1_state_names]
     solve!(prob, max_iter=20)
-    final = [fidelity(prob.trajectory, sys1, state_symb=n) for n in state_names]
+    final = [fidelity(prob.trajectory, sys1, state_symb=n) for n in sys1_state_names]
     @test all(final .> init)
 end
 
