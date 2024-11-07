@@ -35,17 +35,6 @@ where $n$ is the dimension of the unitary operators.
     return 1 / size(U_goal, 1) * abs(tr(U_goal'U))
 end
 
-@views function unitary_fidelity(
-    Ũ⃗::AbstractVector,
-    Ũ⃗_goal::AbstractVector;
-    kwargs...
-)
-    return unitary_fidelity(
-        iso_vec_to_operator(Ũ⃗),
-        iso_vec_to_operator(Ũ⃗_goal);
-        kwargs...
-    )
-end
 
 @doc raw"""
     iso_vec_unitary_fidelity(Ũ⃗::AbstractVector, Ũ⃗_goal::AbstractVector)
@@ -78,7 +67,7 @@ where $T_R = \langle \vec{\widetilde{U}}_{\text{goal}, R}, \vec{\widetilde{U}}_R
     return 1 / n * sqrt(Tᵣ^2 + Tᵢ^2)
 end
 
-@views function unitary_infidelity(
+@views function iso_vec_unitary_infidelity(
     Ũ⃗::AbstractVector,
     Ũ⃗_goal::AbstractVector;
     subspace::AbstractVector{Int}=axes(iso_vec_to_operator(Ũ⃗_goal), 1)
@@ -87,7 +76,7 @@ end
     return abs(1 - ℱ)
 end
 
-@views function unitary_infidelity_gradient(
+@views function iso_vec_unitary_infidelity_gradient(
     Ũ⃗::AbstractVector,
     Ũ⃗_goal::AbstractVector;
     subspace::AbstractVector{Int}=axes(iso_vec_to_operator(Ũ⃗_goal), 1)
@@ -108,7 +97,7 @@ end
     return -sign(1 - ℱ) * ∇ℱ
 end
 
-@views function unitary_infidelity_hessian(
+@views function iso_vec_unitary_infidelity_hessian(
     Ũ⃗::AbstractVector,
     Ũ⃗_goal::AbstractVector;
     subspace::AbstractVector{Int}=axes(iso_vec_to_operator(Ũ⃗_goal), 1)
@@ -131,6 +120,7 @@ end
     ∂ᵢ²ℱ = 1 / ℱ * (-∇ᵢℱ * ∇ᵢℱ' + 1 / n^2 * (Wᵣᵣ + Wᵢᵢ))
     ∂ᵣ∂ᵢℱ = 1 / ℱ * (-∇ᵢℱ * ∇ᵣℱ' + 1 / n^2 * (Wᵢᵣ - Wᵣᵢ))
     ∂²ℱ = [∂ᵣ²ℱ ∂ᵣ∂ᵢℱ; ∂ᵣ∂ᵢℱ' ∂ᵢ²ℱ]
+    # TODO: This should be moved to Isomorphisms.jl
     permutation = vcat(vcat([[slice(j, n), slice(j, n) .+ n^2] for j = 1:n]...)...)
     ∂²ℱ = ∂²ℱ[permutation, permutation]
     return -sign(1 - ℱ) * ∂²ℱ
@@ -148,13 +138,13 @@ struct UnitaryInfidelityLoss <: AbstractLoss
         Ũ⃗_goal::AbstractVector;
         subspace::AbstractVector{Int}=axes(iso_vec_to_operator(Ũ⃗_goal), 1)
     )
-        l = Ũ⃗ -> unitary_infidelity(Ũ⃗, Ũ⃗_goal, subspace=subspace)
+        l = Ũ⃗ -> iso_vec_unitary_infidelity(Ũ⃗, Ũ⃗_goal, subspace=subspace)
 
         @views ∇l = Ũ⃗ -> begin
             subspace_rows, subspace_cols = (subspace, subspace)
             n_subspace = length(subspace_rows)
             n_full = Int(sqrt(length(Ũ⃗) ÷ 2))
-            ∇l_subspace = unitary_infidelity_gradient(Ũ⃗, Ũ⃗_goal, subspace=subspace)
+            ∇l_subspace = iso_vec_unitary_infidelity_gradient(Ũ⃗, Ũ⃗_goal, subspace=subspace)
             ∇l_full = zeros(2 * n_full^2)
             for j ∈ eachindex(subspace_cols)
                 ∇l_full[slice(2subspace_cols[j] - 1, subspace_rows, n_full)] =
@@ -169,7 +159,7 @@ struct UnitaryInfidelityLoss <: AbstractLoss
             subspace_rows, subspace_cols = (subspace, subspace)
             n_subspace = length(subspace_rows)
             n_full = Int(sqrt(length(Ũ⃗) ÷ 2))
-            ∇²l_subspace = unitary_infidelity_hessian(Ũ⃗, Ũ⃗_goal, subspace=subspace)
+            ∇²l_subspace = iso_vec_unitary_infidelity_hessian(Ũ⃗, Ũ⃗_goal, subspace=subspace)
             ∇²l_full = zeros(2 * n_full^2, 2 * n_full^2)
             # NOTE: Assumes subspace_rows = subspace_cols
             for k ∈ eachindex(subspace_cols)
@@ -245,9 +235,12 @@ function free_phase(
     Hs::AbstractVector{<:AbstractMatrix}
 )
     # NOTE: switch to expv for ForwardDiff
-    return reduce(kron, [exp(im * ϕ * H) for (ϕ, H) ∈ zip(ϕs, Hs)])
+    # return reduce(kron, [exp(im * ϕ * H) for (ϕ, H) ∈ zip(ϕs, Hs)])
+    Id = Matrix{eltype(Hs[1])}(I, size(Hs[1]))
+    return reduce(kron, [expv(im * ϕ, H, Id) for (ϕ, H) ∈ zip(ϕs, Hs)])
 end
 
+# TODO: in-place
 function free_phase_gradient(
     ϕs::AbstractVector,
     Hs::AbstractVector{<:AbstractMatrix}
@@ -302,7 +295,11 @@ end
     phase_operators::AbstractVector{<:AbstractMatrix};
     subspace::AbstractVector{Int}=axes(iso_vec_to_operator(Ũ⃗_goal), 1)
 )
-    return 1 - iso_vec_unitary_free_phase_fidelity(Ũ⃗, Ũ⃗_goal, phases, phase_operators, subspace=subspace)
+    ℱ = iso_vec_unitary_free_phase_fidelity(
+        Ũ⃗, Ũ⃗_goal, phases, phase_operators, 
+        subspace=subspace
+    )
+    return abs(1 - ℱ)
 end
 
 @views function iso_vec_unitary_free_phase_infidelity_gradient(
@@ -324,7 +321,9 @@ end
     R[subspace, subspace] = free_phase(phases, phase_operators)
 
     # loss gradient in subspace
-    ∂ℱ_∂Ũ⃗_subspace = unitary_infidelity_gradient(operator_to_iso_vec(R * U), Ũ⃗_goal, subspace=subspace)
+    ∂ℱ_∂Ũ⃗_subspace = iso_vec_unitary_infidelity_gradient(
+        operator_to_iso_vec(R * U), Ũ⃗_goal, subspace=subspace
+    )
 
     # state slice in subspace
     ∂[1:n_subspace] = operator_to_iso_vec(R[subspace, subspace]'iso_vec_to_operator(∂ℱ_∂Ũ⃗_subspace))
@@ -348,16 +347,20 @@ struct UnitaryFreePhaseInfidelityLoss <: AbstractLoss
     function UnitaryFreePhaseInfidelityLoss(
         Ũ⃗_goal::AbstractVector,
         phase_operators::AbstractVector{<:AbstractMatrix};
-        subspace::AbstractVector{Int}=axes(iso_vec_to_operator(Ũ⃗_goal), 1),
+        subspace::Union{AbstractVector{Int}, Nothing}=nothing,
     )
-        @assert reduce(.*, size.(phase_operators)) == length.(subspace) "phase operators must span the subspace"
+        if isnothing(subspace)
+            subspace = axes(iso_vec_to_operator(Ũ⃗_goal), 1)
+        end
+
+        @assert reduce(*, size.(phase_operators, 1)) == length(subspace) "phase operators must span the subspace"
 
         @views function l(Ũ⃗::AbstractVector, ϕ⃗::AbstractVector)
             return iso_vec_unitary_free_phase_infidelity(Ũ⃗, Ũ⃗_goal, ϕ⃗, phase_operators, subspace=subspace)
         end
 
         @views function ∇l(Ũ⃗::AbstractVector, ϕ⃗::AbstractVector)
-            subspace_rows, subspace_cols = subspace
+            subspace_rows = subspace_cols = subspace
             n_phase = length(ϕ⃗)
             n_rows = length(subspace_rows)
             n_cols = length(subspace_cols)
@@ -379,7 +382,6 @@ struct UnitaryFreePhaseInfidelityLoss <: AbstractLoss
 
             # phase slice
             ∇l_full[2 * n_full^2 .+ (1:n_phase)] = ∇l_subspace[2 * n_rows * n_cols .+ (1:n_phase)]
-
             return ∇l_full
         end
 

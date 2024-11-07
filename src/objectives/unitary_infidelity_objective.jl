@@ -151,10 +151,15 @@ function UnitaryFreePhaseInfidelityObjective(;
     end
 
     @views function ∇L(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory)
-        # TODO: implement analytic
-        ∇ = ForwardDiff.gradient(Z⃗ -> L(Z⃗, Z), Z⃗)
-        # println(nnz(sparse(∇)))
-        # println(∇[Z.global_components[global_name]])
+        ∇ = zeros(Z.dim * Z.T + Z.global_dim)
+        Ũ⃗_slice = slice(Z.T, Z.components[name], Z.dim)
+        Ũ⃗ = Z⃗[Ũ⃗_slice]
+        ϕ⃗_slice = Z.global_components[phase_name]
+        ϕ⃗ = Z⃗[ϕ⃗_slice]
+        ∇l = l(Ũ⃗, ϕ⃗; gradient=true)
+        ∇[Ũ⃗_slice] = Q * ∇l[1:length(Ũ⃗)]
+        # WARNING: 2π periodic; using Q≠1 is not recommended
+        ∇[ϕ⃗_slice] = Q * ∇l[length(Ũ⃗) .+ (1:length(ϕ⃗))]
         return ∇
     end
 
