@@ -16,12 +16,12 @@ function QuantumStateSamplingProblem(
     control_name::Symbol=:a,
     timestep_name::Symbol=:Δt,
     a_bound::Float64=1.0,
-    a_bounds=fill(a_bound, systems[1].n_drives),
+    a_bounds=fill(a_bound, length(systems[1].G_drives)),
     a_guess::Union{Matrix{Float64},Nothing}=nothing,
     da_bound::Float64=Inf,
-    da_bounds::Vector{Float64}=fill(da_bound, systems[1].n_drives),
+    da_bounds::Vector{Float64}=fill(da_bound, length(systems[1].G_drives)),
     dda_bound::Float64=1.0,
-    dda_bounds::Vector{Float64}=fill(dda_bound, systems[1].n_drives),
+    dda_bounds::Vector{Float64}=fill(dda_bound, length(systems[1].G_drives)),
     Δt_min::Float64=0.5 * Δt,
     Δt_max::Float64=1.5 * Δt,
     drive_derivative_σ::Float64=0.01,
@@ -40,12 +40,14 @@ function QuantumStateSamplingProblem(
     if !isnothing(init_trajectory)
         traj = init_trajectory
     else
+        n_drives = length(systems[1].G_drives)
+
         traj = initialize_trajectory(
             ψ_goals,
             ψ_inits,
             T,
             Δt,
-            systems[1].n_drives,
+            n_drives,
             (a_bounds, da_bounds, dda_bounds);
             state_name=state_name,
             control_name=control_name,
@@ -77,6 +79,7 @@ function QuantumStateSamplingProblem(
     J = QuadraticRegularizer(control_names[1], traj, R_a; timestep_name=timestep_name)
     J += QuadraticRegularizer(control_names[2], traj, R_da; timestep_name=timestep_name)
     J += QuadraticRegularizer(control_names[3], traj, R_dda; timestep_name=timestep_name)
+
     for (weight, names) in zip(system_weights, eachcol(state_names))
         for name in names
             J += weight * QuantumStateObjective(name, traj, Q)
@@ -89,12 +92,12 @@ function QuantumStateSamplingProblem(
         for name ∈ names
             if piccolo_options.integrator == :pade
                 state_integrator = QuantumStatePadeIntegrator(
-                    name, control_name, system, traj;
+                    system, name, control_name, traj;
                     order=piccolo_options.pade_order
                 )
             elseif piccolo_options.integrator == :exponential
                 state_integrator = QuantumStateExponentialIntegrator(
-                    name, control_name, system, traj
+                    system, name, control_name, traj
                 )
             else
                 error("integrator must be one of (:pade, :exponential)")
@@ -113,6 +116,7 @@ function QuantumStateSamplingProblem(
     apply_piccolo_options!(
         J, constraints, piccolo_options, traj, leakage_operator, state_name, timestep_name
     )
+
     return QuantumControlProblem(
         direct_sum(systems),
         traj,
@@ -156,12 +160,24 @@ end
         piccolo_options=PiccoloOptions(verbose=false)
     )
 
-    state_names = [n for n ∈ prob.trajectory.names if startswith(string(n), "ψ̃")]
+    state_name = :ψ̃
+    state_names = [n for n ∈ prob.trajectory.names if startswith(string(n), string(state_name))]
+    sys1_state_names = [n for n ∈ state_names if endswith(string(n), "1")]
 
-    init = [rollout_fidelity(prob.trajectory, sys1, state_symb=n) for n in state_names]
+    # Separately compute all unique initial and goal state fidelities
+    init = [fidelity(prob.trajectory, sys1, state_symb=n) for n in sys1_state_names]
     solve!(prob, max_iter=20)
-    final = [rollout_fidelity(prob.trajectory, sys1, state_symb=n) for n in state_names]
+    final = [fidelity(prob.trajectory, sys1, state_symb=n) for n in sys1_state_names]
     @test all(final .> init)
+
+    # Check that a_guess can be used
+    prob = QuantumStateSamplingProblem(
+        [sys1, sys2], ψ_init, ψ_target, T, Δt;
+        ipopt_options=IpoptOptions(print_level=1),
+        piccolo_options=PiccoloOptions(verbose=false),
+        a_guess=prob.trajectory.a
+    )
+    solve!(prob, max_iter=20)
 
     # Compare a solution without robustness
     # -------------------------------------
@@ -172,8 +188,9 @@ end
         robustness=false
     )
     solve!(prob_default, max_iter=20)
-    final_default = rollout_fidelity(prob_default.trajectory, sys1)
-    final_robust = rollout_fidelity(prob.trajectory, sys1, state_symb=state_names[1])
+    final_default = fidelity(prob_default.trajectory, sys1)
+    # Pick any initial state
+    final_robust = fidelity(prob.trajectory, sys1, state_symb=state_names[1])
     @test final_robust > final_default
 end
 
@@ -195,10 +212,12 @@ end
         piccolo_options=PiccoloOptions(verbose=false)
     )
 
-    state_names = [n for n ∈ prob.trajectory.names if startswith(string(n), "ψ̃")]
+    state_name = :ψ̃
+    state_names = [n for n ∈ prob.trajectory.names if startswith(string(n), string(state_name))]
+    sys1_state_names = [n for n ∈ state_names if endswith(string(n), "1")]
 
-    init = [rollout_fidelity(prob.trajectory, sys1, state_symb=n) for n in state_names]
+    init = [fidelity(prob.trajectory, sys1, state_symb=n) for n in sys1_state_names]
     solve!(prob, max_iter=20)
-    final = [rollout_fidelity(prob.trajectory, sys1, state_symb=n) for n in state_names]
+    final = [fidelity(prob.trajectory, sys1, state_symb=n) for n in sys1_state_names]
     @test all(final .> init)
 end
