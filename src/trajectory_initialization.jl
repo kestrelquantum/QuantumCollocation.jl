@@ -513,11 +513,9 @@ function initialize_quantum_states(
             state_data = repeat(state_data, length(system))
         end
     else
-        for sys ∈ system
-            for ψ̃_init ∈ ψ̃_inits
-                ψ̃_traj = rollout(ψ̃_init, a_guess, timesteps, sys; integrator=rollout_integrator)
-                push!(state_data, ψ̃_traj)
-            end
+        for ψ̃_init ∈ ψ̃_inits
+            ψ̃_traj = rollout(ψ̃_init, a_guess, timesteps, system; integrator=rollout_integrator)
+            push!(state_data, ψ̃_traj)
         end
     end
 
