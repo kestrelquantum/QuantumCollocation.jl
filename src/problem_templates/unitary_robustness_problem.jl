@@ -17,7 +17,7 @@ export UnitaryRobustnessProblem
 Create a quantum control problem for robustness optimization of a unitary trajectory.
 
 # Keyword Arguments
-- `unitary_symbol::Symbol=:Ũ⃗`: The symbol for the unitary trajectory in `trajectory`.
+- `unitary_name::Symbol=:Ũ⃗`: The symbol for the unitary trajectory in `trajectory`.
 - `final_fidelity::Union{Real, Nothing}=nothing`: The target fidelity for the final unitary.
 - `ipopt_options::IpoptOptions=IpoptOptions()`: Options for the Ipopt solver.
 - `piccolo_options::PiccoloOptions=PiccoloOptions()`: Options for the Piccolo solver.
@@ -33,17 +33,19 @@ function UnitaryRobustnessProblem(
     objective::Objective,
     integrators::Vector{<:AbstractIntegrator},
     constraints::Vector{<:AbstractConstraint};
-    unitary_symbol::Symbol=:Ũ⃗,
+    unitary_name::Symbol=:Ũ⃗,
     final_fidelity::Union{Real, Nothing}=nothing,
+    phase_name::Symbol=:ϕ,
+    phase_operators::Union{AbstractVector{<:AbstractMatrix}, Nothing}=nothing,
     ipopt_options::IpoptOptions=IpoptOptions(),
     piccolo_options::PiccoloOptions=PiccoloOptions(),
     kwargs...
 )
-    @assert unitary_symbol ∈ trajectory.names
+    @assert unitary_name ∈ trajectory.names
 
     if isnothing(final_fidelity)
         final_fidelity = unitary_fidelity(
-            trajectory[unitary_symbol][:, end], trajectory.goal[unitary_symbol]
+            trajectory[unitary_name][:, end], trajectory.goal[unitary_name]
         )
     end
 
@@ -52,12 +54,28 @@ function UnitaryRobustnessProblem(
         eval_hessian=piccolo_options.eval_hessian,
     )
 
-    fidelity_constraint = FinalUnitaryFidelityConstraint(
-        unitary_symbol,
-        final_fidelity,
-        trajectory;
-        subspace=H_error isa EmbeddedOperator ? H_error.subspace_indices : nothing
-    )
+    subspace = H_error isa EmbeddedOperator ? H_error.subspace_indices : nothing
+
+    if isnothing(phase_operators)
+        fidelity_constraint = FinalUnitaryFidelityConstraint(
+            unitary_name,
+            final_fidelity,
+            trajectory;
+            subspace=subspace,
+            eval_hessian=piccolo_options.eval_hessian
+        )
+    else
+        fidelity_constraint = FinalUnitaryFreePhaseFidelityConstraint(
+            unitary_name,
+            phase_name,
+            phase_operators,
+            final_fidelity,
+            trajectory;
+            subspace=subspace,
+            eval_hessian=piccolo_options.eval_hessian
+        )
+    end
+
     push!(constraints, fidelity_constraint)
 
     return QuantumControlProblem(

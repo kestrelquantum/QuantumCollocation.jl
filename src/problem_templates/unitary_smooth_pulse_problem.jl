@@ -62,7 +62,8 @@ with
 - `R_a::Union{Float64, Vector{Float64}}=R`: the weight on the regularization term for the control pulses
 - `R_da::Union{Float64, Vector{Float64}}=R`: the weight on the regularization term for the control pulse derivatives
 - `R_dda::Union{Float64, Vector{Float64}}=R`: the weight on the regularization term for the control pulse second derivatives
-- `global_data::Union{NamedTuple, Nothing}=nothing`: global data for the problem
+- `phase_name::Symbol=:ϕ`: the name of the phase
+- `phase_operators::Union{AbstractVector{<:AbstractMatrix}, Nothing}=nothing`: the phase operators for free phase corrections
 - `constraints::Vector{<:AbstractConstraint}=AbstractConstraint[]`: the constraints to enforce
 
 """
@@ -92,7 +93,8 @@ function UnitarySmoothPulseProblem(
     R_a::Union{Float64, Vector{Float64}}=R,
     R_da::Union{Float64, Vector{Float64}}=R,
     R_dda::Union{Float64, Vector{Float64}}=R,
-    global_data::Union{NamedTuple, Nothing}=nothing,
+    phase_name::Symbol=:ϕ,
+    phase_operators::Union{AbstractVector{<:AbstractMatrix}, Nothing}=nothing,
     constraints::Vector{<:AbstractConstraint}=AbstractConstraint[],
     kwargs...
 )
@@ -118,31 +120,26 @@ function UnitarySmoothPulseProblem(
             a_guess=a_guess,
             system=system,
             rollout_integrator=piccolo_options.rollout_integrator,
-            global_data=global_data
+            phase_name=phase_name,
+            phase_operators=phase_operators
         )
     end
 
     # Subspace
     subspace = operator isa EmbeddedOperator ? operator.subspace_indices : nothing
-    goal = operator_to_iso_vec(operator isa EmbeddedOperator ? operator.operator : operator)
 
     # Objective
-    if isnothing(global_data)
+    if isnothing(phase_operators)
         J = UnitaryInfidelityObjective(
             state_name, traj, Q; 
             subspace=subspace,
             eval_hessian=piccolo_options.eval_hessian,
         )
     else
-        # TODO: remove hardcoded args
         J = UnitaryFreePhaseInfidelityObjective(
-            name=state_name,
-            phase_name=:ϕ,
-            goal=goal,
-            phase_operators=fill(GATES[:Z], length(traj.global_components[:ϕ])),
-            Q=Q,
+            state_name, phase_name, phase_operators, traj, Q;
+            subspace=subspace,
             eval_hessian=piccolo_options.eval_hessian,
-            subspace=subspace
         )
     end
 

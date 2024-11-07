@@ -52,11 +52,12 @@ function UnitaryMinimumTimeProblem(
     integrators::Vector{<:AbstractIntegrator},
     constraints::Vector{<:AbstractConstraint};
     unitary_name::Symbol=:Ũ⃗,
-    global_name::Union{Nothing, Symbol}=nothing,
     final_fidelity::Union{Real, Nothing}=nothing,
     D=1.0,
     ipopt_options::IpoptOptions=IpoptOptions(),
     piccolo_options::PiccoloOptions=PiccoloOptions(),
+    phase_name::Symbol=:ϕ,
+    phase_operators::Union{AbstractVector{<:AbstractMatrix}, Nothing}=nothing,
     subspace=nothing,
     kwargs...
 )
@@ -70,7 +71,7 @@ function UnitaryMinimumTimeProblem(
 
     objective += MinimumTimeObjective(trajectory; D=D, eval_hessian=piccolo_options.eval_hessian)
 
-    if isnothing(global_name)
+    if isnothing(phase_operators)
         fidelity_constraint = FinalUnitaryFidelityConstraint(
             unitary_name,
             final_fidelity,
@@ -79,12 +80,9 @@ function UnitaryMinimumTimeProblem(
             eval_hessian=piccolo_options.eval_hessian
         )
     else
-        phase_operators= [
-            GATES[:Z] for _ in eachindex(trajectory.global_components[global_name])
-        ]
         fidelity_constraint = FinalUnitaryFreePhaseFidelityConstraint(
             unitary_name,
-            global_name,
+            phase_name,
             phase_operators,
             final_fidelity,
             trajectory;
