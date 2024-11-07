@@ -76,6 +76,7 @@ function rollout(
 )
     T = size(controls, 2)
 
+    # Real type enables ForwardDiff
     Ψ̃ = zeros(Real, length(ψ̃_init), T)
 
     Ψ̃[:, 1] .= ψ̃_init
@@ -170,6 +171,7 @@ function open_rollout(
 )
     T = size(controls, 2)
 
+    # Real type enables ForwardDiff
     ρ⃗̃ = zeros(Real, 2length(ρ⃗₁), T)
 
     ρ⃗̃[:, 1] .= ket_to_iso(ρ⃗₁)
@@ -212,6 +214,7 @@ function unitary_rollout(
 )
     T = size(controls, 2)
 
+    # Real type enables ForwardDiff
     Ũ⃗ = zeros(Real, length(Ũ⃗_init), T)
 
     Ũ⃗[:, 1] .= Ũ⃗_init
@@ -266,10 +269,16 @@ function unitary_rollout_fidelity(
     Δt::AbstractVector,
     system::AbstractQuantumSystem;
     subspace::AbstractVector{Int}=axes(iso_vec_to_operator(Ũ⃗_goal), 1),
+    phases::Union{Nothing, AbstractVector{<:Real}}=nothing,
+    phase_operators::Union{Nothing, AbstractVector{<:AbstractMatrix{<:Complex}}}=nothing,
     kwargs...
 )
-    Ũ⃗ = unitary_rollout(Ũ⃗_init, controls, Δt, system; kwargs...)
-    return iso_vec_unitary_fidelity(Ũ⃗[:, end], Ũ⃗_goal; subspace=subspace)
+    Ũ⃗_T = unitary_rollout(Ũ⃗_init, controls, Δt, system; kwargs...)[:, end]
+    if !isnothing(phases)
+        return iso_vec_unitary_free_phase_fidelity(Ũ⃗_T, Ũ⃗_goal, phases, phase_operators; subspace=subspace)
+    else
+        return iso_vec_unitary_fidelity(Ũ⃗_T, Ũ⃗_goal; subspace=subspace)
+    end
 end
 
 function unitary_rollout_fidelity(
