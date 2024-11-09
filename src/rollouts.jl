@@ -474,6 +474,9 @@ end
     @test unitary_fidelity(prob) ≈ 1
     @test unitary_fidelity(embedded_U_goal, as, ts, sys) ≈ 1
 
+    # Free phase unitary
+    @test unitary_fidelity(prob, phases=[0.0], phase_operators=[PAULIS[:Z]]) ≈ 1
+
     # Expv explicit
     # State fidelity
     @test fidelity(ψ, ψ_goal, as, ts, sys, integrator=expv) ≈ 1

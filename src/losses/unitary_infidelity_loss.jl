@@ -419,6 +419,11 @@ end
     Y = [0 -im; im 0]
     @test unitary_fidelity(X, X) ≈ 1
     @test unitary_fidelity(X, Y) ≈ 0
+
+    # Tr undefined on Type{Any}
+    X = Any[0 1; 1 0]
+    Y = Complex[0 -im; im 0]
+    @test unitary_fidelity(X, Y) ≈ 0
 end
 
 @testitem "Isovec Unitary Fidelity" begin
@@ -513,5 +518,36 @@ end
 
 
 @testitem "Isovec Unitary Fidelity Gradient" begin
+    @test_skip true
+end
 
+@testitem "Free phase fidelity" begin
+    n_levels = 3
+    phase_data = [1.9, 2.7]
+    phase_operators = [PAULIS[:Z], PAULIS[:Z]]
+    subspace = get_subspace_indices([1:2, 1:2], [n_levels, n_levels])
+
+    R = Losses.free_phase(phase_data, phase_operators)
+    @test R'R ≈ [1 0 0 0; 0 1 0 0; 0 0 1 0; 0 0 0 1]
+    @test size(R) == (2^2, 2^2)
+
+    U_goal = EmbeddedOperator(GATES[:CZ], subspace, [n_levels, n_levels]).operator
+    U_final = EmbeddedOperator(R'GATES[:CZ], subspace, [n_levels, n_levels]).operator
+    # Value is ~0.3 without phases
+    @test unitary_fidelity(U_final, U_goal, subspace=subspace) < 0.5
+    @test unitary_free_phase_fidelity(
+        U_final, 
+        U_goal, 
+        phase_data,
+        phase_operators,
+        subspace=subspace
+    ) ≈ 1
+
+    # Forgot subspace
+    @test_throws DimensionMismatch iso_vec_unitary_free_phase_fidelity(
+        operator_to_iso_vec(U_final),
+        operator_to_iso_vec(U_goal),
+        phase_data,
+        phase_operators,
+    )
 end

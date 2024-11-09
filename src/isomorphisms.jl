@@ -76,7 +76,7 @@ function iso_vec_to_operator(Ũ⃗::AbstractVector{R}) where R
     N = Int(sqrt(Ũ⃗_dim))
     U = Matrix{complex(eltype(Ũ⃗))}(undef, N, N)
     for i=0:N-1
-        U[:, i+1] .= @view(Ũ⃗[i * 2N .+ (1:N)]) + one(R) * im * @view(Ũ⃗[i * 2N .+ (N+1:2N)])
+        U[:, i+1] .= @view(Ũ⃗[i * 2N .+ (1:N)]) + one(eltype(Ũ⃗)) * im * @view(Ũ⃗[i * 2N .+ (N+1:2N)])
     end
     return U
 end
@@ -226,6 +226,34 @@ iso_dm(ρ::AbstractMatrix) = ket_to_iso(vec(ρ))
     @test iso_vec_to_iso_operator(iso_vec) == [1.0 0.0 -0.0 -0.0; 0.0 1.0 -0.0 -0.0; 0.0 0.0 1.0 0.0; 0.0 0.0 0.0 1.0]
     @test operator_to_iso_vec(Complex[1.0 0.0; 0.0 1.0]) == iso_vec
     @test iso_operator_to_iso_vec(iso_vec_to_iso_operator(iso_vec)) == iso_vec
+end
+
+@testitem "Test isomorphism type promotion" begin
+    # Check that generic types are converted to Complex
+    X = Any[0 1; 1 0]
+    @test operator_to_iso_vec(X) == [0; 1; 0; 0; 1; 0; 0; 0]
+
+    X = Number[0 1; 1 0]
+    @test operator_to_iso_vec(X) == [0; 1; 0; 0; 1; 0; 0; 0]
+
+
+    # Check that Any types are converted to Real
+    x = Any[0; 1; 0; 0; 1; 0; 0; 0]
+    @test iso_vec_to_operator(x) == [0 1; 1 0]
+
+    # Check that valid Complex can be converted to Real
+    x = Complex[0; 1; 0; 0; 1; 0; 0; 0]
+    @test iso_vec_to_operator(x) == [0 1; 1 0]
+
+    # Check that actual Complex throws an error
+    x = Complex[0; im; 0; 0; 1; 0; 0; 0]
+    @test_throws TypeError iso_vec_to_operator(x)
+    
+    # Check the non-converting Isomorphisms
+    x = Any[0; 1; 0; 0; 1; 0; 0; 0]
+    X = Any[0 1 0 0; 1 0 0 0; 0 0 0 1; 0 0 1 0]
+    @test iso_vec_to_iso_operator(x) == X
+    @test iso_operator_to_iso_vec(X) == x
 end
 
 end

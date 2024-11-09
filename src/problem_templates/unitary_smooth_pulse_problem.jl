@@ -308,3 +308,32 @@ end
     final = unitary_fidelity(prob, subspace=U_goal.subspace_indices)
     @test final > initial
 end
+
+@testitem "Free phase Y gate using X" begin
+    using Random
+    Random.seed!(1234)
+    phase_name = :ϕ
+    phase_operators = [PAULIS[:Z]]
+
+    prob = UnitarySmoothPulseProblem(
+        QuantumSystem([PAULIS[:X]]), GATES[:Y], 51, 0.2;
+        phase_operators=phase_operators,
+        phase_name=phase_name,
+        ipopt_options=IpoptOptions(print_level=1),
+        piccolo_options=PiccoloOptions(verbose=false, free_time=false)
+    )
+
+    before = prob.trajectory.global_data[phase_name]
+    solve!(prob, max_iter=20)
+    after = prob.trajectory.global_data[phase_name]
+
+    @test before ≠ after
+
+    @test unitary_fidelity(
+        prob, 
+        phases=prob.trajectory.global_data[phase_name],
+        phase_operators=phase_operators
+    ) > 0.9
+
+    @test unitary_fidelity(prob) < 0.9
+end
