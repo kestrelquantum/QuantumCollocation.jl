@@ -89,7 +89,6 @@ function UnitarySamplingProblem(
             Δt_bounds=(Δt_min, Δt_max),
             geodesic=piccolo_options.geodesic,
             bound_state=piccolo_options.bound_state,
-            drive_derivative_σ=drive_derivative_σ,
             a_guess=a_guess,
             system=systems,
             rollout_integrator=piccolo_options.rollout_integrator,
