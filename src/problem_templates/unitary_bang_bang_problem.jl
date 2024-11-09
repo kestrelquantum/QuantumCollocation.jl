@@ -62,7 +62,7 @@ with
 - `R_a::Union{Float64, Vector{Float64}}=R`: the weight on the regularization term for the control pulses
 - `R_da::Union{Float64, Vector{Float64}}=R`: the weight on the regularization term for the control pulse derivatives
 - `R_bang_bang::Union{Float64, Vector{Float64}}=1e-1`: the weight on the bang-bang regularization term
-- `global_data::Union{NamedTuple, Nothing}=nothing`: global data to be used in the problem
+- `phase_operators::Union{AbstractVector{<:AbstractMatrix}, Nothing}=nothing`: the phase operators for free phase corrections
 - `constraints::Vector{<:AbstractConstraint}=AbstractConstraint[]`: the constraints to enforce
 """
 function UnitaryBangBangProblem end
@@ -85,14 +85,13 @@ function UnitaryBangBangProblem(
     da_bounds=fill(da_bound, length(system.G_drives)),
     Δt_min::Float64=Δt isa Float64 ? 0.5 * Δt : 0.5 * mean(Δt),
     Δt_max::Float64=Δt isa Float64 ? 1.5 * Δt : 1.5 * mean(Δt),
-    drive_derivative_σ::Float64=0.01,
     Q::Float64=100.0,
     R=1e-2,
-    quadratic_control_regularization=false,
     R_a::Union{Float64, Vector{Float64}}=R,
-    R_da::Union{Float64, Vector{Float64}}=R,
+    R_da::Union{Float64, Vector{Float64}}=0.0,
     R_bang_bang::Union{Float64, Vector{Float64}}=1e-1,
-    global_data::Union{NamedTuple, Nothing}=nothing,
+    phase_name::Symbol=:ϕ,
+    phase_operators::Union{AbstractVector{<:AbstractMatrix}, Nothing}=nothing,
     constraints::Vector{<:AbstractConstraint}=AbstractConstraint[],
     kwargs...
 )
@@ -114,31 +113,26 @@ function UnitaryBangBangProblem(
             Δt_bounds=(Δt_min, Δt_max),
             geodesic=piccolo_options.geodesic,
             bound_state=piccolo_options.bound_state,
-            drive_derivative_σ=drive_derivative_σ,
             a_guess=a_guess,
             system=system,
             rollout_integrator=piccolo_options.rollout_integrator,
-            global_data=global_data
+            phase_name=phase_name,
+            phase_operators=phase_operators
         )
     end
 
+    subspace = operator isa EmbeddedOperator ? operator.subspace_indices : nothing
+
     # Objective
-    if isnothing(global_data)
+    if isnothing(phase_operators)
         J = UnitaryInfidelityObjective(state_name, traj, Q;
-            subspace=operator isa EmbeddedOperator ? operator.subspace_indices : nothing,
+            subspace=subspace,
         )
     else
-        # TODO: remove hardcoded args
         J = UnitaryFreePhaseInfidelityObjective(
-            name=state_name,
-            phase_name=piccolo_options.phase_name,
-            goal=operator_to_iso_vec(
-                operator isa EmbeddedOperator ? operator.operator : operator
-            ),
-            phase_operators=[GATES[:Z] for _ in eachindex(traj.global_components[:piccolo_options.phase_name])],
-            Q=Q,
+            state_name, phase_name, phase_operators, traj, Q;
+            subspace=subspace,
             eval_hessian=piccolo_options.eval_hessian,
-            subspace=operator isa EmbeddedOperator ? operator.subspace_indices : nothing
         )
     end
 
@@ -147,11 +141,9 @@ function UnitaryBangBangProblem(
             if endswith(string(name), string(control_name))
     ]
 
-    # TODO: do we need these regularizers?
-    if quadratic_control_regularization
-        J += QuadraticRegularizer(control_names[1], traj, R_a; timestep_name=timestep_name)
-        J += QuadraticRegularizer(control_names[2], traj, R_da; timestep_name=timestep_name)
-    end
+    J += QuadraticRegularizer(control_names[1], traj, R_a; timestep_name=timestep_name)
+    # Default to R_da = 0.0 because L1 is turned on by this problem.
+    J += QuadraticRegularizer(control_names[2], traj, R_da; timestep_name=timestep_name)
 
     # Constraints
     if R_bang_bang isa Float64
@@ -205,7 +197,7 @@ end
 
 # *************************************************************************** #
 
-@testitem "Bang-bang hadamard gate" begin
+@testitem "Bang-bang Hadamard gate" begin
     sys = QuantumSystem(0.01 * GATES[:Z], [GATES[:X], GATES[:Y]])
     U_goal = GATES[:H]
     T = 51
@@ -237,4 +229,33 @@ end
     a_sparse = sum(prob.trajectory.du .> 5e-2)
     a_dense = sum(smooth_prob.trajectory.du .> 5e-2)
     @test a_sparse < a_dense
+end
+
+@testitem "Free phase Y gate using X" begin
+    using Random
+    Random.seed!(1234)
+    phase_name = :ϕ
+    phase_operators = [PAULIS[:Z]]
+
+    prob = UnitaryBangBangProblem(
+        QuantumSystem([PAULIS[:X]]), GATES[:Y], 51, 0.2;
+        phase_operators=phase_operators,
+        phase_name=phase_name,
+        ipopt_options=IpoptOptions(print_level=1),
+        piccolo_options=PiccoloOptions(verbose=false, free_time=false)
+    )
+
+    before = prob.trajectory.global_data[phase_name]
+    solve!(prob, max_iter=20)
+    after = prob.trajectory.global_data[phase_name]
+
+    @test before ≠ after
+
+    @test unitary_fidelity(
+        prob, 
+        phases=prob.trajectory.global_data[phase_name],
+        phase_operators=phase_operators
+    ) > 0.9
+
+    @test unitary_fidelity(prob) < 0.9
 end

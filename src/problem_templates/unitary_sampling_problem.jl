@@ -33,7 +33,6 @@ robust solution by including multiple systems reflecting the problem uncertainty
 - `dda_bounds::Vector{Float64} = fill(dda_bound, length(systems[1].G_drives))`: The bounds for the control second derivatives.
 - `Δt_min::Float64 = 0.5 * Δt`: The minimum time step size.
 - `Δt_max::Float64 = 1.5 * Δt`: The maximum time step size.
-- `drive_derivative_σ::Float64 = 0.01`: The standard deviation for the drive derivative noise.
 - `Q::Float64 = 100.0`: The fidelity weight.
 - `R::Float64 = 1e-2`: The regularization weight.
 - `R_a::Union{Float64, Vector{Float64}} = R`: The regularization weight for the control amplitudes.
@@ -64,7 +63,6 @@ function UnitarySamplingProblem(
     dda_bounds::Vector{Float64}=fill(dda_bound, length(systems[1].G_drives)),
     Δt_min::Float64=0.5 * Δt,
     Δt_max::Float64=1.5 * Δt,
-    drive_derivative_σ::Float64=0.01,
     Q::Float64=100.0,
     R=1e-2,
     R_a::Union{Float64,Vector{Float64}}=R,

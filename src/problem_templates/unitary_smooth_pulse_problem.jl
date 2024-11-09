@@ -56,7 +56,6 @@ with
 - `dda_bounds::Vector{Float64}=fill(dda_bound, length(system.G_drives))`: the bounds on the control pulse second derivatives, one for each drive
 - `Δt_min::Float64=Δt isa Float64 ? 0.5 * Δt : 0.5 * mean(Δt)`: the minimum time step size
 - `Δt_max::Float64=Δt isa Float64 ? 1.5 * Δt : 1.5 * mean(Δt)`: the maximum time step size
-- `drive_derivative_σ::Float64=0.01`: the standard deviation of the initial guess for the control pulse derivatives
 - `Q::Float64=100.0`: the weight on the infidelity objective
 - `R=1e-2`: the weight on the regularization terms
 - `R_a::Union{Float64, Vector{Float64}}=R`: the weight on the regularization term for the control pulses
@@ -87,7 +86,6 @@ function UnitarySmoothPulseProblem(
     dda_bounds::Vector{Float64}=fill(dda_bound, length(system.G_drives)),
     Δt_min::Float64=Δt isa Float64 ? 0.5 * Δt : 0.5 * mean(Δt),
     Δt_max::Float64=Δt isa Float64 ? 1.5 * Δt : 1.5 * mean(Δt),
-    drive_derivative_σ::Float64=0.01,
     Q::Float64=100.0,
     R=1e-2,
     R_a::Union{Float64, Vector{Float64}}=R,
@@ -118,7 +116,6 @@ function UnitarySmoothPulseProblem(
             Δt_bounds=(Δt_min, Δt_max),
             geodesic=piccolo_options.geodesic,
             bound_state=piccolo_options.bound_state,
-            drive_derivative_σ=drive_derivative_σ,
             a_guess=a_guess,
             system=system,
             rollout_integrator=piccolo_options.rollout_integrator,
