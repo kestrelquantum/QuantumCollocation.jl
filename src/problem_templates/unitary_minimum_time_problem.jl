@@ -63,15 +63,17 @@ function UnitaryMinimumTimeProblem(
 )
     @assert unitary_name ∈ trajectory.names
 
-    if isnothing(final_fidelity)
-        final_fidelity = iso_vec_unitary_fidelity(
-            trajectory[unitary_name][:, end], trajectory.goal[unitary_name]
-        )
-    end
-
     objective += MinimumTimeObjective(trajectory; D=D, eval_hessian=piccolo_options.eval_hessian)
 
     if isnothing(phase_operators)
+        if isnothing(final_fidelity)
+            final_fidelity = iso_vec_unitary_fidelity(
+                trajectory[unitary_name][:, end], 
+                trajectory.goal[unitary_name],
+                subspace=subspace
+            )
+        end
+
         fidelity_constraint = FinalUnitaryFidelityConstraint(
             unitary_name,
             final_fidelity,
@@ -80,6 +82,16 @@ function UnitaryMinimumTimeProblem(
             eval_hessian=piccolo_options.eval_hessian
         )
     else
+        if isnothing(final_fidelity)
+            final_fidelity = iso_vec_unitary_free_phase_fidelity(
+                trajectory[unitary_name][:, end], 
+                trajectory.goal[unitary_name], 
+                trajectory.global_data[phase_name],
+                phase_operators;
+                subspace=subspace
+            )
+        end
+
         fidelity_constraint = FinalUnitaryFreePhaseFidelityConstraint(
             unitary_name,
             phase_name,
@@ -190,4 +202,11 @@ end
     duration_after = sum(get_timesteps(mintime_prob.trajectory))
     duration_before = sum(get_timesteps(prob.trajectory))
     @test duration_after < duration_before
+
+    # Quick check for using default fidelity
+    @test UnitaryMinimumTimeProblem(
+        prob, 
+        final_fidelity=final_fidelity,
+        phase_operators=phase_operators
+    ) isa QuantumControlProblem
 end

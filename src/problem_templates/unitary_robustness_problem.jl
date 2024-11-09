@@ -39,24 +39,25 @@ function UnitaryRobustnessProblem(
     phase_operators::Union{AbstractVector{<:AbstractMatrix}, Nothing}=nothing,
     ipopt_options::IpoptOptions=IpoptOptions(),
     piccolo_options::PiccoloOptions=PiccoloOptions(),
+    subspace=nothing,
     kwargs...
 )
     @assert unitary_name ∈ trajectory.names
 
-    if isnothing(final_fidelity)
-        final_fidelity = unitary_fidelity(
-            trajectory[unitary_name][:, end], trajectory.goal[unitary_name]
-        )
-    end
-
     objective += UnitaryRobustnessObjective(
         H_error=H_error,
-        eval_hessian=piccolo_options.eval_hessian,
+        eval_hessian=piccolo_options.eval_hessian
     )
 
-    subspace = H_error isa EmbeddedOperator ? H_error.subspace_indices : nothing
-
     if isnothing(phase_operators)
+        if isnothing(final_fidelity)
+            final_fidelity = iso_vec_unitary_fidelity(
+                trajectory[unitary_name][:, end], 
+                trajectory.goal[unitary_name],
+                subspace=subspace
+            )
+        end
+        
         fidelity_constraint = FinalUnitaryFidelityConstraint(
             unitary_name,
             final_fidelity,
@@ -65,6 +66,16 @@ function UnitaryRobustnessProblem(
             eval_hessian=piccolo_options.eval_hessian
         )
     else
+        if isnothing(final_fidelity)
+            final_fidelity = iso_vec_unitary_free_phase_fidelity(
+                trajectory[unitary_name][:, end], 
+                trajectory.goal[unitary_name], 
+                trajectory.global_data[phase_name],
+                phase_operators;
+                subspace=subspace
+            )
+        end
+
         fidelity_constraint = FinalUnitaryFreePhaseFidelityConstraint(
             unitary_name,
             phase_name,
@@ -163,4 +174,45 @@ end
 
     # TODO: Fidelity constraint approximately satisfied
     @test_skip isapprox(unitary_rollout_fidelity(rob_prob; subspace=U_goal.subspace_indices), 0.99, atol=0.05)
+end
+
+@testitem "Set up a free phase problem" begin
+    using LinearAlgebra
+    δ1 = δ2 = -0.1
+    T = 75
+    Δt = 1.0
+    n_levels = 3
+    a = annihilate(n_levels)
+    id = I(n_levels)
+    a1 = kron(a, id)
+    a2 = kron(id, a)
+    H_drift = δ1 / 2 * a1' * a1' * a1 * a1 + δ2 / 2 * a2' * a2' * a2 * a2
+    H_drives = [a1'a1, a2'a2, a1'a2 + a1*a2', im * (a1'a2 - a1 * a2')]
+    system = QuantumSystem(H_drift, H_drives)
+    U_goal = EmbeddedOperator(
+        GATES[:CZ], 
+        get_subspace_indices([1:2, 1:2], [n_levels, n_levels]),
+        [n_levels, n_levels]
+    )
+
+    phase_operators = [PAULIS[:Z], PAULIS[:Z]]
+    prob = UnitarySmoothPulseProblem(
+        system, U_goal, T, Δt,
+        ipopt_options=IpoptOptions(print_level=1),
+        piccolo_options=PiccoloOptions(verbose=false, eval_hessian=false),
+        phase_operators=phase_operators,
+    )
+
+    ZZ = EmbeddedOperator(
+        reduce(kron, phase_operators), 
+        get_subspace_indices([1:2, 1:2], [n_levels, n_levels]), 
+        [n_levels, n_levels]
+    )
+
+    @test UnitaryRobustnessProblem(
+        ZZ,
+        prob,
+        phase_operators=phase_operators,
+        subspace=U_goal.subspace_indices,
+    ) isa QuantumControlProblem
 end
