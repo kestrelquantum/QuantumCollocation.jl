@@ -133,8 +133,8 @@ end
 @testitem "Minimum time Hadamard gate" begin
     using NamedTrajectories
 
-    H_drift = GATES[:Z]
-    H_drives = [GATES[:X], GATES[:Y]]
+    H_drift = PAULIS[:Z]
+    H_drives = [PAULIS[:X], PAULIS[:Y]]
     U_goal = GATES[:H]
     T = 51
     Δt = 0.2
@@ -164,4 +164,30 @@ end
     # Set up without a final fidelity to check interface
     UnitaryMinimumTimeProblem(prob)
 
+end
+
+@testitem "Minimum time free phase" begin
+    using NamedTrajectories
+
+    phase_operators = [PAULIS[:Z]]
+
+    prob = UnitarySmoothPulseProblem(
+        QuantumSystem([PAULIS[:X]]), GATES[:H], 51, 0.2,
+        ipopt_options=IpoptOptions(print_level=1),
+        piccolo_options=PiccoloOptions(verbose=false),
+        phase_operators=phase_operators
+    )
+
+    # Soft fidelity constraint
+    final_fidelity = minimum([0.99, unitary_fidelity(prob)])
+    mintime_prob = UnitaryMinimumTimeProblem(
+        prob, 
+        final_fidelity=final_fidelity,
+        phase_operators=phase_operators
+    )
+    solve!(mintime_prob; max_iter=100)
+
+    duration_after = sum(get_timesteps(mintime_prob.trajectory))
+    duration_before = sum(get_timesteps(prob.trajectory))
+    @test duration_after < duration_before
 end
