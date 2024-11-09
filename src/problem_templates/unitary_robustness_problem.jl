@@ -25,7 +25,6 @@ Create a quantum control problem for robustness optimization of a unitary trajec
 """
 function UnitaryRobustnessProblem end
 
-
 function UnitaryRobustnessProblem(
     H_error::OperatorType,
     trajectory::NamedTrajectory,
@@ -49,13 +48,13 @@ function UnitaryRobustnessProblem(
         eval_hessian=piccolo_options.eval_hessian
     )
 
+    U_T = trajectory[unitary_name][:, end]
+    U_G = trajectory.goal[unitary_name]
+    subspace = isnothing(subspace) ? axes(iso_vec_to_operator(U_T), 1) : subspace
+
     if isnothing(phase_operators)
         if isnothing(final_fidelity)
-            final_fidelity = iso_vec_unitary_fidelity(
-                trajectory[unitary_name][:, end], 
-                trajectory.goal[unitary_name],
-                subspace=subspace
-            )
+            final_fidelity = iso_vec_unitary_fidelity(U_T, U_G, subspace=subspace)
         end
         
         fidelity_constraint = FinalUnitaryFidelityConstraint(
@@ -67,12 +66,9 @@ function UnitaryRobustnessProblem(
         )
     else
         if isnothing(final_fidelity)
+            phases = trajectory.global_data[phase_name]
             final_fidelity = iso_vec_unitary_free_phase_fidelity(
-                trajectory[unitary_name][:, end], 
-                trajectory.goal[unitary_name], 
-                trajectory.global_data[phase_name],
-                phase_operators;
-                subspace=subspace
+                U_T, U_G, phases, phase_operators; subspace=subspace
             )
         end
 
@@ -152,6 +148,11 @@ end
 
     # Subspace gate success
     @test after > before
+
+
+    # set up without a final fidelity
+    # -------------------------------
+    @test UnitaryRobustnessProblem(H_embed, prob) isa QuantumControlProblem
 
 
     #  test robustness from previous problem

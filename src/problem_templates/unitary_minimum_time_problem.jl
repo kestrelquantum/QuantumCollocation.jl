@@ -63,41 +63,34 @@ function UnitaryMinimumTimeProblem(
 )
     @assert unitary_name ∈ trajectory.names
 
-    objective += MinimumTimeObjective(trajectory; D=D, eval_hessian=piccolo_options.eval_hessian)
+    objective += MinimumTimeObjective(
+        trajectory; D=D, eval_hessian=piccolo_options.eval_hessian
+    )
+
+    U_T = trajectory[unitary_name][:, end]
+    U_G = trajectory.goal[unitary_name]
+    subspace = isnothing(subspace) ? axes(iso_vec_to_operator(U_T), 1) : subspace
 
     if isnothing(phase_operators)
         if isnothing(final_fidelity)
-            final_fidelity = iso_vec_unitary_fidelity(
-                trajectory[unitary_name][:, end], 
-                trajectory.goal[unitary_name],
-                subspace=subspace
-            )
+            final_fidelity = iso_vec_unitary_fidelity(U_T, U_G, subspace=subspace)
         end
 
         fidelity_constraint = FinalUnitaryFidelityConstraint(
-            unitary_name,
-            final_fidelity,
-            trajectory;
+            unitary_name, final_fidelity, trajectory;
             subspace=subspace,
             eval_hessian=piccolo_options.eval_hessian
         )
     else
         if isnothing(final_fidelity)
+            phases = trajectory.global_data[phase_name]
             final_fidelity = iso_vec_unitary_free_phase_fidelity(
-                trajectory[unitary_name][:, end], 
-                trajectory.goal[unitary_name], 
-                trajectory.global_data[phase_name],
-                phase_operators;
-                subspace=subspace
+                U_T, U_G, phases, phase_operators; subspace=subspace
             )
         end
 
         fidelity_constraint = FinalUnitaryFreePhaseFidelityConstraint(
-            unitary_name,
-            phase_name,
-            phase_operators,
-            final_fidelity,
-            trajectory;
+            unitary_name, phase_name, phase_operators, final_fidelity, trajectory;
             subspace=subspace,
             eval_hessian=piccolo_options.eval_hessian
         )
@@ -173,8 +166,8 @@ end
     duration_before = sum(get_timesteps(prob.trajectory))
     @test duration_after < duration_before
 
-    # Set up without a final fidelity to check interface
-    UnitaryMinimumTimeProblem(prob)
+    # Set up without a final fidelity
+    @test UnitaryMinimumTimeProblem(prob) isa QuantumControlProblem
 
 end
 
