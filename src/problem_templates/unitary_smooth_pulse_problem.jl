@@ -56,13 +56,13 @@ with
 - `dda_bounds::Vector{Float64}=fill(dda_bound, length(system.G_drives))`: the bounds on the control pulse second derivatives, one for each drive
 - `Δt_min::Float64=Δt isa Float64 ? 0.5 * Δt : 0.5 * mean(Δt)`: the minimum time step size
 - `Δt_max::Float64=Δt isa Float64 ? 1.5 * Δt : 1.5 * mean(Δt)`: the maximum time step size
-- `drive_derivative_σ::Float64=0.01`: the standard deviation of the initial guess for the control pulse derivatives
 - `Q::Float64=100.0`: the weight on the infidelity objective
 - `R=1e-2`: the weight on the regularization terms
 - `R_a::Union{Float64, Vector{Float64}}=R`: the weight on the regularization term for the control pulses
 - `R_da::Union{Float64, Vector{Float64}}=R`: the weight on the regularization term for the control pulse derivatives
 - `R_dda::Union{Float64, Vector{Float64}}=R`: the weight on the regularization term for the control pulse second derivatives
-- `global_data::Union{NamedTuple, Nothing}=nothing`: global data for the problem
+- `phase_name::Symbol=:ϕ`: the name of the phase
+- `phase_operators::Union{AbstractVector{<:AbstractMatrix}, Nothing}=nothing`: the phase operators for free phase corrections
 - `constraints::Vector{<:AbstractConstraint}=AbstractConstraint[]`: the constraints to enforce
 
 """
@@ -86,13 +86,13 @@ function UnitarySmoothPulseProblem(
     dda_bounds::Vector{Float64}=fill(dda_bound, length(system.G_drives)),
     Δt_min::Float64=Δt isa Float64 ? 0.5 * Δt : 0.5 * mean(Δt),
     Δt_max::Float64=Δt isa Float64 ? 1.5 * Δt : 1.5 * mean(Δt),
-    drive_derivative_σ::Float64=0.01,
     Q::Float64=100.0,
     R=1e-2,
     R_a::Union{Float64, Vector{Float64}}=R,
     R_da::Union{Float64, Vector{Float64}}=R,
     R_dda::Union{Float64, Vector{Float64}}=R,
-    global_data::Union{NamedTuple, Nothing}=nothing,
+    phase_name::Symbol=:ϕ,
+    phase_operators::Union{AbstractVector{<:AbstractMatrix}, Nothing}=nothing,
     constraints::Vector{<:AbstractConstraint}=AbstractConstraint[],
     kwargs...
 )
@@ -116,33 +116,29 @@ function UnitarySmoothPulseProblem(
             Δt_bounds=(Δt_min, Δt_max),
             geodesic=piccolo_options.geodesic,
             bound_state=piccolo_options.bound_state,
-            drive_derivative_σ=drive_derivative_σ,
             a_guess=a_guess,
             system=system,
             rollout_integrator=piccolo_options.rollout_integrator,
-            global_data=global_data
+            phase_name=phase_name,
+            phase_operators=phase_operators
         )
     end
 
+    # Subspace
+    subspace = operator isa EmbeddedOperator ? operator.subspace_indices : nothing
+
     # Objective
-    if isnothing(global_data)
-        J = UnitaryInfidelityObjective(state_name, traj, Q;
-            subspace=operator isa EmbeddedOperator ? operator.subspace_indices : nothing,
+    if isnothing(phase_operators)
+        J = UnitaryInfidelityObjective(
+            state_name, traj, Q; 
+            subspace=subspace,
+            eval_hessian=piccolo_options.eval_hessian,
         )
     else
-        # TODO: remove hardcoded args
         J = UnitaryFreePhaseInfidelityObjective(
-            name=state_name,
-            phase_name=:ϕ,
-            goal=operator_to_iso_vec(
-                operator isa EmbeddedOperator ?
-                operator.operator :
-                operator
-            ),
-            phase_operators=fill(GATES[:Z], length(traj.global_components[:ϕ])),
-            Q=Q,
+            state_name, phase_name, phase_operators, traj, Q;
+            subspace=subspace,
             eval_hessian=piccolo_options.eval_hessian,
-            subspace=operator isa EmbeddedOperator ? operator.subspace_indices : nothing
         )
     end
 
@@ -308,4 +304,33 @@ end
     solve!(prob, max_iter=20)
     final = unitary_fidelity(prob, subspace=U_goal.subspace_indices)
     @test final > initial
+end
+
+@testitem "Free phase Y gate using X" begin
+    using Random
+    Random.seed!(1234)
+    phase_name = :ϕ
+    phase_operators = [PAULIS[:Z]]
+
+    prob = UnitarySmoothPulseProblem(
+        QuantumSystem([PAULIS[:X]]), GATES[:Y], 51, 0.2;
+        phase_operators=phase_operators,
+        phase_name=phase_name,
+        ipopt_options=IpoptOptions(print_level=1),
+        piccolo_options=PiccoloOptions(verbose=false, free_time=false)
+    )
+
+    before = prob.trajectory.global_data[phase_name]
+    solve!(prob, max_iter=20)
+    after = prob.trajectory.global_data[phase_name]
+
+    @test before ≠ after
+
+    @test unitary_fidelity(
+        prob, 
+        phases=prob.trajectory.global_data[phase_name],
+        phase_operators=phase_operators
+    ) > 0.9
+
+    @test unitary_fidelity(prob) < 0.9
 end

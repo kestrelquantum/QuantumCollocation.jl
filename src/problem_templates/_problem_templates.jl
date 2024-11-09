@@ -1,5 +1,6 @@
 module ProblemTemplates
 
+using ..QuantumObjectUtils
 using ..QuantumSystems
 using ..Isomorphisms
 using ..EmbeddedOperators

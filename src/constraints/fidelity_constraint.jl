@@ -286,8 +286,8 @@ function FinalUnitaryFreePhaseFidelityConstraint(;
 end
 
 function FinalUnitaryFreePhaseFidelityConstraint(
-    state_symbol::Symbol,
-    global_symbol::Symbol,
+    state_name::Symbol,
+    phase_name::Symbol,
     phase_operators::AbstractVector{<:AbstractMatrix{<:Complex}},
     val::Float64,
     traj::NamedTrajectory;
@@ -296,9 +296,9 @@ function FinalUnitaryFreePhaseFidelityConstraint(
 )
     return FinalUnitaryFreePhaseFidelityConstraint(;
         value=val,
-        state_slice=slice(traj.T, traj.components[state_symbol], traj.dim),
-        phase_slice=trajectory.global_components[global_symbol],
-        goal=traj.goal[state_symbol],
+        state_slice=slice(traj.T, traj.components[state_name], traj.dim),
+        phase_slice=traj.global_components[phase_name],
+        goal=traj.goal[state_name],
         phase_operators=phase_operators,
         zdim=length(traj),
         subspace=subspace,

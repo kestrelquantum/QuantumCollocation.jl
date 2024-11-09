@@ -52,42 +52,45 @@ function UnitaryMinimumTimeProblem(
     integrators::Vector{<:AbstractIntegrator},
     constraints::Vector{<:AbstractConstraint};
     unitary_name::Symbol=:Ũ⃗,
-    global_name::Union{Nothing, Symbol}=nothing,
     final_fidelity::Union{Real, Nothing}=nothing,
     D=1.0,
     ipopt_options::IpoptOptions=IpoptOptions(),
     piccolo_options::PiccoloOptions=PiccoloOptions(),
+    phase_name::Symbol=:ϕ,
+    phase_operators::Union{AbstractVector{<:AbstractMatrix}, Nothing}=nothing,
     subspace=nothing,
     kwargs...
 )
     @assert unitary_name ∈ trajectory.names
 
-    if isnothing(final_fidelity)
-        final_fidelity = iso_vec_unitary_fidelity(
-            trajectory[unitary_name][:, end], trajectory.goal[unitary_name]
-        )
-    end
+    objective += MinimumTimeObjective(
+        trajectory; D=D, eval_hessian=piccolo_options.eval_hessian
+    )
 
-    objective += MinimumTimeObjective(trajectory; D=D, eval_hessian=piccolo_options.eval_hessian)
+    U_T = trajectory[unitary_name][:, end]
+    U_G = trajectory.goal[unitary_name]
+    subspace = isnothing(subspace) ? axes(iso_vec_to_operator(U_T), 1) : subspace
 
-    if isnothing(global_name)
+    if isnothing(phase_operators)
+        if isnothing(final_fidelity)
+            final_fidelity = iso_vec_unitary_fidelity(U_T, U_G, subspace=subspace)
+        end
+
         fidelity_constraint = FinalUnitaryFidelityConstraint(
-            unitary_name,
-            final_fidelity,
-            trajectory;
+            unitary_name, final_fidelity, trajectory;
             subspace=subspace,
             eval_hessian=piccolo_options.eval_hessian
         )
     else
-        phase_operators= [
-            GATES[:Z] for _ in eachindex(trajectory.global_components[global_name])
-        ]
+        if isnothing(final_fidelity)
+            phases = trajectory.global_data[phase_name]
+            final_fidelity = iso_vec_unitary_free_phase_fidelity(
+                U_T, U_G, phases, phase_operators; subspace=subspace
+            )
+        end
+
         fidelity_constraint = FinalUnitaryFreePhaseFidelityConstraint(
-            unitary_name,
-            global_name,
-            phase_operators,
-            final_fidelity,
-            trajectory;
+            unitary_name, phase_name, phase_operators, final_fidelity, trajectory;
             subspace=subspace,
             eval_hessian=piccolo_options.eval_hessian
         )
@@ -135,8 +138,8 @@ end
 @testitem "Minimum time Hadamard gate" begin
     using NamedTrajectories
 
-    H_drift = GATES[:Z]
-    H_drives = [GATES[:X], GATES[:Y]]
+    H_drift = PAULIS[:Z]
+    H_drives = [PAULIS[:X], PAULIS[:Y]]
     U_goal = GATES[:H]
     T = 51
     Δt = 0.2
@@ -163,7 +166,40 @@ end
     duration_before = sum(get_timesteps(prob.trajectory))
     @test duration_after < duration_before
 
-    # Set up without a final fidelity to check interface
-    UnitaryMinimumTimeProblem(prob)
+    # Set up without a final fidelity
+    @test UnitaryMinimumTimeProblem(prob) isa QuantumControlProblem
 
+end
+
+@testitem "Minimum time free phase" begin
+    using NamedTrajectories
+
+    phase_operators = [PAULIS[:Z]]
+
+    prob = UnitarySmoothPulseProblem(
+        QuantumSystem([PAULIS[:X]]), GATES[:H], 51, 0.2,
+        ipopt_options=IpoptOptions(print_level=1),
+        piccolo_options=PiccoloOptions(verbose=false),
+        phase_operators=phase_operators
+    )
+
+    # Soft fidelity constraint
+    final_fidelity = minimum([0.99, unitary_fidelity(prob)])
+    mintime_prob = UnitaryMinimumTimeProblem(
+        prob, 
+        final_fidelity=final_fidelity,
+        phase_operators=phase_operators
+    )
+    solve!(mintime_prob; max_iter=100)
+
+    duration_after = sum(get_timesteps(mintime_prob.trajectory))
+    duration_before = sum(get_timesteps(prob.trajectory))
+    @test duration_after < duration_before
+
+    # Quick check for using default fidelity
+    @test UnitaryMinimumTimeProblem(
+        prob, 
+        final_fidelity=final_fidelity,
+        phase_operators=phase_operators
+    ) isa QuantumControlProblem
 end
