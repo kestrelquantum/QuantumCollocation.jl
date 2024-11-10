@@ -27,6 +27,8 @@ include("quantum_state_smooth_pulse_problem.jl")
 include("quantum_state_minimum_time_problem.jl")
 include("quantum_state_sampling_problem.jl")
 
+include("density_operator_smooth_pulse_problem.jl")
+
 function apply_piccolo_options!(
     J::Objective,
     constraints::AbstractVector{<:AbstractConstraint},

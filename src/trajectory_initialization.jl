@@ -402,7 +402,9 @@ function initialize_unitaries(
         state_data = initialize_unitary_trajectory(U_init, U_goal, T; geodesic=geodesic)
     else
         @assert !isnothing(system) "System must be provided if a_guess is provided."
-        state_data = unitary_rollout(Ũ⃗_init, a_guess, timesteps, system; integrator=rollout_integrator)
+        state_data = unitary_rollout(Ũ⃗_init, a_guess, timesteps, system;
+            integrator=rollout_integrator
+        )
     end
 
     return state_data
@@ -516,16 +518,14 @@ function initialize_quantum_states(
             ψ̃_traj = linear_interpolation(ψ̃_init, ψ̃_goal, T)
             push!(state_data, ψ̃_traj)
         end
-        if system isa AbstractVector
-            state_data = repeat(state_data, length(system))
-        end
     else
         for ψ̃_init ∈ ψ̃_inits
-            ψ̃_traj = rollout(ψ̃_init, a_guess, timesteps, system; integrator=rollout_integrator)
+            ψ̃_traj = rollout(ψ̃_init, a_guess, timesteps, system;
+                integrator=rollout_integrator
+            )
             push!(state_data, ψ̃_traj)
         end
     end
-
     return state_data
 end
 
@@ -592,6 +592,95 @@ function initialize_trajectory(
         # state_names are the same
         state_inits = ψ̃_inits
         state_goals = ψ̃_goals
+    end
+
+    return initialize_trajectory(
+        state_data,
+        state_inits,
+        state_goals,
+        state_names,
+        T,
+        Δt,
+        args...;
+        a_guess=a_guess,
+        verbose=verbose,
+        kwargs...
+    )
+end
+
+function initialize_density_operators(
+    ρ⃗̃_init::AbstractVector{<:Number},
+    ρ⃗̃_goal::AbstractVector{<:Number},
+    T::Int,
+    timesteps::AbstractVector{<:Real};
+    a_guess::Union{AbstractMatrix{<:Float64}, Nothing}=nothing,
+    system::Union{AbstractQuantumSystem, Nothing}=nothing,
+    rollout_integrator::Function=expv,
+)::Matrix{Float64}
+    if isnothing(a_guess)
+        ρ⃗̃_traj = linear_interpolation(ρ⃗̃_init, ρ⃗̃_goal, T)
+        return ρ⃗̃_traj
+    else
+        ρ⃗̃_traj = rollout(ρ⃗̃_init, a_guess, timesteps, system; integrator=rollout_integrator)
+        return ρ⃗̃_traj
+    end
+end
+
+
+
+function initialize_trajectory(
+    ρ_init::AbstractMatrix{<:Number},
+    ρ_goal::AbstractMatrix{<:Number},
+    T::Int,
+    Δt::Union{Real, AbstractVecOrMat{<:Real}},
+    args...;
+    state_name::Symbol=:ρ⃗̃,
+    a_guess::Union{AbstractMatrix{<:Float64}, Nothing}=nothing,
+    system::Union{AbstractQuantumSystem, AbstractVector{<:AbstractQuantumSystem}, Nothing}=nothing,
+    rollout_integrator::Function=expv,
+    geodesic=true,
+    verbose=false,
+    kwargs...
+)
+    ρ⃗̃_init = iso_dm(ρ_init)
+    ρ⃗̃_goal = iso_dm(ρ_goal)
+
+    # Construct timesteps
+    if Δt isa AbstractMatrix
+        timesteps = vec(Δt)
+    elseif Δt isa Float64
+        timesteps = fill(Δt, T)
+    else
+        timesteps = Δt
+    end
+
+    # Construct state data
+    if system isa AbstractVector
+        state_data = map(system) do sys
+            initialize_density_operators(
+                ρ⃗̃_init, ρ⃗̃_goal, T, timesteps;
+                a_guess=a_guess,
+                system=sys,
+                rollout_integrator=rollout_integrator
+            )
+        end
+
+        state_names = Symbol.([string(state_name) * "_system_$i" for i in eachindex(system)])
+        if verbose
+            println("Created state names for ($(length(system))) systems: $state_names")
+        end
+        state_inits = repeat([ρ⃗̃_init], length(system))
+        state_goals = repeat([ρ⃗̃_goal], length(system))
+    else
+        state_data = [initialize_density_operators(
+            ρ⃗̃_init, ρ⃗̃_goal, T, timesteps;
+            a_guess=a_guess,
+            system=system,
+            rollout_integrator=rollout_integrator
+        )]
+        state_names = [state_name]
+        state_inits = [ρ⃗̃_init]
+        state_goals = [ρ⃗̃_goal]
     end
 
     return initialize_trajectory(
@@ -795,6 +884,40 @@ end
 
     @test traj isa NamedTrajectory
 end
+
+@testitem "density operator trajectory initialization" begin
+    using NamedTrajectories
+
+    ψ_init = [1.0, 0.0]
+    ψ_goal = [0.0, 1.0]
+
+    ρ_init = ψ_init * ψ_init'
+    ρ_goal = ψ_goal * ψ_goal'
+
+    T = 10
+    Δt = 0.1
+    n_drives = 2
+    all_a_bounds = ([1.0, 1.0],)
+
+    traj = initialize_trajectory(
+        ρ_init, ρ_goal, T, Δt, n_drives, all_a_bounds
+    )
+
+    @test traj isa NamedTrajectory
+
+    systems = [
+        QuantumSystem(GATES[:Z], [1.0 * GATES[:X], 1.0 * GATES[:Y]]),
+        QuantumSystem(GATES[:X], [1.0 * GATES[:Y], 1.0 * GATES[:Z]])
+    ]
+
+    traj = initialize_trajectory(
+        ρ_init, ρ_goal, T, Δt, n_drives, all_a_bounds;
+        system=systems
+    )
+
+    @test traj isa NamedTrajectory
+end
+
 
 
 end
