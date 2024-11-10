@@ -2,7 +2,7 @@
 
 julia_version = "1.11.1"
 manifest_format = "2.0"
-project_hash = "f6e2eec61eae4f29dc816cb1ecb8cface453f9c5"
+project_hash = "fb0fa972ce22c7daf557d442da710fda4139d29e"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "eea5d80188827b35333801ef97a40c2ed653b081"
@@ -1380,7 +1380,7 @@ version = "2.11.1"
     Enzyme = "7da242da-08ed-463a-9acd-ee780be4f1d9"
 
 [[deps.QuantumCollocationCore]]
-deps = ["Einsum", "ExponentialAction", "ForwardDiff", "Ipopt", "JLD2", "Libdl", "LinearAlgebra", "MathOptInterface", "NamedTrajectories", "PiccoloQuantumObjects", "Reexport", "SparseArrays", "Symbolics", "TestItemRunner", "TestItems", "TrajectoryIndexingUtils"]
+deps = ["Einsum", "ExponentialAction", "ForwardDiff", "Ipopt", "JLD2", "Libdl", "LinearAlgebra", "MathOptInterface", "NamedTrajectories", "PiccoloQuantumObjects", "Reexport", "SparseArrays", "SparseConnectivityTracer", "Symbolics", "TestItemRunner", "TestItems", "TrajectoryIndexingUtils"]
 path = "../QuantumCollocationCore.jl"
 uuid = "2b384925-53cb-4042-a8d2-6faa627467e1"
 version = "0.0.1"
@@ -1605,6 +1605,26 @@ version = "1.2.1"
 deps = ["Libdl", "LinearAlgebra", "Random", "Serialization", "SuiteSparse_jll"]
 uuid = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 version = "1.11.0"
+
+[[deps.SparseConnectivityTracer]]
+deps = ["ADTypes", "DocStringExtensions", "FillArrays", "LinearAlgebra", "Random", "SparseArrays"]
+git-tree-sha1 = "6914df6005bab9940e2a96879a97a43e1fb1ce78"
+uuid = "9f842d2f-2579-4b1d-911e-f412cf18a3f5"
+version = "0.6.8"
+
+    [deps.SparseConnectivityTracer.extensions]
+    SparseConnectivityTracerDataInterpolationsExt = "DataInterpolations"
+    SparseConnectivityTracerLogExpFunctionsExt = "LogExpFunctions"
+    SparseConnectivityTracerNNlibExt = "NNlib"
+    SparseConnectivityTracerNaNMathExt = "NaNMath"
+    SparseConnectivityTracerSpecialFunctionsExt = "SpecialFunctions"
+
+    [deps.SparseConnectivityTracer.weakdeps]
+    DataInterpolations = "82cc6244-b520-54b8-b5a6-8a565e85f1d0"
+    LogExpFunctions = "2ab3a3ac-af41-5b50-aa03-7779005ae688"
+    NNlib = "872c559c-99b0-510c-b3b7-b6c96a88d5cd"
+    NaNMath = "77ba4419-2d1f-58cd-9bb1-8ffee604a2e3"
+    SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
 
 [[deps.SpecialFunctions]]
 deps = ["IrrationalConstants", "LogExpFunctions", "OpenLibm_jll", "OpenSpecFun_jll"]

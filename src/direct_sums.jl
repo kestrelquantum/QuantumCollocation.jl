@@ -37,7 +37,12 @@ end
 Returns the direct sum of two iso_vec operators.
 """
 function direct_sum(Ã⃗::AbstractVector, B̃⃗::AbstractVector)
-    return operator_to_iso_vec(direct_sum(iso_vec_to_operator(Ã⃗), iso_vec_to_operator(B̃⃗)))
+    return operator_to_iso_vec(
+        direct_sum(
+            iso_vec_to_operator(Ã⃗),
+            iso_vec_to_operator(B̃⃗)
+        )
+    )
 end
 
 """
@@ -52,7 +57,31 @@ function direct_sum(sys1::QuantumSystem, sys2::QuantumSystem)
     G = a -> direct_sum(sys1.G(a), sys2.G(a))
     ∂G = a -> [direct_sum(∂Gᵢ(a), ∂Gⱼ(a)) for (∂Gᵢ, ∂Gⱼ) ∈ zip(sys1.∂G(a), sys2.∂G(a))]
     levels = sys1.levels + sys2.levels
-    return QuantumSystem(H, G, ∂G, levels, n_drives)
+    direct_sum_params = Dict{Symbol, Dict{Symbol, Any}}()
+    if haskey(sys1.params, :system_1)
+        n_systems = length(keys(sys1.params))
+        direct_sum_params = sys1.params
+        if haskey(sys2.params, :system_1)
+            for i = 1:length(keys(sys2.params))
+                direct_sum_params[Symbol("system_$(n_systems + i)")] =
+                    sys2.params[Symbol("system_$(i)")]
+            end
+        else
+            direct_sum_params[Symbol("system_$(n_systems + 1)")] = sys2.params
+        end
+    else
+        direct_sum_params[:system_1] = sys1.params
+        if haskey(sys2.params, :system_1)
+            n_systems = length(keys(sys2.params))
+            for i = 1:length(keys(sys2.params))
+                direct_sum_params[Symbol("system_$(1 + i)")] =
+                    sys2.params[Symbol("system_$(i)")]
+            end
+        else
+            direct_sum_params[:system_2] = sys2.params
+        end
+    end
+    return QuantumSystem(H, G, ∂G, levels, n_drives, direct_sum_params)
 end
 
 direct_sum(systems::AbstractVector{<:QuantumSystem}) = reduce(direct_sum, systems)
@@ -569,12 +598,20 @@ end
     H_drift = 0.01 * GATES[:Z]
     H_drives = [GATES[:X], GATES[:Y]]
     T = 50
-    sys = QuantumSystem(H_drift, H_drives)
+    sys_1 = QuantumSystem(H_drift, H_drives)
+    sys_2 = deepcopy(sys_1)
 
     # direct sum of systems
-    sys2 = direct_sum(sys, sys)
+    sys_sum = direct_sum(sys_1, sys_2)
 
-    @test sys2.levels == sys.levels * 2
+    @test sys_sum.levels == sys_1.levels * 2
+    @test isempty(symdiff(keys(sys_sum.params), [:system_1, :system_2]))
+
+    sys_sum_2 = direct_sum(sys_sum, deepcopy(sys_1))
+
+    @test sys_sum_2.levels == sys_1.levels * 3
+    display(sys_sum_2.params)
+    @test isempty(symdiff(keys(sys_sum_2.params), [:system_1, :system_2, :system_3]))
 
 end
 
