@@ -12,6 +12,39 @@ using MathOptInterface
 using Ipopt
 const MOI = MathOptInterface
 
+
+@doc raw"""
+   solve!(prob::QuantumControlProblem;
+        init_traj=nothing,
+        save_path=nothing,
+        max_iter=prob.ipopt_options.max_iter,
+        linear_solver=prob.ipopt_options.linear_solver,
+        print_level=prob.ipopt_options.print_level,
+        remove_slack_variables=false,
+        callback=nothing
+        # state_type=:unitary,
+        # print_fidelity=false,
+    )
+
+    Call optimization solver to solve the quantum control problem with parameters and callbacks.
+
+    prob: QuantumControlProblem
+        The quantum control problem to solve.
+    init_traj: NamedTrajectory, optional
+        Initial guess for the control trajectory. If not provided, a random guess will be generated.
+    save_path: String, optional
+        Path to save the problem after optimization.
+    max_iter: Int, optional
+        Maximum number of iterations for the optimization solver.
+    linear_solver: String, optional (e.g., "mumps", "paradiso", etc)
+        Linear solver to use for the optimization solver.
+    print_level: Int, optional
+        Verbosity level for the solver
+    remove_slack_variables: Bool, optional
+        Remove slack variables from the trajectory after optimization.
+    callback: Function, optional
+        Callback function to call during optimization steps.
+"""
 function solve!(
     prob::QuantumControlProblem;
     init_traj=nothing,
