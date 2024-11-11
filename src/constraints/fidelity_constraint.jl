@@ -161,7 +161,6 @@ function FinalUnitaryFidelityConstraint(
     subspace::Union{AbstractVector{<:Integer}, Nothing}=nothing,
     eval_hessian::Bool=true
 )
-    @assert statesymb ∈ traj.names
     return FinalFidelityConstraint(;
         fidelity_function=iso_vec_unitary_fidelity,
         value=val,
@@ -221,7 +220,7 @@ function FinalUnitaryFreePhaseFidelityConstraint(;
     state_slice::Union{AbstractVector{Int},Nothing}=nothing,
     phase_slice::Union{AbstractVector{Int},Nothing}=nothing,
     goal::Union{AbstractVector{Float64},Nothing}=nothing,
-    phase_operators::Union{AbstractVector{<:AbstractMatrix{<:Complex{Float64}}},Nothing}=nothing,
+    phase_operators::Union{AbstractVector{<:AbstractMatrix{<:Complex}},Nothing}=nothing,
     zdim::Union{Int,Nothing}=nothing,
     subspace::Union{AbstractVector{<:Integer}, Nothing}=nothing,
     eval_hessian::Bool=false
@@ -283,5 +282,26 @@ function FinalUnitaryFreePhaseFidelityConstraint(;
         μ∂²g_structure,
         1,
         params
+    )
+end
+
+function FinalUnitaryFreePhaseFidelityConstraint(
+    state_name::Symbol,
+    phase_name::Symbol,
+    phase_operators::AbstractVector{<:AbstractMatrix{<:Complex}},
+    val::Float64,
+    traj::NamedTrajectory;
+    subspace::Union{AbstractVector{<:Integer}, Nothing}=nothing,
+    eval_hessian::Bool=false
+)
+    return FinalUnitaryFreePhaseFidelityConstraint(;
+        value=val,
+        state_slice=slice(traj.T, traj.components[state_name], traj.dim),
+        phase_slice=traj.global_components[phase_name],
+        goal=traj.goal[state_name],
+        phase_operators=phase_operators,
+        zdim=length(traj),
+        subspace=subspace,
+        eval_hessian=eval_hessian
     )
 end

@@ -20,13 +20,13 @@ function ComplexModulusContraint(;
     R::Union{Float64, Nothing}=nothing,
     comps::Union{AbstractVector{Int}, Nothing}=nothing,
     times::Union{AbstractVector{Int}, Nothing}=nothing,
-    dim::Union{Int, Nothing}=nothing,
+    zdim::Union{Int, Nothing}=nothing,
     T::Union{Int, Nothing}=nothing,
 )
     @assert !isnothing(R) "must provide a value R, s.t. |z| <= R"
     @assert !isnothing(comps) "must provide components of the complex number"
     @assert !isnothing(times) "must provide times"
-    @assert !isnothing(dim) "must provide a trajectory dimension"
+    @assert !isnothing(zdim) "must provide a trajectory dimension"
     @assert !isnothing(T) "must provide a T"
 
     @assert length(comps) == 2 "component must represent a complex number and have dimension 2"
@@ -37,7 +37,7 @@ function ComplexModulusContraint(;
     params[:R] = R
     params[:comps] = comps
     params[:times] = times
-    params[:dim] = dim
+    params[:zdim] = zdim
     params[:T] = T
 
     gₜ(xₜ, yₜ) = [R^2 - xₜ^2 - yₜ^2]
@@ -47,7 +47,7 @@ function ComplexModulusContraint(;
     @views function g(Z⃗)
         r = zeros(length(times))
         for (i, t) ∈ enumerate(times)
-            zₜ = Z⃗[slice(t, comps, dim)]
+            zₜ = Z⃗[slice(t, comps, zdim)]
             xₜ = zₜ[1]
             yₜ = zₜ[2]
             r[i] = gₜ(xₜ, yₜ)[1]
@@ -58,17 +58,17 @@ function ComplexModulusContraint(;
     ∂g_structure = []
 
     for (i, t) ∈ enumerate(times)
-        push!(∂g_structure, (i, index(t, comps[1], dim)))
-        push!(∂g_structure, (i, index(t, comps[2], dim)))
+        push!(∂g_structure, (i, index(t, comps[1], zdim)))
+        push!(∂g_structure, (i, index(t, comps[2], zdim)))
     end
 
     @views function ∂g(Z⃗; ipopt=true)
         ∂ = spzeros(length(times), length(Z⃗))
         for (i, t) ∈ enumerate(times)
-            zₜ = Z⃗[slice(t, comps, dim)]
+            zₜ = Z⃗[slice(t, comps, zdim)]
             xₜ = zₜ[1]
             yₜ = zₜ[2]
-            ∂[i, slice(t, comps, dim)] = ∂gₜ(xₜ, yₜ)
+            ∂[i, slice(t, comps, zdim)] = ∂gₜ(xₜ, yₜ)
         end
         if ipopt
             return [∂[i, j] for (i, j) in ∂g_structure]
@@ -83,15 +83,15 @@ function ComplexModulusContraint(;
         push!(
             μ∂²g_structure,
             (
-                index(t, comps[1], dim),
-                index(t, comps[1], dim)
+                index(t, comps[1], zdim),
+                index(t, comps[1], zdim)
             )
         )
         push!(
             μ∂²g_structure,
             (
-                index(t, comps[2], dim),
-                index(t, comps[2], dim)
+                index(t, comps[2], zdim),
+                index(t, comps[2], zdim)
             )
         )
     end
@@ -100,7 +100,7 @@ function ComplexModulusContraint(;
         n = length(Z⃗)
         μ∂² = spzeros(n, n)
         for (i, t) ∈ enumerate(times)
-            t_slice = slice(t, comps, dim)
+            t_slice = slice(t, comps, zdim)
             μ∂²[t_slice, t_slice] = μₜ∂²gₜ(μ[i])
         end
         if ipopt

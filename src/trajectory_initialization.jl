@@ -3,8 +3,7 @@ module TrajectoryInitialization
 export unitary_geodesic
 export linear_interpolation
 export unitary_linear_interpolation
-export initialize_unitary_trajectory
-export initialize_quantum_state_trajectory
+export initialize_trajectory
 export convert_fixed_time
 export convert_free_time
 
@@ -118,31 +117,40 @@ function unitary_geodesic(
     if U_goal isa EmbeddedOperator
         U_goal = U_goal.operator
     end
-    return unitary_geodesic(Matrix{ComplexF64}(I(size(U_goal, 1))), U_goal, samples; kwargs...)
+    return unitary_geodesic(
+        Matrix{ComplexF64}(I(size(U_goal, 1))),
+        U_goal,
+        samples;
+        kwargs...
+    )
 end
 
+"""
+    unitary_geodesic(U_init, U_goal, times; kwargs...)
+
+Compute the geodesic connecting U_init and U_goal at the specified times. Allows for the possibility of unequal times and ranges outside [0,1].
+
+# Arguments
+- `U_init::AbstractMatrix{<:Number}`: The initial unitary operator.
+- `U_goal::AbstractMatrix{<:Number}`: The goal unitary operator.
+- `times::AbstractVector{<:Number}`: The times at which to evaluate the geodesic.
+
+# Keyword Arguments
+- `return_unitary_isos::Bool=true`: If true returns a matrix where each column is a unitary isovec, i.e. vec(vcat(real(U), imag(U))). If false, returns a vector of unitary matrices.
+- `return_generator::Bool=false`: If true, returns the effective Hamiltonian generating the geodesic.
+"""
 function unitary_geodesic(
     U_init::AbstractMatrix{<:Number},
     U_goal::AbstractMatrix{<:Number},
-    timesteps::AbstractVector{<:Number};
+    times::AbstractVector{<:Number};
     return_unitary_isos=true,
     return_generator=false
 )
-    """
-    Compute the effective generator of the geodesic connecting U₀ and U₁.
-        U_goal = exp(-im * H * T) U_init
-        log(U_goal * U_init') = -im * H * T
-
-    Allow for the possibiltiy of unequal timesteps and ranges outside [0,1].
-
-    Returns the geodesic.
-    Optionally returns the effective Hamiltonian generating the geodesic.
-    """
-    t₀ = timesteps[1]
-    T = timesteps[end] - t₀
+    t₀ = times[1]
+    T = times[end] - t₀
     H = im * log(U_goal * U_init') / T
     # -im prefactor is not included in H
-    U_geo = [exp(-im * H * (t - t₀)) * U_init for t ∈ timesteps]
+    U_geo = [exp(-im * H * (t - t₀)) * U_init for t ∈ times]
     if !return_unitary_isos
         if return_generator
             return U_geo, H
@@ -167,7 +175,7 @@ linear_interpolation(x::AbstractVector, y::AbstractVector, n::Int) =
 const VectorBound = Union{AbstractVector{R}, Tuple{AbstractVector{R}, AbstractVector{R}}} where R <: Real
 const ScalarBound = Union{R, Tuple{R, R}} where R <: Real
 
-function initialize_unitaries(
+function initialize_unitary_trajectory(
     U_init::AbstractMatrix{<:Number},
     U_goal::OperatorType,
     T::Int;
@@ -185,7 +193,7 @@ end
 #                           Initial controls                                    #
 # ----------------------------------------------------------------------------- #
 
-function initialize_controls(
+function initialize_control_trajectory(
     n_drives::Int,
     n_derivatives::Int,
     T::Int,
@@ -216,57 +224,81 @@ function initialize_controls(
     return controls
 end
 
-function initialize_controls(a::AbstractMatrix, Δt::AbstractVecOrMat, n_derivatives::Int)
+function initialize_control_trajectory(
+    a::AbstractMatrix,
+    Δt::AbstractVecOrMat,
+    n_derivatives::Int
+)
     controls = Matrix{Float64}[a]
+
     for n in 1:n_derivatives
         # next derivative
         push!(controls,  derivative(controls[end], Δt))
 
         # to avoid constraint violation error at initial iteration for da, dda, ...
         if n > 1
-            controls[end-1][:, end] = controls[end-1][:, end-1] + Δt[end-1] * controls[end][:, end-1]
+            controls[end-1][:, end] =
+                controls[end-1][:, end-1] + Δt[end-1] * controls[end][:, end-1]
         end
     end
     return controls
 end
 
-initialize_controls(a::AbstractMatrix, Δt::Real, n_derivatives::Int) =
-    initialize_controls(a, fill(Δt, size(a, 2)), n_derivatives)
+initialize_control_trajectory(a::AbstractMatrix, Δt::Real, n_derivatives::Int) =
+    initialize_control_trajectory(a, fill(Δt, size(a, 2)), n_derivatives)
 
 # ----------------------------------------------------------------------------- #
 #                           Trajectory initialization                           #
 # ----------------------------------------------------------------------------- #
 
 """
-    initialize_unitary_trajectory
+    initialize_trajectory
 
 
-Initialize a trajectory for a unitary control problem. The trajectory is initialized with
+Initialize a trajectory for a control problem. The trajectory is initialized with
 data that should be consistently the same type (in this case, Float64).
 
 """
-function initialize_unitary_trajectory(
-    U_goal::OperatorType,
+function initialize_trajectory(
+    state_data::Vector{<:AbstractMatrix{Float64}},
+    state_inits::Vector{<:AbstractVector{Float64}},
+    state_goals::Vector{<:AbstractVector{Float64}},
+    state_names::AbstractVector{Symbol},
     T::Int,
     Δt::Union{Float64, AbstractVecOrMat{<:Float64}},
     n_drives::Int,
-    all_a_bounds::NamedTuple{anames, <:Tuple{Vararg{VectorBound}}} where anames;
-    U_init::AbstractMatrix{<:Number}=Matrix{ComplexF64}(I(size(U_goal, 1))),
-    n_derivatives::Int=2,
-    geodesic=true,
-    bound_unitary=false,
+    control_bounds::Tuple{Vararg{VectorBound}};
+    bound_state=false,
     free_time=false,
+    control_name=:a,
+    n_control_derivatives::Int=length(control_bounds) - 1,
+    timestep_name=:Δt,
     Δt_bounds::ScalarBound=(0.5 * Δt, 1.5 * Δt),
     drive_derivative_σ::Float64=0.1,
     a_guess::Union{AbstractMatrix{<:Float64}, Nothing}=nothing,
-    system::Union{AbstractQuantumSystem, AbstractVector{<:AbstractQuantumSystem}, Nothing}=nothing,
-    global_data::Union{NamedTuple, Nothing}=nothing,
-    rollout_integrator::Function=expv,
-    Ũ⃗_keys::AbstractVector{<:Symbol}=[:Ũ⃗],
-    a_keys::AbstractVector{<:Symbol}=[Symbol("d"^i * "a") for i in 0:n_derivatives]
+    phase_name::Symbol=:ϕ,
+    phase_data::Union{AbstractVector{<:Real}, Nothing}=nothing,
+    verbose=false,
 )
-    @assert length(a_keys) == n_derivatives + 1 "a_keys must have the same length as n_derivatives + 1"
+    @assert length(state_data) == length(state_names) == length(state_inits) == length(state_goals) "state_data, state_names, state_inits, and state_goals must have the same length"
+    @assert length(control_bounds) == n_control_derivatives + 1 "control_bounds must have $n_control_derivatives + 1 elements"
 
+    # assert that state names are unique
+    @assert length(state_names) == length(Set(state_names)) "state_names must be unique"
+
+    # Control data
+    control_derivative_names = [
+        Symbol("d"^i * string(control_name)) for i = 1:n_control_derivatives
+    ]
+    if verbose
+        println("control_derivative_names: $control_derivative_names")
+    end
+
+    control_names = (control_name, control_derivative_names...)
+
+    control_bounds = NamedTuple{control_names}(control_bounds)
+
+    # Timestep data
     if free_time
         if Δt isa Real
             Δt = fill(Δt, 1, T)
@@ -275,195 +307,309 @@ function initialize_unitary_trajectory(
         else
             @assert size(Δt) == (1, T) "Δt must be a Real, AbstractVector, or 1x$(T) AbstractMatrix"
         end
-        timestep = :Δt
+        timestep = timestep_name
     else
         @assert Δt isa Real "Δt must be a Real if free_time is false"
         timestep = Δt
     end
 
+    # Constraints
+    initial = (;
+        (state_names .=> state_inits)...,
+        control_name => zeros(n_drives),
+    )
+
+    final = (;
+        control_name => zeros(n_drives),
+    )
+
+    goal = (; (state_names .=> state_goals)...)
+
+    # Bounds
+    bounds = control_bounds
+
+    # Put unit box bounds on the state if bound_state is true
+    if bound_state
+        state_dim = length(state_inits[1])
+        state_bounds = repeat([(-ones(state_dim), ones(state_dim))], length(state_names))
+        bounds = merge(bounds, (; (state_names .=> state_bounds)...))
+    end
+
+    # Trajectory
+    if isnothing(a_guess)
+        # Randomly sample controls
+        a_values = initialize_control_trajectory(
+            n_drives,
+            n_control_derivatives,
+            T,
+            bounds[control_name],
+            drive_derivative_σ
+        )
+    else
+        # Use provided controls and take derivatives
+        a_values = initialize_control_trajectory(a_guess, Δt, n_control_derivatives)
+    end
+
+    names = [state_names..., control_names...]
+    values = [state_data..., a_values...]
+
+    if free_time
+        push!(names, timestep_name)
+        push!(values, Δt)
+        controls = (control_names[end], timestep_name)
+        bounds = merge(bounds, (; timestep_name => Δt_bounds,))
+    else
+        controls = (control_names[end],)
+    end
+
+    # Construct global data for free phases
+    global_data = isnothing(phase_data) ? (;) : (; phase_name => phase_data)
+
+    return NamedTrajectory(
+        (; (names .=> values)...);
+        controls=controls,
+        timestep=timestep,
+        bounds=bounds,
+        initial=initial,
+        final=final,
+        goal=goal,
+        global_data=global_data
+    )
+end
+
+"""
+    Initialize the unitary states for a single set of parameters.
+
+"""
+function initialize_unitaries(
+    U_goal::OperatorType,
+    T::Int,
+    timesteps::AbstractVector{<:Real};
+    U_init::AbstractMatrix{<:Number}=Matrix{ComplexF64}(I(size(U_goal, 1))),
+    a_guess::Union{AbstractMatrix{<:Float64}, Nothing}=nothing,
+    system::Union{AbstractQuantumSystem, Nothing}=nothing,
+    rollout_integrator::Function=expv,
+    geodesic=true,
+)::Matrix{Float64}
     Ũ⃗_init = operator_to_iso_vec(U_init)
+
+    if U_goal isa EmbeddedOperator
+        Ũ⃗_goal = operator_to_iso_vec(U_goal.operator)
+    else
+        Ũ⃗_goal = operator_to_iso_vec(U_goal)
+    end
+    
+    # Construct state data
+    if isnothing(a_guess)
+        state_data = initialize_unitary_trajectory(U_init, U_goal, T; geodesic=geodesic)
+    else
+        @assert !isnothing(system) "System must be provided if a_guess is provided."
+        state_data = unitary_rollout(Ũ⃗_init, a_guess, timesteps, system; integrator=rollout_integrator)
+    end
+
+    return state_data
+end
+    
+"""
+    initialize_trajectory
+
+Trajectory initialization of unitary states can broadcast over multiple systems.
+"""
+function initialize_trajectory(
+    U_goal::OperatorType,
+    T::Int,
+    Δt::Union{Real, AbstractVecOrMat{<:Real}},
+    args...;
+    state_name::Symbol=:Ũ⃗,
+    U_init::AbstractMatrix{<:Number}=Matrix{ComplexF64}(I(size(U_goal, 1))),
+    a_guess::Union{AbstractMatrix{<:Float64}, Nothing}=nothing,
+    system::Union{AbstractQuantumSystem, AbstractVector{<:AbstractQuantumSystem}, Nothing}=nothing,
+    rollout_integrator::Function=expv,
+    geodesic=true,
+    phase_operators::Union{AbstractVector{<:AbstractMatrix}, Nothing}=nothing,
+    verbose=false,
+    kwargs...
+)
+    Ũ⃗_init = operator_to_iso_vec(U_init)
+
     if U_goal isa EmbeddedOperator
         Ũ⃗_goal = operator_to_iso_vec(U_goal.operator)
     else
         Ũ⃗_goal = operator_to_iso_vec(U_goal)
     end
 
-    # Constraints
-    Ũ⃗_inits = repeat([Ũ⃗_init], length(Ũ⃗_keys))
-    initial = (;
-        (Ũ⃗_keys .=> Ũ⃗_inits)...,
-        a = zeros(n_drives),
-    )
-
-    final = (
-        a = zeros(n_drives),
-    )
-
-    Ũ⃗_goals = repeat([Ũ⃗_goal], length(Ũ⃗_keys))
-    goal = (; (Ũ⃗_keys .=> Ũ⃗_goals)...)
-
-    # Bounds
-    bounds = all_a_bounds
-
-    if bound_unitary
-        Ũ⃗_dim = length(Ũ⃗_init)
-        Ũ⃗_bounds = repeat([(-ones(Ũ⃗_dim), ones(Ũ⃗_dim))], length(Ũ⃗_keys))
-        bounds = merge(bounds, (; (Ũ⃗_keys .=> Ũ⃗_bounds)...))
+    # Construct timesteps
+    if Δt isa AbstractMatrix
+        timesteps = vec(Δt)
+    elseif Δt isa Float64
+        timesteps = fill(Δt, T)
+    else
+        timesteps = Δt
     end
 
-    # Initial state and control values
-    if isnothing(a_guess)
-        Ũ⃗ = initialize_unitaries(U_init, U_goal, T, geodesic=geodesic)
-        Ũ⃗_values = repeat([Ũ⃗], length(Ũ⃗_keys))
-        a_values = initialize_controls(
-            n_drives,
-            n_derivatives,
-            T,
-            bounds[a_keys[1]],
-            drive_derivative_σ
-        )
-    else
-        @assert size(a_guess, 1) == n_drives "a_guess must have the same number of drives as n_drives"
-        @assert size(a_guess, 2) == T "a_guess must have the same number of timesteps as T"
-        @assert !isnothing(system) "system must be provided if a_guess is provided"
-
-        if Δt isa AbstractMatrix
-            ts = vec(Δt)
-        elseif Δt isa Float64
-            ts = fill(Δt, T)
-        else
-            ts = Δt
+    # Construct state data
+    if system isa AbstractVector
+        state_data = map(system) do sys
+            initialize_unitaries(
+                U_goal, T, timesteps;
+                U_init=U_init,
+                a_guess=a_guess,
+                system=sys,
+                rollout_integrator=rollout_integrator,
+                geodesic=geodesic
+            )
         end
 
-        if system isa AbstractVector
-            @assert length(system) == length(Ũ⃗_keys) "systems must have the same length as Ũ⃗_keys"
-            Ũ⃗_values = map(system) do sys
-                unitary_rollout(Ũ⃗_init, a_guess, ts, sys; integrator=rollout_integrator)
-            end
-        else
-            Ũ⃗ = unitary_rollout(Ũ⃗_init, a_guess, ts, system; integrator=rollout_integrator)
-            Ũ⃗_values = repeat([Ũ⃗], length(Ũ⃗_keys))
+        state_names = Symbol.([string(state_name) * "_system_$i" for i in eachindex(system)])
+        if verbose
+            println("Created state names for ($(length(system))) systems: $state_names")
         end
-        Ũ⃗_values = Matrix{Float64}.(Ũ⃗_values)
-        a_values = initialize_controls(a_guess, ts, n_derivatives)
-    end
-
-    # Trajectory
-    keys = [Ũ⃗_keys..., a_keys...]
-    values = [Ũ⃗_values..., a_values...]
-
-    if free_time
-        push!(keys, :Δt)
-        push!(values, Δt)
-        controls = (a_keys[end], :Δt)
-        bounds = merge(bounds, (Δt = Δt_bounds,))
+        state_inits = repeat([Ũ⃗_init], length(system))
+        state_goals = repeat([Ũ⃗_goal], length(system))
     else
-        controls = (a_keys[end],)
+        state_data = [initialize_unitaries(
+            U_goal, T, timesteps; 
+            U_init=U_init,
+            a_guess=a_guess, 
+            system=system, 
+            rollout_integrator=rollout_integrator, 
+            geodesic=geodesic
+        )]
+        state_names = [state_name]
+        state_inits = [Ũ⃗_init]
+        state_goals = [Ũ⃗_goal]
     end
 
-    return NamedTrajectory(
-        (; (keys .=> values)...);
-        controls=controls,
-        timestep=timestep,
-        bounds=bounds,
-        initial=initial,
-        final=final,
-        goal=goal,
-        global_data= isnothing(global_data) ? (;) : global_data
+    # Construct phase data
+    phase_data = isnothing(phase_operators) ? nothing : π * randn(length(phase_operators))
+
+    return initialize_trajectory(
+        state_data,
+        state_inits,
+        state_goals,
+        state_names,
+        T,
+        Δt,
+        args...;
+        phase_data=phase_data,
+        a_guess=a_guess,
+        verbose=verbose,
+        kwargs...
     )
 end
 
-function initialize_quantum_state_trajectory(
-    ψ̃_goals::AbstractVector{<:AbstractVector{<:Real}},
-    ψ̃_inits::AbstractVector{<:AbstractVector{<:Real}},
+"""
+    initialize_quantum_states
+
+Initialize the quantum states for a single set of parameters.
+"""
+function initialize_quantum_states(
+    ψ̃_goals::AbstractVector{<:AbstractVector{Float64}},
+    ψ̃_inits::AbstractVector{<:AbstractVector{Float64}},
+    T::Int,
+    timesteps::AbstractVector{<:Real};
+    a_guess::Union{AbstractMatrix{<:Float64}, Nothing}=nothing,
+    system::Union{AbstractQuantumSystem, Nothing}=nothing,
+    rollout_integrator::Function=expv,
+)
+    state_data = Matrix{Float64}[]
+    if isnothing(a_guess)
+        for (ψ̃_init, ψ̃_goal) ∈ zip(ψ̃_inits, ψ̃_goals)
+            ψ̃_traj = linear_interpolation(ψ̃_init, ψ̃_goal, T)
+            push!(state_data, ψ̃_traj)
+        end
+        if system isa AbstractVector
+            state_data = repeat(state_data, length(system))
+        end
+    else
+        for ψ̃_init ∈ ψ̃_inits
+            ψ̃_traj = rollout(ψ̃_init, a_guess, timesteps, system; integrator=rollout_integrator)
+            push!(state_data, ψ̃_traj)
+        end
+    end
+
+    return state_data
+end
+
+"""
+    initialize_trajectory
+    
+Trajectory initialization of quantum states can broadcast over multiple systems.
+"""
+function initialize_trajectory(
+    ψ_goals::AbstractVector{<:AbstractVector{ComplexF64}},
+    ψ_inits::AbstractVector{<:AbstractVector{ComplexF64}},
     T::Int,
     Δt::Union{Real, AbstractVector{<:Real}},
-    n_drives::Int,
-    all_a_bounds::NamedTuple{anames, <:Tuple{Vararg{VectorBound}}} where anames;
-    n_derivatives::Int=2,
-    free_time=false,
-    Δt_bounds::ScalarBound=(0.5 * Δt, 1.5 * Δt),
-    drive_derivative_σ::Float64=0.1,
+    args...;
+    state_name=:ψ̃,
+    state_names::AbstractVector{<:Symbol}=length(ψ_goals) == 1 ?
+        [state_name] :
+        [Symbol(string(state_name) * "$i") for i = 1:length(ψ_goals)],
     a_guess::Union{AbstractMatrix{<:Float64}, Nothing}=nothing,
     system::Union{AbstractQuantumSystem, AbstractVector{<:AbstractQuantumSystem}, Nothing}=nothing,
-    global_data::Union{NamedTuple, Nothing}=nothing,
-    rollout_integrator::Function=exp,
-    ψ̃_keys::AbstractVector{<:Symbol}=[Symbol("ψ̃$i") for i = 1:length(ψ̃_goals)],
-    a_keys::AbstractVector{<:Symbol}=[Symbol("d"^i * "a") for i = 0:n_derivatives]
+    rollout_integrator::Function=expv,
+    verbose=false,
+    kwargs...
 )
-    @assert length(ψ̃_inits) == length(ψ̃_goals) "ψ̃_inits and ψ̃_goals must have the same length"
-    @assert length(ψ̃_keys) == length(ψ̃_goals) "ψ̃_keys and ψ̃_goals must have the same length"
+    @assert length(ψ_inits) == length(ψ_goals) "ψ_inits and ψ_goals must have the same length"
+    @assert length(state_names) == length(ψ_goals) "state_names and ψ_goals must have the same length"
 
-    if free_time
-        if Δt isa Real
-            Δt = fill(Δt, 1, T)
-        elseif Δt isa AbstractVector
-            Δt = reshape(Δt, 1, :)
-        else
-            @assert size(Δt) == (1, T) "Δt must be a Real, AbstractVector, or 1x$(T) AbstractMatrix"
+    ψ̃_goals = ket_to_iso.(ψ_goals)
+    ψ̃_inits = ket_to_iso.(ψ_inits)
+
+    if Δt isa AbstractMatrix
+        timesteps = vec(Δt)
+    elseif Δt isa Float64
+        timesteps = fill(Δt, T)
+    else
+        timesteps = Δt
+    end
+
+    if system isa AbstractVector
+        state_data = map(system) do sys
+            initialize_quantum_states(
+                ψ̃_goals, ψ̃_inits, T, timesteps;
+                a_guess=a_guess,
+                system=sys,
+                rollout_integrator=rollout_integrator
+            )
         end
-    end
-
-    # Constraints
-    state_initial = (; (ψ̃_keys .=> ψ̃_inits)...)
-    control_initial = (a = zeros(n_drives),)
-    initial = merge(state_initial, control_initial)
-
-    final = (a = zeros(n_drives),)
-
-    goal = (; (ψ̃_keys .=> ψ̃_goals)...)
-
-    # Bounds
-    bounds = all_a_bounds
-
-    # Initial state and control values
-    if isnothing(a_guess)
-        ψ̃_values = NamedTuple([
-            k => linear_interpolation(ψ̃_init, ψ̃_goal, T)
-                for (k, ψ̃_init, ψ̃_goal) in zip(ψ̃_keys, ψ̃_inits, ψ̃_goals)
-        ])
-        a_values = initialize_controls(
-            n_drives,
-            n_derivatives,
-            T,
-            bounds[a_keys[1]],
-            drive_derivative_σ
+        # Flatten state data along systems
+        state_data = vcat(state_data...)
+        # Update state names using systems
+        state_names = Symbol.([string(n) * "_system_$i" for i in eachindex(system) for n in state_names])
+        if verbose
+            println("Created state names for ($(length(system))) systems: $state_names")
+        end
+        state_inits = repeat(ψ̃_inits, length(system))
+        state_goals = repeat(ψ̃_goals, length(system))
+    else
+        state_data = initialize_quantum_states(
+            ψ̃_goals, ψ̃_inits, T, timesteps;
+            a_guess=a_guess,
+            system=system,
+            rollout_integrator=rollout_integrator
         )
-    else
-        ψ̃_values = NamedTuple([
-            k => rollout(ψ̃_init, a_guess, Δt, system, integrator=rollout_integrator)
-                for (k, ψ̃_init) in zip(ψ̃_keys, ψ̃_inits)
-        ])
-        a_values = initialize_controls(a_guess, Δt, n_derivatives)
+        # state_names are the same
+        state_inits = ψ̃_inits
+        state_goals = ψ̃_goals
     end
 
-    # Trajectory
-    keys = [ψ̃_keys..., a_keys...]
-    values = [ψ̃_values..., a_values...]
-
-    if free_time
-        push!(keys, :Δt)
-        push!(values, Δt)
-        controls = (a_keys[end], :Δt)
-        timestep = :Δt
-        bounds = merge(bounds, (Δt = Δt_bounds,))
-    else
-        controls = (a_keys[end],)
-        @assert Δt isa Real "Δt must be a Real if free_time is false"
-        timestep = Δt
-    end
-
-    return NamedTrajectory(
-        (; (keys .=> values)...);
-        controls=controls,
-        timestep=timestep,
-        bounds=bounds,
-        initial=initial,
-        final=final,
-        goal=goal,
-        global_data=isnothing(global_data) ? (;) : global_data
+    return initialize_trajectory(
+        state_data,
+        state_inits,
+        state_goals,
+        state_names,
+        T,
+        Δt,
+        args...;
+        a_guess=a_guess,
+        verbose=verbose,
+        kwargs...
     )
 end
+
 
 # ============================================================================= #
 
@@ -536,7 +682,7 @@ end
     drive_bounds = [1.0, 2.0]
     drive_derivative_σ = 0.01
 
-    a, da, dda = TrajectoryInitialization.initialize_controls(n_drives, n_derivates, T, drive_bounds, drive_derivative_σ)
+    a, da, dda = TrajectoryInitialization.initialize_control_trajectory(n_drives, n_derivates, T, drive_bounds, drive_derivative_σ)
 
     @test size(a) == (n_drives, T)
     @test size(da) == (n_drives, T)
@@ -625,10 +771,10 @@ end
     T = 10
     Δt = 0.1
     n_drives = 2
-    all_a_bounds = (a = [1.0, 1.0],)
+    a_bounds = ([1.0, 1.0],)
 
-    traj = initialize_unitary_trajectory(
-        U_goal, T, Δt, n_drives, all_a_bounds
+    traj = initialize_trajectory(
+        U_goal, T, Δt, n_drives, a_bounds
     )
 
     @test traj isa NamedTrajectory
@@ -637,16 +783,16 @@ end
 @testitem "quantum state trajectory initialization" begin
     using NamedTrajectories
 
-    ψ̃_init = ket_to_iso([0.0, 1.0])
-    ψ̃_goal = ket_to_iso([1.0, 0.0])
+    ψ_init = Vector{ComplexF64}([0.0, 1.0])
+    ψ_goal = Vector{ComplexF64}([1.0, 0.0])
 
     T = 10
     Δt = 0.1
     n_drives = 2
-    all_a_bounds = (a = [1.0, 1.0],)
+    all_a_bounds = ([1.0, 1.0],)
 
-    traj = initialize_quantum_state_trajectory(
-        [ψ̃_goal], [ψ̃_init], T, Δt, n_drives, all_a_bounds
+    traj = initialize_trajectory(
+        [ψ_goal], [ψ_init], T, Δt, n_drives, all_a_bounds
     )
 
     @test traj isa NamedTrajectory
