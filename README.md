@@ -1,7 +1,7 @@
 # QuantumCollocation.jl
 
 <div align="center"> <a href="https://github.com/kestrelquantum/Piccolo.jl">
-    <img src="assets/logo.svg" alt="logo" width="35%"/>
+    <img src="docs/src/assets/logo.svg" alt="logo" width="35%"/>
 </a> </div>
 
 
@@ -41,12 +41,23 @@ using Pkg
 Pkg.add(QuantumCollocation)
 ```
 
-## Examples
+## Example
 
 ### Single Qubit X-Gate
-See the example script [examples/scripts/single_qubit_gate.jl](examples/scripts/single_qubit_gate.jl), which  produces the following plot:
+```Julia
+using QuantumCollocation
 
-![Single Qubit X-Gate](images/T_100_Q_1000_iter_1000_00004_fidelity_0.9999999999994745.png)
+T = 50
+Δt = 0.2
+system = QuantumSystem([PAULIS[:X], PAULIS[:Y]])
+
+# Hadamard Gate
+prob = UnitarySmoothPulseProblem(system, GATES[:H], T, Δt)
+solve!(prob, max_iter=100)
+
+plot_unitary_populations(prob)
+```
+![Single Qubit X-Gate](docs/src/assets/x_gate_unitary_populations.svg)
 
 ## Quickstart developers guide
 

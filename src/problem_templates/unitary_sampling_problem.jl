@@ -33,7 +33,6 @@ robust solution by including multiple systems reflecting the problem uncertainty
 - `dda_bounds::Vector{Float64} = fill(dda_bound, length(systems[1].G_drives))`: The bounds for the control second derivatives.
 - `Δt_min::Float64 = 0.5 * Δt`: The minimum time step size.
 - `Δt_max::Float64 = 1.5 * Δt`: The maximum time step size.
-- `drive_derivative_σ::Float64 = 0.01`: The standard deviation for the drive derivative noise.
 - `Q::Float64 = 100.0`: The fidelity weight.
 - `R::Float64 = 1e-2`: The regularization weight.
 - `R_a::Union{Float64, Vector{Float64}} = R`: The regularization weight for the control amplitudes.
@@ -47,7 +46,6 @@ function UnitarySamplingProblem(
     operator::OperatorType,
     T::Int,
     Δt::Union{Float64,Vector{Float64}};
-    system_labels=string.(1:length(systems)),
     system_weights=fill(1.0, length(systems)),
     init_trajectory::Union{NamedTrajectory,Nothing}=nothing,
     ipopt_options::IpoptOptions=IpoptOptions(),
@@ -65,7 +63,6 @@ function UnitarySamplingProblem(
     dda_bounds::Vector{Float64}=fill(dda_bound, length(systems[1].G_drives)),
     Δt_min::Float64=0.5 * Δt,
     Δt_max::Float64=1.5 * Δt,
-    drive_derivative_σ::Float64=0.01,
     Q::Float64=100.0,
     R=1e-2,
     R_a::Union{Float64,Vector{Float64}}=R,
@@ -73,9 +70,6 @@ function UnitarySamplingProblem(
     R_dda::Union{Float64,Vector{Float64}}=R,
     kwargs...
 )
-    # Create keys for multiple systems
-    Ũ⃗_names = [add_suffix(state_name, ℓ) for ℓ ∈ system_labels]
-
     # Trajectory
     if !isnothing(init_trajectory)
         traj = init_trajectory
@@ -95,13 +89,16 @@ function UnitarySamplingProblem(
             Δt_bounds=(Δt_min, Δt_max),
             geodesic=piccolo_options.geodesic,
             bound_state=piccolo_options.bound_state,
-            drive_derivative_σ=drive_derivative_σ,
             a_guess=a_guess,
             system=systems,
             rollout_integrator=piccolo_options.rollout_integrator,
-            state_names=Ũ⃗_names
         )
     end
+
+    state_names = [
+        name for name ∈ traj.names
+        if startswith(string(name), string(state_name))
+    ]
 
     control_names = [
         name for name ∈ traj.names
@@ -109,61 +106,29 @@ function UnitarySamplingProblem(
     ]
 
     # Objective
-    J = NullObjective()
-    for (wᵢ, Ũ⃗_name) in zip(system_weights, Ũ⃗_names)
-        J += wᵢ * UnitaryInfidelityObjective(
-            Ũ⃗_name, traj, Q;
-            subspace=operator isa EmbeddedOperator ? operator.subspace_indices : nothing
-        )
-    end
-    J += QuadraticRegularizer(control_names[1], traj, R_a; timestep_name=timestep_name)
+    J = QuadraticRegularizer(control_names[1], traj, R_a; timestep_name=timestep_name)
     J += QuadraticRegularizer(control_names[2], traj, R_da; timestep_name=timestep_name)
     J += QuadraticRegularizer(control_names[3], traj, R_dda; timestep_name=timestep_name)
 
-    # Constraints
-    if piccolo_options.leakage_suppression
-        if operator isa EmbeddedOperator
-            leakage_indices = get_iso_vec_leakage_indices(operator)
-            for Ũ⃗_name in Ũ⃗_names
-                J += L1Regularizer!(
-                    constraints, Ũ⃗_name, traj,
-                    R_value=piccolo_options.R_leakage,
-                    indices=leakage_indices,
-                    eval_hessian=piccolo_options.eval_hessian
-                )
-            end
-        else
-            @warn "leakage_suppression is not supported for non-embedded operators, ignoring."
-        end
-    end
-
-    if piccolo_options.free_time
-        if piccolo_options.timesteps_all_equal
-            push!(constraints, TimeStepsAllEqualConstraint(:Δt, traj))
-        end
-    end
-
-    if !isnothing(piccolo_options.complex_control_norm_constraint_name)
-        norm_con = ComplexModulusContraint(
-            piccolo_options.complex_control_norm_constraint_name,
-            piccolo_options.complex_control_norm_constraint_radius,
-            traj;
+    for (weight, name) in zip(system_weights, state_names)
+        J += weight * UnitaryInfidelityObjective(
+            name, traj, Q;
+            subspace=operator isa EmbeddedOperator ? operator.subspace_indices : nothing
         )
-        push!(constraints, norm_con)
     end
 
     # Integrators
     unitary_integrators = AbstractIntegrator[]
-    for (sys, Ũ⃗_name) in zip(systems, Ũ⃗_names)
+    for (sys, name) in zip(systems, state_names)
         if piccolo_options.integrator == :pade
             push!(
                 unitary_integrators,
-                UnitaryPadeIntegrator(sys, Ũ⃗_name, control_name, traj; order=piccolo_options.pade_order)
+                UnitaryPadeIntegrator(sys, name, control_name, traj; order=piccolo_options.pade_order)
             )
         elseif piccolo_options.integrator == :exponential
             push!(
                 unitary_integrators,
-                UnitaryExponentialIntegrator(sys, Ũ⃗_name, control_name, traj)
+                UnitaryExponentialIntegrator(sys, name, control_name, traj)
             )
         else
             error("integrator must be one of (:pade, :exponential)")
@@ -175,6 +140,11 @@ function UnitarySamplingProblem(
         DerivativeIntegrator(control_name, control_names[2], traj),
         DerivativeIntegrator(control_names[2], control_names[3], traj),
     ]
+
+    # Optional Piccolo constraints and objectives
+    apply_piccolo_options!(
+        J, constraints, piccolo_options, traj, operator, state_name, timestep_name
+    )
 
     return QuantumControlProblem(
         direct_sum(systems),
@@ -262,7 +232,7 @@ end
         piccolo_options=pi_ops
     )
 
-    @test g1_prob.trajectory.Ũ⃗1 ≈ g1_prob.trajectory.Ũ⃗2
+    @test g1_prob.trajectory.Ũ⃗_system_1 ≈ g1_prob.trajectory.Ũ⃗_system_2
 
     g2_prob = UnitarySamplingProblem(
         [systems(0), systems(0.05)], operator, T, Δt;
@@ -270,5 +240,5 @@ end
         piccolo_options=pi_ops
     )
 
-    @test ~(g2_prob.trajectory.Ũ⃗1 ≈ g2_prob.trajectory.Ũ⃗2)
+    @test ~(g2_prob.trajectory.Ũ⃗_system_1 ≈ g2_prob.trajectory.Ũ⃗_system_2)
 end

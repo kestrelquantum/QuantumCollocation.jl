@@ -58,12 +58,12 @@ Convert a real vector `Ũ⃗` into a complex matrix representing an operator.
 
 Must be differentiable.
 """
-function iso_vec_to_operator(Ũ⃗::AbstractVector{R}) where R
+function iso_vec_to_operator(Ũ⃗::AbstractVector{R}) where R <: Real
     Ũ⃗_dim = div(length(Ũ⃗), 2)
     N = Int(sqrt(Ũ⃗_dim))
-    U = Matrix{complex(R)}(undef, N, N)
+    U = Matrix{complex(eltype(Ũ⃗))}(undef, N, N)
     for i=0:N-1
-        U[:, i+1] .= @view(Ũ⃗[i * 2N .+ (1:N)]) + one(R) * im * @view(Ũ⃗[i * 2N .+ (N+1:2N)])
+        U[:, i+1] .= @view(Ũ⃗[i * 2N .+ (1:N)]) + one(eltype(Ũ⃗)) * im * @view(Ũ⃗[i * 2N .+ (N+1:2N)])
     end
     return U
 end
@@ -98,7 +98,7 @@ Convert a complex matrix `U` representing an operator into a real vector.
 
 Must be differentiable.
 """
-function operator_to_iso_vec(U::AbstractMatrix{R}) where R
+function operator_to_iso_vec(U::AbstractMatrix{R}) where R <: Number
     N = size(U,1)
     Ũ⃗ = Vector{real(R)}(undef, N^2 * 2)
     for i=0:N-1

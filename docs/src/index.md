@@ -14,6 +14,25 @@ Check out our JuliaCon 2023 talk:
 </center>
 ```
 
+Also check out [the sequel, from JuliaCon 2024](https://www.youtube.com/watch?v=v0RPD4eSzVE&t=19980s).
+
+## Example
+
+```Julia
+using QuantumCollocation
+
+T = 50
+Δt = 0.2
+system = QuantumSystem([PAULIS[:X], PAULIS[:Y]])
+
+# Hadamard Gate
+prob = UnitarySmoothPulseProblem(system, GATES[:H], T, Δt)
+solve!(prob, max_iter=100)
+
+plot_unitary_populations(prob)
+```
+![Single Qubit X-Gate](assets/x_gate_unitary_populations.svg)
+
 ## Motivation
 
 In quantum optimal control, we are interested in finding a pulse sequence $a_{1:T-1}$ to drive a quantum system and realize a target gate $U_{\text{goal}}$. We formulate this problem as a nonlinear program (NLP) of the form
@@ -25,7 +44,7 @@ In quantum optimal control, we are interested in finding a pulse sequence $a_{1:
 \end{aligned}
 ```
 
-where $f$ defines the dynamics, implicitly, as constraints on the states and controls, $U_{1:T}$ and $a_{1:T-1}$, which are both free variables in the solver. This optimization framework is called *direct collocation*.  For details of our implementation please see our award-winning paper [Direct Collocation for Quantum Optimal Control](https://arxiv.org/abs/2305.03261).
+where $f$ defines the dynamics, implicitly, as constraints on the states and controls, $U_{1:T}$ and $a_{1:T-1}$, which are both free variables in the solver. This optimization framework is called *direct collocation*.  For technical details of our implementation please see our paper [Direct Collocation for Quantum Optimal Control](https://arxiv.org/abs/2305.03261).
 
 The gist of the method is that the dynamics are given by the solution to the Schrodinger equation, which results in unitary evolution given by $\exp(-i \Delta t H(a_t))$, where $H(a_t)$ is the Hamiltonian of the system and $\Delta t$ is the timestep.  We can approximate this evolution using Pade approximants:
 

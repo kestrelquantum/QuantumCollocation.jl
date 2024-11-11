@@ -119,8 +119,8 @@ Fields:
 """
 function UnitaryFreePhaseInfidelityObjective(;
     name::Union{Nothing,Symbol}=nothing,
-    phase_name::Union{Nothing,Symbol}=nothing,
     goal::Union{Nothing,AbstractVector{<:R}}=nothing,
+    phase_name::Union{Nothing,Symbol}=nothing,
     phase_operators::Union{Nothing,AbstractVector{<:AbstractMatrix{<:Complex{R}}}}=nothing,
 	Q::R=1.0,
 	eval_hessian::Bool=false,
@@ -151,10 +151,15 @@ function UnitaryFreePhaseInfidelityObjective(;
     end
 
     @views function ∇L(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory)
-        # TODO: implement analytic
-        ∇ = ForwardDiff.gradient(Z⃗ -> L(Z⃗, Z), Z⃗)
-        # println(nnz(sparse(∇)))
-        # println(∇[Z.global_components[global_name]])
+        ∇ = zeros(Z.dim * Z.T + Z.global_dim)
+        Ũ⃗_slice = slice(Z.T, Z.components[name], Z.dim)
+        Ũ⃗ = Z⃗[Ũ⃗_slice]
+        ϕ⃗_slice = Z.global_components[phase_name]
+        ϕ⃗ = Z⃗[ϕ⃗_slice]
+        ∇l = l(Ũ⃗, ϕ⃗; gradient=true)
+        ∇[Ũ⃗_slice] = Q * ∇l[1:length(Ũ⃗)]
+        # WARNING: 2π periodic; using Q≠1 is not recommended
+        ∇[ϕ⃗_slice] = Q * ∇l[length(Ũ⃗) .+ (1:length(ϕ⃗))]
         return ∇
     end
 
@@ -162,4 +167,24 @@ function UnitaryFreePhaseInfidelityObjective(;
     ∂²L(Z⃗::AbstractVector{<:Real}, Z::NamedTrajectory) = []
 
 	return Objective(L, ∇L, ∂²L, ∂²L_structure, Dict[params])
+end
+
+function UnitaryFreePhaseInfidelityObjective(
+    name::Symbol,
+    phase_name::Symbol,
+    phase_operators::AbstractVector{<:AbstractMatrix{<:Complex}},
+    traj::NamedTrajectory,
+    Q::Float64;
+    subspace=nothing,
+	eval_hessian::Bool=true
+)
+    return UnitaryFreePhaseInfidelityObjective(
+        name=name,
+        goal=traj.goal[name],
+        phase_name=phase_name,
+        phase_operators=phase_operators,
+        Q=Q,
+        subspace=subspace,
+        eval_hessian=eval_hessian,
+    )
 end

@@ -16,6 +16,9 @@ using ForwardDiff
 using Symbolics
 using TestItemRunner
 
+# For differentiable exponential
+using ExponentialAction
+
 # TODO:
 # - [ ] Do not reference the Z object in the loss (components only / remove "name")
 
