@@ -14,6 +14,25 @@ Check out our JuliaCon 2023 talk:
 </center>
 ```
 
+Also check out [the sequel, from JuliaCon 2024](https://www.youtube.com/watch?v=v0RPD4eSzVE&t=19980s).
+
+## Example
+
+```Julia
+using QuantumCollocation
+
+T = 50
+Δt = 0.2
+system = QuantumSystem([PAULIS[:X], PAULIS[:Y]])
+
+# Hadamard Gate
+prob = UnitarySmoothPulseProblem(system, GATES[:H], T, Δt)
+solve!(prob, max_iter=100)
+
+plot_unitary_populations(prob)
+```
+![Single Qubit X-Gate](../../assets/x_gate_unitary_populations.svg)
+
 ## Motivation
 
 In quantum optimal control, we are interested in finding a pulse sequence $a_{1:T-1}$ to drive a quantum system and realize a target gate $U_{\text{goal}}$. We formulate this problem as a nonlinear program (NLP) of the form
