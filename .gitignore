@@ -36,3 +36,7 @@ pardiso.lic
 
 # generated build folder
 build/
+
+# VS code
+*.code-workspace
+.vscode/settings.json
