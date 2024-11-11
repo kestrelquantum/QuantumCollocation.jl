@@ -55,20 +55,22 @@ end
         piccolo_options=PiccoloOptions(verbose=false)
     )
 
-    trajectory_history = NamedTrajectory[]
-    function get_history_callback(
-        kwargs...
-    )
-        x_vals = map(x -> MOI.get(prob.optimizer, MOI.CallbackVariablePrimal(prob.optimizer), x), prob.variables)
-        push!(trajectory_history, NamedTrajectory(x_vals, prob.trajectory))
-        return true
-    end
+    trajectory_history = []
+function get_history_callback(
+    kwargs...
+)
+    push!(trajectory_history, QuantumCollocation.Problems.get_datavec(prob))
+    return true
+end
 
     initial = fidelity(prob)
     solve!(prob, max_iter=20, callback=get_history_callback)
 
     # for (iter, traj) in enumerate(trajectory_history)
-    #     plot("./iteration-$iter-trajectory.png", traj, [:ψ̃1, :a])
+    #     # change next line to plot the trajectory but on fixed xaxis and yaxis
+    #     # get the length of the trajectory history depending on length and left pad the index with leading zeros
+    #     str_index = lpad(iter, length(string(length(trajectory_history))), "0")
+    #     plot("./test_animation_frames/iteration-$str_index-trajectory.png", NamedTrajectory(traj, prob.trajectory),  [:ψ̃1, :a], xlims=(-Δt, (T+5)*Δt), plot_ylims=(ψ̃1 = (-2, 2), a = (-1.1, 1.1)))
     # end
     @test length(trajectory_history) == 21
 end
