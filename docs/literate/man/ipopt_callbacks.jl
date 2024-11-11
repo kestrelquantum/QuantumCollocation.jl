@@ -6,6 +6,10 @@
 
 # By default, IpOpt callbacks are called at each optimization step with the following signature:
 using QuantumCollocation
+using NamedTrajectories
+
+import ..QuantumStateSmoothPulseProblem
+import ..Callbacks
 
 function get_history_callback(
     alg_mod::Cint,
@@ -43,15 +47,11 @@ end
 # The callback function can also be used to stop the optimization early by returning `false`. The following callback when passed to `solve!` will stop the optimization after the first iteration:
 my_callback = (kwargs...) -> false
 
-# Callbacks to visualize pulse during optimization
-using NamedTrajectories
-const MOI = MathOptInterface
-
 T = 50
 Δt = 0.2
 sys = QuantumSystem(0.1 * GATES[:Z], [GATES[:X], GATES[:Y]])
-ψ_init = [1.0, 0.0]
-ψ_target = [0.0, 1.0]
+ψ_init =  Vector{ComplexF64}([1.0, 0.0])
+ψ_target =  Vector{ComplexF64}([0.0, 1.0])
 
 # Single initial and target states
 # --------------------------------
@@ -71,3 +71,25 @@ for (iter, traj) in enumerate(trajectory_history)
     # plot the trajectory but on fixed xaxis and yaxis
     plot("./iteration-$str_index-trajectory.png", NamedTrajectory(traj, prob.trajectory),  [:ψ̃1, :a], xlims=(-Δt, (T+5)*Δt), plot_ylims=(ψ̃1 = (-2, 2), a = (-1.1, 1.1)))
 end
+
+# Using a callback to get the best trajectory from all the optimization iterations
+T = 50
+Δt = 0.2
+sys = QuantumSystem(0.1 * GATES[:Z], [GATES[:X], GATES[:Y]])
+ψ_init =  Vector{ComplexF64}([0.0, 1.0])
+ψ_target =  Vector{ComplexF64}([1.0, 0.0])
+
+# Single initial and target states
+# --------------------------------
+prob = QuantumStateSmoothPulseProblem(
+    sys, ψ_init, ψ_target, T, Δt;
+    ipopt_options=IpoptOptions(print_level=1), 
+    piccolo_options=PiccoloOptions(verbose=false)
+)
+
+(best_traj_callback, best_traj) = make_save_best_trajectory_callback(prob, prob.trajectory)
+solve!(prob, max_iter=20, callback=best_traj_callback)
+# fidelity of the last iterate
+@show fidelity(prob)
+# fidelity of the best iterate
+@show fidelity(best_traj)
