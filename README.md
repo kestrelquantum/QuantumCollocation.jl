@@ -1,7 +1,7 @@
 # QuantumCollocation.jl
 
 <div align="center"> <a href="https://github.com/kestrelquantum/Piccolo.jl">
-    <img src="assets/logo.svg" alt="logo" width="35%"/>
+    <img src="docs/src/assets/logo.svg" alt="logo" width="35%"/>
 </a> </div>
 
 
@@ -57,7 +57,7 @@ solve!(prob, max_iter=100)
 
 plot_unitary_populations(prob)
 ```
-![Single Qubit X-Gate](assets/x_gate_unitary_populations.svg)
+![Single Qubit X-Gate](docs/src/assets/x_gate_unitary_populations.svg)
 
 ## Quickstart developers guide
 
