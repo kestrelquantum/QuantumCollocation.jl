@@ -58,20 +58,7 @@ Convert a real vector `Ũ⃗` into a complex matrix representing an operator.
 
 Must be differentiable.
 """
-function iso_vec_to_operator(Ũ⃗::AbstractVector{R}) where R
-    if !(R <: Real)
-        try
-            Ũ⃗ = convert(Vector{Real}, Ũ⃗)
-        catch 
-            throw(TypeError(
-                :iso_vec_to_operator,
-                "unable to convert input to a Real vector",
-                Real,
-                R
-            ))
-        end
-    end
-
+function iso_vec_to_operator(Ũ⃗::AbstractVector{R}) where R <: Real
     Ũ⃗_dim = div(length(Ũ⃗), 2)
     N = Int(sqrt(Ũ⃗_dim))
     U = Matrix{complex(eltype(Ũ⃗))}(undef, N, N)
@@ -111,22 +98,9 @@ Convert a complex matrix `U` representing an operator into a real vector.
 
 Must be differentiable.
 """
-function operator_to_iso_vec(U::AbstractMatrix{R}) where R
-    if !(R <: Number)
-        try
-            U = convert(Matrix{Complex}, U)
-        catch 
-            throw(TypeError(
-                :operator_to_iso_vec,
-                "unable to convert input to a Complex matrix",
-                Number,
-                R
-            ))
-        end
-    end
-
+function operator_to_iso_vec(U::AbstractMatrix{R}) where R <: Number
     N = size(U,1)
-    Ũ⃗ = Vector{real(eltype(U))}(undef, N^2 * 2)
+    Ũ⃗ = Vector{real(R)}(undef, N^2 * 2)
     for i=0:N-1
         Ũ⃗[i*2N .+ (1:N)] .= real(@view(U[:, i+1]))
         Ũ⃗[i*2N .+ (N+1:2N)] .= imag(@view(U[:, i+1]))
@@ -226,34 +200,6 @@ iso_dm(ρ::AbstractMatrix) = ket_to_iso(vec(ρ))
     @test iso_vec_to_iso_operator(iso_vec) == [1.0 0.0 -0.0 -0.0; 0.0 1.0 -0.0 -0.0; 0.0 0.0 1.0 0.0; 0.0 0.0 0.0 1.0]
     @test operator_to_iso_vec(Complex[1.0 0.0; 0.0 1.0]) == iso_vec
     @test iso_operator_to_iso_vec(iso_vec_to_iso_operator(iso_vec)) == iso_vec
-end
-
-@testitem "Test isomorphism type promotion" begin
-    # Check that generic types are converted to Complex
-    X = Any[0 1; 1 0]
-    @test operator_to_iso_vec(X) == [0; 1; 0; 0; 1; 0; 0; 0]
-
-    X = Number[0 1; 1 0]
-    @test operator_to_iso_vec(X) == [0; 1; 0; 0; 1; 0; 0; 0]
-
-
-    # Check that Any types are converted to Real
-    x = Any[0; 1; 0; 0; 1; 0; 0; 0]
-    @test iso_vec_to_operator(x) == [0 1; 1 0]
-
-    # Check that valid Complex can be converted to Real
-    x = Complex[0; 1; 0; 0; 1; 0; 0; 0]
-    @test iso_vec_to_operator(x) == [0 1; 1 0]
-
-    # Check that actual Complex throws an error
-    x = Complex[0; im; 0; 0; 1; 0; 0; 0]
-    @test_throws TypeError iso_vec_to_operator(x)
-    
-    # Check the non-converting Isomorphisms
-    x = Any[0; 1; 0; 0; 1; 0; 0; 0]
-    X = Any[0 1 0 0; 1 0 0 0; 0 0 0 1; 0 0 1 0]
-    @test iso_vec_to_iso_operator(x) == X
-    @test iso_operator_to_iso_vec(X) == x
 end
 
 end

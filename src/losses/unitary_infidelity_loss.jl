@@ -421,9 +421,9 @@ end
     @test unitary_fidelity(X, Y) ≈ 0
 
     # Tr undefined on Type{Any}
-    X = Any[0 1; 1 0]
-    Y = Complex[0 -im; im 0]
-    @test unitary_fidelity(X, Y) ≈ 0
+    X1 = Real[0 1; 1 0]
+    X2 = Float64[0 1; 1 0]
+    @test unitary_fidelity(X1, X2) ≈ 1
 end
 
 @testitem "Isovec Unitary Fidelity" begin
