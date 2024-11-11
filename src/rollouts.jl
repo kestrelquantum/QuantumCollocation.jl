@@ -18,6 +18,7 @@ using ExponentialAction
 using LinearAlgebra
 using ProgressMeter
 using TestItemRunner
+using ForwardDiff
 
 # ----------------------------------------------------------------------------- #
 
@@ -204,18 +205,24 @@ end
 # ----------------------------------------------------------------------------- #
 
 function unitary_rollout(
-    Ũ⃗_init::AbstractVector{<:Real},
-    controls::AbstractMatrix,
-    Δt::AbstractVector,
+    Ũ⃗_init::AbstractVector{R1},
+    controls::AbstractMatrix{R2},
+    Δt::AbstractVector{R3},
     system::AbstractQuantumSystem;
     show_progress=false,
     integrator=expv,
     exp_vector_product=infer_is_evp(integrator),
-)
+) where {R1 <: Real, R2 <: Real, R3 <: Real}
     T = size(controls, 2)
 
-    # Real type enables ForwardDiff
-    Ũ⃗ = zeros(Real, length(Ũ⃗_init), T)
+    if R1 <: ForwardDiff.Dual || R2 <: ForwardDiff.Dual || R3 <: ForwardDiff.Dual
+        R = ForwardDiff.Dual
+    else
+        R = R1
+    end
+
+    Ũ⃗ = zeros(R, length(Ũ⃗_init), T)
+    println(typeof(Ũ⃗))
 
     Ũ⃗[:, 1] .= Ũ⃗_init
 
@@ -458,7 +465,7 @@ end
     @test unitary_rollout_fidelity(embedded_U_goal, as, ts, sys) ≈ 1
 
     # Free phase unitary
-    @test unitary_fidelity(prob, phases=[0.0], phase_operators=[PAULIS[:Z]]) ≈ 1
+    @test unitary_rollout_fidelity(prob, phases=[0.0], phase_operators=Matrix{ComplexF64}[PAULIS[:Z]]) ≈ 1
 
     # Expv explicit
     # State fidelity

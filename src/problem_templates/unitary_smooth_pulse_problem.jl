@@ -350,16 +350,16 @@ end
     )
 
     before = prob.trajectory.global_data[phase_name]
-    solve!(prob, max_iter=20)
+    solve!(prob, max_iter=100)
     after = prob.trajectory.global_data[phase_name]
 
     @test before ≠ after
 
-    @test unitary_fidelity(
+    @test unitary_rollout_fidelity(
         prob,
         phases=prob.trajectory.global_data[phase_name],
         phase_operators=phase_operators
     ) > 0.9
 
-    @test unitary_fidelity(prob) < 0.9
+    @test unitary_rollout_fidelity(prob) < 0.9
 end
