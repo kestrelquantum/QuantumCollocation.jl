@@ -40,7 +40,7 @@ function solve!(
     #         fids = fidelity(prob)
     #         println("\nInitial Fidelities: $fids")
     #     elseif state_type == :unitary
-    #         fids = unitary_fidelity(prob)
+    #         fids = unitary_rollout_fidelity(prob)
     #         println("\nInitial Fidelity: $fids")
 
 

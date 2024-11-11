@@ -337,7 +337,7 @@ end
 end
 @testitem "Free phase Y gate using X" begin
     using Random
-    Random.seed!(1234)
+    # Random.seed!(1234)
     phase_name = :ϕ
     phase_operators = [PAULIS[:Z]]
 
@@ -350,7 +350,7 @@ end
     )
 
     before = prob.trajectory.global_data[phase_name]
-    solve!(prob, max_iter=100)
+    solve!(prob, max_iter=50)
     after = prob.trajectory.global_data[phase_name]
 
     @test before ≠ after

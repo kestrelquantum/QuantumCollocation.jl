@@ -184,9 +184,9 @@ end
     )
 
     # Soft fidelity constraint
-    final_fidelity = minimum([0.99, unitary_fidelity(prob)])
+    final_fidelity = minimum([0.99, unitary_rollout_fidelity(prob)])
     mintime_prob = UnitaryMinimumTimeProblem(
-        prob, 
+        prob,
         final_fidelity=final_fidelity,
         phase_operators=phase_operators
     )
@@ -198,7 +198,7 @@ end
 
     # Quick check for using default fidelity
     @test UnitaryMinimumTimeProblem(
-        prob, 
+        prob,
         final_fidelity=final_fidelity,
         phase_operators=phase_operators
     ) isa QuantumControlProblem
