@@ -77,8 +77,9 @@ function rollout(
 )
     T = size(controls, 2)
 
-    # Real type enables ForwardDiff
-    Ψ̃ = zeros(Real, length(ψ̃_init), T)
+    # Enable ForwardDiff
+    R = Base.promote_eltype(ψ̃_init, controls, Δt)
+    Ψ̃ = zeros(R, length(ψ̃_init), T)
 
     Ψ̃[:, 1] .= ψ̃_init
 
@@ -172,8 +173,9 @@ function open_rollout(
 )
     T = size(controls, 2)
 
-    # Real type enables ForwardDiff
-    ρ⃗̃ = zeros(Real, 2length(ρ⃗₁), T)
+    # Enable ForwardDiff
+    R = Base.promote_eltype(ρ⃗₁, controls, Δt)
+    ρ⃗̃ = zeros(R, 2length(ρ⃗₁), T)
 
     ρ⃗̃[:, 1] .= ket_to_iso(ρ⃗₁)
 
@@ -215,14 +217,9 @@ function unitary_rollout(
 ) where {R1 <: Real, R2 <: Real, R3 <: Real}
     T = size(controls, 2)
 
-    if R1 <: ForwardDiff.Dual || R2 <: ForwardDiff.Dual || R3 <: ForwardDiff.Dual
-        R = ForwardDiff.Dual
-    else
-        R = R1
-    end
-
+    # Enable ForwardDiff
+    R = Base.promote_eltype(Ũ⃗_init, controls, Δt)
     Ũ⃗ = zeros(R, length(Ũ⃗_init), T)
-    println(typeof(Ũ⃗))
 
     Ũ⃗[:, 1] .= Ũ⃗_init
 
@@ -466,6 +463,9 @@ end
 
     # Free phase unitary
     @test unitary_rollout_fidelity(prob, phases=[0.0], phase_operators=Matrix{ComplexF64}[PAULIS[:Z]]) ≈ 1
+
+    # Free phase unitary
+    @test unitary_fidelity(prob, phases=[0.0], phase_operators=[PAULIS[:Z]]) ≈ 1
 
     # Expv explicit
     # State fidelity

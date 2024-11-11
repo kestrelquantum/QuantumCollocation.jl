@@ -1,6 +1,5 @@
 module ProblemTemplates
 
-using ..EmbeddedOperators
 using ..DirectSums
 using ..Rollouts
 using ..TrajectoryInitialization

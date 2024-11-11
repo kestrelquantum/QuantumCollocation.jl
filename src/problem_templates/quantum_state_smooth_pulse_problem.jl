@@ -131,6 +131,7 @@ function QuantumStateSmoothPulseProblem(
     end
 
     # Integrators
+    state_integrators = []
     if length(ψ_inits) == 1
         if piccolo_options.integrator == :pade
             state_integrators = [QuantumStatePadeIntegrator(

@@ -530,7 +530,6 @@ end
 
 """
     initialize_trajectory
-
 Trajectory initialization of quantum states can broadcast over multiple systems.
 """
 function initialize_trajectory(

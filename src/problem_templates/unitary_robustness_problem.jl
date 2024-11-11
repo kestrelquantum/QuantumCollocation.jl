@@ -217,3 +217,44 @@ end
         subspace=U_goal.subspace_indices,
     ) isa QuantumControlProblem
 end
+
+@testitem "Set up a free phase problem" begin
+    using LinearAlgebra
+    δ1 = δ2 = -0.1
+    T = 75
+    Δt = 1.0
+    n_levels = 3
+    a = annihilate(n_levels)
+    id = I(n_levels)
+    a1 = kron(a, id)
+    a2 = kron(id, a)
+    H_drift = δ1 / 2 * a1' * a1' * a1 * a1 + δ2 / 2 * a2' * a2' * a2 * a2
+    H_drives = [a1'a1, a2'a2, a1'a2 + a1*a2', im * (a1'a2 - a1 * a2')]
+    system = QuantumSystem(H_drift, H_drives)
+    U_goal = EmbeddedOperator(
+        GATES[:CZ], 
+        get_subspace_indices([1:2, 1:2], [n_levels, n_levels]),
+        [n_levels, n_levels]
+    )
+
+    phase_operators = [PAULIS[:Z], PAULIS[:Z]]
+    prob = UnitarySmoothPulseProblem(
+        system, U_goal, T, Δt,
+        ipopt_options=IpoptOptions(print_level=1),
+        piccolo_options=PiccoloOptions(verbose=false, eval_hessian=false),
+        phase_operators=phase_operators,
+    )
+
+    ZZ = EmbeddedOperator(
+        reduce(kron, phase_operators), 
+        get_subspace_indices([1:2, 1:2], [n_levels, n_levels]), 
+        [n_levels, n_levels]
+    )
+
+    @test UnitaryRobustnessProblem(
+        ZZ,
+        prob,
+        phase_operators=phase_operators,
+        subspace=U_goal.subspace_indices,
+    ) isa QuantumControlProblem
+end
