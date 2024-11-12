@@ -4,14 +4,14 @@
 
 # ## Callbacks
 
-# By default, IpOpt callbacks are called at each optimization step with the following signature:
 using QuantumCollocation
 using NamedTrajectories
 
 import ..QuantumStateSmoothPulseProblem
 import ..Callbacks
 
-function get_history_callback(
+# By default, IpOpt callbacks are called at each optimization step with the following signature:
+function full_callback_signature(
     alg_mod::Cint,
     iter_count::Cint,
     obj_value::Float64,
