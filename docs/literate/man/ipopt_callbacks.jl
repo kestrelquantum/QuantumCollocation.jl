@@ -57,7 +57,7 @@ prob = QuantumStateSmoothPulseProblem(
 
 # The callback function can be used to monitor the optimization progress, save intermediate results, or modify the optimization process.
 # For example, the following callback function saves the optimization trajectory at each iteration:
-callback, trajectory_history = Callbacks.callback_get_trajectory_history(prob)
+callback, trajectory_history = Callbacks.trajectory_history_callback(prob)
 # using the get_history_callback function to save the optimization trajectory at each iteration into the trajectory_history 
 solve!(prob, max_iter=20, callback=callback)
 
@@ -80,7 +80,7 @@ prob2 = QuantumStateSmoothPulseProblem(
     piccolo_options=PiccoloOptions(verbose=false)
 )
 
-best_trajectory_callback, best_trajectory_list = callback_get_best_iterate(prob2)
+best_trajectory_callback, best_trajectory_list = best_rollout_fidelity_callback(prob2)
 solve!(prob2, max_iter=20, callback=best_trajectory_callback)
 # fidelity of the last iterate
 @show Losses.fidelity(prob2)
