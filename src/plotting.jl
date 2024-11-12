@@ -5,6 +5,7 @@ export pretty_print
 
 using NamedTrajectories
 using QuantumCollocationCore
+using PiccoloQuantumObjects
 using TestItemRunner
 
 

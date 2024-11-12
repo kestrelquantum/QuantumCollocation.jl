@@ -83,7 +83,7 @@ solve!(prob; max_iter=50)
 Let's look at the fidelity in the subspace
 
 ````@example multilevel_transmon
-println("Fidelity: ", unitary_fidelity(prob; subspace=op.subspace_indices))
+println("Fidelity: ", unitary_rollout_fidelity(prob; subspace=op.subspace_indices))
 ````
 
 and plot the result using the `plot_unitary_populations` function.
@@ -114,7 +114,7 @@ solve!(prob_leakage; max_iter=50)
 Let's look at the fidelity in the subspace
 
 ````@example multilevel_transmon
-println("Fidelity: ", unitary_fidelity(prob_leakage; subspace=op.subspace_indices))
+println("Fidelity: ", unitary_rollout_fidelity(prob_leakage; subspace=op.subspace_indices))
 ````
 
 and plot the result using the `plot_unitary_populations` function.

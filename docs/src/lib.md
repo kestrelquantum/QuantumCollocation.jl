@@ -10,41 +10,6 @@ Modules = [QuantumCollocation.ProblemTemplates]
 Modules = [QuantumCollocation.DirectSums]
 ```
 
-## Quantum Object Utils
-```@autodocs
-Modules = [QuantumCollocation.QuantumObjectUtils]
-```
-
-## Quantum Systems 
-```@autodocs
-Modules = [QuantumCollocation.QuantumSystems]
-```
-
-## Integrators
-```@autodocs
-Modules = [QuantumCollocation.Integrators]
-``` 
-
-## Objectives
-```@autodocs
-Modules = [QuantumCollocation.Objectives]
-```
-
-## Losses
-```@autodocs
-Modules = [QuantumCollocation.Losses]
-```
-
-## Embedded Operators
-```@autodocs
-Modules = [QuantumCollocation.EmbeddedOperators]
-```
-
-## Isomorphisms
-```@autodocs
-Modules = [QuantumCollocation.Isomorphisms]
-```
-
 ## Options
 ```@autodocs
 Modules = [QuantumCollocation.Options]
@@ -68,11 +33,6 @@ Modules = [QuantumCollocation.Rollouts]
 ## Saving and Loading
 ```@autodocs
 Modules = [QuantumCollocation.SaveLoadUtils]
-```
-
-## Structure Utils
-```@autodocs
-Modules = [QuantumCollocation.StructureUtils]
 ```
 
 ## Trajectory Initialization
