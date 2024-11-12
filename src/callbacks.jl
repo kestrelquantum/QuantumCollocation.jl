@@ -8,7 +8,7 @@ using NamedTrajectories
 using TestItemRunner
 
 using ..Losses
-using ..Problems: QuantumControlProblem, get_datavec
+using ..Problems: QuantumControlProblem, get_datavec, get_global_data
 using ..Rollouts
 
 
@@ -37,10 +37,18 @@ function best_unitary_rollout_fidelity_callback(prob::QuantumControlProblem)
     return best_rollout_callback(prob, unitary_fidelity)
 end
 
-function trajectory_history_callback(prob::QuantumControlProblem)
+function trajectory_history_callback(
+    prob::QuantumControlProblem;
+    saved_history::Union{Nothing, AbstractVector{<:Int}}=nothing
+)
     trajectory_history = []
-    function callback(args...)
-        push!(trajectory_history, NamedTrajectory(get_datavec(prob), prob.trajectory))
+    function callback(alg_mod, iter_count, args...)
+        if isnothing(saved_history) || iter_count in saved_history
+            push!(
+                trajectory_history, 
+                NamedTrajectory(get_datavec(prob), get_global_data(prob), prob.trajectory),
+            )
+        end
         return true
     end
 
