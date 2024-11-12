@@ -72,5 +72,8 @@ include("problem_solvers.jl")
 include("plotting.jl")
 @reexport using .Plotting
 
+include("callbacks.jl")
+@reexport using .Callbacks
+
 
 end

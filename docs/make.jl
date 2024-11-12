@@ -15,6 +15,7 @@ pages = [
     "Manual" => [
         "Problem Templates" => "generated/man/problem_templates.md",
         "Embedded Operators" => "generated/man/embedded_operators.md",
+        "Callbacks" => "generated/man/ipopt_callbacks.md",
     ],
     "Examples" => [
         "Two Qubit Gates" => "generated/examples/two_qubit_gates.md",
