@@ -1,29 +1,40 @@
 module Callbacks
 
-export best_trajectory_callback
+export best_rollout_fidelity_callback
+export best_unitary_rollout_fidelity_callback
 export trajectory_history_callback
 
 using NamedTrajectories
 using TestItemRunner
 
-using ..Problems
+using ..Losses
+using ..Problems: QuantumControlProblem, get_datavec
+using ..Rollouts
 
-function best_trajectory_callback(prob::QuantumControlProblem)
-    best_traj = deepcopy(prob.trajectory)
-    best_value = Inf64
+
+function best_rollout_callback(prob::QuantumControlProblem, rollout::Function)
+    best_value = 0.0
+    best_trajectories = []
 
     function callback(args...)
-        obj = get_objective(prob)
-        Z⃗ = Problems.get_datavec(prob)
-        value = obj.L(Z⃗, prob.trajectory)
-        if value < best_value
+        traj = NamedTrajectory(get_datavec(prob), prob.trajectory)
+        value = rollout(traj, prob.system)
+        if value > best_value
             best_value = value
-            update!(best_traj, Z⃗)
+            push!(best_trajectories, traj)
         end
         return true
     end
 
-    return callback, best_traj
+    return callback, best_trajectories
+end
+
+function best_rollout_fidelity_callback(prob::QuantumControlProblem)
+    return best_rollout_callback(prob, fidelity)
+end
+
+function best_unitary_rollout_fidelity_callback(prob::QuantumControlProblem)
+    return best_rollout_callback(prob, fidelity_unitary)
 end
 
 function trajectory_history_callback(prob::QuantumControlProblem)
@@ -80,15 +91,21 @@ end
 
     prob, system = smooth_quantum_state_problem(return_system=true)
 
-    callback, best_traj = best_trajectory_callback(prob)
-    @test best_traj isa NamedTrajectory
+    callback, best_trajs = best_rollout_fidelity_callback(prob)
+    @test length(best_trajs) == 0
 
-    before = fidelity(best_traj, system)
+    # measure fidelity
+    before = fidelity(prob)
     solve!(prob, max_iter=20, callback=callback)
-    after = fidelity(prob.trajectory, system)
-    best = fidelity(best_traj, system)
+
+    # length must increase if iterations are made
+    @test length(best_trajs) > 0
+    @test best_trajs[end] isa NamedTrajectory
     
-    @test best_traj isa NamedTrajectory
+    # fidelity ranking
+    after = fidelity(prob)
+    best = fidelity(best_trajs[end], system)
+    
     @test before < after
     @test before < best
     @test after ≤ best
@@ -126,4 +143,4 @@ end
     @test length(obj_vals) == 4   # problem init, iter 1, iter 2, iter 3 (terminate)
 end
 
-end # module
+end
