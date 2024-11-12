@@ -39,7 +39,6 @@ end
 
 function trajectory_history_callback(prob::QuantumControlProblem)
     trajectory_history = []
-
     function callback(args...)
         push!(trajectory_history, get_datavec(prob))
         return true

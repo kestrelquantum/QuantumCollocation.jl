@@ -1,4 +1,7 @@
-# # IpOpt Solver Callbacks
+# ```@meta
+# CollapsedDocStrings = true
+# ```
+# # IpOpt Callbacks
 
 # This page describes the callback functions that can be used with the IpOpt solver (in the future, may describe more general callback behavior).
 
