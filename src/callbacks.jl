@@ -126,4 +126,4 @@ end
     @test length(obj_vals) == 4   # problem init, iter 1, iter 2, iter 3 (terminate)
 end
 
-end
+end # module
