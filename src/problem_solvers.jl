@@ -13,7 +13,7 @@ using Ipopt
 const MOI = MathOptInterface
 
 
-@doc raw"""
+"""
    solve!(prob::QuantumControlProblem;
         init_traj=nothing,
         save_path=nothing,
@@ -29,9 +29,6 @@ const MOI = MathOptInterface
     Call optimization solver to solve the quantum control problem with parameters and callbacks.
 
 # Arguments
-- `matrix::Matrix{ComplexF64}`: Operator to embed.
-- `subspace_indices::AbstractVector{Int}`: Indices of the subspace to embed the operator in.
-- `levels::Int`: Total number of levels in the system.
 - `prob::QuantumControlProblem`: The quantum control problem to solve.
 - `init_traj::NamedTrajectory`: Initial guess for the control trajectory. If not provided, a random guess will be generated.
 - `save_path::String`: Path to save the problem after optimization.

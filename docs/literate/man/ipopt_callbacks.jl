@@ -32,22 +32,18 @@ end
 
 # This gives the user access to some of the optimization state internals at each iteration.
 # A callback function with any subset of these arguments can be passed into the `solve!` function via the `callback` keyword argument see below.
-# ```@docs
-# ProblemSolvers.solve!(prob::QuantumControlProblem; callback=nothing)
-# ```
-
 
 # The callback function can be used to stop the optimization early by returning `false`. The following callback when passed to `solve!` will stop the optimization after the first iteration:
 my_callback = (kwargs...) -> false
 
+# Single initial and target states
+# --------------------------------
 T = 50
 Δt = 0.2
 sys = QuantumSystem(0.1 * GATES[:Z], [GATES[:X], GATES[:Y]])
 ψ_init =  Vector{ComplexF64}([1.0, 0.0])
 ψ_target =  Vector{ComplexF64}([0.0, 1.0])
 
-# Single initial and target states
-# --------------------------------
 prob = QuantumStateSmoothPulseProblem(
     sys, ψ_init, ψ_target, T, Δt;
     ipopt_options=IpoptOptions(print_level=1), 
@@ -56,24 +52,27 @@ prob = QuantumStateSmoothPulseProblem(
     
 
 # The callback function can be used to monitor the optimization progress, save intermediate results, or modify the optimization process.
-# For example, the following callback function saves the optimization trajectory at each iteration:
-callback, trajectory_history = Callbacks.trajectory_history_callback(prob)
-# using the get_history_callback function to save the optimization trajectory at each iteration into the trajectory_history 
+# For example, the following callback function saves the optimization trajectory at each iteration - this can be useful for debugging or plotting the optimization progress.
+# `trajectory_history_callback` from the `Callbacks` module
+callback, trajectory_history = QuantumCollocation.Callbacks.trajectory_history_callback(prob)
 solve!(prob, max_iter=20, callback=callback)
 
-# save trajectory images into files
+# Save trajectory images into files which can be used to create a gif like the following: 
 for (iter, traj) in enumerate(trajectory_history)
     str_index = lpad(iter, length(string(length(trajectory_history))), "0")
     plot("./iteration-$str_index-trajectory.png", traj, [:ψ̃, :a], xlims=(-Δt, (T+5)*Δt), ylims=(ψ̃1 = (-2, 2), a = (-1.1, 1.1)))
 end
+
+# ![pulse optimization animation](../../assets/animation.gif)
 
 # Using a callback to get the best trajectory from all the optimization iterations
 sys2 = QuantumSystem(0.15 * GATES[:Z], [GATES[:X], GATES[:Y]])
 ψ_init2 =  Vector{ComplexF64}([0.0, 1.0])
 ψ_target2 =  Vector{ComplexF64}([1.0, 0.0])
 
-# Single initial and target states
+# Using other callbacks from the callback library 
 # --------------------------------
+# Callback used here is `best_rollout_fidelity_callback` which appends the best trajectories based on monotonically increasing fidelity of the rollout
 prob2 = QuantumStateSmoothPulseProblem(
     sys2, ψ_init2, ψ_target2, T, Δt;
     ipopt_options=IpoptOptions(print_level=1), 
