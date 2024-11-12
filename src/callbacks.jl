@@ -1,26 +1,40 @@
 module Callbacks
 
-export make_save_best_trajectory_callback
+export callback_get_best_iterate
+export callback_get_trajectory_history
 
 using NamedTrajectories
 
+import ..Losses
+import ..Problems
 import ..QuantumControlProblem
-import ..Problems: get_datavec
 
-function make_save_best_trajectory_callback(prob::QuantumControlProblem, traj::NamedTrajectory)
-    best_traj = NamedTrajectory(get_datavec(prob), prob.trajectory)
+function callback_get_best_iterate(prob::QuantumControlProblem)
+    best_trajectory_list = []
     best_fidelity = 0.0
 
-    function save_best_trajectory_callback(prob::QuantumControlProblem)
-        fidelity = prob.objective.fidelity(prob)
+    function callback(args...)
+        trajectory = NamedTrajectory(Problems.get_datavec(prob), prob.trajectory)
+        fidelity = Losses.fidelity(trajectory, prob.system)
         if fidelity > best_fidelity
+            push!(best_trajectory_list, trajectory)
             best_fidelity = fidelity
-            copy!(best_traj, prob.trajectory)
         end
         return true
     end
 
-    return save_best_trajectory_callback, best_traj
+    return callback, best_trajectory_list
 end
 
+function callback_get_trajectory_history(prob::QuantumControlProblem)
+    trajectory_history = []
+
+    function callback(args...)
+        push!(trajectory_history, NamedTrajectory(Problems.get_datavec(prob), prob.trajectory))
+        return true
+    end
+    
+    return callback, trajectory_history
 end
+
+end # module

@@ -13,8 +13,8 @@
     T = 50
     Δt = 0.2
     sys = QuantumSystem(0.1 * GATES[:Z], [GATES[:X], GATES[:Y]])
-    ψ_init = [1.0, 0.0]
-    ψ_target = [0.0, 1.0]
+    ψ_init = Vector{ComplexF64}([1.0, 0.0])
+    ψ_target = Vector{ComplexF64}([0.0, 1.0])
 
     # Single initial and target states
     # --------------------------------
@@ -24,7 +24,7 @@
         piccolo_options=PiccoloOptions(verbose=false)
     )
 
-    my_callback = (kwargs...) -> false
+    my_callback = (args...) -> false
 
     initial = fidelity(prob)
     solve!(prob, max_iter=20, callback=my_callback)
@@ -44,8 +44,8 @@ end
     T = 50
     Δt = 0.2
     sys = QuantumSystem(0.1 * GATES[:Z], [GATES[:X], GATES[:Y]])
-    ψ_init = [1.0, 0.0]
-    ψ_target = [0.0, 1.0]
+    ψ_init = Vector{ComplexF64}([1.0, 0.0])
+    ψ_target = Vector{ComplexF64}([0.0, 1.0])
 
     # Single initial and target states
     # --------------------------------
@@ -55,22 +55,14 @@ end
         piccolo_options=PiccoloOptions(verbose=false)
     )
 
-    trajectory_history = []
-function get_history_callback(
-    kwargs...
-)
-    push!(trajectory_history, QuantumCollocation.Problems.get_datavec(prob))
-    return true
-end
+    callback, trajectory_history = get_history_callback(prob)
 
     initial = fidelity(prob)
-    solve!(prob, max_iter=20, callback=get_history_callback)
+    solve!(prob, max_iter=20, callback=callback)
 
     # for (iter, traj) in enumerate(trajectory_history)
-    #     # change next line to plot the trajectory but on fixed xaxis and yaxis
-    #     # get the length of the trajectory history depending on length and left pad the index with leading zeros
     #     str_index = lpad(iter, length(string(length(trajectory_history))), "0")
-    #     plot("./test_animation_frames/iteration-$str_index-trajectory.png", NamedTrajectory(traj, prob.trajectory),  [:ψ̃1, :a], xlims=(-Δt, (T+5)*Δt), plot_ylims=(ψ̃1 = (-2, 2), a = (-1.1, 1.1)))
+    #     plot("./iteration-$str_index-trajectory.png", traj,  [:ψ̃1, :a], xlims=(-Δt, (T+5)*Δt), plot_ylims=(ψ̃1 = (-2, 2), a = (-1.1, 1.1)))
     # end
     @test length(trajectory_history) == 21
 end
@@ -83,8 +75,8 @@ end
     T = 50
     Δt = 0.2
     sys = QuantumSystem(0.1 * GATES[:Z], [GATES[:X], GATES[:Y]])
-    ψ_init = [1.0, 0.0]
-    ψ_target = [0.0, 1.0]
+    ψ_init = Vector{ComplexF64}([1.0, 0.0])
+    ψ_target = Vector{ComplexF64}([0.0, 1.0])
 
     # Single initial and target states
     # --------------------------------
@@ -95,7 +87,7 @@ end
     )
 
     obj_vals = []
-    function get_history_callback(
+    function use_iter_counts_callback(
         alg_mod::Cint,
         iter_count::Cint,
         obj_value::Float64,
@@ -112,7 +104,7 @@ end
         return iter_count < 3
     end
 
-    solve!(prob, max_iter=20, callback=get_history_callback)
+    solve!(prob, max_iter=20, callback=use_iter_counts_callback)
 
     @test MOI.get(prob.optimizer, MOI.TerminationStatus()) == MOI.INTERRUPTED
     @test length(obj_vals) == 4   # problem init, iter 1, iter 2, iter 3 (terminate)
