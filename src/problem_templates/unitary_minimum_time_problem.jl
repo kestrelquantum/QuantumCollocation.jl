@@ -41,6 +41,9 @@ J(\vec{\tilde{U}}, a, \dot{a}, \ddot{a}) + D \sum_t \Delta t_t \\
 - `D=1.0`: The weight for the minimum-time objective.
 - `ipopt_options::IpoptOptions=IpoptOptions()`: The options for the Ipopt solver.
 - `piccolo_options::PiccoloOptions=PiccoloOptions()`: The options for the Piccolo solver.
+- `phase_name::Symbol=:ϕ`: The name of the phase variable.
+- `phase_operators::Union{AbstractVector{<:AbstractMatrix}, Nothing}=nothing`: The phase operators.
+- `subspace=nothing`: The subspace for the fidelity calculation.
 - `kwargs...`: Additional keyword arguments to pass to `QuantumControlProblem`.
 """
 function UnitaryMinimumTimeProblem end

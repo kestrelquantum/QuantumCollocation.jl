@@ -4,23 +4,54 @@ export UnitaryRobustnessProblem
 @doc raw"""
     UnitaryRobustnessProblem(
         H_error,
-        trajectory,
-        system,
-        objective,
-        integrators,
-        constraints;
+        trajectory::NamedTrajectory,
+        system::AbstractQuantumSystem,
+        objective::Objective,
+        integrators::Vector{<:AbstractIntegrator},
+        constraints::Vector{<:AbstractConstraint};
         kwargs...
     )
 
-    UnitaryRobustnessProblem(Hₑ, prob::QuantumControlProblem; kwargs...)
+    UnitaryRobustnessProblem(
+        H_error, 
+        prob::QuantumControlProblem; 
+        kwargs...
+    )
 
-Create a quantum control problem for robustness optimization of a unitary trajectory.
+Create a quantum control problem for robust optimization of a unitary trajectory.
+
+The known system dynamics are
+```math
+U_\text{sys}(a)= \prod_t \exp{-i H_\text{sys}(a_t)}
+```
+and $H_\text{error}$ is a perturbation or error Hamiltonian, $H = H_\text{sys} + H_\text{error}$.
+
+The robustness objective is
+```math
+Objective(a) = \frac{1}{N} \norm{H^{(1)}_\text{error}(T)}^2_F
+```
+where N is the dimension of the Hilbert space, and 
+```math
+H^{(1)}_\text{error}(T) = \frac{1}{T \norm{H_\text{error}}_2} \sum_t U_\text{sys}(a_t)^\dag H_\text{error} U_\text{sys}(a_t) \Delta t
+```
+is the (unitless) first-order Magnus expansion of the error Hamiltonian in the control frame.
+
+# Arguments
+- `H_error`: The error Hamiltonian.
+- `trajectory::NamedTrajectory`: The initial trajectory.
+- `system::AbstractQuantumSystem`: The quantum system.
+- `objective::Objective`: The objective function.
+- `integrators::Vector{<:AbstractIntegrator}`: The integrators.
+- `constraints::Vector{<:AbstractConstraint}`: The constraints.
 
 # Keyword Arguments
 - `unitary_name::Symbol=:Ũ⃗`: The symbol for the unitary trajectory in `trajectory`.
 - `final_fidelity::Union{Real, Nothing}=nothing`: The target fidelity for the final unitary.
+- `phase_name::Symbol=:ϕ`: The name of the phase variable.
+- `phase_operators::Union{AbstractVector{<:AbstractMatrix}, Nothing}=nothing`: The phase operators.
 - `ipopt_options::IpoptOptions=IpoptOptions()`: Options for the Ipopt solver.
 - `piccolo_options::PiccoloOptions=PiccoloOptions()`: Options for the Piccolo solver.
+- `subspace=nothing`: The subspace for the fidelity calculation.
 - `kwargs...`: Additional keyword arguments passed to `QuantumControlProblem`.
 """
 function UnitaryRobustnessProblem end

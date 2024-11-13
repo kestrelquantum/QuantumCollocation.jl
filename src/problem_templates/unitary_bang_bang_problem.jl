@@ -28,10 +28,7 @@ where, for $U \in SU(N)$,
 
 is the *infidelity* objective function, $Q$ is a weight, $R_a$, and $R_{\dot{a}}$ are weights on the regularization terms, and $\vb{P}^{(n)}$ is the $n$th-order Pade integrator.
 
-TODO: Document bang-bang modification.
-
 # Arguments
-
 - `H_drift::AbstractMatrix{<:Number}`: the drift hamiltonian
 - `H_drives::Vector{<:AbstractMatrix{<:Number}}`: the control hamiltonians
 or
