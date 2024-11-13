@@ -12,10 +12,22 @@ We provide a number of problem templates for making it simple and easy to set up
 UnitarySmoothPulseProblem
 ```
 
+## Unitary Bang-Bang Problem
+
+```@docs
+UnitaryBangBangProblem
+```
+
 ## Unitary Minimum Time Problem
 
 ```@docs
 UnitaryMinimumTimeProblem
+```
+
+## Unitary Robustness Problem
+
+```@docs
+UnitaryRobustnessProblem
 ```
 
 ---

@@ -10,17 +10,17 @@ println("")
 
 pages = [
     "Home" => "index.md",
-    "Quickstart Guide" => "generated/quickstart.md",
+    # "Quickstart Guide" => "generated/quickstart.md",
     "Contribution Guide" => "contribution_guide.md",
     "Manual" => [
         "Problem Templates" => "generated/man/problem_templates.md",
         "Embedded Operators" => "generated/man/embedded_operators.md",
-        "Callbacks" => "generated/man/ipopt_callbacks.md",
+        # "Callbacks" => "generated/man/ipopt_callbacks.md",
     ],
-    "Examples" => [
-        "Two Qubit Gates" => "generated/examples/two_qubit_gates.md",
-        "Multilevel Transmon" => "generated/examples/multilevel_transmon.md",
-    ],
+    # "Examples" => [
+    #     "Two Qubit Gates" => "generated/examples/two_qubit_gates.md",
+    #     "Multilevel Transmon" => "generated/examples/multilevel_transmon.md",
+    # ],
     "Library" => "lib.md",
     "Release Notes" => "release_notes.md",
 ]

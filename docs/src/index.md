@@ -61,8 +61,8 @@ where $B(a_t)$ and $F(a_t)$ are the *backward* and *forward* Pade operators and 
 This implementation is possible because direct collocation allows for the dynamics to be implicit. Since numerically calculating matrix exponentials inherently requires an approximation -- the Padé approximant is commonly used -- utilizing this formulation significantly improves performance, as, at least here, no matrix inversion is required.
 
 
-## Index
+<!-- ## Index
 
 ```@index
-```
+``` -->
 
