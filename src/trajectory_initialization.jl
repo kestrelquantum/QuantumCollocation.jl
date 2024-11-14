@@ -433,7 +433,6 @@ function initialize_trajectory(
         args...;
         phase_data=phase_data,
         a_guess=a_guess,
-        verbose=verbose,
         kwargs...
     )
 end

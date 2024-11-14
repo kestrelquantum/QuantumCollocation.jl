@@ -188,7 +188,7 @@ iso_dm(ρ::AbstractMatrix) = ket_to_iso(vec(ρ))
 
 
 
-# =========================================================================== #
+# *************************************************************************** #
 
 @testitem "Test isomorphism utilities" begin
     using LinearAlgebra

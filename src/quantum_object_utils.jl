@@ -268,7 +268,7 @@ function create(levels::Int)
     return collect(annihilate(levels)')
 end
 
-# ============================================================================= #
+# *************************************************************************** #
 
 @testitem "Test ket_from_bitstring function" begin
     using LinearAlgebra

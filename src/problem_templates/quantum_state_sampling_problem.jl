@@ -158,7 +158,7 @@ function QuantumStateSamplingProblem(
     return QuantumStateSamplingProblem(systems, [ψ_init], [ψ_goal], args...; kwargs...)
 end
 
-# ============================================================================= #
+# *************************************************************************** #
 
 @testitem "Sample systems with single initial, target" begin
     # System
