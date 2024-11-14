@@ -66,7 +66,7 @@ function QuantumStateSamplingProblem(
             )
         end
 
-        traj = NamedTrajectories.merge(
+        traj = merge(
             trajs, 
             merge_names=(; a=1, da=1, dda=1, Δt=1),
             free_time=piccolo_options.free_time
