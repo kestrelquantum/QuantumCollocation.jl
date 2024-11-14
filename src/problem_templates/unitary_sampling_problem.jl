@@ -198,7 +198,7 @@ function UnitarySamplingProblem(
     )
 end
 
-# =============================================================================
+# *************************************************************************** #
 
 @testitem "Sample robustness test" begin
     using Distributions

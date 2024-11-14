@@ -47,7 +47,7 @@ function trajectory_history_callback(prob::QuantumControlProblem)
     return callback, trajectory_history
 end
 
-# ========================================================================== # 
+# *************************************************************************** #
 
 @testitem "Callback returns false early stops" begin
     using MathOptInterface
