@@ -35,24 +35,22 @@ include("quantum_state_smooth_pulse_problem.jl")
 include("quantum_state_minimum_time_problem.jl")
 include("quantum_state_sampling_problem.jl")
 
+
 function apply_piccolo_options!(
     J::Objective,
     constraints::AbstractVector{<:AbstractConstraint},
     piccolo_options::PiccoloOptions,
     traj::NamedTrajectory,
-    operator::Union{Nothing, OperatorType},
-    state_name::Symbol,
+    operators::Union{Nothing, AbstractVector{<:OperatorType}},
+    state_names::AbstractVector{<:Symbol},
     timestep_name::Symbol
 )
-    if !isnothing(operator) && piccolo_options.leakage_suppression
-        state_names = [
-            name for name ∈ traj.names
-                if startswith(string(name), string(state_name))
-        ]
-
-        if operator isa EmbeddedOperator
-            leakage_indices = get_iso_vec_leakage_indices(operator)
-            for state_name in state_names
+    # TODO: This should be changed to leakage indices (more general, for states)
+    # (also, it should be looped over relevant state names, not broadcast)
+    if piccolo_options.leakage_suppression && !isnothing(operators)
+        for (operator, state_name) in zip(operators, state_names)
+            if operator isa EmbeddedOperator
+                leakage_indices = get_iso_vec_leakage_indices(operator)
                 J += L1Regularizer!(
                     constraints,
                     state_name,
@@ -61,9 +59,9 @@ function apply_piccolo_options!(
                     indices=leakage_indices,
                     eval_hessian=piccolo_options.eval_hessian
                 )
+            else
+                @warn "leakage_suppression is only supported for embedded operators, ignoring."
             end
-        else
-            @warn "leakage_suppression is only supported for embedded operators, ignoring."
         end
     end
 
@@ -86,6 +84,37 @@ function apply_piccolo_options!(
     end
 
     return
+end
+
+function apply_piccolo_options!(
+    J::Objective,
+    constraints::AbstractVector{<:AbstractConstraint},
+    piccolo_options::PiccoloOptions,
+    traj::NamedTrajectory,
+    operator::Union{Nothing, OperatorType},
+    state_name::Symbol,
+    timestep_name::Symbol
+)
+    state_names = [
+        name for name ∈ traj.names
+            if startswith(string(name), string(state_name))
+    ]
+
+    if !isnothing(operator)
+        operators = fill(operator, length(state_names))
+    else
+        operators = nothing
+    end
+
+    return apply_piccolo_options!(
+        J,
+        constraints,
+        piccolo_options,
+        traj,
+        operators,
+        state_names,
+        timestep_name
+    )
 end
 
 
