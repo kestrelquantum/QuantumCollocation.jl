@@ -43,7 +43,7 @@ robust solution by including multiple systems reflecting the problem uncertainty
 """
 function UnitarySamplingProblem(
     systems::AbstractVector{<:AbstractQuantumSystem},
-    operator::OperatorType,
+    operators::AbstractVector{<:OperatorType},
     T::Int,
     Δt::Union{Float64,Vector{Float64}};
     system_weights=fill(1.0, length(systems)),
@@ -70,35 +70,42 @@ function UnitarySamplingProblem(
     R_dda::Union{Float64,Vector{Float64}}=R,
     kwargs...
 )
+    @assert length(systems) == length(operators)
+
     # Trajectory
+    state_names = [
+        Symbol(string(state_name, "_system_", label)) for label ∈ 1:length(systems)
+    ]
+
     if !isnothing(init_trajectory)
         traj = init_trajectory
     else
-        n_drives = length(systems[1].G_drives)
+        trajs = map(zip(systems, operators, state_names)) do (sys, op, s)
+            initialize_trajectory(
+                op,
+                T,
+                Δt,
+                length(sys.G_drives),
+                (a_bounds, da_bounds, dda_bounds);
+                state_name=s,
+                control_name=control_name,
+                timestep_name=timestep_name,
+                free_time=piccolo_options.free_time,
+                Δt_bounds=(Δt_min, Δt_max),
+                geodesic=piccolo_options.geodesic,
+                bound_state=piccolo_options.bound_state,
+                a_guess=a_guess,
+                system=sys,
+                rollout_integrator=piccolo_options.rollout_integrator,
+            )
+        end
 
-        traj = initialize_trajectory(
-            operator,
-            T,
-            Δt,
-            n_drives,
-            (a_bounds, da_bounds, dda_bounds);
-            state_name=state_name,
-            control_name=control_name,
-            timestep_name=timestep_name,
-            free_time=piccolo_options.free_time,
-            Δt_bounds=(Δt_min, Δt_max),
-            geodesic=piccolo_options.geodesic,
-            bound_state=piccolo_options.bound_state,
-            a_guess=a_guess,
-            system=systems,
-            rollout_integrator=piccolo_options.rollout_integrator,
+        traj = NamedTrajectories.merge(
+            trajs, 
+            merge_names=(; a=1, da=1, dda=1, Δt=1),
+            free_time=piccolo_options.free_time
         )
-    end
-
-    state_names = [
-        name for name ∈ traj.names
-        if startswith(string(name), string(state_name))
-    ]
+    end    
 
     control_names = [
         name for name ∈ traj.names
@@ -106,14 +113,14 @@ function UnitarySamplingProblem(
     ]
 
     # Objective
-    J = QuadraticRegularizer(control_names[1], traj, R_a; timestep_name=timestep_name)
+    J = QuadraticRegularizer(control_name, traj, R_a; timestep_name=timestep_name)
     J += QuadraticRegularizer(control_names[2], traj, R_da; timestep_name=timestep_name)
     J += QuadraticRegularizer(control_names[3], traj, R_dda; timestep_name=timestep_name)
 
-    for (weight, name) in zip(system_weights, state_names)
+    for (weight, op, name) in zip(system_weights, operators, state_names)
         J += weight * UnitaryInfidelityObjective(
             name, traj, Q;
-            subspace=operator isa EmbeddedOperator ? operator.subspace_indices : nothing
+            subspace=op isa EmbeddedOperator ? op.subspace_indices : nothing
         )
     end
 
@@ -143,7 +150,7 @@ function UnitarySamplingProblem(
 
     # Optional Piccolo constraints and objectives
     apply_piccolo_options!(
-        J, constraints, piccolo_options, traj, operator, state_name, timestep_name
+        J, constraints, piccolo_options, traj, operators, state_names, timestep_name
     )
 
     return QuantumControlProblem(
@@ -159,21 +166,34 @@ function UnitarySamplingProblem(
 end
 
 function UnitarySamplingProblem(
-    system::Function,
-    distribution::Sampleable,
-    num_samples::Int,
+    systems::AbstractVector{<:AbstractQuantumSystem},
     operator::OperatorType,
     T::Int,
     Δt::Union{Float64,Vector{Float64}};
+    kwargs...
+)
+    # Broadcast the operator to all systems
+    return UnitarySamplingProblem(
+        systems,
+        fill(operator, length(systems)),
+        T,
+        Δt;
+        kwargs...
+    )
+end
+
+function UnitarySamplingProblem(
+    system::Function,
+    distribution::Sampleable,
+    num_samples::Int,
+    args...;
     kwargs...
 )
     samples = rand(distribution, num_samples)
     systems = [system(x) for x in samples]
     return UnitarySamplingProblem(
         systems,
-        operator,
-        T,
-        Δt;
+        args...;
         kwargs...
     )
 end

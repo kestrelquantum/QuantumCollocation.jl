@@ -378,7 +378,7 @@ end
 """
     initialize_trajectory
 
-Trajectory initialization of unitary states can broadcast over multiple systems.
+Trajectory initialization of unitaries.
 """
 function initialize_trajectory(
     U_goal::OperatorType,
@@ -388,11 +388,10 @@ function initialize_trajectory(
     state_name::Symbol=:Ũ⃗,
     U_init::AbstractMatrix{<:Number}=Matrix{ComplexF64}(I(size(U_goal, 1))),
     a_guess::Union{AbstractMatrix{<:Float64}, Nothing}=nothing,
-    system::Union{AbstractVector{<:AbstractQuantumSystem}, Nothing}=nothing,
+    system::Union{AbstractQuantumSystem, Nothing}=nothing,
     rollout_integrator::Function=expv,
     geodesic=true,
     phase_operators::Union{AbstractVector{<:AbstractMatrix}, Nothing}=nothing,
-    verbose=false,
     kwargs...
 )
     # Construct timesteps
@@ -442,7 +441,7 @@ end
 """
     initialize_trajectory
     
-Trajectory initialization of quantum states can broadcast over multiple systems.
+Trajectory initialization of quantum states.
 """
 function initialize_trajectory(
     ψ_goals::AbstractVector{<:AbstractVector{ComplexF64}},
@@ -457,7 +456,6 @@ function initialize_trajectory(
     a_guess::Union{AbstractMatrix{<:Float64}, Nothing}=nothing,
     system::Union{AbstractQuantumSystem, Nothing}=nothing,
     rollout_integrator::Function=expv,
-    verbose=false,
     kwargs...
 )
     @assert length(ψ_inits) == length(ψ_goals) "ψ_inits and ψ_goals must have the same length"
@@ -501,7 +499,6 @@ function initialize_trajectory(
         Δt,
         args...;
         a_guess=a_guess,
-        verbose=verbose,
         kwargs...
     )
 end
