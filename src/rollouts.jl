@@ -355,6 +355,24 @@ function Losses.unitary_fidelity(
     return iso_vec_unitary_fidelity(Ũ⃗_init, Ũ⃗_goal, controls, Δt, sys; kwargs...)
 end
 
+function Losses.unitary_fidelity(
+    traj::NamedTrajectory,
+    systems::AbstractVector{<:AbstractQuantumSystem};
+    unitary_name::Symbol=:Ũ⃗,
+    unitary_names::AbstractVector{<:Symbol}=[n for n ∈ traj.names if startswith(string(n), string(unitary_name))],
+    drive_name::Symbol=:a,
+    kwargs...
+)
+    controls = traj[drive_name]
+    Δt = get_timesteps(traj)
+    fids = map(zip(systems, unitary_names)) do (sys, name)
+        Ũ⃗_goal = traj.goal[name]
+        Ũ⃗_init = traj.initial[name]
+        iso_vec_unitary_fidelity(Ũ⃗_init, Ũ⃗_goal, controls, Δt, sys; kwargs...)
+    end
+    return fids
+end
+
 Losses.unitary_fidelity(prob::QuantumControlProblem; kwargs...) =
     unitary_fidelity(prob.trajectory, prob.system; kwargs...)
 

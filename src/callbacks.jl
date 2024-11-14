@@ -9,16 +9,20 @@ using TestItemRunner
 
 using ..Losses
 using ..Problems: QuantumControlProblem, get_datavec
+using ..QuantumSystems
 using ..Rollouts
 
 
-function best_rollout_callback(prob::QuantumControlProblem, rollout::Function)
+function best_rollout_callback(
+    prob::QuantumControlProblem, rollout_fidelity::Function;
+    system::Union{AbstractQuantumSystem, AbstractVector{<:AbstractQuantumSystem}}=prob.system
+)
     best_value = 0.0
     best_trajectories = []
 
     function callback(args...)
         traj = NamedTrajectory(get_datavec(prob), prob.trajectory)
-        value = rollout(traj, prob.system)
+        value = rollout_fidelity(traj, system)
         if value > best_value
             best_value = value
             push!(best_trajectories, traj)
