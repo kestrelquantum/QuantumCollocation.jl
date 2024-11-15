@@ -100,7 +100,7 @@ function UnitaryDirectSumProblem(
     # Build the direct sum system
 
     # merge suffix trajectories
-    traj = direct_sum([add_suffix(p.trajectory, ℓ) for (p, ℓ) ∈ zip(probs, prob_labels)])
+    traj = merge([add_suffix(p.trajectory, ℓ) for (p, ℓ) ∈ zip(probs, prob_labels)])
 
     # add noise to control data (avoid restoration)
     if drive_reset_ratio > 0

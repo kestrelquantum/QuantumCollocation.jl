@@ -4,8 +4,6 @@ export unitary_geodesic
 export linear_interpolation
 export unitary_linear_interpolation
 export initialize_trajectory
-export convert_fixed_time
-export convert_free_time
 
 using NamedTrajectories
 
@@ -376,44 +374,11 @@ function initialize_trajectory(
         global_data=global_data
     )
 end
-
-"""
-    Initialize the unitary states for a single set of parameters.
-
-"""
-function initialize_unitaries(
-    U_goal::OperatorType,
-    T::Int,
-    timesteps::AbstractVector{<:Real};
-    U_init::AbstractMatrix{<:Number}=Matrix{ComplexF64}(I(size(U_goal, 1))),
-    a_guess::Union{AbstractMatrix{<:Float64}, Nothing}=nothing,
-    system::Union{AbstractQuantumSystem, Nothing}=nothing,
-    rollout_integrator::Function=expv,
-    geodesic=true,
-)::Matrix{Float64}
-    Ũ⃗_init = operator_to_iso_vec(U_init)
-
-    if U_goal isa EmbeddedOperator
-        Ũ⃗_goal = operator_to_iso_vec(U_goal.operator)
-    else
-        Ũ⃗_goal = operator_to_iso_vec(U_goal)
-    end
-    
-    # Construct state data
-    if isnothing(a_guess)
-        state_data = initialize_unitary_trajectory(U_init, U_goal, T; geodesic=geodesic)
-    else
-        @assert !isnothing(system) "System must be provided if a_guess is provided."
-        state_data = unitary_rollout(Ũ⃗_init, a_guess, timesteps, system; integrator=rollout_integrator)
-    end
-
-    return state_data
-end
     
 """
     initialize_trajectory
 
-Trajectory initialization of unitary states can broadcast over multiple systems.
+Trajectory initialization of unitaries.
 """
 function initialize_trajectory(
     U_goal::OperatorType,
@@ -423,21 +388,12 @@ function initialize_trajectory(
     state_name::Symbol=:Ũ⃗,
     U_init::AbstractMatrix{<:Number}=Matrix{ComplexF64}(I(size(U_goal, 1))),
     a_guess::Union{AbstractMatrix{<:Float64}, Nothing}=nothing,
-    system::Union{AbstractQuantumSystem, AbstractVector{<:AbstractQuantumSystem}, Nothing}=nothing,
+    system::Union{AbstractQuantumSystem, Nothing}=nothing,
     rollout_integrator::Function=expv,
     geodesic=true,
     phase_operators::Union{AbstractVector{<:AbstractMatrix}, Nothing}=nothing,
-    verbose=false,
     kwargs...
 )
-    Ũ⃗_init = operator_to_iso_vec(U_init)
-
-    if U_goal isa EmbeddedOperator
-        Ũ⃗_goal = operator_to_iso_vec(U_goal.operator)
-    else
-        Ũ⃗_goal = operator_to_iso_vec(U_goal)
-    end
-
     # Construct timesteps
     if Δt isa AbstractMatrix
         timesteps = vec(Δt)
@@ -447,94 +403,44 @@ function initialize_trajectory(
         timesteps = Δt
     end
 
-    # Construct state data
-    if system isa AbstractVector
-        state_data = map(system) do sys
-            initialize_unitaries(
-                U_goal, T, timesteps;
-                U_init=U_init,
-                a_guess=a_guess,
-                system=sys,
-                rollout_integrator=rollout_integrator,
-                geodesic=geodesic
-            )
-        end
+    # Initial state and goal
+    Ũ⃗_init = operator_to_iso_vec(U_init)
 
-        state_names = Symbol.([string(state_name) * "_system_$i" for i in eachindex(system)])
-        if verbose
-            println("Created state names for ($(length(system))) systems: $state_names")
-        end
-        state_inits = repeat([Ũ⃗_init], length(system))
-        state_goals = repeat([Ũ⃗_goal], length(system))
+    if U_goal isa EmbeddedOperator
+        Ũ⃗_goal = operator_to_iso_vec(U_goal.operator)
     else
-        state_data = [initialize_unitaries(
-            U_goal, T, timesteps; 
-            U_init=U_init,
-            a_guess=a_guess, 
-            system=system, 
-            rollout_integrator=rollout_integrator, 
-            geodesic=geodesic
-        )]
-        state_names = [state_name]
-        state_inits = [Ũ⃗_init]
-        state_goals = [Ũ⃗_goal]
+        Ũ⃗_goal = operator_to_iso_vec(U_goal)
+    end
+    
+    # Construct state data
+    if isnothing(a_guess)
+        Ũ⃗_traj = initialize_unitary_trajectory(U_init, U_goal, T; geodesic=geodesic)
+    else
+        @assert !isnothing(system) "System must be provided if a_guess is provided."
+        Ũ⃗_traj = unitary_rollout(Ũ⃗_init, a_guess, timesteps, system; integrator=rollout_integrator)
     end
 
     # Construct phase data
     phase_data = isnothing(phase_operators) ? nothing : π * randn(length(phase_operators))
 
     return initialize_trajectory(
-        state_data,
-        state_inits,
-        state_goals,
-        state_names,
+        [Ũ⃗_traj],
+        [Ũ⃗_init],
+        [Ũ⃗_goal],
+        [state_name],
         T,
         Δt,
         args...;
         phase_data=phase_data,
         a_guess=a_guess,
-        verbose=verbose,
         kwargs...
     )
 end
 
 """
-    initialize_quantum_states
-
-Initialize the quantum states for a single set of parameters.
-"""
-function initialize_quantum_states(
-    ψ̃_goals::AbstractVector{<:AbstractVector{Float64}},
-    ψ̃_inits::AbstractVector{<:AbstractVector{Float64}},
-    T::Int,
-    timesteps::AbstractVector{<:Real};
-    a_guess::Union{AbstractMatrix{<:Float64}, Nothing}=nothing,
-    system::Union{AbstractQuantumSystem, Nothing}=nothing,
-    rollout_integrator::Function=expv,
-)
-    state_data = Matrix{Float64}[]
-    if isnothing(a_guess)
-        for (ψ̃_init, ψ̃_goal) ∈ zip(ψ̃_inits, ψ̃_goals)
-            ψ̃_traj = linear_interpolation(ψ̃_init, ψ̃_goal, T)
-            push!(state_data, ψ̃_traj)
-        end
-        if system isa AbstractVector
-            state_data = repeat(state_data, length(system))
-        end
-    else
-        for ψ̃_init ∈ ψ̃_inits
-            ψ̃_traj = rollout(ψ̃_init, a_guess, timesteps, system; integrator=rollout_integrator)
-            push!(state_data, ψ̃_traj)
-        end
-    end
-
-    return state_data
-end
-
-"""
     initialize_trajectory
     
-Trajectory initialization of quantum states can broadcast over multiple systems.
+Trajectory initialization of quantum states.
 """
 function initialize_trajectory(
     ψ_goals::AbstractVector{<:AbstractVector{ComplexF64}},
@@ -547,9 +453,8 @@ function initialize_trajectory(
         [state_name] :
         [Symbol(string(state_name) * "$i") for i = 1:length(ψ_goals)],
     a_guess::Union{AbstractMatrix{<:Float64}, Nothing}=nothing,
-    system::Union{AbstractQuantumSystem, AbstractVector{<:AbstractQuantumSystem}, Nothing}=nothing,
+    system::Union{AbstractQuantumSystem, Nothing}=nothing,
     rollout_integrator::Function=expv,
-    verbose=false,
     kwargs...
 )
     @assert length(ψ_inits) == length(ψ_goals) "ψ_inits and ψ_goals must have the same length"
@@ -558,6 +463,7 @@ function initialize_trajectory(
     ψ̃_goals = ket_to_iso.(ψ_goals)
     ψ̃_inits = ket_to_iso.(ψ_inits)
 
+    # Construct timesteps
     if Δt isa AbstractMatrix
         timesteps = vec(Δt)
     elseif Δt isa Float64
@@ -566,112 +472,36 @@ function initialize_trajectory(
         timesteps = Δt
     end
 
-    if system isa AbstractVector
-        state_data = map(system) do sys
-            initialize_quantum_states(
-                ψ̃_goals, ψ̃_inits, T, timesteps;
-                a_guess=a_guess,
-                system=sys,
-                rollout_integrator=rollout_integrator
-            )
+    # Construct state data
+    ψ̃_trajs = Matrix{Float64}[]
+    if isnothing(a_guess)
+        for (ψ̃_init, ψ̃_goal) ∈ zip(ψ̃_inits, ψ̃_goals)
+            ψ̃_traj = linear_interpolation(ψ̃_init, ψ̃_goal, T)
+            push!(ψ̃_trajs, ψ̃_traj)
         end
-        # Flatten state data along systems
-        state_data = vcat(state_data...)
-        # Update state names using systems
-        state_names = Symbol.([string(n) * "_system_$i" for i in eachindex(system) for n in state_names])
-        if verbose
-            println("Created state names for ($(length(system))) systems: $state_names")
+        if system isa AbstractVector
+            ψ̃_trajs = repeat(ψ̃_trajs, length(system))
         end
-        state_inits = repeat(ψ̃_inits, length(system))
-        state_goals = repeat(ψ̃_goals, length(system))
     else
-        state_data = initialize_quantum_states(
-            ψ̃_goals, ψ̃_inits, T, timesteps;
-            a_guess=a_guess,
-            system=system,
-            rollout_integrator=rollout_integrator
-        )
-        # state_names are the same
-        state_inits = ψ̃_inits
-        state_goals = ψ̃_goals
+        for ψ̃_init ∈ ψ̃_inits
+            ψ̃_traj = rollout(ψ̃_init, a_guess, timesteps, system; integrator=rollout_integrator)
+            push!(ψ̃_trajs, ψ̃_traj)
+        end
     end
 
     return initialize_trajectory(
-        state_data,
-        state_inits,
-        state_goals,
+        ψ̃_trajs,
+        ψ̃_inits,
+        ψ̃_goals,
         state_names,
         T,
         Δt,
         args...;
         a_guess=a_guess,
-        verbose=verbose,
         kwargs...
     )
 end
 
-
-# ============================================================================= #
-
-remove_component(
-    names::NTuple{N, Symbol} where N,
-    remove_name::Symbol
-) = ([n for n in names if n != remove_name]...,)
-
-function remove_component(
-    container,
-    names::NTuple{N, Symbol} where N,
-    remove_name::Symbol,
-)
-    keys = Symbol[]
-    vals = []
-    for symb in names
-        if symb != remove_name
-            push!(keys, symb)
-            push!(vals, container[symb])
-        end
-    end
-    return (; (keys .=> vals)...)
-end
-
-function convert_fixed_time(
-    traj::NamedTrajectory;
-    Δt_symb=:Δt,
-    timestep = sum(get_timesteps(traj)) / traj.T
-)
-    @assert Δt_symb ∈ traj.control_names "Problem must be free time"
-    return NamedTrajectory(
-        remove_component(traj, traj.names, Δt_symb);
-        controls=remove_component(traj.control_names, Δt_symb),
-        timestep=timestep,
-        bounds=remove_component(traj.bounds, keys(traj.bounds), Δt_symb),
-        initial=remove_component(traj.initial, keys(traj.initial), Δt_symb),
-        final=remove_component(traj.final, keys(traj.final), Δt_symb),
-        goal=remove_component(traj.goal, keys(traj.goal), Δt_symb)
-    )
-end
-
-function convert_free_time(
-    traj::NamedTrajectory,
-    Δt_bounds::Union{ScalarBound, BoundType};
-    Δt_symb=:Δt,
-)
-    @assert Δt_symb ∉ traj.control_names "Problem must not be free time"
-
-    Δt_bound = (; Δt_symb => Δt_bounds,)
-    time_data = (; Δt_symb => get_timesteps(traj))
-    comp_data = get_components(traj)
-
-    return NamedTrajectory(
-        merge_outer(comp_data, time_data);
-        controls=merge_outer(traj.control_names, (Δt_symb,)),
-        timestep=Δt_symb,
-        bounds=merge_outer(traj.bounds, Δt_bound),
-        initial=traj.initial,
-        final=traj.final,
-        goal=traj.goal
-    )
-end
 
 # ============================================================================= #
 
@@ -744,25 +574,6 @@ end
     @test Us_wrap[:, 1] ≈ operator_to_iso_vec(GATES[:I])
     @test Us_wrap[:, end] ≈ operator_to_iso_vec(U_ω)
 
-end
-
-@testitem "Free and fixed time conversion" begin
-    using NamedTrajectories
-    include("../test/test_utils.jl")
-
-    free_traj = named_trajectory_type_1(free_time=true)
-    fixed_traj = named_trajectory_type_1(free_time=false)
-    Δt_bounds = free_traj.bounds[:Δt]
-
-    # Test free to fixed time
-    @test :Δt ∉ convert_fixed_time(free_traj).control_names
-
-    # Test fixed to free time
-    @test :Δt ∈ convert_free_time(fixed_traj, Δt_bounds).control_names
-
-    # Test inverses
-    @test convert_free_time(convert_fixed_time(free_traj), Δt_bounds) == free_traj
-    @test convert_fixed_time(convert_free_time(fixed_traj, Δt_bounds)) == fixed_traj
 end
 
 @testitem "unitary trajectory initialization" begin
