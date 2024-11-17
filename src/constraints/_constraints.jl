@@ -38,7 +38,7 @@ include("linear_trajectory_constraints.jl")
 include("complex_modulus_constraint.jl")
 include("fidelity_constraint.jl")
 include("l1_slack_constraint.jl")
-
+include("area_constraint.jl")
 
 # ----------------------------------------------------------------------------- #
 #                     Linear Constraint                                         #

@@ -1,8 +1,8 @@
-export ComplexModulusContraint
+export ComplexModulusConstraint
 
 
 """
-    ComplexModulusContraint(<keyword arguments>)
+    ComplexModulusConstraint(<keyword arguments>)
 
 Returns a NonlinearInequalityConstraint on the complex modulus of a complex control
 
@@ -14,31 +14,27 @@ TODO: Changed zdim -> dim. Constraint should be tested for global params.
    both the real and imaginary parts
 - `times::Union{AbstractVector{Int},Nothing}=nothing`: the times at which the constraint is applied
 - `dim::Union{Int,Nothing}=nothing`: the dimension of a single time step of the trajectory
-- `T::Union{Int,Nothing}=nothing`: the number of time steps
 """
-function ComplexModulusContraint(;
+function ComplexModulusConstraint(;
     R::Union{Float64, Nothing}=nothing,
     comps::Union{AbstractVector{Int}, Nothing}=nothing,
     times::Union{AbstractVector{Int}, Nothing}=nothing,
     zdim::Union{Int, Nothing}=nothing,
-    T::Union{Int, Nothing}=nothing,
 )
     @assert !isnothing(R) "must provide a value R, s.t. |z| <= R"
     @assert !isnothing(comps) "must provide components of the complex number"
     @assert !isnothing(times) "must provide times"
     @assert !isnothing(zdim) "must provide a trajectory dimension"
-    @assert !isnothing(T) "must provide a T"
 
     @assert length(comps) == 2 "component must represent a complex number and have dimension 2"
 
     params = Dict{Symbol, Any}()
 
-    params[:type] = :ComplexModulusContraint
+    params[:type] = :ComplexModulusConstraint
     params[:R] = R
     params[:comps] = comps
     params[:times] = times
     params[:zdim] = zdim
-    params[:T] = T
 
     gₜ(xₜ, yₜ) = [R^2 - xₜ^2 - yₜ^2]
     ∂gₜ(xₜ, yₜ) = [-2xₜ, -2yₜ]
@@ -56,7 +52,6 @@ function ComplexModulusContraint(;
     end
 
     ∂g_structure = []
-
     for (i, t) ∈ enumerate(times)
         push!(∂g_structure, (i, index(t, comps[1], zdim)))
         push!(∂g_structure, (i, index(t, comps[2], zdim)))
@@ -122,12 +117,12 @@ function ComplexModulusContraint(;
 end
 
 """
-    ComplexModulusContraint(symb::Symbol, R::Float64, traj::NamedTrajectory)
+    ComplexModulusConstraint(symb::Symbol, R::Float64, traj::NamedTrajectory)
 
 Returns a ComplexModulusContraint for the complex control NamedTrajector symbol
 where R is the maximum allowed complex modulus.
 """
-function ComplexModulusContraint(
+function ComplexModulusConstraint(
     name::Symbol,
     R::Float64,
     traj::NamedTrajectory;
@@ -136,11 +131,10 @@ function ComplexModulusContraint(
 )
     @assert name ∈ traj.names
     comps = traj.components[name][name_comps]
-    return ComplexModulusContraint(;
+    return ComplexModulusConstraint(;
         R=R,
         comps=comps,
         times=times,
         zdim=traj.dim,
-        T=traj.T
     )
 end
