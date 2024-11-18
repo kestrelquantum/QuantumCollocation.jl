@@ -141,16 +141,16 @@ end
 function Losses.fidelity(
     trajectory::NamedTrajectory,
     system::AbstractQuantumSystem;
-    state_symb::Symbol=:ψ̃,
-    control_symb=:a,
+    state_name::Symbol=:ψ̃,
+    control_name=:a,
     kwargs...
 )
     fids = []
-    for symb in trajectory.names
-        if startswith(symb, state_symb)
-            controls = trajectory[control_symb]
-            init = trajectory.initial[symb]
-            goal = trajectory.goal[symb]
+    for name ∈ trajectory.names
+        if startswith(name, state_name)
+            controls = trajectory[control_name]
+            init = trajectory.initial[name]
+            goal = trajectory.goal[name]
             fid = iso_fidelity(init, goal, controls, get_timesteps(trajectory), system; kwargs...)
             push!(fids, fid)
         end
