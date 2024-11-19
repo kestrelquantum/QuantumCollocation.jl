@@ -34,7 +34,7 @@ function apply_piccolo_options!(
     constraints::AbstractVector{<:AbstractConstraint},
     piccolo_options::PiccoloOptions,
     traj::NamedTrajectory,
-    operator::Union{Nothing, OperatorType},
+    operator::Union{Nothing, AbstractPiccoloOperator},
     state_name::Symbol,
     timestep_name::Symbol
 )

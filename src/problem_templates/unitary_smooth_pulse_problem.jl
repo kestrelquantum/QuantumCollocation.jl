@@ -36,7 +36,7 @@ or
 - `H_drift::AbstractMatrix{<:Number}`: the drift hamiltonian
 - `H_drives::Vector{<:AbstractMatrix{<:Number}}`: the control hamiltonians
 with
-- `operator::OperatorType`: the target unitary, either in the form of an `EmbeddedOperator` or a `Matrix{ComplexF64}
+- `operator::AbstractPiccoloOperator`: the target unitary, either in the form of an `EmbeddedOperator` or a `Matrix{ComplexF64}
 - `T::Int`: the number of timesteps
 - `Δt::Float64`: the (initial) time step size
 
@@ -68,7 +68,7 @@ with
 """
 function UnitarySmoothPulseProblem(
     system::AbstractQuantumSystem,
-    operator::OperatorType,
+    operator::AbstractPiccoloOperator,
     T::Int,
     Δt::Union{Float64, Vector{Float64}};
     ipopt_options::IpoptOptions=IpoptOptions(),

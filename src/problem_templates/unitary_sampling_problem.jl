@@ -10,7 +10,7 @@ robust solution by including multiple systems reflecting the problem uncertainty
 
 # Arguments
 - `systems::AbstractVector{<:AbstractQuantumSystem}`: A vector of quantum systems.
-- `operator::OperatorType`: The target unitary operator.
+- `operator::AbstractPiccoloOperator`: The target unitary operator.
 - `T::Int`: The number of time steps.
 - `Δt::Union{Float64, Vector{Float64}}`: The time step value or vector of time steps.
 
@@ -43,7 +43,7 @@ robust solution by including multiple systems reflecting the problem uncertainty
 """
 function UnitarySamplingProblem(
     systems::AbstractVector{<:AbstractQuantumSystem},
-    operator::OperatorType,
+    operator::AbstractPiccoloOperator,
     T::Int,
     Δt::Union{Float64,Vector{Float64}};
     system_weights=fill(1.0, length(systems)),
@@ -160,7 +160,7 @@ function UnitarySamplingProblem(
     system::Function,
     distribution::Sampleable,
     num_samples::Int,
-    operator::OperatorType,
+    operator::AbstractPiccoloOperator,
     T::Int,
     Δt::Union{Float64,Vector{Float64}};
     kwargs...

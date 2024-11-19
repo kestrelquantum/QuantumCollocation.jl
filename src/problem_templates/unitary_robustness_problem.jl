@@ -26,7 +26,7 @@ Create a quantum control problem for robustness optimization of a unitary trajec
 function UnitaryRobustnessProblem end
 
 function UnitaryRobustnessProblem(
-    H_error::OperatorType,
+    H_error::AbstractPiccoloOperator,
     trajectory::NamedTrajectory,
     system::QuantumSystem,
     objective::Objective,
@@ -56,7 +56,7 @@ function UnitaryRobustnessProblem(
         if isnothing(final_fidelity)
             final_fidelity = iso_vec_unitary_fidelity(U_T, U_G, subspace=subspace)
         end
-        
+
         fidelity_constraint = FinalUnitaryFidelityConstraint(
             unitary_name,
             final_fidelity,
@@ -98,7 +98,7 @@ function UnitaryRobustnessProblem(
 end
 
 function UnitaryRobustnessProblem(
-    H_error::OperatorType,
+    H_error::AbstractPiccoloOperator,
     prob::QuantumControlProblem;
     objective::Objective=get_objective(prob),
     constraints::AbstractVector{<:AbstractConstraint}=get_constraints(prob),
@@ -191,7 +191,7 @@ end
     H_drives = [a1'a1, a2'a2, a1'a2 + a1*a2', im * (a1'a2 - a1 * a2')]
     system = QuantumSystem(H_drift, H_drives)
     U_goal = EmbeddedOperator(
-        GATES[:CZ], 
+        GATES[:CZ],
         get_subspace_indices([1:2, 1:2], [n_levels, n_levels]),
         [n_levels, n_levels]
     )
@@ -205,8 +205,8 @@ end
     )
 
     ZZ = EmbeddedOperator(
-        reduce(kron, phase_operators), 
-        get_subspace_indices([1:2, 1:2], [n_levels, n_levels]), 
+        reduce(kron, phase_operators),
+        get_subspace_indices([1:2, 1:2], [n_levels, n_levels]),
         [n_levels, n_levels]
     )
 
@@ -232,7 +232,7 @@ end
     H_drives = [a1'a1, a2'a2, a1'a2 + a1*a2', im * (a1'a2 - a1 * a2')]
     system = QuantumSystem(H_drift, H_drives)
     U_goal = EmbeddedOperator(
-        GATES[:CZ], 
+        GATES[:CZ],
         get_subspace_indices([1:2, 1:2], [n_levels, n_levels]),
         [n_levels, n_levels]
     )
@@ -246,8 +246,8 @@ end
     )
 
     ZZ = EmbeddedOperator(
-        reduce(kron, phase_operators), 
-        get_subspace_indices([1:2, 1:2], [n_levels, n_levels]), 
+        reduce(kron, phase_operators),
+        get_subspace_indices([1:2, 1:2], [n_levels, n_levels]),
         [n_levels, n_levels]
     )
 
