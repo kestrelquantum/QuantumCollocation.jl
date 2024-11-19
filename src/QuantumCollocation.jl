@@ -20,11 +20,7 @@ include("trajectory_interpolations.jl")
 include("problem_templates/_problem_templates.jl")
 @reexport using .ProblemTemplates
 
-include("problem_solvers.jl")
-@reexport using .ProblemSolvers
-
-include("plotting.jl")
-@reexport using .Plotting
-
+include("quantum_system_templates/_quantum_system_templates.jl")
+@reexport using .QuantumSystemTemplates
 
 end

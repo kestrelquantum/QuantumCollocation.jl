@@ -4,8 +4,6 @@ export unitary_geodesic
 export linear_interpolation
 export unitary_linear_interpolation
 export initialize_trajectory
-export convert_fixed_time
-export convert_free_time
 
 using ..Rollouts
 using ..DirectSums
@@ -719,44 +717,6 @@ function remove_component(
     return (; (keys .=> vals)...)
 end
 
-function convert_fixed_time(
-    traj::NamedTrajectory;
-    Δt_symb=:Δt,
-    timestep = sum(get_timesteps(traj)) / traj.T
-)
-    @assert Δt_symb ∈ traj.control_names "Problem must be free time"
-    return NamedTrajectory(
-        remove_component(traj, traj.names, Δt_symb);
-        controls=remove_component(traj.control_names, Δt_symb),
-        timestep=timestep,
-        bounds=remove_component(traj.bounds, keys(traj.bounds), Δt_symb),
-        initial=remove_component(traj.initial, keys(traj.initial), Δt_symb),
-        final=remove_component(traj.final, keys(traj.final), Δt_symb),
-        goal=remove_component(traj.goal, keys(traj.goal), Δt_symb)
-    )
-end
-
-function convert_free_time(
-    traj::NamedTrajectory,
-    Δt_bounds::Union{ScalarBound, BoundType};
-    Δt_symb=:Δt,
-)
-    @assert Δt_symb ∉ traj.control_names "Problem must not be free time"
-
-    Δt_bound = (; Δt_symb => Δt_bounds,)
-    time_data = (; Δt_symb => get_timesteps(traj))
-    comp_data = get_components(traj)
-
-    return NamedTrajectory(
-        merge_outer(comp_data, time_data);
-        controls=merge_outer(traj.control_names, (Δt_symb,)),
-        timestep=Δt_symb,
-        bounds=merge_outer(traj.bounds, Δt_bound),
-        initial=traj.initial,
-        final=traj.final,
-        goal=traj.goal
-    )
-end
 
 # ============================================================================= #
 
@@ -830,26 +790,6 @@ end
     @test Us_wrap[:, end] ≈ operator_to_iso_vec(U_ω)
 
 end
-
-@testitem "Free and fixed time conversion" begin
-    using NamedTrajectories
-    include("../test/test_utils.jl")
-
-    free_traj = named_trajectory_type_1(free_time=true)
-    fixed_traj = named_trajectory_type_1(free_time=false)
-    Δt_bounds = free_traj.bounds[:Δt]
-
-    # Test free to fixed time
-    @test :Δt ∉ convert_fixed_time(free_traj).control_names
-
-    # Test fixed to free time
-    @test :Δt ∈ convert_free_time(fixed_traj, Δt_bounds).control_names
-
-    # Test inverses
-    @test convert_free_time(convert_fixed_time(free_traj), Δt_bounds) == free_traj
-    @test convert_fixed_time(convert_free_time(fixed_traj, Δt_bounds)) == fixed_traj
-end
-
 @testitem "unitary trajectory initialization" begin
     using NamedTrajectories
     U_goal = GATES[:X]

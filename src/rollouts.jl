@@ -465,7 +465,7 @@ end
     @test unitary_rollout_fidelity(prob, phases=[0.0], phase_operators=Matrix{ComplexF64}[PAULIS[:Z]]) ≈ 1
 
     # Free phase unitary
-    @test unitary_fidelity(prob, phases=[0.0], phase_operators=[PAULIS[:Z]]) ≈ 1
+    @test unitary_rollout_fidelity(prob, phases=[0.0], phase_operators=[PAULIS[:Z]]) ≈ 1
 
     # Expv explicit
     # State fidelity
