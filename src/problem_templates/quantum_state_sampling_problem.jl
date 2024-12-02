@@ -116,7 +116,6 @@ function QuantumStateSamplingProblem(
     )
 
     return QuantumControlProblem(
-        direct_sum(systems),
         traj,
         J,
         integrators;

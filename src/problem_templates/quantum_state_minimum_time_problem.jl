@@ -111,7 +111,7 @@ end
         ψ_target = Vector{ComplexF64}([0.0, 1.0])
 
         prob = QuantumStateSmoothPulseProblem(
-            sys, ψ_init, ψ_target, T, Δt;
+            ψ_init, ψ_target, T, Δt;
             ipopt_options=IpoptOptions(print_level=1),
             piccolo_options=PiccoloOptions(verbose=false)
         )

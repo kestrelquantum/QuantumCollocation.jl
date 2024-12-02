@@ -1,12 +1,11 @@
 export DensityOperatorSmoothPulseProblem
 
 function DensityOperatorSmoothPulseProblem(
-    system::AbstractQuantumSystem,
+    system::OpenQuantumSystem,
     ρ_init::AbstractMatrix,
     ψ_goal::AbstractVector,
     T::Int,
     Δt::Union{Float64, Vector{Float64}};
-    U_goal::Union{AbstractMatrix, Nothing}=nothing,
     ipopt_options::IpoptOptions=IpoptOptions(),
     piccolo_options::PiccoloOptions=PiccoloOptions(),
     constraints::Vector{<:AbstractConstraint}=AbstractConstraint[],
@@ -113,7 +112,6 @@ function DensityOperatorSmoothPulseProblem(
     ]
 
     return QuantumControlProblem(
-        system,
         traj,
         J,
         integrators;

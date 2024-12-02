@@ -145,7 +145,6 @@ function UnitarySamplingProblem(
     )
 
     return QuantumControlProblem(
-        direct_sum(systems),
         traj,
         J,
         integrators;

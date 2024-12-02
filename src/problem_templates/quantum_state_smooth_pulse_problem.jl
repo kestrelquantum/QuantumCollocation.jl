@@ -192,7 +192,6 @@ function QuantumStateSmoothPulseProblem(
     )
 
     return QuantumControlProblem(
-        sys,
         traj,
         J,
         integrators;

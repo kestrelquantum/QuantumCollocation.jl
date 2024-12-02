@@ -175,7 +175,6 @@ function UnitarySmoothPulseProblem(
     )
 
     return QuantumControlProblem(
-        system,
         traj,
         J,
         integrators;

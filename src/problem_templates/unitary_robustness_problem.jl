@@ -86,7 +86,6 @@ function UnitaryRobustnessProblem(
     push!(constraints, fidelity_constraint)
 
     return QuantumControlProblem(
-        system,
         trajectory,
         objective,
         integrators;

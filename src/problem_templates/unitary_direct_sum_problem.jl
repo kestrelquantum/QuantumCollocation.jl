@@ -171,7 +171,6 @@ function UnitaryDirectSumProblem(
     end
 
     return QuantumControlProblem(
-        system,
         traj,
         J,
         integrators;

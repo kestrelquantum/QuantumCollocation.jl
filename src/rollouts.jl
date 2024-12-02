@@ -133,16 +133,16 @@ end
 function rollout_fidelity(
     trajectory::NamedTrajectory,
     system::AbstractQuantumSystem;
-    state_symb::Symbol=:ψ̃,
-    control_symb=:a,
+    state_name::Symbol=:ψ̃,
+    control_name=:a,
     kwargs...
 )
     fids = []
-    for symb in trajectory.names
-        if startswith(symb, state_symb)
-            controls = trajectory[control_symb]
-            init = trajectory.initial[symb]
-            goal = trajectory.goal[symb]
+    for name ∈ trajectory.names
+        if startswith(name, state_name)
+            controls = trajectory[control_name]
+            init = trajectory.initial[name]
+            goal = trajectory.goal[name]
             fid = rollout_fidelity(init, goal, controls, get_timesteps(trajectory), system; kwargs...)
             push!(fids, fid)
         end
@@ -151,10 +151,11 @@ function rollout_fidelity(
 end
 
 function rollout_fidelity(
-    prob::QuantumControlProblem;
+    prob::QuantumControlProblem,
+    system::AbstractQuantumSystem;
     kwargs...
 )
-    return rollout_fidelity(prob.trajectory, prob.system; kwargs...)
+    return rollout_fidelity(prob.trajectory, system; kwargs...)
 end
 
 # ----------------------------------------------------------------------------- #
