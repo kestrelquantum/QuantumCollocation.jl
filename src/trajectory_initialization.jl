@@ -638,8 +638,8 @@ function initialize_trajectory(
     verbose=false,
     kwargs...
 )
-    ρ⃗̃_init = iso_dm(ρ_init)
-    ρ⃗̃_goal = iso_dm(ρ_goal)
+    ρ⃗̃_init = density_to_iso_vec(ρ_init)
+    ρ⃗̃_goal = density_to_iso_vec(ρ_goal)
 
     # Construct timesteps
     if Δt isa AbstractMatrix
