@@ -239,9 +239,9 @@ end
         ipopt_options=IpoptOptions(print_level=1),
         piccolo_options=PiccoloOptions(verbose=false)
     )
-    initial = rollout_fidelity(prob)
+    initial = rollout_fidelity(prob, sys)
     solve!(prob, max_iter=20)
-    final = rollout_fidelity(prob)
+    final = rollout_fidelity(prob, sys)
     @test final > initial
 
     # Multiple initial and target states

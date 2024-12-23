@@ -29,7 +29,6 @@ function QuantumStateMinimumTimeProblem end
 
 function QuantumStateMinimumTimeProblem(
     traj::NamedTrajectory,
-    sys::QuantumSystem,
     obj::Objective,
     integrators::Vector{<:AbstractIntegrator},
     constraints::Vector{<:AbstractConstraint};
@@ -63,7 +62,6 @@ function QuantumStateMinimumTimeProblem(
     end
 
     return QuantumControlProblem(
-        sys,
         traj,
         obj,
         integrators;
@@ -87,7 +85,6 @@ function QuantumStateMinimumTimeProblem(
 
     return QuantumStateMinimumTimeProblem(
         copy(prob.trajectory),
-        prob.system,
         obj,
         prob.integrators,
         constraints;
@@ -107,11 +104,11 @@ end
         T = 50
         Δt = 0.2
         sys = QuantumSystem(0.1 * GATES[:Z], [GATES[:X], GATES[:Y]])
-        ψ_init = Vector{ComplexF64}([1.0, 0.0])
-        ψ_target = Vector{ComplexF64}([0.0, 1.0])
+        ψ_init = Vector{ComplexF64}[[1.0, 0.0]]
+        ψ_target = Vector{ComplexF64}[[0.0, 1.0]]
 
         prob = QuantumStateSmoothPulseProblem(
-            ψ_init, ψ_target, T, Δt;
+            sys, ψ_init, ψ_target, T, Δt;
             ipopt_options=IpoptOptions(print_level=1),
             piccolo_options=PiccoloOptions(verbose=false)
         )
