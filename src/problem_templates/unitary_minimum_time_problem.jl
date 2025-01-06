@@ -52,6 +52,7 @@ function UnitaryMinimumTimeProblem(
     integrators::Vector{<:AbstractIntegrator},
     constraints::Vector{<:AbstractConstraint};
     unitary_name::Symbol=:Ũ⃗,
+    control_name::Symbol=:a,
     final_fidelity::Union{Real, Nothing}=nothing,
     D=1.0,
     ipopt_options::IpoptOptions=IpoptOptions(),
@@ -105,12 +106,14 @@ function UnitaryMinimumTimeProblem(
         constraints=constraints,
         ipopt_options=ipopt_options,
         piccolo_options=piccolo_options,
+        control_name=control_name,
         kwargs...
     )
 end
 
 function UnitaryMinimumTimeProblem(
-    prob::QuantumControlProblem;
+    prob::QuantumControlProblem,
+    sys::AbstractQuantumSystem;
     objective::Objective=get_objective(prob),
     constraints::AbstractVector{<:AbstractConstraint}=get_constraints(prob),
     ipopt_options::IpoptOptions=deepcopy(prob.ipopt_options),
@@ -122,7 +125,7 @@ function UnitaryMinimumTimeProblem(
 
     return UnitaryMinimumTimeProblem(
         copy(prob.trajectory),
-        prob.system,
+        sys,
         objective,
         prob.integrators,
         constraints;
@@ -143,30 +146,32 @@ end
     T = 51
     Δt = 0.2
 
+    sys = QuantumSystem(H_drift, H_drives)
+
     prob = UnitarySmoothPulseProblem(
-        H_drift, H_drives, U_goal, T, Δt,
+        sys, U_goal, T, Δt,
         ipopt_options=IpoptOptions(print_level=1),
         piccolo_options=PiccoloOptions(verbose=false)
     )
 
-    before = unitary_rollout_fidelity(prob)
+    before = unitary_rollout_fidelity(prob.trajectory, sys)
     solve!(prob, max_iter=50)
-    after = unitary_rollout_fidelity(prob)
+    after = unitary_rollout_fidelity(prob.trajectory, sys)
     @test after > before
 
     # Soft fidelity constraint
     final_fidelity = minimum([0.99, after])
-    mintime_prob = UnitaryMinimumTimeProblem(prob, final_fidelity=final_fidelity)
+    mintime_prob = UnitaryMinimumTimeProblem(prob, sys, final_fidelity=final_fidelity)
     solve!(mintime_prob; max_iter=100)
 
     # Test fidelity is approximatley staying above the constraint
-    @test unitary_rollout_fidelity(mintime_prob) ≥ (final_fidelity - 0.1 * final_fidelity)
+    @test unitary_rollout_fidelity(mintime_prob.trajectory, sys) ≥ (final_fidelity - 0.1 * final_fidelity)
     duration_after = sum(get_timesteps(mintime_prob.trajectory))
     duration_before = sum(get_timesteps(prob.trajectory))
     @test duration_after < duration_before
 
     # Set up without a final fidelity
-    @test UnitaryMinimumTimeProblem(prob) isa QuantumControlProblem
+    @test UnitaryMinimumTimeProblem(prob, sys) isa QuantumControlProblem
 
 end
 
@@ -174,18 +179,19 @@ end
     using NamedTrajectories
 
     phase_operators = [PAULIS[:Z]]
-
+    sys = QuantumSystem([PAULIS[:X]])
     prob = UnitarySmoothPulseProblem(
-        QuantumSystem([PAULIS[:X]]), GATES[:H], 51, 0.2,
+        sys, GATES[:H], 51, 0.2,
         ipopt_options=IpoptOptions(print_level=1),
         piccolo_options=PiccoloOptions(verbose=false),
         phase_operators=phase_operators
     )
 
     # Soft fidelity constraint
-    final_fidelity = minimum([0.99, unitary_rollout_fidelity(prob)])
+    final_fidelity = minimum([0.99, unitary_rollout_fidelity(prob.trajectory, sys)])
     mintime_prob = UnitaryMinimumTimeProblem(
         prob,
+        sys;
         final_fidelity=final_fidelity,
         phase_operators=phase_operators
     )
@@ -198,6 +204,7 @@ end
     # Quick check for using default fidelity
     @test UnitaryMinimumTimeProblem(
         prob,
+        sys;
         final_fidelity=final_fidelity,
         phase_operators=phase_operators
     ) isa QuantumControlProblem

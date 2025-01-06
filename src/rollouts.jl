@@ -323,7 +323,7 @@ unitary_rollout_fidelity(
     controls::AbstractMatrix,
     Δt::AbstractVector,
     system::AbstractQuantumSystem;
-    subspace::AbstractVector{Int}=U_goal.subspace_indices,
+    subspace::AbstractVector{Int}=U_goal.subspace,
     kwargs...
 ) = unitary_rollout_fidelity(U_goal.operator, controls, Δt, system; subspace=subspace, kwargs...)
 
@@ -341,10 +341,6 @@ function unitary_rollout_fidelity(
     return unitary_rollout_fidelity(Ũ⃗_init, Ũ⃗_goal, controls, Δt, sys; kwargs...)
 end
 
-unitary_rollout_fidelity(prob::QuantumControlProblem; kwargs...) =
-    unitary_rollout_fidelity(prob.trajectory, prob.system; kwargs...)
-
-
 # ----------------------------------------------------------------------------- #
 # Experimental rollouts
 # ----------------------------------------------------------------------------- #
@@ -354,7 +350,7 @@ unitary_rollout_fidelity(
     controls::AbstractMatrix{Float64},
     Δt::Union{AbstractVector{Float64}, AbstractMatrix{Float64}, Float64},
     sys::AbstractQuantumSystem;
-    subspace=U_goal.subspace_indices,
+    subspace=U_goal.subspace,
     kwargs...
 ) = unitary_rollout_fidelity(U_goal.operator, controls, Δt, sys; subspace=subspace, kwargs...)
 
@@ -459,14 +455,18 @@ end
     # Unitary fidelity
     @test unitary_rollout_fidelity(U_goal, as, ts, sys) ≈ 1
     @test unitary_rollout_fidelity(prob.trajectory, sys) ≈ 1
-    @test unitary_rollout_fidelity(prob) ≈ 1
     @test unitary_rollout_fidelity(embedded_U_goal, as, ts, sys) ≈ 1
 
     # Free phase unitary
-    @test unitary_rollout_fidelity(prob, phases=[0.0], phase_operators=Matrix{ComplexF64}[PAULIS[:Z]]) ≈ 1
+    @test unitary_rollout_fidelity(prob.trajectory, sys;
+        phases=[0.0], phase_operators=Matrix{ComplexF64}[PAULIS[:Z]]
+    ) ≈ 1
 
     # Free phase unitary
-    @test unitary_rollout_fidelity(prob, phases=[0.0], phase_operators=[PAULIS[:Z]]) ≈ 1
+    @test unitary_rollout_fidelity(prob.trajectory, sys;
+        phases=[0.0],
+        phase_operators=[PAULIS[:Z]]
+    ) ≈ 1
 
     # Expv explicit
     # State fidelity
@@ -475,7 +475,6 @@ end
     # Unitary fidelity
     @test unitary_rollout_fidelity(U_goal, as, ts, sys, integrator=expv) ≈ 1
     @test unitary_rollout_fidelity(prob.trajectory, sys, integrator=expv) ≈ 1
-    @test unitary_rollout_fidelity(prob, integrator=expv) ≈ 1
     @test unitary_rollout_fidelity(embedded_U_goal, as, ts, sys, integrator=expv) ≈ 1
 
     # Exp explicit
@@ -485,7 +484,6 @@ end
     # Unitary fidelity
     @test unitary_rollout_fidelity(U_goal, as, ts, sys, integrator=exp) ≈ 1
     @test unitary_rollout_fidelity(prob.trajectory, sys, integrator=exp) ≈ 1
-    @test unitary_rollout_fidelity(prob, integrator=exp) ≈ 1
     @test unitary_rollout_fidelity(embedded_U_goal, as, ts, sys, integrator=exp) ≈ 1
 
     # Bad integrator

@@ -122,6 +122,7 @@ function QuantumStateSamplingProblem(
         constraints=constraints,
         ipopt_options=ipopt_options,
         piccolo_options=piccolo_options,
+        control_name=control_name,
         kwargs...
     )
 end
@@ -162,9 +163,9 @@ end
     sys1_state_names = [n for n ∈ state_names if endswith(string(n), "1")]
 
     # Separately compute all unique initial and goal state fidelities
-    init = [rollout_fidelity(prob.trajectory, sys1, state_symb=n) for n in sys1_state_names]
+    init = [rollout_fidelity(prob.trajectory, sys1; state_name=n) for n in sys1_state_names]
     solve!(prob, max_iter=20)
-    final = [rollout_fidelity(prob.trajectory, sys1, state_symb=n) for n in sys1_state_names]
+    final = [rollout_fidelity(prob.trajectory, sys1, state_name=n) for n in sys1_state_names]
     @test all(final .> init)
 
     # Check that a_guess can be used
@@ -187,7 +188,7 @@ end
     solve!(prob_default, max_iter=20)
     final_default = rollout_fidelity(prob_default.trajectory, sys1)
     # Pick any initial state
-    final_robust = rollout_fidelity(prob.trajectory, sys1, state_symb=state_names[1])
+    final_robust = rollout_fidelity(prob.trajectory, sys1, state_name=state_names[1])
     @test final_robust > final_default
 end
 
@@ -213,8 +214,8 @@ end
     state_names = [n for n ∈ prob.trajectory.names if startswith(string(n), string(state_name))]
     sys1_state_names = [n for n ∈ state_names if endswith(string(n), "1")]
 
-    init = [rollout_fidelity(prob.trajectory, sys1, state_symb=n) for n in sys1_state_names]
+    init = [rollout_fidelity(prob.trajectory, sys1, state_name=n) for n in sys1_state_names]
     solve!(prob, max_iter=20)
-    final = [rollout_fidelity(prob.trajectory, sys1, state_symb=n) for n in sys1_state_names]
+    final = [rollout_fidelity(prob.trajectory, sys1, state_name=n) for n in sys1_state_names]
     @test all(final .> init)
 end

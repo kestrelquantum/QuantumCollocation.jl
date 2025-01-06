@@ -38,6 +38,7 @@ with
 - `a_guess::Union{Matrix{Float64}, Nothing}=nothing`: The initial guess for the control pulse.
 - `da_bound::Float64=Inf`: The bound on the first derivative of the control pulse.
 - `da_bounds::Vector{Float64}=fill(da_bound, length(system.G_drives))`: The bounds on the first derivative of the control pulse.
+- `zero_initial_and_final_derivative::Bool=false`: Whether to enforce zero initial and final derivative.
 - `dda_bound::Float64=1.0`: The bound on the second derivative of the control pulse.
 - `dda_bounds::Vector{Float64}=fill(dda_bound, length(system.G_drives))`: The bounds on the second derivative of the control pulse.
 - `Δt_min::Float64=0.5 * Δt`: The minimum timestep size.
@@ -70,6 +71,7 @@ function QuantumStateSmoothPulseProblem(
     a_guess::Union{Matrix{Float64}, Nothing}=nothing,
     da_bound::Float64=Inf,
     da_bounds::Vector{Float64}=fill(da_bound, sys.n_drives),
+    zero_initial_and_final_derivative::Bool=false,
     dda_bound::Float64=1.0,
     dda_bounds::Vector{Float64}=fill(dda_bound, sys.n_drives),
     Δt_min::Float64=0.5 * Δt,
@@ -100,6 +102,7 @@ function QuantumStateSmoothPulseProblem(
             state_name=state_name,
             control_name=control_name,
             timestep_name=timestep_name,
+            zero_initial_and_final_derivative=zero_initial_and_final_derivative,
             free_time=piccolo_options.free_time,
             Δt_bounds=(Δt_min, Δt_max),
             bound_state=piccolo_options.bound_state,
@@ -198,6 +201,7 @@ function QuantumStateSmoothPulseProblem(
         constraints=constraints,
         ipopt_options=ipopt_options,
         piccolo_options=piccolo_options,
+        control_name=control_name,
         kwargs...
     )
 end
@@ -239,9 +243,9 @@ end
         ipopt_options=IpoptOptions(print_level=1),
         piccolo_options=PiccoloOptions(verbose=false)
     )
-    initial = rollout_fidelity(prob, sys)
+    initial = rollout_fidelity(prob.trajectory, sys)
     solve!(prob, max_iter=20)
-    final = rollout_fidelity(prob, sys)
+    final = rollout_fidelity(prob.trajectory, sys)
     @test final > initial
 
     # Multiple initial and target states
@@ -253,9 +257,9 @@ end
         ipopt_options=IpoptOptions(print_level=1),
         piccolo_options=PiccoloOptions(verbose=false)
     )
-    initial = rollout_fidelity(prob)
+    initial = rollout_fidelity(prob.trajectory, sys)
     solve!(prob, max_iter=20)
-    final = rollout_fidelity(prob)
+    final = rollout_fidelity(prob.trajectory, sys)
     @test all(final .> initial)
 end
 
@@ -275,9 +279,9 @@ end
         ipopt_options=IpoptOptions(print_level=1),
         piccolo_options=PiccoloOptions(verbose=false, integrator=integrator)
     )
-    initial = rollout_fidelity(prob)
+    initial = rollout_fidelity(prob.trajectory, sys)
     solve!(prob, max_iter=20)
-    final = rollout_fidelity(prob)
+    final = rollout_fidelity(prob.trajectory, sys)
     @test final > initial
 
     # Multiple initial and target states
@@ -289,9 +293,9 @@ end
         ipopt_options=IpoptOptions(print_level=1),
         piccolo_options=PiccoloOptions(verbose=false, integrator=integrator)
     )
-    initial = rollout_fidelity(prob)
+    initial = rollout_fidelity(prob.trajectory, sys)
     solve!(prob, max_iter=20)
-    final = rollout_fidelity(prob)
+    final = rollout_fidelity(prob.trajectory, sys)
     @test all(final .> initial)
 end
 
@@ -311,8 +315,8 @@ end
         control_name=:u,
         timestep_name=:dt
     )
-    initial = rollout_fidelity(prob)
+    initial = rollout_fidelity(prob.trajectory, sys)
     solve!(prob, max_iter=20)
-    final = rollout_fidelity(prob)
+    final = rollout_fidelity(prob.trajectory, sys)
     @test all(final .> initial)
 end

@@ -33,6 +33,7 @@ function UnitaryRobustnessProblem(
     integrators::Vector{<:AbstractIntegrator},
     constraints::Vector{<:AbstractConstraint};
     unitary_name::Symbol=:Ũ⃗,
+    control_name::Symbol=:a,
     final_fidelity::Union{Real, Nothing}=nothing,
     phase_name::Symbol=:ϕ,
     phase_operators::Union{AbstractVector{<:AbstractMatrix}, Nothing}=nothing,
@@ -92,13 +93,15 @@ function UnitaryRobustnessProblem(
         constraints=constraints,
         ipopt_options=ipopt_options,
         piccolo_options=piccolo_options,
+        control_name=control_name,
         kwargs...
     )
 end
 
 function UnitaryRobustnessProblem(
     H_error::AbstractPiccoloOperator,
-    prob::QuantumControlProblem;
+    prob::QuantumControlProblem,
+    sys::AbstractQuantumSystem;
     objective::Objective=get_objective(prob),
     constraints::AbstractVector{<:AbstractConstraint}=get_constraints(prob),
     ipopt_options::IpoptOptions=deepcopy(prob.ipopt_options),
@@ -111,7 +114,7 @@ function UnitaryRobustnessProblem(
     return UnitaryRobustnessProblem(
         H_error,
         copy(prob.trajectory),
-        prob.system,
+        sys,
         objective,
         prob.integrators,
         constraints;
@@ -141,9 +144,9 @@ end
         ipopt_options=IpoptOptions(print_level=1),
         piccolo_options=PiccoloOptions(verbose=false)
     )
-    before = unitary_rollout_fidelity(prob, subspace=U_goal.subspace_indices)
+    before = unitary_rollout_fidelity(prob.trajectory, sys; subspace=U_goal.subspace)
     solve!(prob, max_iter=15)
-    after = unitary_rollout_fidelity(prob, subspace=U_goal.subspace_indices)
+    after = unitary_rollout_fidelity(prob.trajectory, sys; subspace=U_goal.subspace)
 
     # Subspace gate success
     @test after > before
@@ -151,14 +154,14 @@ end
 
     # set up without a final fidelity
     # -------------------------------
-    @test UnitaryRobustnessProblem(H_embed, prob) isa QuantumControlProblem
+    @test UnitaryRobustnessProblem(H_embed, prob, sys) isa QuantumControlProblem
 
 
     #  test robustness from previous problem
     # --------------------------------------
     final_fidelity = 0.99
     rob_prob = UnitaryRobustnessProblem(
-        H_embed, prob,
+        H_embed, prob, sys;
         final_fidelity=final_fidelity,
         ipopt_options=IpoptOptions(recalc_y="yes", recalc_y_feas_tol=100.0, print_level=1),
     )
@@ -173,7 +176,7 @@ end
     @test (after < before) || (before < 0.25)
 
     # TODO: Fidelity constraint approximately satisfied
-    @test_skip isapprox(unitary_rollout_fidelity(rob_prob; subspace=U_goal.subspace_indices), 0.99, atol=0.05)
+    @test_skip isapprox(unitary_rollout_fidelity(rob_prob; subspace=U_goal.subspace), 0.99, atol=0.05)
 end
 
 @testitem "Set up a free phase problem" begin
@@ -212,8 +215,9 @@ end
     @test UnitaryRobustnessProblem(
         ZZ,
         prob,
+        system,
         phase_operators=phase_operators,
-        subspace=U_goal.subspace_indices,
+        subspace=U_goal.subspace,
     ) isa QuantumControlProblem
 end
 
@@ -253,7 +257,8 @@ end
     @test UnitaryRobustnessProblem(
         ZZ,
         prob,
+        system;
         phase_operators=phase_operators,
-        subspace=U_goal.subspace_indices,
+        subspace=U_goal.subspace,
     ) isa QuantumControlProblem
 end

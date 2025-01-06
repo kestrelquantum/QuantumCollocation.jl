@@ -51,7 +51,7 @@ end
 Returns the direct sum of two `QuantumSystem` objects.
 """
 function direct_sum(sys1::QuantumSystem, sys2::QuantumSystem)
-    @assert sys1.n_drives == sys2.n_drives
+    @assert sys1.n_drives == sys2.n_drives "System 1 drives ($(sys1.n_drives)) must equal System 2 drives ($(sys2.n_drives))"
     n_drives = sys1.n_drives
     H = a -> direct_sum(sys1.H(a), sys2.H(a))
     G = a -> direct_sum(sys1.G(a), sys2.G(a))
@@ -81,7 +81,7 @@ function direct_sum(sys1::QuantumSystem, sys2::QuantumSystem)
             direct_sum_params[:system_2] = sys2.params
         end
     end
-    return QuantumSystem(H, G, ∂G, levels, n_drives, direct_sum_params)
+    return QuantumSystem(H, G, ∂G, n_drives, levels, direct_sum_params)
 end
 
 direct_sum(systems::AbstractVector{<:QuantumSystem}) = reduce(direct_sum, systems)
@@ -603,6 +603,8 @@ end
 
     # direct sum of systems
     sys_sum = direct_sum(sys_1, sys_2)
+    @info sys_sum.n_drives
+
 
     @test sys_sum.levels == sys_1.levels * 2
     @test isempty(symdiff(keys(sys_sum.params), [:system_1, :system_2]))

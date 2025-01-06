@@ -33,6 +33,7 @@ function QuantumStateMinimumTimeProblem(
     integrators::Vector{<:AbstractIntegrator},
     constraints::Vector{<:AbstractConstraint};
     state_name::Symbol=:ψ̃,
+    control_name::Symbol=:a,
     final_fidelity::Union{Real, Nothing}=nothing,
     D=1.0,
     ipopt_options::IpoptOptions=IpoptOptions(),
@@ -68,6 +69,7 @@ function QuantumStateMinimumTimeProblem(
         constraints=constraints,
         ipopt_options=ipopt_options,
         piccolo_options=piccolo_options,
+        control_name=control_name,
         kwargs...
     )
 end

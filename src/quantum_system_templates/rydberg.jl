@@ -66,7 +66,13 @@ function RydbergChainSystem(;
     all2all::Bool=true,
     ignore_Y_drive::Bool=false,
 )
-    PAULIS = Dict(:I => [1 0; 0 1], :X => [0 1; 1 0], :Y => [0 -im; im 0], :Z => [1 0; 0 -1], :n => [0 0; 0 1])
+    PAULIS = (
+        I = ComplexF64[1 0; 0 1],
+        X = ComplexF64[0 1; 1 0],
+        Y = ComplexF64[0 -im; im 0],
+        Z = ComplexF64[1 0; 0 -1],
+        n = ComplexF64[0 0; 0 1]
+    )
 
     if all2all
         H_drift = zeros(ComplexF64, 2^N, 2^N)

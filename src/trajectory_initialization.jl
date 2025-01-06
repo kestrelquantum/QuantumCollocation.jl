@@ -267,6 +267,7 @@ function initialize_trajectory(
     free_time=false,
     control_name=:a,
     n_control_derivatives::Int=length(control_bounds) - 1,
+    zero_initial_and_final_derivative=false,
     timestep_name=:Δt,
     Δt_bounds::ScalarBound=(0.5 * Δt, 1.5 * Δt),
     drive_derivative_σ::Float64=0.1,
@@ -317,6 +318,11 @@ function initialize_trajectory(
     final = (;
         control_name => zeros(n_drives),
     )
+
+    if zero_initial_and_final_derivative
+        initial = merge(initial, (; control_derivative_names[1] => zeros(n_drives),))
+        final = merge(final, (; control_derivative_names[1] => zeros(n_drives),))
+    end
 
     goal = (; (state_names .=> state_goals)...)
 
@@ -528,6 +534,7 @@ end
 
 """
     initialize_trajectory
+
 Trajectory initialization of quantum states can broadcast over multiple systems.
 """
 function initialize_trajectory(
@@ -589,6 +596,8 @@ function initialize_trajectory(
         state_inits = ψ̃_inits
         state_goals = ψ̃_goals
     end
+
+    @info state_names
 
     return initialize_trajectory(
         state_data,

@@ -179,6 +179,7 @@ function UnitaryBangBangProblem(
         constraints=constraints,
         ipopt_options=ipopt_options,
         piccolo_options=piccolo_options,
+        control_name=control_name,
         kwargs...
     )
 end
@@ -218,9 +219,9 @@ end
         piccolo_options=piccolo_options,
         control_name=:u
     )
-    initial = unitary_rollout_fidelity(prob; drive_name=:u)
+    initial = unitary_rollout_fidelity(prob.trajectory, sys; drive_name=:u)
     solve!(prob)
-    final = unitary_rollout_fidelity(prob; drive_name=:u)
+    final = unitary_rollout_fidelity(prob.trajectory, sys; drive_name=:u)
     @test final > initial
     solve!(smooth_prob)
     threshold = 1e-3
@@ -235,8 +236,10 @@ end
     phase_name = :ϕ
     phase_operators = [PAULIS[:Z]]
 
+    sys = QuantumSystem([PAULIS[:X]])
+
     prob = UnitaryBangBangProblem(
-        QuantumSystem([PAULIS[:X]]), GATES[:Y], 51, 0.2;
+        sys, GATES[:Y], 51, 0.2;
         phase_operators=phase_operators,
         phase_name=phase_name,
         ipopt_options=IpoptOptions(print_level=1),
@@ -250,10 +253,11 @@ end
     @test before ≠ after
 
     @test unitary_rollout_fidelity(
-        prob,
+        prob.trajectory,
+        sys;
         phases=prob.trajectory.global_data[phase_name],
         phase_operators=phase_operators
     ) > 0.9
 
-    @test unitary_rollout_fidelity(prob) < 0.9
+    @test unitary_rollout_fidelity(prob.trajectory, sys) < 0.9
 end
