@@ -71,7 +71,7 @@ function (traj_int::DataInterpolation)(T::Int)
     return traj_int(times)
 end
 
-# =========================================================================
+# *************************************************************************** #
 
 @testitem "Trajectory interpolation test" begin
     include("../test/test_utils.jl")

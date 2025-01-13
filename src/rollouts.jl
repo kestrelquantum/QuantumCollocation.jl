@@ -424,7 +424,7 @@ function lab_frame_unitary_rollout_trajectory(
     )
 end
 
-# ============================================================================= #
+# *************************************************************************** #
 
 @testitem "Test rollouts using fidelities" begin
     using ExponentialAction

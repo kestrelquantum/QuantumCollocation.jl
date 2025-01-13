@@ -116,3 +116,38 @@ function named_trajectory_type_1(; free_time=false)
         goal=goal
     )
 end
+
+function smooth_quantum_state_problem(; return_system::Bool=false)
+    T = 50
+    Δt = 0.2
+    sys = QuantumSystem(0.1 * PAULIS[:Z], [PAULIS[:X], PAULIS[:Y]])
+    ψ_init = ComplexF64[1.0, 0.0]
+    ψ_target = ComplexF64[0.0, 1.0]
+    prob = QuantumStateSmoothPulseProblem(
+        sys, ψ_init, ψ_target, T, Δt;
+        ipopt_options=IpoptOptions(print_level=1), 
+        piccolo_options=PiccoloOptions(verbose=false)
+    )
+    if return_system
+        return prob, sys
+    else
+        return prob
+    end
+end
+
+function smooth_unitary_problem(; return_system::Bool=false)
+    T = 50
+    Δt = 0.2
+    sys = QuantumSystem(0.1 * PAULIS[:Z], [PAULIS[:X], PAULIS[:Y]])
+    U_goal = GATES[:H]
+    prob = UnitarySmoothPulseProblem(
+        sys, U_goal, T, Δt;
+        ipopt_options=IpoptOptions(print_level=1), 
+        piccolo_options=PiccoloOptions(verbose=false)
+    )
+    if return_system
+        return prob, sys
+    else
+        return prob
+    end
+end
