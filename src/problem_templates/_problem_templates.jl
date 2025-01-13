@@ -85,7 +85,7 @@ function apply_piccolo_options!(
     piccolo_options::PiccoloOptions,
     traj::NamedTrajectory,
     operator::Union{Nothing, AbstractPiccoloOperator},
-    state_name::Symbol,
+    state_names::AbstractVector{<:Symbol},
     timestep_name::Symbol
 )
     state_names = [
