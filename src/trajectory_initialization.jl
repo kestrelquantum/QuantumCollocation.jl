@@ -108,7 +108,7 @@ function unitary_geodesic(
 end
 
 function unitary_geodesic(
-    U_goal::OperatorType,
+    U_goal::AbstractPiccoloOperator,
     samples::Int;
     kwargs...
 )
@@ -175,7 +175,7 @@ const ScalarBound = Union{R, Tuple{R, R}} where R <: Real
 
 function initialize_unitary_trajectory(
     U_init::AbstractMatrix{<:Number},
-    U_goal::OperatorType,
+    U_goal::AbstractPiccoloOperator,
     T::Int;
     geodesic=true
 )
@@ -381,7 +381,7 @@ end
 Trajectory initialization of unitaries.
 """
 function initialize_trajectory(
-    U_goal::OperatorType,
+    U_goal::AbstractPiccoloOperator,
     T::Int,
     Δt::Union{Real, AbstractVecOrMat{<:Real}},
     args...;
