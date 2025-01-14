@@ -34,11 +34,11 @@ function best_rollout_callback(
 end
 
 function best_rollout_fidelity_callback(prob::QuantumControlProblem)
-    return best_rollout_callback(prob, fidelity)
+    return best_rollout_callback(prob, rollout_fidelity)
 end
 
 function best_unitary_rollout_fidelity_callback(prob::QuantumControlProblem)
-    return best_rollout_callback(prob, unitary_fidelity)
+    return best_rollout_callback(prob, unitary_rollout_fidelity)
 end
 
 function trajectory_history_callback(prob::QuantumControlProblem)
@@ -58,13 +58,13 @@ end
     const MOI = MathOptInterface
     include("../test/test_utils.jl")
 
-    prob = smooth_quantum_state_problem()
+    prob, sys = smooth_quantum_state_problem(return_system=true)
 
     my_callback = (kwargs...) -> false
 
-    initial = fidelity(prob)
+    initial = rollout_fidelity(prob, sys)
     solve!(prob, max_iter=20, callback=my_callback)
-    final = fidelity(prob)
+    final = rollout_fidelity(prob, sys)
 
     # callback forces problem to exit early as per Ipopt documentation
     @test MOI.get(prob.optimizer, MOI.TerminationStatus()) == MOI.INTERRUPTED
@@ -78,7 +78,7 @@ end
     const MOI = MathOptInterface
     include("../test/test_utils.jl")
 
-    prob = smooth_quantum_state_problem()
+    prob, sys = smooth_quantum_state_problem(return_system=true)
 
     callback, trajectory_history = trajectory_history_callback(prob)
 
@@ -98,7 +98,7 @@ end
     @test length(best_trajs) == 0
 
     # measure fidelity
-    before = fidelity(prob)
+    before = rollout_fidelity(prob, sys)
     solve!(prob, max_iter=20, callback=callback)
 
     # length must increase if iterations are made
@@ -106,7 +106,7 @@ end
     @test best_trajs[end] isa NamedTrajectory
     
     # fidelity ranking
-    after = fidelity(prob)
+    after = rollout_fidelity(prob, sys)
     best = fidelity(best_trajs[end], system)
     
     @test before < after
@@ -126,7 +126,7 @@ end
     @test length(best_trajs) == 0
 
     # measure fidelity
-    before = unitary_fidelity(prob)
+    before = unitary_rollout_fidelity(prob, sys)
     solve!(prob, max_iter=20, callback=callback)
 
     # length must increase if iterations are made
@@ -134,7 +134,7 @@ end
     @test best_trajs[end] isa NamedTrajectory
     
     # fidelity ranking
-    after = unitary_fidelity(prob)
+    after = unitary_rollout_fidelity(prob, sys)
     best = unitary_fidelity(best_trajs[end], system)
     
     @test before < after
@@ -148,7 +148,7 @@ end
     const MOI = MathOptInterface
     include("../test/test_utils.jl")
 
-    prob = smooth_quantum_state_problem()
+    prob, sys = smooth_quantum_state_problem(return_system=true)
 
     obj_vals = []
     function get_history_callback(

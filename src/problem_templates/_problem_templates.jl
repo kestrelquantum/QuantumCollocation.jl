@@ -34,8 +34,8 @@ function apply_piccolo_options!(
     constraints::AbstractVector{<:AbstractConstraint},
     piccolo_options::PiccoloOptions,
     traj::NamedTrajectory,
-    operator::Union{Nothing, AbstractPiccoloOperator},
-    state_name::Symbol,
+    operators::Union{Nothing, AbstractVector{<:AbstractPiccoloOperator}},
+    state_names::AbstractVector{Symbol},
     timestep_name::Symbol
 )
     # TODO: This should be changed to leakage indices (more general, for states)
@@ -85,7 +85,7 @@ function apply_piccolo_options!(
     piccolo_options::PiccoloOptions,
     traj::NamedTrajectory,
     operator::Union{Nothing, AbstractPiccoloOperator},
-    state_names::AbstractVector{<:Symbol},
+    state_name::Symbol,
     timestep_name::Symbol
 )
     state_names = [
