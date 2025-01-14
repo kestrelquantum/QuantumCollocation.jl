@@ -85,7 +85,7 @@ function UnitarySamplingProblem(
                 op,
                 T,
                 Δt,
-                length(sys.G_drives),
+                sys.n_drives,
                 (a_bounds, da_bounds, dda_bounds);
                 state_name=s,
                 control_name=control_name,

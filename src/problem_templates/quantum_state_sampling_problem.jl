@@ -51,7 +51,7 @@ function QuantumStateSamplingProblem(
                 ψgs,
                 T,
                 Δt,
-                length(sys.G_drives),
+                sys.n_drives,
                 (a_bounds, da_bounds, dda_bounds);
                 state_names=names,
                 control_name=control_name,
