@@ -23,4 +23,7 @@ include("problem_templates/_problem_templates.jl")
 include("quantum_system_templates/_quantum_system_templates.jl")
 @reexport using .QuantumSystemTemplates
 
+include("callbacks.jl")
+@reexport using .Callbacks
+
 end
