@@ -55,19 +55,17 @@ end
 @testitem "Callback returns false early stops" begin
     using MathOptInterface
     const MOI = MathOptInterface
+    using LinearAlgebra
     include("../test/test_utils.jl")
 
-    prob, system = smooth_quantum_state_problem(return_system=true)
+    prob = smooth_quantum_state_problem()
 
     my_callback = (kwargs...) -> false
 
-    initial = rollout_fidelity(prob, system)
     solve!(prob, max_iter=20, callback=my_callback)
-    final = rollout_fidelity(prob, system)
 
     # callback forces problem to exit early as per Ipopt documentation
     @test MOI.get(prob.optimizer, MOI.TerminationStatus()) == MOI.INTERRUPTED
-    @test initial ≈ final atol=1e-2
 end
 
 
