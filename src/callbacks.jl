@@ -20,7 +20,7 @@ function best_rollout_callback(
     best_trajectories = []
 
     function callback(args...)
-        traj = NamedTrajectory(get_datavec(prob), prob.trajectory)
+        traj = NamedTrajectory(Problems.get_datavec(prob), prob.trajectory)
         value = rollout_fidelity(traj, system)
         if value > best_value
             best_value = value
@@ -43,7 +43,7 @@ end
 function trajectory_history_callback(prob::QuantumControlProblem)
     trajectory_history = []
     function callback(args...)
-        push!(trajectory_history, NamedTrajectory(get_datavec(prob), prob.trajectory))
+        push!(trajectory_history, NamedTrajectory(Problems.get_datavec(prob), prob.trajectory))
         return true
     end
 
