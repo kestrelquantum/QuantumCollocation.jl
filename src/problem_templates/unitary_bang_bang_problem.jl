@@ -37,7 +37,7 @@ TODO: Document bang-bang modification.
 or
 - `system::QuantumSystem`: the system to be controlled
 with
-- `operator::OperatorType`: the target unitary, either in the form of an `EmbeddedOperator` or a `Matrix{ComplexF64}
+- `operator::AbstractPiccoloOperator`: the target unitary, either in the form of an `EmbeddedOperator` or a `Matrix{ComplexF64}
 - `T::Int`: the number of timesteps
 - `Δt::Float64`: the (initial) time step size
 
@@ -69,7 +69,7 @@ function UnitaryBangBangProblem end
 
 function UnitaryBangBangProblem(
     system::AbstractQuantumSystem,
-    operator::OperatorType,
+    operator::AbstractPiccoloOperator,
     T::Int,
     Δt::Union{Float64, Vector{Float64}};
     ipopt_options::IpoptOptions=IpoptOptions(),
@@ -79,10 +79,10 @@ function UnitaryBangBangProblem(
     timestep_name::Symbol = :Δt,
     init_trajectory::Union{NamedTrajectory, Nothing}=nothing,
     a_bound::Float64=1.0,
-    a_bounds=fill(a_bound, length(system.G_drives)),
+    a_bounds=fill(a_bound, system.n_drives),
     a_guess::Union{Matrix{Float64}, Nothing}=nothing,
     da_bound::Float64=1.0,
-    da_bounds=fill(da_bound, length(system.G_drives)),
+    da_bounds=fill(da_bound, system.n_drives),
     Δt_min::Float64=Δt isa Float64 ? 0.5 * Δt : 0.5 * mean(Δt),
     Δt_max::Float64=Δt isa Float64 ? 1.5 * Δt : 1.5 * mean(Δt),
     Q::Float64=100.0,
@@ -99,12 +99,11 @@ function UnitaryBangBangProblem(
     if !isnothing(init_trajectory)
         traj = init_trajectory
     else
-        n_drives = length(system.G_drives)
         traj = initialize_trajectory(
             operator,
             T,
             Δt,
-            n_drives,
+            system.n_drives,
             (a_bounds, da_bounds);
             state_name=state_name,
             control_name=control_name,
@@ -147,7 +146,7 @@ function UnitaryBangBangProblem(
 
     # Constraints
     if R_bang_bang isa Float64
-        R_bang_bang = fill(R_bang_bang, length(system.G_drives))
+        R_bang_bang = fill(R_bang_bang, system.n_drives)
     end
     J += L1Regularizer!(
         constraints, control_names[2], traj,
@@ -157,10 +156,10 @@ function UnitaryBangBangProblem(
     # Integrators
     if piccolo_options.integrator == :pade
         unitary_integrator =
-            UnitaryPadeIntegrator(system, state_name, control_names[1], traj; order=piccolo_options.pade_order)
+            UnitaryPadeIntegrator(state_name, control_names[1], system, traj; order=piccolo_options.pade_order)
     elseif piccolo_options.integrator == :exponential
         unitary_integrator =
-            UnitaryExponentialIntegrator(system, state_name, control_names[1], traj)
+            UnitaryExponentialIntegrator(state_name, control_names[1], system, traj)
     else
         error("integrator must be one of (:pade, :exponential)")
     end
@@ -174,13 +173,13 @@ function UnitaryBangBangProblem(
     apply_piccolo_options!(J, constraints, piccolo_options, traj, operator, state_name, timestep_name)
 
     return QuantumControlProblem(
-        system,
         traj,
         J,
         integrators;
         constraints=constraints,
         ipopt_options=ipopt_options,
         piccolo_options=piccolo_options,
+        control_name=control_name,
         kwargs...
     )
 end
@@ -220,9 +219,9 @@ end
         piccolo_options=piccolo_options,
         control_name=:u
     )
-    initial = unitary_fidelity(prob; drive_name=:u)
+    initial = unitary_rollout_fidelity(prob.trajectory, sys; drive_name=:u)
     solve!(prob)
-    final = unitary_fidelity(prob; drive_name=:u)
+    final = unitary_rollout_fidelity(prob.trajectory, sys; drive_name=:u)
     @test final > initial
     solve!(smooth_prob)
     threshold = 1e-3
@@ -237,8 +236,10 @@ end
     phase_name = :ϕ
     phase_operators = [PAULIS[:Z]]
 
+    sys = QuantumSystem([PAULIS[:X]])
+
     prob = UnitaryBangBangProblem(
-        QuantumSystem([PAULIS[:X]]), GATES[:Y], 51, 0.2;
+        sys, GATES[:Y], 51, 0.2;
         phase_operators=phase_operators,
         phase_name=phase_name,
         ipopt_options=IpoptOptions(print_level=1),
@@ -251,11 +252,12 @@ end
 
     @test before ≠ after
 
-    @test unitary_fidelity(
-        prob, 
+    @test unitary_rollout_fidelity(
+        prob.trajectory,
+        sys;
         phases=prob.trajectory.global_data[phase_name],
         phase_operators=phase_operators
     ) > 0.9
 
-    @test unitary_fidelity(prob) < 0.9
+    @test unitary_rollout_fidelity(prob.trajectory, sys) < 0.9
 end

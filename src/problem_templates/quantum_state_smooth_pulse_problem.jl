@@ -38,6 +38,7 @@ with
 - `a_guess::Union{Matrix{Float64}, Nothing}=nothing`: The initial guess for the control pulse.
 - `da_bound::Float64=Inf`: The bound on the first derivative of the control pulse.
 - `da_bounds::Vector{Float64}=fill(da_bound, length(system.G_drives))`: The bounds on the first derivative of the control pulse.
+- `zero_initial_and_final_derivative::Bool=false`: Whether to enforce zero initial and final derivative.
 - `dda_bound::Float64=1.0`: The bound on the second derivative of the control pulse.
 - `dda_bounds::Vector{Float64}=fill(dda_bound, length(system.G_drives))`: The bounds on the second derivative of the control pulse.
 - `Δt_min::Float64=0.5 * Δt`: The minimum timestep size.
@@ -54,7 +55,7 @@ with
 function QuantumStateSmoothPulseProblem end
 
 function QuantumStateSmoothPulseProblem(
-    system::AbstractQuantumSystem,
+    sys::AbstractQuantumSystem,
     ψ_inits::Vector{<:AbstractVector{<:ComplexF64}},
     ψ_goals::Vector{<:AbstractVector{<:ComplexF64}},
     T::Int,
@@ -66,12 +67,13 @@ function QuantumStateSmoothPulseProblem(
     timestep_name::Symbol=:Δt,
     init_trajectory::Union{NamedTrajectory, Nothing}=nothing,
     a_bound::Float64=1.0,
-    a_bounds::Vector{Float64}=fill(a_bound, length(system.G_drives)),
+    a_bounds::Vector{Float64}=fill(a_bound, sys.n_drives),
     a_guess::Union{Matrix{Float64}, Nothing}=nothing,
     da_bound::Float64=Inf,
-    da_bounds::Vector{Float64}=fill(da_bound, length(system.G_drives)),
+    da_bounds::Vector{Float64}=fill(da_bound, sys.n_drives),
+    zero_initial_and_final_derivative::Bool=false,
     dda_bound::Float64=1.0,
-    dda_bounds::Vector{Float64}=fill(dda_bound, length(system.G_drives)),
+    dda_bounds::Vector{Float64}=fill(dda_bound, sys.n_drives),
     Δt_min::Float64=0.5 * Δt,
     Δt_max::Float64=1.5 * Δt,
     drive_derivative_σ::Float64=0.01,
@@ -90,24 +92,23 @@ function QuantumStateSmoothPulseProblem(
     if !isnothing(init_trajectory)
         traj = init_trajectory
     else
-        n_drives = length(system.G_drives)
-
         traj = initialize_trajectory(
             ψ_goals,
             ψ_inits,
             T,
             Δt,
-            n_drives,
+            sys.n_drives,
             (a_bounds, da_bounds, dda_bounds);
             state_name=state_name,
             control_name=control_name,
             timestep_name=timestep_name,
+            zero_initial_and_final_derivative=zero_initial_and_final_derivative,
             free_time=piccolo_options.free_time,
             Δt_bounds=(Δt_min, Δt_max),
             bound_state=piccolo_options.bound_state,
             drive_derivative_σ=drive_derivative_σ,
             a_guess=a_guess,
-            system=system,
+            system=sys,
             rollout_integrator=piccolo_options.rollout_integrator,
         )
     end
@@ -134,20 +135,52 @@ function QuantumStateSmoothPulseProblem(
 
     # Integrators
     state_integrators = []
-    for name ∈ state_names
+    if length(ψ_inits) == 1
         if piccolo_options.integrator == :pade
-            state_integrator = QuantumStatePadeIntegrator(
-                system, name, control_name, traj;
+            state_integrators = [QuantumStatePadeIntegrator(
+                state_name,
+                control_name,
+                sys,
+                traj;
                 order=piccolo_options.pade_order
-            )
+            )]
         elseif piccolo_options.integrator == :exponential
-            state_integrator = QuantumStateExponentialIntegrator(
-                system, name, control_name, traj
-            )
+            state_integrators = [QuantumStateExponentialIntegrator(
+                state_name,
+                control_name,
+                sys,
+                traj
+            )]
         else
             error("integrator must be one of (:pade, :exponential)")
         end
-        push!(state_integrators, state_integrator)
+    else
+        state_names = [
+            name for name ∈ traj.names
+                if startswith(string(name), string(state_name))
+        ]
+        state_integrators = []
+        for i = 1:length(ψ_inits)
+            if piccolo_options.integrator == :pade
+                state_integrator = QuantumStatePadeIntegrator(
+                    state_names[i],
+                    control_name,
+                    sys,
+                    traj;
+                    order=piccolo_options.pade_order
+                )
+            elseif piccolo_options.integrator == :exponential
+                state_integrator = QuantumStateExponentialIntegrator(
+                    state_names[i],
+                    control_name,
+                    sys,
+                    traj
+                )
+            else
+                error("integrator must be one of (:pade, :exponential)")
+            end
+            push!(state_integrators, state_integrator)
+        end
     end
 
     integrators = [
@@ -162,13 +195,13 @@ function QuantumStateSmoothPulseProblem(
     )
 
     return QuantumControlProblem(
-        system,
         traj,
         J,
         integrators;
         constraints=constraints,
         ipopt_options=ipopt_options,
         piccolo_options=piccolo_options,
+        control_name=control_name,
         kwargs...
     )
 end
@@ -210,9 +243,9 @@ end
         ipopt_options=IpoptOptions(print_level=1),
         piccolo_options=PiccoloOptions(verbose=false)
     )
-    initial = fidelity(prob)
+    initial = rollout_fidelity(prob.trajectory, sys)
     solve!(prob, max_iter=20)
-    final = fidelity(prob)
+    final = rollout_fidelity(prob.trajectory, sys)
     @test final > initial
 
     # Multiple initial and target states
@@ -224,9 +257,9 @@ end
         ipopt_options=IpoptOptions(print_level=1),
         piccolo_options=PiccoloOptions(verbose=false)
     )
-    initial = fidelity(prob)
+    initial = rollout_fidelity(prob.trajectory, sys)
     solve!(prob, max_iter=20)
-    final = fidelity(prob)
+    final = rollout_fidelity(prob.trajectory, sys)
     @test all(final .> initial)
 end
 
@@ -246,9 +279,9 @@ end
         ipopt_options=IpoptOptions(print_level=1),
         piccolo_options=PiccoloOptions(verbose=false, integrator=integrator)
     )
-    initial = fidelity(prob)
+    initial = rollout_fidelity(prob.trajectory, sys)
     solve!(prob, max_iter=20)
-    final = fidelity(prob)
+    final = rollout_fidelity(prob.trajectory, sys)
     @test final > initial
 
     # Multiple initial and target states
@@ -260,9 +293,9 @@ end
         ipopt_options=IpoptOptions(print_level=1),
         piccolo_options=PiccoloOptions(verbose=false, integrator=integrator)
     )
-    initial = fidelity(prob)
+    initial = rollout_fidelity(prob.trajectory, sys)
     solve!(prob, max_iter=20)
-    final = fidelity(prob)
+    final = rollout_fidelity(prob.trajectory, sys)
     @test all(final .> initial)
 end
 
@@ -282,8 +315,8 @@ end
         control_name=:u,
         timestep_name=:dt
     )
-    initial = fidelity(prob)
+    initial = rollout_fidelity(prob.trajectory, sys)
     solve!(prob, max_iter=20)
-    final = fidelity(prob)
+    final = rollout_fidelity(prob.trajectory, sys)
     @test all(final .> initial)
 end

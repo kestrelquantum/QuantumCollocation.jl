@@ -10,7 +10,7 @@ robust solution by including multiple systems reflecting the problem uncertainty
 
 # Arguments
 - `systems::AbstractVector{<:AbstractQuantumSystem}`: A vector of quantum systems.
-- `operator::OperatorType`: The target unitary operator.
+- `operator::AbstractPiccoloOperator`: The target unitary operator.
 - `T::Int`: The number of time steps.
 - `Δt::Union{Float64, Vector{Float64}}`: The time step value or vector of time steps.
 
@@ -43,7 +43,7 @@ robust solution by including multiple systems reflecting the problem uncertainty
 """
 function UnitarySamplingProblem(
     systems::AbstractVector{<:AbstractQuantumSystem},
-    operators::AbstractVector{<:OperatorType},
+    operators::AbstractVector{<:AbstractPiccoloOperator},
     T::Int,
     Δt::Union{Float64,Vector{Float64}};
     system_weights=fill(1.0, length(systems)),
@@ -55,12 +55,12 @@ function UnitarySamplingProblem(
     timestep_name::Symbol=:Δt,
     constraints::Vector{<:AbstractConstraint}=AbstractConstraint[],
     a_bound::Float64=1.0,
-    a_bounds=fill(a_bound, length(systems[1].G_drives)),
+    a_bounds=fill(a_bound, systems[1].n_drives),
     a_guess::Union{Matrix{Float64},Nothing}=nothing,
     da_bound::Float64=Inf,
-    da_bounds::Vector{Float64}=fill(da_bound, length(systems[1].G_drives)),
+    da_bounds::Vector{Float64}=fill(da_bound, systems[1].n_drives),
     dda_bound::Float64=1.0,
-    dda_bounds::Vector{Float64}=fill(dda_bound, length(systems[1].G_drives)),
+    dda_bounds::Vector{Float64}=fill(dda_bound, systems[1].n_drives),
     Δt_min::Float64=0.5 * Δt,
     Δt_max::Float64=1.5 * Δt,
     Q::Float64=100.0,
@@ -85,7 +85,7 @@ function UnitarySamplingProblem(
                 op,
                 T,
                 Δt,
-                length(sys.G_drives),
+                sys.n_drives,
                 (a_bounds, da_bounds, dda_bounds);
                 state_name=s,
                 control_name=control_name,
@@ -126,16 +126,16 @@ function UnitarySamplingProblem(
 
     # Integrators
     unitary_integrators = AbstractIntegrator[]
-    for (sys, name) in zip(systems, state_names)
+    for (sys, Ũ⃗_name) in zip(systems, state_names)
         if piccolo_options.integrator == :pade
             push!(
                 unitary_integrators,
-                UnitaryPadeIntegrator(sys, name, control_name, traj; order=piccolo_options.pade_order)
+                UnitaryPadeIntegrator(Ũ⃗_name, control_name, sys, traj; order=piccolo_options.pade_order)
             )
         elseif piccolo_options.integrator == :exponential
             push!(
                 unitary_integrators,
-                UnitaryExponentialIntegrator(sys, name, control_name, traj)
+                UnitaryExponentialIntegrator(Ũ⃗_name, control_name, sys, traj)
             )
         else
             error("integrator must be one of (:pade, :exponential)")
@@ -154,20 +154,20 @@ function UnitarySamplingProblem(
     )
 
     return QuantumControlProblem(
-        direct_sum(systems),
         traj,
         J,
         integrators;
         constraints=constraints,
         ipopt_options=ipopt_options,
         piccolo_options=piccolo_options,
+        control_name=control_name,
         kwargs...
     )
 end
 
 function UnitarySamplingProblem(
     systems::AbstractVector{<:AbstractQuantumSystem},
-    operator::OperatorType,
+    operator::AbstractPiccoloOperator,
     T::Int,
     Δt::Union{Float64,Vector{Float64}};
     kwargs...

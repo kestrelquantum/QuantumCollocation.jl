@@ -36,7 +36,7 @@ or
 - `H_drift::AbstractMatrix{<:Number}`: the drift hamiltonian
 - `H_drives::Vector{<:AbstractMatrix{<:Number}}`: the control hamiltonians
 with
-- `operator::OperatorType`: the target unitary, either in the form of an `EmbeddedOperator` or a `Matrix{ComplexF64}
+- `operator::AbstractPiccoloOperator`: the target unitary, either in the form of an `EmbeddedOperator` or a `Matrix{ComplexF64}
 - `T::Int`: the number of timesteps
 - `Δt::Float64`: the (initial) time step size
 
@@ -52,6 +52,7 @@ with
 - `a_guess::Union{Matrix{Float64}, Nothing}=nothing`: an initial guess for the control pulses
 - `da_bound::Float64=Inf`: the bound on the control pulse derivative
 - `da_bounds::Vector{Float64}=fill(da_bound, length(system.G_drives))`: the bounds on the control pulse derivatives, one for each drive
+- `zero_initial_and_final_derivative::Bool=false`: whether to enforce zero initial and final control pulse derivatives
 - `dda_bound::Float64=1.0`: the bound on the control pulse second derivative
 - `dda_bounds::Vector{Float64}=fill(dda_bound, length(system.G_drives))`: the bounds on the control pulse second derivatives, one for each drive
 - `Δt_min::Float64=Δt isa Float64 ? 0.5 * Δt : 0.5 * mean(Δt)`: the minimum time step size
@@ -68,7 +69,7 @@ with
 """
 function UnitarySmoothPulseProblem(
     system::AbstractQuantumSystem,
-    operator::OperatorType,
+    operator::AbstractPiccoloOperator,
     T::Int,
     Δt::Union{Float64, Vector{Float64}};
     ipopt_options::IpoptOptions=IpoptOptions(),
@@ -78,12 +79,13 @@ function UnitarySmoothPulseProblem(
     timestep_name::Symbol = :Δt,
     init_trajectory::Union{NamedTrajectory, Nothing}=nothing,
     a_bound::Float64=1.0,
-    a_bounds=fill(a_bound, length(system.G_drives)),
+    a_bounds=fill(a_bound, system.n_drives),
     a_guess::Union{Matrix{Float64}, Nothing}=nothing,
     da_bound::Float64=Inf,
-    da_bounds::Vector{Float64}=fill(da_bound, length(system.G_drives)),
+    da_bounds::Vector{Float64}=fill(da_bound, system.n_drives),
+    zero_initial_and_final_derivative::Bool=false,
     dda_bound::Float64=1.0,
-    dda_bounds::Vector{Float64}=fill(dda_bound, length(system.G_drives)),
+    dda_bounds::Vector{Float64}=fill(dda_bound, system.n_drives),
     Δt_min::Float64=Δt isa Float64 ? 0.5 * Δt : 0.5 * mean(Δt),
     Δt_max::Float64=Δt isa Float64 ? 1.5 * Δt : 1.5 * mean(Δt),
     Q::Float64=100.0,
@@ -101,19 +103,18 @@ function UnitarySmoothPulseProblem(
     if !isnothing(init_trajectory)
         traj = init_trajectory
     else
-        n_drives = length(system.G_drives)
-
         traj = initialize_trajectory(
             operator,
             T,
             Δt,
-            n_drives,
+            system.n_drives,
             (a_bounds, da_bounds, dda_bounds);
             state_name=state_name,
             control_name=control_name,
             timestep_name=timestep_name,
             free_time=piccolo_options.free_time,
             Δt_bounds=(Δt_min, Δt_max),
+            zero_initial_and_final_derivative=zero_initial_and_final_derivative,
             geodesic=piccolo_options.geodesic,
             bound_state=piccolo_options.bound_state,
             a_guess=a_guess,
@@ -125,12 +126,12 @@ function UnitarySmoothPulseProblem(
     end
 
     # Subspace
-    subspace = operator isa EmbeddedOperator ? operator.subspace_indices : nothing
+    subspace = operator isa EmbeddedOperator ? operator.subspace : nothing
 
     # Objective
     if isnothing(phase_operators)
         J = UnitaryInfidelityObjective(
-            state_name, traj, Q; 
+            state_name, traj, Q;
             subspace=subspace,
             eval_hessian=piccolo_options.eval_hessian,
         )
@@ -152,15 +153,15 @@ function UnitarySmoothPulseProblem(
     J += QuadraticRegularizer(control_names[3], traj, R_dda; timestep_name=timestep_name)
 
     # Integrators
+
     if piccolo_options.integrator == :pade
         unitary_integrator =
-            UnitaryPadeIntegrator(
-                system, state_name, control_name, traj;
+            UnitaryPadeIntegrator(state_name, control_name, system, traj;
                 order=piccolo_options.pade_order
             )
     elseif piccolo_options.integrator == :exponential
         unitary_integrator =
-            UnitaryExponentialIntegrator(system, state_name, control_name, traj)
+            UnitaryExponentialIntegrator(state_name, control_name, system, traj)
     else
         error("integrator must be one of (:pade, :exponential)")
     end
@@ -177,13 +178,13 @@ function UnitarySmoothPulseProblem(
     )
 
     return QuantumControlProblem(
-        system,
         traj,
         J,
         integrators;
         constraints=constraints,
         ipopt_options=ipopt_options,
         piccolo_options=piccolo_options,
+        control_name=control_name,
         kwargs...
     )
 end
@@ -213,9 +214,9 @@ end
         piccolo_options=PiccoloOptions(verbose=false)
     )
 
-    initial = unitary_fidelity(prob)
+    initial = unitary_rollout_fidelity(prob.trajectory, sys)
     solve!(prob, max_iter=20)
-    final = unitary_fidelity(prob)
+    final = unitary_rollout_fidelity(prob.trajectory, sys)
     @test final > initial
 end
 
@@ -231,9 +232,9 @@ end
         piccolo_options=PiccoloOptions(verbose=false, integrator=:exponential, jacobian_structure=false)
     )
 
-    initial = unitary_fidelity(prob)
+    initial = unitary_rollout_fidelity(prob.trajectory, sys)
     solve!(prob, max_iter=20)
-    final = unitary_fidelity(prob)
+    final = unitary_rollout_fidelity(prob.trajectory, sys)
     @test final > initial
 end
 
@@ -257,9 +258,9 @@ end
         piccolo_options=piccolo_options
     )
 
-    initial = unitary_fidelity(prob)
+    initial = unitary_rollout_fidelity(prob.trajectory, sys)
     solve!(prob, max_iter=20)
-    final = unitary_fidelity(prob)
+    final = unitary_rollout_fidelity(prob.trajectory, sys)
     @test final > initial
 end
 
@@ -280,9 +281,9 @@ end
         piccolo_options=PiccoloOptions(verbose=false)
     )
 
-    initial = unitary_fidelity(prob, subspace=U_goal.subspace_indices)
+    initial = unitary_rollout_fidelity(prob.trajectory, sys, subspace=U_goal.subspace)
     solve!(prob, max_iter=20)
-    final = unitary_fidelity(prob, subspace=U_goal.subspace_indices)
+    final = unitary_rollout_fidelity(prob.trajectory, sys, subspace=U_goal.subspace)
     @test final > initial
 
     # Test leakage suppression
@@ -300,20 +301,54 @@ end
         piccolo_options=PiccoloOptions(verbose=false)
     )
 
-    initial = unitary_fidelity(prob, subspace=U_goal.subspace_indices)
+    initial = unitary_rollout_fidelity(prob.trajectory, sys, subspace=U_goal.subspace)
     solve!(prob, max_iter=20)
-    final = unitary_fidelity(prob, subspace=U_goal.subspace_indices)
+    final = unitary_rollout_fidelity(prob.trajectory, sys, subspace=U_goal.subspace)
     @test final > initial
 end
 
+@testitem "Additional Objective" begin
+    H_drift = GATES[:Z]
+    H_drives = [GATES[:X], GATES[:Y]]
+    U_goal = GATES[:H]
+    T = 50
+    Δt = 0.2
+
+    prob_vanilla = UnitarySmoothPulseProblem(
+        H_drift, H_drives, U_goal, T, Δt,
+        ipopt_options=IpoptOptions(print_level=1),
+        piccolo_options=PiccoloOptions(verbose=false),
+    )
+
+    J_extra = QuadraticSmoothnessRegularizer(:dda, prob_vanilla.trajectory, 10.0)
+
+    prob_additional = UnitarySmoothPulseProblem(
+        H_drift, H_drives, U_goal, T, Δt,
+        ipopt_options=IpoptOptions(print_level=1),
+        piccolo_options=PiccoloOptions(verbose=false),
+        additional_objective=J_extra,
+    )
+
+    J_prob_vanilla = Problems.get_objective(prob_vanilla)
+
+    J_additional = Problems.get_objective(prob_additional)
+
+    Z = prob_vanilla.trajectory
+    Z⃗ = vec(prob_vanilla.trajectory)
+
+    @test J_prob_vanilla.L(Z⃗, Z) + J_extra.L(Z⃗, Z) ≈ J_additional.L(Z⃗, Z)
+end
 @testitem "Free phase Y gate using X" begin
     using Random
-    Random.seed!(1234)
+    # Random.seed!(1234)
     phase_name = :ϕ
     phase_operators = [PAULIS[:Z]]
-
+    sys = QuantumSystem([PAULIS[:X]])
     prob = UnitarySmoothPulseProblem(
-        QuantumSystem([PAULIS[:X]]), GATES[:Y], 51, 0.2;
+        sys,
+        GATES[:Y],
+        51,
+        0.2;
         phase_operators=phase_operators,
         phase_name=phase_name,
         ipopt_options=IpoptOptions(print_level=1),
@@ -321,16 +356,17 @@ end
     )
 
     before = prob.trajectory.global_data[phase_name]
-    solve!(prob, max_iter=20)
+    solve!(prob, max_iter=50)
     after = prob.trajectory.global_data[phase_name]
 
     @test before ≠ after
 
-    @test unitary_fidelity(
-        prob, 
+    @test unitary_rollout_fidelity(
+        prob.trajectory,
+        sys;
         phases=prob.trajectory.global_data[phase_name],
         phase_operators=phase_operators
     ) > 0.9
 
-    @test unitary_fidelity(prob) < 0.9
+    @test unitary_rollout_fidelity(prob.trajectory, sys) < 0.9
 end

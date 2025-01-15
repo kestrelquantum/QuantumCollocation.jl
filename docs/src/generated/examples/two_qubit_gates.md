@@ -120,7 +120,7 @@ prob = UnitarySmoothPulseProblem(
 solve!(prob; max_iter=100)
 
 # Let's take a look at the final fidelity
-unitary_fidelity(prob)
+unitary_rollout_fidelity(prob)
 ````
 
 Looks good!
@@ -138,7 +138,7 @@ min_time_prob = UnitaryMinimumTimeProblem(prob; final_fidelity=.99)
 
 solve!(min_time_prob; max_iter=300)
 
-unitary_fidelity(min_time_prob)
+unitary_rollout_fidelity(min_time_prob)
 ````
 
 And let's plot this solution
@@ -194,7 +194,7 @@ prob = UnitarySmoothPulseProblem(
 solve!(prob; max_iter=1_000)
 
 # Let's take a look at the final fidelity
-unitary_fidelity(prob)
+unitary_rollout_fidelity(prob)
 ````
 
 Again, looks good!
@@ -212,7 +212,7 @@ min_time_prob = UnitaryMinimumTimeProblem(prob; final_fidelity=.999)
 
 solve!(min_time_prob; max_iter=300)
 
-unitary_fidelity(min_time_prob)
+unitary_rollout_fidelity(min_time_prob)
 ````
 
 And let's plot this solution

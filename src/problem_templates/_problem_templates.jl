@@ -1,27 +1,19 @@
 module ProblemTemplates
 
-using ..QuantumObjectUtils
-using ..QuantumSystems
-using ..Isomorphisms
-using ..EmbeddedOperators
 using ..DirectSums
 using ..Rollouts
 using ..TrajectoryInitialization
-using ..Objectives
-using ..Constraints
 using ..Losses
-using ..Integrators
-using ..Problems
-using ..Options
 
 using Distributions
 using TrajectoryIndexingUtils
 using NamedTrajectories
+using QuantumCollocationCore
+using PiccoloQuantumObjects
 using LinearAlgebra
 using SparseArrays
 using ExponentialAction
 using JLD2
-
 using TestItemRunner
 
 include("unitary_smooth_pulse_problem.jl")
@@ -35,14 +27,15 @@ include("quantum_state_smooth_pulse_problem.jl")
 include("quantum_state_minimum_time_problem.jl")
 include("quantum_state_sampling_problem.jl")
 
+include("density_operator_smooth_pulse_problem.jl")
 
 function apply_piccolo_options!(
     J::Objective,
     constraints::AbstractVector{<:AbstractConstraint},
     piccolo_options::PiccoloOptions,
     traj::NamedTrajectory,
-    operators::Union{Nothing, AbstractVector{<:OperatorType}},
-    state_names::AbstractVector{<:Symbol},
+    operators::Union{Nothing, AbstractVector{<:AbstractPiccoloOperator}},
+    state_names::AbstractVector{Symbol},
     timestep_name::Symbol
 )
     # TODO: This should be changed to leakage indices (more general, for states)
@@ -91,7 +84,7 @@ function apply_piccolo_options!(
     constraints::AbstractVector{<:AbstractConstraint},
     piccolo_options::PiccoloOptions,
     traj::NamedTrajectory,
-    operator::Union{Nothing, OperatorType},
+    operator::Union{Nothing, AbstractPiccoloOperator},
     state_name::Symbol,
     timestep_name::Symbol
 )

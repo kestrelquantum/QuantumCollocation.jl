@@ -29,11 +29,11 @@ function QuantumStateMinimumTimeProblem end
 
 function QuantumStateMinimumTimeProblem(
     traj::NamedTrajectory,
-    sys::QuantumSystem,
     obj::Objective,
     integrators::Vector{<:AbstractIntegrator},
     constraints::Vector{<:AbstractConstraint};
     state_name::Symbol=:ψ̃,
+    control_name::Symbol=:a,
     final_fidelity::Union{Real, Nothing}=nothing,
     D=1.0,
     ipopt_options::IpoptOptions=IpoptOptions(),
@@ -47,7 +47,7 @@ function QuantumStateMinimumTimeProblem(
 
     # Default to average state fidelity
     if isnothing(final_fidelity)
-        vals = [fidelity(traj[n][:, end], traj.goal[n]) for n ∈ state_names]
+        vals = [iso_fidelity(traj[n][:, end], traj.goal[n]) for n ∈ state_names]
         final_fidelity = sum(vals) / length(vals)
     end
 
@@ -63,13 +63,13 @@ function QuantumStateMinimumTimeProblem(
     end
 
     return QuantumControlProblem(
-        sys,
         traj,
         obj,
         integrators;
         constraints=constraints,
         ipopt_options=ipopt_options,
         piccolo_options=piccolo_options,
+        control_name=control_name,
         kwargs...
     )
 end
@@ -87,7 +87,6 @@ function QuantumStateMinimumTimeProblem(
 
     return QuantumStateMinimumTimeProblem(
         copy(prob.trajectory),
-        prob.system,
         obj,
         prob.integrators,
         constraints;
@@ -101,13 +100,14 @@ end
 
 @testitem "Test quantum state minimum time" begin
         using NamedTrajectories
+        using PiccoloQuantumObjects
 
         # System
         T = 50
         Δt = 0.2
         sys = QuantumSystem(0.1 * GATES[:Z], [GATES[:X], GATES[:Y]])
-        ψ_init = Vector{ComplexF64}([1.0, 0.0])
-        ψ_target = Vector{ComplexF64}([0.0, 1.0])
+        ψ_init = Vector{ComplexF64}[[1.0, 0.0]]
+        ψ_target = Vector{ComplexF64}[[0.0, 1.0]]
 
         prob = QuantumStateSmoothPulseProblem(
             sys, ψ_init, ψ_target, T, Δt;

@@ -6,8 +6,6 @@ push!(LOAD_PATH, joinpath(@__DIR__, "..", "src"))
 
 # DocMeta.setdocmeta!(QuantumCollocation, :DocTestSetup, :(using QuantumCollocation); recursive=true)
 
-println("")
-
 pages = [
     "Home" => "index.md",
     "Quickstart Guide" => "generated/quickstart.md",

@@ -5,16 +5,11 @@ export get_suffix
 export get_suffix_label
 export direct_sum
 
-using ..Integrators
-using ..Problems
-using ..QuantumSystems
-using ..Isomorphisms
-using ..Objectives
-
 using SparseArrays
 using TestItemRunner
-
 using NamedTrajectories
+using QuantumCollocationCore
+using PiccoloQuantumObjects
 
 
 """
@@ -41,7 +36,12 @@ end
 Returns the direct sum of two iso_vec operators.
 """
 function direct_sum(Ã⃗::AbstractVector, B̃⃗::AbstractVector)
-    return operator_to_iso_vec(direct_sum(iso_vec_to_operator(Ã⃗), iso_vec_to_operator(B̃⃗)))
+    return operator_to_iso_vec(
+        direct_sum(
+            iso_vec_to_operator(Ã⃗),
+            iso_vec_to_operator(B̃⃗)
+        )
+    )
 end
 
 """
@@ -50,18 +50,37 @@ end
 Returns the direct sum of two `QuantumSystem` objects.
 """
 function direct_sum(sys1::QuantumSystem, sys2::QuantumSystem)
-    H_drift = direct_sum(sys1.H_drift, sys2.H_drift)
-    H1_zero = spzeros(size(sys1.H_drift))
-    H2_zero = spzeros(size(sys2.H_drift))
-    H_drives = [
-        [direct_sum(H, H2_zero) for H ∈ sys1.H_drives]...,
-        [direct_sum(H1_zero, H) for H ∈ sys2.H_drives]...
-    ]
-    return QuantumSystem(
-        H_drift,
-        H_drives,
-        params=merge(sys1.params, sys2.params)
-    )
+    @assert sys1.n_drives == sys2.n_drives "System 1 drives ($(sys1.n_drives)) must equal System 2 drives ($(sys2.n_drives))"
+    n_drives = sys1.n_drives
+    H = a -> direct_sum(sys1.H(a), sys2.H(a))
+    G = a -> direct_sum(sys1.G(a), sys2.G(a))
+    ∂G = a -> [direct_sum(∂Gᵢ(a), ∂Gⱼ(a)) for (∂Gᵢ, ∂Gⱼ) ∈ zip(sys1.∂G(a), sys2.∂G(a))]
+    levels = sys1.levels + sys2.levels
+    direct_sum_params = Dict{Symbol, Dict{Symbol, Any}}()
+    if haskey(sys1.params, :system_1)
+        n_systems = length(keys(sys1.params))
+        direct_sum_params = sys1.params
+        if haskey(sys2.params, :system_1)
+            for i = 1:length(keys(sys2.params))
+                direct_sum_params[Symbol("system_$(n_systems + i)")] =
+                    sys2.params[Symbol("system_$(i)")]
+            end
+        else
+            direct_sum_params[Symbol("system_$(n_systems + 1)")] = sys2.params
+        end
+    else
+        direct_sum_params[:system_1] = sys1.params
+        if haskey(sys2.params, :system_1)
+            n_systems = length(keys(sys2.params))
+            for i = 1:length(keys(sys2.params))
+                direct_sum_params[Symbol("system_$(1 + i)")] =
+                    sys2.params[Symbol("system_$(i)")]
+            end
+        else
+            direct_sum_params[:system_2] = sys2.params
+        end
+    end
+    return QuantumSystem(H, G, ∂G, n_drives, levels, direct_sum_params)
 end
 
 direct_sum(systems::AbstractVector{<:QuantumSystem}) = reduce(direct_sum, systems)
@@ -105,13 +124,12 @@ function add_suffix(traj::NamedTrajectory, suffix::String)
     )
 end
 
-function add_suffix(sys::QuantumSystem, suffix::String)
-    return QuantumSystem(
-        sys.H_drift,
-        sys.H_drives,
-        params=add_suffix(sys.params, suffix)
-    )
-end
+# function add_suffix(sys::QuantumSystem, suffix::String)
+#     return QuantumSystem(
+#         sys.H_drift,
+#         sys.H_drives
+#     )
+# end
 
 # get suffix label utilities
 # --------------------
@@ -155,57 +173,26 @@ end
 # ---------------------------
 
 function modify_integrator_suffix(
-    modifier::Function,
     integrator::AbstractIntegrator,
-    sys::AbstractQuantumSystem,
+    modifier::Function,
+    suffix::String,
     traj::NamedTrajectory,
-    mod_traj::NamedTrajectory,
-    suffix::String
+    mod_traj::NamedTrajectory
 )
-    if integrator isa UnitaryExponentialIntegrator
-        unitary_name = get_component_names(traj, integrator.unitary_components)
-        drive_name = get_component_names(traj, integrator.drive_components)
-        return integrator(
-            sys,
-            mod_traj,
-            unitary_name=modifier(unitary_name, suffix),
-            drive_name=modifier(drive_name, suffix)
-        )
-    elseif integrator isa QuantumStateExponentialIntegrator
+    mod_integrator = deepcopy(integrator)
+
+    if integrator isa QuantumIntegrator
         state_name = get_component_names(traj, integrator.state_components)
         drive_name = get_component_names(traj, integrator.drive_components)
-        return integrator(
-            sys,
-            mod_traj,
-            state_name=modifier(state_name, suffix),
-            drive_name=modifier(drive_name, suffix)
-        )
-    elseif integrator isa UnitaryPadeIntegrator
-        unitary_name = get_component_names(traj, integrator.unitary_components)
-        drive_name = get_component_names(traj, integrator.drive_components)
-        return integrator(
-            sys,
-            mod_traj,
-            unitary_name=modifier(unitary_name, suffix),
-            drive_name=modifier(drive_name, suffix)
-        )
-    elseif integrator isa QuantumStatePadeIntegrator
-        state_name = get_component_names(traj, integrator.state_components)
-        drive_name = get_component_names(traj, integrator.drive_components)
-        return integrator(
-            sys,
-            mod_traj,
-            state_name=modifier(state_name, suffix),
-            drive_name=modifier(drive_name, suffix)
-        )
+        mod_integrator.state_components = mod_traj.components[modifier(state_name, suffix)]
+        mod_integrator.drive_components = mod_traj.components[modifier(drive_name, suffix)]
+        return mod_integrator
     elseif integrator isa DerivativeIntegrator
-        variable = get_component_names(traj, integrator.variable_components)
-        derivative = get_component_names(traj, integrator.derivative_components)
-        return integrator(
-            mod_traj,
-            variable=modifier(variable, suffix),
-            derivative=modifier(derivative, suffix)
-        )
+        var_name = get_component_names(traj, integrator.variable_components)
+        der_name = get_component_names(traj, integrator.derivative_components)
+        mod_integrator.variable_components = mod_traj.components[modifier(var_name, suffix)]
+        mod_integrator.derivative_components = mod_traj.components[modifier(der_name, suffix)]
+        return mod_integrator 
     else
         error("Integrator type not recognized")
     end
@@ -213,42 +200,41 @@ end
 
 function add_suffix(
     integrator::AbstractIntegrator,
-    sys::AbstractQuantumSystem,
+    suffix::String,
     traj::NamedTrajectory,
-    mod_traj::NamedTrajectory,
-    suffix::String
+    mod_traj::NamedTrajectory
 )
-    return modify_integrator_suffix(add_suffix, integrator, sys, traj, mod_traj, suffix)
+    return modify_integrator_suffix(integrator, add_suffix, suffix, traj, mod_traj)
 end
 
 function add_suffix(
     integrators::AbstractVector{<:AbstractIntegrator},
-    sys::AbstractQuantumSystem,
+    suffix::String,
     traj::NamedTrajectory,
-    mod_traj::NamedTrajectory,
-    suffix::String
+    mod_traj::NamedTrajectory
 )
-    return [add_suffix(intg, sys, traj, mod_traj, suffix) for intg in integrators]
+    return [
+        add_suffix(integrator, suffix, traj, mod_traj)
+            for integrator ∈ integrators
+    ]
 end
 
 function remove_suffix(
     integrator::AbstractIntegrator,
-    sys::AbstractQuantumSystem,
+    suffix::String,
     traj::NamedTrajectory,
-    mod_traj::NamedTrajectory,
-    suffix::String
+    mod_traj::NamedTrajectory
 )
-    return modify_integrator_suffix(remove_suffix, integrator, sys, traj, mod_traj, suffix)
+    return modify_integrator_suffix(integrator, remove_suffix, suffix, traj, mod_traj)
 end
 
 function remove_suffix(
     integrators::AbstractVector{<:AbstractIntegrator},
-    sys::AbstractQuantumSystem,
+    suffix::String,
     traj::NamedTrajectory,
-    mod_traj::NamedTrajectory,
-    suffix::String
+    mod_traj::NamedTrajectory
 )
-    return [remove_suffix(intg, sys, traj, mod_traj, suffix) for intg in integrators]
+    return [remove_suffix(intg, suffix, traj, mod_traj) for intg in integrators]
 end
 
 
@@ -261,11 +247,11 @@ Base.endswith(integrator::DerivativeIntegrator, suffix::String) = endswith(integ
 
 function Base.endswith(integrator::AbstractIntegrator, traj::NamedTrajectory, suffix::String)
     if integrator isa UnitaryExponentialIntegrator
-        name = get_component_names(traj, integrator.unitary_components)
+        name = get_component_names(traj, integrator.state_components)
     elseif integrator isa QuantumStateExponentialIntegrator
         name = get_component_names(traj, integrator.state_components)
     elseif integrator isa UnitaryPadeIntegrator
-        name = get_component_names(traj, integrator.unitary_components)
+        name = get_component_names(traj, integrator.state_components)
     elseif integrator isa QuantumStatePadeIntegrator
         name = get_component_names(traj, integrator.state_components)
     elseif integrator isa DerivativeIntegrator
@@ -408,24 +394,23 @@ end
     H_drift = 0.01 * GATES[:Z]
     H_drives = [GATES[:X], GATES[:Y]]
     T = 50
-    sys = QuantumSystem(H_drift, H_drives, params=Dict(:T=>T))
+    sys_1 = QuantumSystem(H_drift, H_drives)
+    sys_2 = deepcopy(sys_1)
 
-    # apply suffix and sum
-    sys2 = direct_sum(
-        add_suffix(sys, "_1"),
-        add_suffix(sys, "_2")
-    )
+    # direct sum of systems
+    sys_sum = direct_sum(sys_1, sys_2)
+    @info sys_sum.n_drives
 
-    @test length(sys2.H_drives) == 4
-    @test sys2.params[:T_1] == T
-    @test sys2.params[:T_2] == T
 
-    # add another system
-    sys = QuantumSystem(H_drift, H_drives, params=Dict(:T=>T, :S=>2T))
-    sys3 = direct_sum(sys2, add_suffix(sys, "_3"))
-    @test length(sys3.H_drives) == 6
-    @test sys3.params[:T_3] == T
-    @test sys3.params[:S_3] == 2T
+    @test sys_sum.levels == sys_1.levels * 2
+    @test isempty(symdiff(keys(sys_sum.params), [:system_1, :system_2]))
+
+    sys_sum_2 = direct_sum(sys_sum, deepcopy(sys_1))
+
+    @test sys_sum_2.levels == sys_1.levels * 3
+    display(sys_sum_2.params)
+    @test isempty(symdiff(keys(sys_sum_2.params), [:system_1, :system_2, :system_3]))
+
 end
 
 # TODO: fix broken test

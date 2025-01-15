@@ -48,6 +48,7 @@ function UnitaryDirectSumProblem(
     prob_labels::AbstractVector{<:String}=[string(i) for i ∈ 1:length(probs)],
     graph::Union{Nothing, AbstractVector{<:Tuple{String, String}}, AbstractVector{<:Tuple{Symbol, Symbol}}}=nothing,
     boundary_values::Union{AbstractDict{<:String, <:AbstractArray}, AbstractDict{<:Symbol, <:AbstractArray}}=Dict{String, Array}(),
+    control_name::Symbol=:a,
     Q::Union{Float64, Vector{Float64}}=100.0,
     Q_symb::Symbol=:dda,
     R::Float64=1e-2,
@@ -121,15 +122,12 @@ function UnitaryDirectSumProblem(
     end
 
     # Rebuild integrators
-    integrators = vcat(
-        [add_suffix(p.integrators, p.system, p.trajectory, traj, ℓ) for (p, ℓ) ∈ zip(probs, prob_labels)]...
-    )
-
-    # direct sum (used for problem saving, only)
-    system = direct_sum([add_suffix(p.system, ℓ) for (p, ℓ) ∈ zip(probs, prob_labels)])
+    integrators = vcat([
+        add_suffix(p.integrators, ℓ, p.trajectory, traj)
+            for (p, ℓ) ∈ zip(probs, prob_labels)
+    ]...)
 
     # Rebuild trajectory constraints
-    piccolo_options.build_trajectory_constraints = true
     constraints = AbstractConstraint[]
 
     # Add goal constraints for each problem
@@ -171,13 +169,14 @@ function UnitaryDirectSumProblem(
     end
 
     return QuantumControlProblem(
-        system,
         traj,
         J,
         integrators;
         constraints=constraints,
         ipopt_options=ipopt_options,
         piccolo_options=piccolo_options,
+        control_name=control_name,
+        kwargs...
     )
 end
 

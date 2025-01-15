@@ -1,3 +1,7 @@
+export TransmonSystem
+export TransmonDipoleCoupling
+export MultiTransmonSystem
+
 @doc raw"""
     TransmonSystem(;
         ω::Float64=4.4153,  # GHz
@@ -94,8 +98,7 @@ function TransmonSystem(;
     return QuantumSystem(
         H_drift,
         H_drives;
-        constructor=TransmonSystem,
-        params=params,
+        params=params
     )
 end
 

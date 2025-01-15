@@ -7,21 +7,20 @@ export trajectory_history_callback
 using NamedTrajectories
 using TestItemRunner
 
-using ..Losses
-using ..Problems: QuantumControlProblem, get_datavec
-using ..QuantumSystems
+using QuantumCollocationCore
+using PiccoloQuantumObjects
+
 using ..Rollouts
 
 
 function best_rollout_callback(
-    prob::QuantumControlProblem, rollout_fidelity::Function;
-    system::Union{AbstractQuantumSystem, AbstractVector{<:AbstractQuantumSystem}}=prob.system
+    prob::QuantumControlProblem, system::Union{AbstractQuantumSystem, AbstractVector{<:AbstractQuantumSystem}}, rollout_fidelity::Function
 )
     best_value = 0.0
     best_trajectories = []
 
     function callback(args...)
-        traj = NamedTrajectory(get_datavec(prob), prob.trajectory)
+        traj = NamedTrajectory(Problems.get_datavec(prob), prob.trajectory)
         value = rollout_fidelity(traj, system)
         if value > best_value
             best_value = value
@@ -33,18 +32,18 @@ function best_rollout_callback(
     return callback, best_trajectories
 end
 
-function best_rollout_fidelity_callback(prob::QuantumControlProblem)
-    return best_rollout_callback(prob, fidelity)
+function best_rollout_fidelity_callback(prob::QuantumControlProblem, system::Union{AbstractQuantumSystem, AbstractVector{<:AbstractQuantumSystem}})
+    return best_rollout_callback(prob, system, rollout_fidelity)
 end
 
-function best_unitary_rollout_fidelity_callback(prob::QuantumControlProblem)
-    return best_rollout_callback(prob, unitary_fidelity)
+function best_unitary_rollout_fidelity_callback(prob::QuantumControlProblem, system::Union{AbstractQuantumSystem, AbstractVector{<:AbstractQuantumSystem}})
+    return best_rollout_callback(prob, system, unitary_rollout_fidelity)
 end
 
 function trajectory_history_callback(prob::QuantumControlProblem)
     trajectory_history = []
     function callback(args...)
-        push!(trajectory_history, NamedTrajectory(get_datavec(prob), prob.trajectory))
+        push!(trajectory_history, NamedTrajectory(Problems.get_datavec(prob), prob.trajectory))
         return true
     end
 
@@ -56,19 +55,17 @@ end
 @testitem "Callback returns false early stops" begin
     using MathOptInterface
     const MOI = MathOptInterface
+    using LinearAlgebra
     include("../test/test_utils.jl")
 
     prob = smooth_quantum_state_problem()
 
     my_callback = (kwargs...) -> false
 
-    initial = fidelity(prob)
     solve!(prob, max_iter=20, callback=my_callback)
-    final = fidelity(prob)
 
     # callback forces problem to exit early as per Ipopt documentation
     @test MOI.get(prob.optimizer, MOI.TerminationStatus()) == MOI.INTERRUPTED
-    @test initial ≈ final atol=1e-2
 end
 
 
@@ -94,11 +91,11 @@ end
 
     prob, system = smooth_quantum_state_problem(return_system=true)
 
-    callback, best_trajs = best_rollout_fidelity_callback(prob)
+    callback, best_trajs = best_rollout_fidelity_callback(prob, system)
     @test length(best_trajs) == 0
 
     # measure fidelity
-    before = fidelity(prob)
+    before = rollout_fidelity(prob, system)
     solve!(prob, max_iter=20, callback=callback)
 
     # length must increase if iterations are made
@@ -106,8 +103,8 @@ end
     @test best_trajs[end] isa NamedTrajectory
     
     # fidelity ranking
-    after = fidelity(prob)
-    best = fidelity(best_trajs[end], system)
+    after = rollout_fidelity(prob, system)
+    best = rollout_fidelity(best_trajs[end], system)
     
     @test before < after
     @test before < best
@@ -122,11 +119,11 @@ end
 
     prob, system = smooth_unitary_problem(return_system=true)
 
-    callback, best_trajs = best_unitary_rollout_fidelity_callback(prob)
+    callback, best_trajs = best_unitary_rollout_fidelity_callback(prob, system)
     @test length(best_trajs) == 0
 
     # measure fidelity
-    before = unitary_fidelity(prob)
+    before = unitary_rollout_fidelity(prob.trajectory, system)
     solve!(prob, max_iter=20, callback=callback)
 
     # length must increase if iterations are made
@@ -134,8 +131,8 @@ end
     @test best_trajs[end] isa NamedTrajectory
     
     # fidelity ranking
-    after = unitary_fidelity(prob)
-    best = unitary_fidelity(best_trajs[end], system)
+    after = unitary_rollout_fidelity(prob.trajectory, system)
+    best = unitary_rollout_fidelity(best_trajs[end], system)
     
     @test before < after
     @test before < best

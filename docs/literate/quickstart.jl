@@ -56,7 +56,7 @@ solve!(prob; max_iter=30)
 
 # The above output comes from the Ipopt.jl solver. To see the final fidelity we can use the `unitary_fidelity` function exported by QuantumCollocation.jl.
 
-println("Final fidelity: ", unitary_fidelity(prob))
+println("Final fidelity: ", unitary_rollout_fidelity(prob))
 
 # We can also easily plot the solutions using the `plot` function exported by NamedTrajectories.jl.
 
@@ -86,7 +86,7 @@ solve!(prob_min_time; max_iter=30)
 
 # We can see that the final fidelity is indeed greater than the minimum fidelity we set.
 
-println("Final fidelity:    ", unitary_fidelity(prob_min_time))
+println("Final fidelity:    ", unitary_rollout_fidelity(prob_min_time))
 
 # and that the duration of the pulse has decreased.
 

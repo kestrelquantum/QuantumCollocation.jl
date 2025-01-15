@@ -1,3 +1,4 @@
+export RydbergChainSystem
 
 function generate_pattern(N::Int, i::Int)
     # Create an array filled with 'I'
@@ -65,8 +66,14 @@ function RydbergChainSystem(;
     all2all::Bool=true,
     ignore_Y_drive::Bool=false,
 )
-    PAULIS = Dict(:I => [1 0; 0 1], :X => [0 1; 1 0], :Y => [0 -im; im 0], :Z => [1 0; 0 -1], :n => [0 0; 0 1])
-    
+    PAULIS = (
+        I = ComplexF64[1 0; 0 1],
+        X = ComplexF64[0 1; 1 0],
+        Y = ComplexF64[0 -im; im 0],
+        Z = ComplexF64[1 0; 0 -1],
+        n = ComplexF64[0 0; 0 1]
+    )
+
     if all2all
         H_drift = zeros(ComplexF64, 2^N, 2^N)
         for gap in 0:N-2
@@ -104,20 +111,9 @@ function RydbergChainSystem(;
     H_detune = -sum([operator_from_string(lift('n',i,N), lookup=PAULIS) for i in 1:N])
     push!(H_drives, H_detune)
 
-    params = Dict{Symbol, Any}(
-        :N => N,
-        :C => C,
-        :distance => distance,
-        :cutoff_order => cutoff_order,
-        :local_detune => local_detune,
-        :all2all => all2all,
-    )
-
     return QuantumSystem(
         H_drift,
-        H_drives;
-        constructor=RydbergChainSystem,
-        params=params,
+        H_drives
     )
 end
 

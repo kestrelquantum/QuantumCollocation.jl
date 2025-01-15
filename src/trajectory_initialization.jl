@@ -108,7 +108,7 @@ function unitary_geodesic(
 end
 
 function unitary_geodesic(
-    U_goal::OperatorType,
+    U_goal::AbstractPiccoloOperator,
     samples::Int;
     kwargs...
 )
@@ -175,7 +175,7 @@ const ScalarBound = Union{R, Tuple{R, R}} where R <: Real
 
 function initialize_unitary_trajectory(
     U_init::AbstractMatrix{<:Number},
-    U_goal::OperatorType,
+    U_goal::AbstractPiccoloOperator,
     T::Int;
     geodesic=true
 )
@@ -270,6 +270,7 @@ function initialize_trajectory(
     free_time=false,
     control_name=:a,
     n_control_derivatives::Int=length(control_bounds) - 1,
+    zero_initial_and_final_derivative=false,
     timestep_name=:Δt,
     Δt_bounds::ScalarBound=(0.5 * Δt, 1.5 * Δt),
     drive_derivative_σ::Float64=0.1,
@@ -320,6 +321,11 @@ function initialize_trajectory(
     final = (;
         control_name => zeros(n_drives),
     )
+
+    if zero_initial_and_final_derivative
+        initial = merge(initial, (; control_derivative_names[1] => zeros(n_drives),))
+        final = merge(final, (; control_derivative_names[1] => zeros(n_drives),))
+    end
 
     goal = (; (state_names .=> state_goals)...)
 
@@ -381,7 +387,7 @@ end
 Trajectory initialization of unitaries.
 """
 function initialize_trajectory(
-    U_goal::OperatorType,
+    U_goal::AbstractPiccoloOperator,
     T::Int,
     Δt::Union{Real, AbstractVecOrMat{<:Real}},
     args...;
