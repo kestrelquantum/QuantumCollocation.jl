@@ -22,7 +22,7 @@ or
 - `D=1.0`: The cost weight on the time.
 - `ipopt_options::IpoptOptions=IpoptOptions()`: The Ipopt options.
 - `piccolo_options::PiccoloOptions=PiccoloOptions()`: The Piccolo options.
-- `kwargs...`: Additional keyword arguments, passed to [`QuantumControlProblem`](@ref).
+- `kwargs...`: Additional keyword arguments, passed to `QuantumControlProblem`.
 
 """
 function QuantumStateMinimumTimeProblem end

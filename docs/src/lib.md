@@ -5,24 +5,9 @@
 Modules = [QuantumCollocation.ProblemTemplates]
 ```
 
-## Direct Sums
-```@autodocs
-Modules = [QuantumCollocation.DirectSums]
-```
-
 ## Options
 ```@autodocs
 Modules = [QuantumCollocation.Options]
-```
-
-## Plotting 
-```@autodocs
-Modules = [QuantumCollocation.Plotting]
-```
-
-## Problem Solvers
-```@autodocs
-Modules = [QuantumCollocation.ProblemSolvers]
 ```
 
 ## Rollouts
@@ -30,9 +15,9 @@ Modules = [QuantumCollocation.ProblemSolvers]
 Modules = [QuantumCollocation.Rollouts]
 ```
 
-## Saving and Loading
+## Direct Sums
 ```@autodocs
-Modules = [QuantumCollocation.SaveLoadUtils]
+Modules = [QuantumCollocation.DirectSums]
 ```
 
 ## Trajectory Initialization

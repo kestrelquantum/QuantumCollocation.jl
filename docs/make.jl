@@ -8,19 +8,15 @@ push!(LOAD_PATH, joinpath(@__DIR__, "..", "src"))
 
 pages = [
     "Home" => "index.md",
-    "Quickstart Guide" => "generated/quickstart.md",
     "Contribution Guide" => "contribution_guide.md",
     "Manual" => [
         "Problem Templates" => "generated/man/problem_templates.md",
-        "Embedded Operators" => "generated/man/embedded_operators.md",
+        "Rollouts" => "generated/man/rollouts.md",
         "Callbacks" => "generated/man/ipopt_callbacks.md",
     ],
     "Examples" => [
-        "Two Qubit Gates" => "generated/examples/two_qubit_gates.md",
-        "Multilevel Transmon" => "generated/examples/multilevel_transmon.md",
     ],
     "Library" => "lib.md",
-    "Release Notes" => "release_notes.md",
 ]
 
 format = Documenter.HTML(;
