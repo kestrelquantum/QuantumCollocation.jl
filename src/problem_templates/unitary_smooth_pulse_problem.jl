@@ -71,7 +71,7 @@ function UnitarySmoothPulseProblem(
     system::AbstractQuantumSystem,
     operator::AbstractPiccoloOperator,
     T::Int,
-    Δt::Union{Float64, Vector{Float64}};
+    Δt::Union{Float64, <:AbstractVector{Float64}};
     ipopt_options::IpoptOptions=IpoptOptions(),
     piccolo_options::PiccoloOptions=PiccoloOptions(),
     state_name::Symbol = :Ũ⃗,
@@ -174,7 +174,8 @@ function UnitarySmoothPulseProblem(
 
     # Optional Piccolo constraints and objectives
     apply_piccolo_options!(
-        J, constraints, piccolo_options, traj, operator, state_name, timestep_name
+        J, constraints, piccolo_options, traj, state_name, timestep_name;
+        state_leakage_indices=operator isa EmbeddedOperator ? get_leakage_indices(operator) : nothing
     )
 
     return QuantumControlProblem(
