@@ -34,27 +34,23 @@ function apply_piccolo_options!(
     constraints::AbstractVector{<:AbstractConstraint},
     piccolo_options::PiccoloOptions,
     traj::NamedTrajectory,
-    operators::Union{Nothing, AbstractVector{<:AbstractPiccoloOperator}},
     state_names::AbstractVector{Symbol},
-    timestep_name::Symbol
+    timestep_name::Symbol;
+    state_leakage_indices::Union{Nothing, AbstractVector{<:AbstractVector{Int}}}=nothing,
 )
-    # TODO: This should be changed to leakage indices (more general, for states)
-    # (also, it should be looped over relevant state names, not broadcast)
-    if piccolo_options.leakage_suppression && !isnothing(operators)
-        for (operator, state_name) in zip(operators, state_names)
-            if operator isa EmbeddedOperator
-                leakage_indices = get_iso_vec_leakage_indices(operator)
-                J += L1Regularizer!(
-                    constraints,
-                    state_name,
-                    traj;
-                    R_value=piccolo_options.R_leakage,
-                    indices=leakage_indices,
-                    eval_hessian=piccolo_options.eval_hessian
-                )
-            else
-                @warn "leakage_suppression is only supported for embedded operators, ignoring."
-            end
+    if piccolo_options.leakage_suppression
+        if isnothing(state_leakage_indices)
+            error("You must provide leakage indices for leakage suppression.")
+        end
+        for (state_name, leakage_indices) ∈ zip(state_names, state_leakage_indices)
+            J += L1Regularizer!(
+                constraints,
+                state_name,
+                traj;
+                R_value=piccolo_options.R_leakage,
+                indices=leakage_indices,
+                eval_hessian=piccolo_options.eval_hessian
+            )
         end
     end
 
@@ -84,29 +80,23 @@ function apply_piccolo_options!(
     constraints::AbstractVector{<:AbstractConstraint},
     piccolo_options::PiccoloOptions,
     traj::NamedTrajectory,
-    operator::Union{Nothing, AbstractPiccoloOperator},
     state_name::Symbol,
-    timestep_name::Symbol
+    timestep_name::Symbol;
+    state_leakage_indices::Union{Nothing, AbstractVector{Int}}=nothing,
 )
     state_names = [
         name for name ∈ traj.names
             if startswith(string(name), string(state_name))
     ]
 
-    if !isnothing(operator)
-        operators = fill(operator, length(state_names))
-    else
-        operators = nothing
-    end
-
     return apply_piccolo_options!(
         J,
         constraints,
         piccolo_options,
         traj,
-        operators,
         state_names,
-        timestep_name
+        timestep_name;
+        state_leakage_indices=isnothing(state_leakage_indices) ? nothing : fill(state_leakage_indices, length(state_names)),
     )
 end
 
