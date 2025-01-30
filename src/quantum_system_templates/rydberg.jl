@@ -10,6 +10,7 @@ function generate_pattern(N::Int, i::Int)
     end
     return join(qubits)
 end
+
 function generate_pattern_with_gap(N::Int, i::Int, gap::Int)
     # Create an array filled with 'I'
     qubits = fill('I', N)
@@ -29,6 +30,7 @@ function lift(x::Char,i::Int, N::Int)
     qubits[i] = x
     return join(qubits)
 end
+
 @doc raw"""
     RydbergChainSystem(;
         N::Int=3, # number of atoms
