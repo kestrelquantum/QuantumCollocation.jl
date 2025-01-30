@@ -8,4 +8,4 @@ QuantumCollocationCore = "2b384925-53cb-4042-a8d2-6faa627467e1"
 Revise = "295af30f-e4ad-537b-8983-00126c2a3abe"
 
 [compat]
-NamedTrajectories = "0.2.4"
+NamedTrajectories = "0.2"
