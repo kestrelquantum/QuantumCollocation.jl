@@ -6,10 +6,9 @@ CurrentModule = QuantumCollocation
 
 *Quickly set up and solve a zoo of quantum optimal control problems.*
 
+## Motivation
 
-## Motivation 
-
-[QuantumCollocation.jl](https://github.com/kestrelquantum/NamedTrajectories.jl) sets up and solves *quantum control problems*. A generic quantum control problem looks like
+[QuantumCollocation.jl](https://github.com/kestrelquantum/NamedTrajectories.jl) sets up and solves *quantum control problems* as nonlinear programs. A generic quantum control problem looks like
 ```math
 \begin{aligned}
     \arg \min_{\mathbf{Z}}\quad & J(\mathbf{Z}) \\
@@ -17,27 +16,21 @@ CurrentModule = QuantumCollocation
     \nonumber & \mathbf{g}(\mathbf{Z}) \le 0  
 \end{aligned}
 ```
-where $\mathbf{Z}$ is a trajectory.
+where $\mathbf{Z}$ is a trajectory containing states and controls.
 
-*Problem Templates* provide a reusable design pattern for setting up and solving common quantum control problems. For example, a `UnitarySmoothPulseProblem` minimizes infidelity,
+*Problem Templates* provide a reusable design pattern for setting up and solving common quantum control problems. For example, a `UnitarySmoothPulseProblem` minimizes infidelity subject to constraints from the Schroedinger equation,
 ```math
     \begin{aligned}
         \arg \min_{\mathbf{Z}}\quad & |1 - \mathcal{F}(U_T, U_\text{goal})|  \\
         \nonumber \text{s.t.}
-        \qquad & U_{t+1} = \exp{- i \Delta t_t H(a_t)} U_t \quad \forall\, t \\
+        \qquad & U_{t+1} = \exp\{- i H(a_t) \Delta t_t \} U_t, \quad \forall\, t \\
     \end{aligned}
 ```
 while a `UnitaryMinimumTimeProblem` minimizes time and constrains fidelity,
 ```math
     \begin{aligned}
         \arg \min_{\mathbf{Z}}\quad & \sum_{t=1}^T \Delta t_t \\
-        \qquad & U_{t+1} = \exp{- i \Delta t_t H(a_t)} U_t \quad \forall\, t \\
+        \qquad & U_{t+1} = \exp\{- i H(a_t) \Delta t_t \} U_t, \quad \forall\, t \\
         \nonumber & \mathcal{F}(U_T, U_\text{goal}) \ge 0.9999
     \end{aligned}
 ```
-
-## TODO
-
-- [ ] From core: Document Saving and Loading
-- [ ] Document rollouts.
-- [ ] Internal links
