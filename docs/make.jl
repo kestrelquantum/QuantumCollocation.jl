@@ -8,13 +8,10 @@ push!(LOAD_PATH, joinpath(@__DIR__, "..", "src"))
 
 pages = [
     "Home" => "index.md",
-    "Contribution Guide" => "contribution_guide.md",
     "Manual" => [
         "Problem Templates" => "generated/man/problem_templates.md",
         "Rollouts" => "generated/man/rollouts.md",
         "Callbacks" => "generated/man/ipopt_callbacks.md",
-    ],
-    "Examples" => [
     ],
     "Library" => "lib.md",
 ]
