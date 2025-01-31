@@ -14,7 +14,7 @@ using LinearAlgebra
 using SparseArrays
 using ExponentialAction
 using JLD2
-using TestItemRunner
+using TestItems
 
 include("unitary_smooth_pulse_problem.jl")
 include("unitary_minimum_time_problem.jl")

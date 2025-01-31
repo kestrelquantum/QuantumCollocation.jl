@@ -5,7 +5,7 @@ export best_unitary_rollout_fidelity_callback
 export trajectory_history_callback
 
 using NamedTrajectories
-using TestItemRunner
+using TestItems
 
 using QuantumCollocationCore
 using PiccoloQuantumObjects

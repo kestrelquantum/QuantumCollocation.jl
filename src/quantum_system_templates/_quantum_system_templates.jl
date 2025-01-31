@@ -2,7 +2,7 @@ module QuantumSystemTemplates
 
 using PiccoloQuantumObjects
 using LinearAlgebra
-using TestItemRunner
+using TestItems
 
 include("transmons.jl")
 include("rydberg.jl")

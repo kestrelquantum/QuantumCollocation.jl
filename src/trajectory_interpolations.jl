@@ -5,7 +5,7 @@ export DataInterpolation
 using NamedTrajectories
 
 using Interpolations: Extrapolation, constant_interpolation, linear_interpolation
-using TestItemRunner
+using TestItems
 
 
 struct DataInterpolation
