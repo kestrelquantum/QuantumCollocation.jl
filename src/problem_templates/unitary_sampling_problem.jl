@@ -150,7 +150,8 @@ function UnitarySamplingProblem(
 
     # Optional Piccolo constraints and objectives
     apply_piccolo_options!(
-        J, constraints, piccolo_options, traj, operators, state_names, timestep_name
+        J, constraints, piccolo_options, traj, state_names, timestep_name;
+        state_leakage_indices=all(op -> op isa EmbeddedOperator, operators) ? get_leakage_indices.(operators) : nothing
     )
 
     return QuantumControlProblem(

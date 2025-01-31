@@ -59,7 +59,7 @@ function QuantumStateSmoothPulseProblem(
     ψ_inits::Vector{<:AbstractVector{<:ComplexF64}},
     ψ_goals::Vector{<:AbstractVector{<:ComplexF64}},
     T::Int,
-    Δt::Float64;
+    Δt::Union{Float64, <:AbstractVector{Float64}};
     ipopt_options::IpoptOptions=IpoptOptions(),
     piccolo_options::PiccoloOptions=PiccoloOptions(),
     state_name::Symbol=:ψ̃,
@@ -82,7 +82,7 @@ function QuantumStateSmoothPulseProblem(
     R_a::Union{Float64, Vector{Float64}}=R,
     R_da::Union{Float64, Vector{Float64}}=R,
     R_dda::Union{Float64, Vector{Float64}}=R,
-    leakage_operator::Union{Nothing, EmbeddedOperator}=nothing,
+    leakage_indices::Union{Nothing, <:AbstractVector{Int}}=nothing,
     constraints::Vector{<:AbstractConstraint}=AbstractConstraint[],
     kwargs...
 )
@@ -191,7 +191,8 @@ function QuantumStateSmoothPulseProblem(
 
     # Optional Piccolo constraints and objectives
     apply_piccolo_options!(
-        J, constraints, piccolo_options, traj, leakage_operator, state_name, timestep_name
+        J, constraints, piccolo_options, traj, state_name, timestep_name;
+        state_leakage_indices=leakage_indices
     )
 
     return QuantumControlProblem(
