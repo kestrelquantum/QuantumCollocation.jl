@@ -8,7 +8,7 @@ CurrentModule = QuantumCollocation
 
 ## Motivation
 
-[QuantumCollocation.jl](https://github.com/kestrelquantum/NamedTrajectories.jl) sets up and solves *quantum control problems* as nonlinear programs. A generic quantum control problem looks like
+[QuantumCollocation.jl](https://github.com/kestrelquantum/NamedTrajectories.jl) sets up and solves *quantum control problems* as nonlinear programs (NLPs). In this context, a generic quantum control problem looks like
 ```math
 \begin{aligned}
     \arg \min_{\mathbf{Z}}\quad & J(\mathbf{Z}) \\
@@ -18,7 +18,12 @@ CurrentModule = QuantumCollocation
 ```
 where $\mathbf{Z}$ is a trajectory containing states and controls.
 
-*Problem Templates* provide a reusable design pattern for setting up and solving common quantum control problems. For example, a `UnitarySmoothPulseProblem` minimizes infidelity subject to constraints from the Schroedinger equation,
+
+## Problem Templates 
+
+*Problem Templates* are reusable design patterns for setting up and solving common quantum control problems. 
+
+For example, a `UnitarySmoothPulseProblem` minimizes infidelity subject to constraints from the Schroedinger equation,
 ```math
     \begin{aligned}
         \arg \min_{\mathbf{Z}}\quad & |1 - \mathcal{F}(U_T, U_\text{goal})|  \\
