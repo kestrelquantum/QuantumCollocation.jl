@@ -4,23 +4,26 @@ using Literate
 
 push!(LOAD_PATH, joinpath(@__DIR__, "..", "src"))
 
-# DocMeta.setdocmeta!(QuantumCollocation, :DocTestSetup, :(using QuantumCollocation); recursive=true)
+@info "Building Documenter site for NamedTrajectories.jl"
+open(joinpath(@__DIR__, "src", "index.md"), write = true) do io
+    for line in eachline(joinpath(@__DIR__, "..", "README.md"))
+        if occursin("<!--", line) && occursin("-->", line)
+            comment_content = match(r"<!--(.*)-->", line).captures[1]
+            write(io, comment_content * "\n")
+        else
+            write(io, line * "\n")
+        end
+    end
+end
 
 pages = [
     "Home" => "index.md",
-    "Quickstart Guide" => "generated/quickstart.md",
-    "Contribution Guide" => "contribution_guide.md",
     "Manual" => [
         "Problem Templates" => "generated/man/problem_templates.md",
-        "Embedded Operators" => "generated/man/embedded_operators.md",
+        "Rollouts" => "generated/man/rollouts.md",
         "Callbacks" => "generated/man/ipopt_callbacks.md",
     ],
-    "Examples" => [
-        "Two Qubit Gates" => "generated/examples/two_qubit_gates.md",
-        "Multilevel Transmon" => "generated/examples/multilevel_transmon.md",
-    ],
     "Library" => "lib.md",
-    "Release Notes" => "release_notes.md",
 ]
 
 format = Documenter.HTML(;

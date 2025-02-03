@@ -6,7 +6,7 @@ export get_suffix_label
 export direct_sum
 
 using SparseArrays
-using TestItemRunner
+using TestItems
 using NamedTrajectories
 using QuantumCollocationCore
 using PiccoloQuantumObjects

@@ -10,7 +10,7 @@ using NamedTrajectories
 using Distributions
 using ExponentialAction
 using LinearAlgebra
-using TestItemRunner
+using TestItems
 
 using ..Isomorphisms
 using ..QuantumSystems

@@ -17,7 +17,7 @@ using PiccoloQuantumObjects
 using ExponentialAction
 using LinearAlgebra
 using ProgressMeter
-using TestItemRunner
+using TestItems
 using ForwardDiff
 
 # ----------------------------------------------------------------------------- #
