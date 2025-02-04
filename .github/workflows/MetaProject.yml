@@ -1,0 +1,7 @@
+      - name: Meta Package Update
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.PAT }}
+          repository: kestrelquantum/Piccolo.jl
+          event-type: meta-update-qc
+          client-payload: '{"ref": "${{ github.ref }}", "sha": "${{ github.sha }}"}'
