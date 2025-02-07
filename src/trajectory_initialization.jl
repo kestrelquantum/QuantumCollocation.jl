@@ -508,6 +508,69 @@ function initialize_trajectory(
     )
 end
 
+"""
+    initialize_trajectory
+
+Trajectory initialization of density matrices.
+"""
+function initialize_trajectory(
+    ρ_init,
+    ρ_goal,
+    T::Int,
+    Δt::Union{Real, AbstractVecOrMat{<:Real}},
+    args...;
+    state_name::Symbol=:Ũ⃗,
+    a_guess::Union{AbstractMatrix{<:Float64}, Nothing}=nothing,
+    system::Union{OpenQuantumSystem, Nothing}=nothing,
+    rollout_integrator::Function=expv,
+    geodesic=true,
+    phase_operators::Union{AbstractVector{<:AbstractMatrix}, Nothing}=nothing,
+    kwargs...
+)
+    # Construct timesteps
+    if Δt isa AbstractMatrix
+        timesteps = vec(Δt)
+    elseif Δt isa Float64
+        timesteps = fill(Δt, T)
+    else
+        timesteps = Δt
+    end
+
+    # Initial state and goal
+    ρ⃗̃_init = operator_to_iso_vec(U_init)
+    ρ⃗̃_goal = operator_to_iso_vec(U_goal)
+
+    if U_goal isa EmbeddedOperator
+        ρ⃗̃_goal = operator_to_iso_vec(U_goal.operator)
+    else
+    end
+    
+    # Construct state data
+    if isnothing(a_guess)
+        ρ⃗̃_traj = initialize_unitary_trajectory(U_init, U_goal, T; geodesic=geodesic)
+    else
+        @assert !isnothing(system) "System must be provided if a_guess is provided."
+        ρ⃗̃_traj = unitary_rollout(ρ⃗̃_init, a_guess, timesteps, system; integrator=rollout_integrator)
+    end
+
+    # Construct phase data
+    phase_data = isnothing(phase_operators) ? nothing : π * randn(length(phase_operators))
+
+    return initialize_trajectory(
+        [ρ⃗̃_traj],
+        [ρ⃗̃_init],
+        [ρ⃗̃_goal],
+        [state_name],
+        T,
+        Δt,
+        args...;
+        phase_data=phase_data,
+        a_guess=a_guess,
+        kwargs...
+    )
+end
+
+
 
 # ============================================================================= #
 

@@ -112,7 +112,10 @@ end
         prob = QuantumStateSmoothPulseProblem(
             sys, ψ_init, ψ_target, T, Δt;
             ipopt_options=IpoptOptions(print_level=1),
-            piccolo_options=PiccoloOptions(verbose=false)
+            piccolo_options=PiccoloOptions(
+                verbose=false,
+                integrator=:pade
+            )
         )
         initial = sum(get_timesteps(prob.trajectory))
         mintime_prob = QuantumStateMinimumTimeProblem(prob)

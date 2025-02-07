@@ -153,6 +153,11 @@ function UnitaryBangBangProblem(
         R=R_bang_bang, eval_hessian=piccolo_options.eval_hessian
     )
 
+    # Optional Piccolo constraints and objectives
+    apply_piccolo_options!(J, constraints, piccolo_options, traj, state_name, timestep_name;
+        state_leakage_indices=operator isa EmbeddedOperator ? get_leakage_indices(operator) : nothing
+    )
+
     # Integrators
     if piccolo_options.integrator == :pade
         unitary_integrator =
@@ -168,11 +173,6 @@ function UnitaryBangBangProblem(
         unitary_integrator,
         DerivativeIntegrator(control_names[1], control_names[2], traj),
     ]
-
-    # Optional Piccolo constraints and objectives
-    apply_piccolo_options!(J, constraints, piccolo_options, traj, state_name, timestep_name;
-        state_leakage_indices=operator isa EmbeddedOperator ? get_leakage_indices(operator) : nothing
-    )
 
     return QuantumControlProblem(
         traj,

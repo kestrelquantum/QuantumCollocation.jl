@@ -133,6 +133,12 @@ function QuantumStateSmoothPulseProblem(
         J += QuantumStateObjective(name, traj, Q)
     end
 
+    # Optional Piccolo constraints and objectives
+    apply_piccolo_options!(
+        J, constraints, piccolo_options, traj, state_name, timestep_name;
+        state_leakage_indices=leakage_indices
+    )
+
     # Integrators
     state_integrators = []
     if length(ψ_inits) == 1
@@ -188,12 +194,6 @@ function QuantumStateSmoothPulseProblem(
         DerivativeIntegrator(control_name, control_names[2], traj),
         DerivativeIntegrator(control_names[2], control_names[3], traj)
     ]
-
-    # Optional Piccolo constraints and objectives
-    apply_piccolo_options!(
-        J, constraints, piccolo_options, traj, state_name, timestep_name;
-        state_leakage_indices=leakage_indices
-    )
 
     return QuantumControlProblem(
         traj,
@@ -259,7 +259,7 @@ end
         piccolo_options=PiccoloOptions(verbose=false)
     )
     initial = rollout_fidelity(prob.trajectory, sys)
-    solve!(prob, max_iter=20)
+    solve!(prob, max_iter=50)
     final = rollout_fidelity(prob.trajectory, sys)
     @test all(final .> initial)
 end

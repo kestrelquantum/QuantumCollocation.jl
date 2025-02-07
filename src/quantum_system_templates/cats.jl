@@ -24,13 +24,16 @@ function CatSystem(;
         :χ_ab => prefactor *  χ_ab,
         :κa => prefactor *  κa,
         :κb => prefactor *  κb,
-        :cat_levels => cat_levels, :buffer_levels => buffer_levels, :prefactor=>prefactor
+        :cat_levels => cat_levels, 
+        :buffer_levels => buffer_levels, 
+        :prefactor => prefactor
     )
+
     # Cat ⊗ Buffer
     a = annihilate(cat_levels) ⊗ Matrix(1.0I, buffer_levels, buffer_levels)
     b = Matrix(1.0I, cat_levels, cat_levels) ⊗ annihilate(buffer_levels)
 
-    H_drift = -χ_aa/2 * a'a'a*a - χ_bb/2 * b'b'b*b - χ_ab * a'a*b'b + g2 * a'a'b  + conj(g2) * a*a*b'
+    H_drift = -χ_aa/2 * a'a'a*a - χ_bb/2 * b'b'b*b - χ_ab * a'a*b'b + g2 * a'a'b + conj(g2) * a*a*b'
 
     # buffer drive, kerr-correction drive
     H_drives = [b + b', a'a]
@@ -41,7 +44,7 @@ function CatSystem(;
     H_drives .*= 2π
     L_dissipators .*= sqrt(2π)
 
-    return QuantumSystem(
+    return OpenQuantumSystem(
         H_drift,
         H_drives,
         L_dissipators;

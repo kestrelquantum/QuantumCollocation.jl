@@ -124,6 +124,12 @@ function UnitarySamplingProblem(
         )
     end
 
+    # Optional Piccolo constraints and objectives
+    apply_piccolo_options!(
+        J, constraints, piccolo_options, traj, state_names, timestep_name;
+        state_leakage_indices=all(op -> op isa EmbeddedOperator, operators) ? get_leakage_indices.(operators) : nothing
+    )
+
     # Integrators
     unitary_integrators = AbstractIntegrator[]
     for (sys, Ũ⃗_name) in zip(systems, state_names)
@@ -147,12 +153,6 @@ function UnitarySamplingProblem(
         DerivativeIntegrator(control_name, control_names[2], traj),
         DerivativeIntegrator(control_names[2], control_names[3], traj),
     ]
-
-    # Optional Piccolo constraints and objectives
-    apply_piccolo_options!(
-        J, constraints, piccolo_options, traj, state_names, timestep_name;
-        state_leakage_indices=all(op -> op isa EmbeddedOperator, operators) ? get_leakage_indices.(operators) : nothing
-    )
 
     return QuantumControlProblem(
         traj,
