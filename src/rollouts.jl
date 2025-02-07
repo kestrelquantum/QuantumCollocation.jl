@@ -8,6 +8,7 @@ export lab_frame_unitary_rollout_trajectory
 
 export rollout_fidelity
 export unitary_rollout_fidelity
+export open_rollout_fidelity
 
 using ..DirectSums
 
@@ -162,46 +163,111 @@ end
 # Open quantum system rollouts
 # ----------------------------------------------------------------------------- #
 
+"""
+    open_rollout(
+        ρ⃗₁::AbstractVector{<:Complex},
+        controls::AbstractMatrix,
+        Δt::AbstractVector,
+        system::AbstractQuantumSystem;
+        kwargs...
+    )
+
+Rollout a quantum state `ρ⃗₁` under the control `controls` for a time `Δt`
+
+# Arguments
+- `ρ⃗₁::AbstractVector{<:Complex}`: Initial state vector
+- `controls::AbstractMatrix`: Control matrix
+- `Δt::AbstractVector`: Time steps
+- `system::AbstractQuantumSystem`: Quantum system
+
+# Keyword Arguments
+- `show_progress::Bool=false`: Show progress bar
+- `integrator::Function=expv`: Integrator function
+- `exp_vector_product::Bool`: Infer whether the integrator is an exponential-vector product
+
+"""
 function open_rollout(
-    ρ⃗₁::AbstractVector{<:Complex},
+    ρ⃗̃_init::AbstractVector{<:Real},
     controls::AbstractMatrix,
     Δt::AbstractVector,
     system::AbstractQuantumSystem;
     show_progress=false,
     integrator=expv,
     exp_vector_product=infer_is_evp(integrator),
-    H=a -> Integrators.G_bilinear(a, system.H_drift, system.H_drives),
 )
     T = size(controls, 2)
 
     # Enable ForwardDiff
-    R = Base.promote_eltype(ρ⃗₁, controls, Δt)
-    ρ⃗̃ = zeros(R, 2length(ρ⃗₁), T)
+    R = Base.promote_eltype(ρ⃗̃_init, controls, Δt)
+    ρ⃗̃ = zeros(R, length(ρ⃗̃_init), T)
 
-    ρ⃗̃[:, 1] .= ket_to_iso(ρ⃗₁)
-
-    if isnothing(system.dissipation_operators)
-        @error "No dissipation operators found in system"
-        L = iso(zeros(Float64, size(system.H_drift)))
-    else
-        L_dissipators = system.dissipation_operators
-        L = Integrators.L_function(L_dissipators)
-    end
+    ρ⃗̃[:, 1] = ρ⃗̃_init
 
     p = Progress(T-1; enabled=show_progress)
     for t = 2:T
         aₜ₋₁ = controls[:, t - 1]
-        adGₜ = Isomorphisms.G(ad_vec(H(aₜ₋₁)))
+        𝒢ₜ = system.𝒢(aₜ₋₁)
         if exp_vector_product
-            ρ⃗̃[:, t] = integrator(Δt[t - 1], adGₜ + iso(L), ρ⃗̃[:, t - 1])
+            ρ⃗̃[:, t] = integrator(Δt[t - 1], 𝒢ₜ, ρ⃗̃[:, t - 1])
         else
-            ρ⃗̃[:, t] = integrator(Δt[t - 1], adGₜ + iso(L)) * ρ⃗̃[:, t - 1]
+            ρ⃗̃[:, t] = integrator(Δt[t - 1], 𝒢ₜ) * ρ⃗̃[:, t - 1]
         end
         next!(p)
     end
 
     return ρ⃗̃
 end
+
+"""
+    open_rollout(
+        ρ₁::AbstractMatrix{<:Complex},
+        controls::AbstractMatrix,
+        Δt::AbstractVector,
+        system::AbstractQuantumSystem;
+        kwargs...
+    )
+
+Rollout a density matrix `ρ₁` under the control `controls` and timesteps `Δt`
+
+"""
+function open_rollout(
+    ρ_init::AbstractMatrix{<:Complex},
+    controls::AbstractMatrix,
+    Δt::AbstractVector,
+    system::AbstractQuantumSystem;
+    kwargs...
+)
+    return open_rollout(density_to_iso_vec(ρ_init), controls, Δt, system; kwargs...)
+end
+
+function open_rollout_fidelity(
+    ρ_init::AbstractMatrix{<:Complex},
+    ρ_goal::AbstractMatrix{<:Complex},
+    controls::AbstractMatrix,
+    Δt::AbstractVector,
+    system::AbstractQuantumSystem;
+    kwargs...
+)
+
+    ρ⃗̃_traj = open_rollout(ρ_init, controls, Δt, system; kwargs...)
+    ρ_final = iso_vec_to_density(ρ⃗̃_traj[:, end])
+    return real(tr(ρ_goal * ρ_final))
+end
+
+function open_rollout_fidelity(
+    traj::NamedTrajectory,
+    system::OpenQuantumSystem;
+    state_name::Symbol=:ρ⃗̃,
+    control_name::Symbol=:a,
+    kwargs...
+)
+    ρ_goal = iso_vec_to_density(traj.goal[state_name])
+    ρ_init = iso_vec_to_density(traj.initial[state_name])
+    controls = traj[control_name]
+    Δt = get_timesteps(traj)
+    return open_rollout_fidelity(ρ_init, ρ_goal, controls, Δt, system; kwargs...)
+end
+
 
 # ----------------------------------------------------------------------------- #
 # Unitary rollouts

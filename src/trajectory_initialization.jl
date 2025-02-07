@@ -380,7 +380,7 @@ function initialize_trajectory(
         global_data=global_data
     )
 end
-    
+
 """
     initialize_trajectory
 
@@ -417,7 +417,7 @@ function initialize_trajectory(
     else
         Ũ⃗_goal = operator_to_iso_vec(U_goal)
     end
-    
+
     # Construct state data
     if isnothing(a_guess)
         Ũ⃗_traj = initialize_unitary_trajectory(U_init, U_goal, T; geodesic=geodesic)
@@ -445,7 +445,7 @@ end
 
 """
     initialize_trajectory
-    
+
 Trajectory initialization of quantum states.
 """
 function initialize_trajectory(
@@ -519,12 +519,10 @@ function initialize_trajectory(
     T::Int,
     Δt::Union{Real, AbstractVecOrMat{<:Real}},
     args...;
-    state_name::Symbol=:Ũ⃗,
+    state_name::Symbol=:ρ⃗̃,
     a_guess::Union{AbstractMatrix{<:Float64}, Nothing}=nothing,
     system::Union{OpenQuantumSystem, Nothing}=nothing,
     rollout_integrator::Function=expv,
-    geodesic=true,
-    phase_operators::Union{AbstractVector{<:AbstractMatrix}, Nothing}=nothing,
     kwargs...
 )
     # Construct timesteps
@@ -537,24 +535,23 @@ function initialize_trajectory(
     end
 
     # Initial state and goal
-    ρ⃗̃_init = operator_to_iso_vec(U_init)
-    ρ⃗̃_goal = operator_to_iso_vec(U_goal)
+    ρ⃗̃_init = density_to_iso_vec(ρ_init)
+    ρ⃗̃_goal = density_to_iso_vec(ρ_goal)
 
-    if U_goal isa EmbeddedOperator
-        ρ⃗̃_goal = operator_to_iso_vec(U_goal.operator)
-    else
-    end
-    
     # Construct state data
     if isnothing(a_guess)
-        ρ⃗̃_traj = initialize_unitary_trajectory(U_init, U_goal, T; geodesic=geodesic)
+        ρ⃗̃_traj = linear_interpolation(ρ_init, ρ_goal, T)
     else
         @assert !isnothing(system) "System must be provided if a_guess is provided."
-        ρ⃗̃_traj = unitary_rollout(ρ⃗̃_init, a_guess, timesteps, system; integrator=rollout_integrator)
-    end
 
-    # Construct phase data
-    phase_data = isnothing(phase_operators) ? nothing : π * randn(length(phase_operators))
+        ρ⃗̃_traj = open_rollout(
+            ρ_init,
+            a_guess,
+            timesteps,
+            system;
+            integrator=rollout_integrator
+        )
+    end
 
     return initialize_trajectory(
         [ρ⃗̃_traj],
@@ -564,7 +561,6 @@ function initialize_trajectory(
         T,
         Δt,
         args...;
-        phase_data=phase_data,
         a_guess=a_guess,
         kwargs...
     )
