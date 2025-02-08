@@ -5,7 +5,6 @@ version = "0.5.2"
 
 [deps]
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
-Einsum = "b7d42ee7-0b51-5a75-98ca-779d3107e4c0"
 ExponentialAction = "e24c0720-ea99-47e8-929e-571b494574d3"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 Interpolations = "a98d9a8b-a2ab-59e6-89dd-64a1c18fca59"
@@ -26,7 +25,6 @@ TrajectoryIndexingUtils = "6dad8b7f-dd9a-4c28-9b70-85b9a079bfc8"
 
 [compat]
 Distributions = "0.25"
-Einsum = "0.4"
 ExponentialAction = "0.2"
 ForwardDiff = "0.10"
 Interpolations = "0.15"
