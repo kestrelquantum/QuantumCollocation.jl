@@ -245,7 +245,7 @@ end
         piccolo_options=PiccoloOptions(verbose=false)
     )
     initial = rollout_fidelity(prob.trajectory, sys)
-    solve!(prob, max_iter=20)
+    solve!(prob, max_iter=50)
     final = rollout_fidelity(prob.trajectory, sys)
     @test final > initial
 
