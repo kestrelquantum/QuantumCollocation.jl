@@ -89,6 +89,12 @@ function QuantumStateSamplingProblem(
         end
     end
 
+    # Optional Piccolo constraints and objectives
+    apply_piccolo_options!(
+        J, constraints, piccolo_options, traj, state_name, timestep_name;
+        state_leakage_indices=leakage_indices
+    )
+
     # Integrators
     state_integrators = []
     for (system, names) ∈ zip(systems, state_names)
@@ -114,12 +120,6 @@ function QuantumStateSamplingProblem(
         DerivativeIntegrator(control_name, control_names[2], traj),
         DerivativeIntegrator(control_names[2], control_names[3], traj),
     ]
-
-    # Optional Piccolo constraints and objectives
-    apply_piccolo_options!(
-        J, constraints, piccolo_options, traj, state_name, timestep_name;
-        state_leakage_indices=leakage_indices
-    )
 
     return QuantumControlProblem(
         traj,

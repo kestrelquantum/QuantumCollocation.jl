@@ -184,6 +184,8 @@ end
 # *************************************************************************** #
 
 @testitem "Construct direct sum problem" begin
+    using QuantumCollocationCore
+    using PiccoloQuantumObjects
     sys = QuantumSystem(0.01 * GATES[:Z], [GATES[:X], GATES[:Y]])
     U_goal1 = GATES[:X]
     U_ε = haar_identity(2, 0.33)

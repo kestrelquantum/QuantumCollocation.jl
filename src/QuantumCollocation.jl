@@ -5,12 +5,6 @@ using Reexport
 @reexport using QuantumCollocationCore
 @reexport using PiccoloQuantumObjects
 
-include("direct_sums.jl")
-@reexport using .DirectSums
-
-include("rollouts.jl")
-@reexport using .Rollouts
-
 include("trajectory_initialization.jl")
 @reexport using .TrajectoryInitialization
 
@@ -22,8 +16,5 @@ include("problem_templates/_problem_templates.jl")
 
 include("quantum_system_templates/_quantum_system_templates.jl")
 @reexport using .QuantumSystemTemplates
-
-include("callbacks.jl")
-@reexport using .Callbacks
 
 end

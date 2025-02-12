@@ -152,6 +152,12 @@ function UnitarySmoothPulseProblem(
     J += QuadraticRegularizer(control_names[2], traj, R_da; timestep_name=timestep_name)
     J += QuadraticRegularizer(control_names[3], traj, R_dda; timestep_name=timestep_name)
 
+    # Optional Piccolo constraints and objectives
+    apply_piccolo_options!(
+        J, constraints, piccolo_options, traj, state_name, timestep_name;
+        state_leakage_indices=operator isa EmbeddedOperator ? get_leakage_indices(operator) : nothing
+    )
+
     # Integrators
 
     if piccolo_options.integrator == :pade
@@ -171,12 +177,6 @@ function UnitarySmoothPulseProblem(
         DerivativeIntegrator(control_name, control_names[2], traj),
         DerivativeIntegrator(control_names[2], control_names[3], traj),
     ]
-
-    # Optional Piccolo constraints and objectives
-    apply_piccolo_options!(
-        J, constraints, piccolo_options, traj, state_name, timestep_name;
-        state_leakage_indices=operator isa EmbeddedOperator ? get_leakage_indices(operator) : nothing
-    )
 
     return QuantumControlProblem(
         traj,
@@ -230,7 +230,7 @@ end
     prob = UnitarySmoothPulseProblem(
         sys, U_goal, T, Δt,
         ipopt_options=IpoptOptions(print_level=1),
-        piccolo_options=PiccoloOptions(verbose=false, integrator=:exponential, jacobian_structure=false)
+        piccolo_options=PiccoloOptions(verbose=false, integrator=:exponential)
     )
 
     initial = unitary_rollout_fidelity(prob.trajectory, sys)
