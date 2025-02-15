@@ -6,17 +6,12 @@ export unitary_linear_interpolation
 export initialize_trajectory
 
 using NamedTrajectories
+using PiccoloQuantumObjects
 
 using Distributions
 using ExponentialAction
 using LinearAlgebra
 using TestItems
-
-using ..Isomorphisms
-using ..QuantumSystems
-using ..Rollouts
-using ..EmbeddedOperators
-using ..DirectSums
 
 
 # ----------------------------------------------------------------------------- #

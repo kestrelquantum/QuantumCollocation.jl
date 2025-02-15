@@ -43,11 +43,11 @@ between each neighbor of the provided `probs`.
 
 """
 function UnitaryDirectSumProblem(
-    probs::AbstractVector{<:QuantumControlProblem},
+    probs::AbstractVector{QuantumControlProblem},
     final_fidelity::Real;
-    prob_labels::AbstractVector{<:String}=[string(i) for i ∈ 1:length(probs)],
+    prob_labels::AbstractVector{String}=[string(i) for i ∈ 1:length(probs)],
     graph::Union{Nothing, AbstractVector{<:Tuple{String, String}}, AbstractVector{<:Tuple{Symbol, Symbol}}}=nothing,
-    boundary_values::Union{AbstractDict{<:String, <:AbstractArray}, AbstractDict{<:Symbol, <:AbstractArray}}=Dict{String, Array}(),
+    boundary_values::Union{AbstractDict{String, <:AbstractArray}, AbstractDict{Symbol, <:AbstractArray}}=Dict{String, Array}(),
     control_name::Symbol=:a,
     Q::Union{Float64, Vector{Float64}}=100.0,
     Q_symb::Symbol=:dda,
@@ -59,7 +59,7 @@ function UnitaryDirectSumProblem(
     drive_derivative_σ::Float64=0.01,
     drive_reset_ratio::Float64=0.50,
     fidelity_cost::Bool=false,
-    subspace::Union{AbstractVector{<:Integer}, Nothing}=nothing,
+    subspace::Union{AbstractVector{Int}, Nothing}=nothing,
     ipopt_options::IpoptOptions=deepcopy(probs[1].ipopt_options),
     piccolo_options::PiccoloOptions=deepcopy(probs[1].piccolo_options),
     kwargs...
@@ -185,7 +185,7 @@ end
 
 @testitem "Construct direct sum problem" begin
     using QuantumCollocationCore
-    using PiccoloQuantumObjects
+    using NamedTrajectories
     sys = QuantumSystem(0.01 * GATES[:Z], [GATES[:X], GATES[:Y]])
     U_goal1 = GATES[:X]
     U_ε = haar_identity(2, 0.33)

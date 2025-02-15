@@ -1,15 +1,13 @@
 module ProblemTemplates
 
-using ..DirectSums
-using ..Rollouts
 using ..TrajectoryInitialization
-using ..Losses
 
-using Distributions
 using TrajectoryIndexingUtils
 using NamedTrajectories
 using QuantumCollocationCore
 using PiccoloQuantumObjects
+
+using Distributions
 using LinearAlgebra
 using SparseArrays
 using ExponentialAction
